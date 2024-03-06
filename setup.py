@@ -10,7 +10,7 @@ from setuptools import setup
 setup(name='pyflow_acdc',
       version='0.1',
       description='A python-based tool for the design and analysis of hybrid AC/DC grids',
-      url='http://github.com/storborg/funniest',
+      url='https://github.com/BernardoCV/pyflow_acdc',
       author='Bernardo Castro Valerio',
       author_email='bernardo.castro@upc.edu',
       license='BSD',
