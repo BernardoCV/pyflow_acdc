@@ -43,7 +43,7 @@ dependencies = ['numpy',
                 'networkx',
                 'matplotlib',
                 'scipy',
-                'prettytable'],
+                'prettytable']
 
 [project.optional-dependencies]
 "OPF":["pymo", "ipopt"]
