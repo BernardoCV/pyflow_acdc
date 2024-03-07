@@ -33,7 +33,6 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: Implementation :: CPython',
-    'Topic :: Hybrid grids',
     'Topic :: Scientific/Engineering',
 ]
 
@@ -47,7 +46,8 @@ dependencies = ['numpy',
                 'prettytable']
 
 [project.optional-dependencies]
-OPF:["pyomo", "ipopt"]
+OPF = ["pyomo",
+         "ipopt"]
 
 
 [project.urls]
