@@ -100,7 +100,7 @@ jobs:
 
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/pyflow_acdc
+      url: https://test.pypi.org/project/pyflow_acdc
 
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
