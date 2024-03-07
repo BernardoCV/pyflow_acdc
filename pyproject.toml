@@ -7,7 +7,7 @@ dynamic = ["version"]
 name = "pyflow_acdc"
 version = "0.0.1"
 license = {file = "LICENSE.txt"}
-requires-python = ">= 3.8
+requires-python = ">= 3.8"
 
 authors = [
    {name = "Bernardo Castro Valerio", email = "bernardo.castro@upc.edu"}]
