@@ -47,7 +47,7 @@ dependencies = ['numpy',
                 'prettytable']
 
 [project.optional-dependencies]
-"OPF":["pymo", "ipopt"]
+OPF:["pyomo", "ipopt"]
 
 
 [project.urls]
