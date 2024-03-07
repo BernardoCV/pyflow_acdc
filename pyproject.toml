@@ -38,12 +38,12 @@ classifiers = [
 
 
 
-dependencies = ['numpy',
-                'pandas',
-                'networkx',
-                'matplotlib',
-                'scipy',
-                'prettytable']
+dependencies = ["numpy",
+                "pandas",
+                "networkx",
+                "matplotlib",
+                "scipy",
+                "prettytable"]
 
 [project.optional-dependencies]
 OPF = ["pyomo",
