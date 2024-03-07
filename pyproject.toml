@@ -10,8 +10,9 @@ license = {file = "LICENSE.txt"}
 requires-python = ">= 3.8
 
 authors = [
-  {name = "Bernardo Castro Valerio", email = "bernardo.castro@upc.edu"},
-]
+   {name = "Bernardo Castro Valerio", email = "bernardo.castro@upc.edu"}]
+ 
+
 maintainers = [
   {name ="Bernardo Castro Valerio", email = "bernardo.castro@upc.edu"}
 ]
