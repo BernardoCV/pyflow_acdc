@@ -52,7 +52,7 @@ OPF = ["pyomo",
 
 
 [project.urls]
-Repository = "https://github.com/BernardoCV/pyflow_acdc"
+Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/pyflow_acdc.tar.gz"
 
 
 
