@@ -9,11 +9,11 @@ import numpy as np
 import pandas as pd
 
 
-from . import PyFlow_ACDC_PF 
+from .PyFlow_ACDC_PF import* 
 
 try:
     import pyomo
-    from . import PyFlow_ACDC_OPF 
+    from .PyFlow_ACDC_OPF import*
     pyomo_imp= True
     
 except ImportError:    
