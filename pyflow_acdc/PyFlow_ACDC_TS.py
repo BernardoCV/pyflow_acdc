@@ -8,11 +8,12 @@ Created on Wed Feb 21 15:38:12 2024
 import numpy as np
 import pandas as pd
 
-from PyFlow_ACDC_PF import*
+
+from . import PyFlow_ACDC_PF 
 
 try:
     import pyomo
-    from PyFlow_ACDC_OPF import*
+    from . import PyFlow_ACDC_OPF 
     pyomo_imp= True
     
 except ImportError:    
