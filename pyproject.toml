@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.0.2.3"
+version = "0.0.3"
 license = {file = "LICENSE.txt"}
 requires-python = ">= 3.8"
 
@@ -52,7 +52,7 @@ OPF = ["pyomo",
 
 
 [project.urls]
-Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.0.2.3.tar.gz"
+Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.0.3.tar.gz"
 
 
 
