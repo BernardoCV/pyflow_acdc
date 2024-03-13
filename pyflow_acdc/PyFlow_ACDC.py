@@ -130,7 +130,7 @@ def reset_all_class():
     
 def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, DCDC_conv=None, data_in_pu=True):
     
-    # reset_all_class()
+    reset_all_class()
     
     if data_in_pu == True:
         [G, res] = Create_grid_from_data_pu(
