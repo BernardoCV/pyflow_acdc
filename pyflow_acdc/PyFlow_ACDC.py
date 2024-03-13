@@ -3,6 +3,7 @@ Created on Fri Dec 15 15:24:42 2023
 
 @author: BernardoCastro
 """
+
 import numpy as np
 import sys
 import csv
@@ -118,8 +119,19 @@ def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
 
     return [Rpu, Xpu, Gpu, Bpu, MVA_rating]
 
-
+def reset_all_class():
+    Node_AC.reset_class()
+    Node_DC.reset_class()
+    Line_AC.reset_class()
+    Line_DC.reset_class()
+    AC_DC_converter.reset_class()
+    DC_DC_converter.reset_class()
+    TS_AC.reset_class()
+    
 def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, DCDC_conv=None, data_in_pu=True):
+    
+    # reset_all_class()
+    
     if data_in_pu == True:
         [G, res] = Create_grid_from_data_pu(
             S_base, AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_data, DCDC_conv)
@@ -1120,7 +1132,12 @@ class Grid:
 class Node_AC:
     nodeNumber = 0
     names = set()
-
+    
+    @classmethod
+    def reset_class(cls):
+        cls.nodeNumber = 0
+        cls.names = set()
+        
     @property
     def name(self):
         return self._name
@@ -1174,7 +1191,12 @@ class Node_AC:
 class Node_DC:
     nodeNumber = 0
     names = set()
-
+    
+    @classmethod
+    def reset_class(cls):
+        cls.nodeNumber = 0
+        cls.names = set()
+    
     @property
     def name(self):
         return self._name
@@ -1214,6 +1236,11 @@ class Line_AC:
     lineNumber = 0
     names = set()
 
+    @classmethod
+    def reset_class(cls):
+        cls.lineNumber = 0
+        cls.names = set()
+        
     @property
     def name(self):
         return self._name
@@ -1248,6 +1275,11 @@ class Line_AC:
 class Line_DC:
     lineNumber = 0
     names = set()
+
+    @classmethod
+    def reset_class(cls):
+        cls.lineNumber = 0
+        cls.names = set()    
 
     @property
     def name(self):
@@ -1291,7 +1323,12 @@ class Line_DC:
 class AC_DC_converter:
     ConvNumber = 0
     names = set()
-
+    
+    @classmethod
+    def reset_class(cls):
+        cls.ConvNumber = 0
+        cls.names = set()
+    
     @property
     def name(self):
         return self._name
@@ -1434,6 +1471,12 @@ class DC_DC_converter:
     ConvNumber = 0
     names = set()
 
+    @classmethod
+    def reset_class(cls):
+        cls.ConvNumber = 0
+        cls.names = set()
+
+    
     @property
     def name(self):
         return self._name
@@ -1467,7 +1510,12 @@ class DC_DC_converter:
 class TS_AC:
     TS_AC_num = 0
     names = set()
-
+    
+    @classmethod
+    def reset_class(cls):
+        cls.TS_AC_num = 0
+        cls.names = set()
+    
     @property
     def name(self):
         return self._name
