@@ -11,3 +11,5 @@ agreement No 101073554.
 Important
 
 This project is experimental and under active development. Issue reports and contributions are very welcome.
+
+To run examples, download the folder to you repository including the csv folders.
