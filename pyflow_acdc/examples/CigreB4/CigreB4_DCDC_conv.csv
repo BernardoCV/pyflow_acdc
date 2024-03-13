@@ -1,3 +1,0 @@
-Conv_id,type,fromNode,toNode,P_MW,R_Ohm,kV_nodefromBase
-CdB1,P,BbB1s,BbB1,600,3.84,400
-CdE1,P,BbE1,BmE1,300,1.92,200
