@@ -10,7 +10,7 @@ from plotly import data
 from plotly.subplots import make_subplots
 
 
-from PyFlow_ACDC_TS import export_TS
+from .PyFlow_ACDC_TS import export_TS
 
 
 def plot_Graph(Grid,image_path=None,dec=3,InPu=True,grid_names=None):
