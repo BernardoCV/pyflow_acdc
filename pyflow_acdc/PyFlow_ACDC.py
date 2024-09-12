@@ -10,13 +10,13 @@ import csv
 import networkx as nx
 import pandas as pd
 from scipy import stats as st
-from PyFlow_ACDC_Results import*
-from PyFlow_ACDC_TS import *
-from PyFlow_ACDC_MarketCoeff import*
+from .PyFlow_ACDC_Results import*
+from .PyFlow_ACDC_TS import *
+from .PyFlow_ACDC_MarketCoeff import*
 
 try:
     import plotly
-    from PyFlow_ACDC_GraphsPlot import*
+    from .PyFlow_ACDC_GraphsPlot import*
     pyomo_imp= True
     
 except ImportError:    
