@@ -44,7 +44,8 @@ dependencies = ["numpy",
                 "networkx",
                 "matplotlib",
                 "scipy",
-                "prettytable"]
+                "prettytable",
+                "plotly"]
 
 [project.optional-dependencies]
 OPF = ["pyomo",
