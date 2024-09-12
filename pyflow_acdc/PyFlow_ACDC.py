@@ -312,23 +312,26 @@ def Create_grid_from_data_calc(S_base, AC_node_data, AC_line_data, DC_node_data,
         "Convertor data sorting"
         Converters = {}
         for index, row in Converter_data.iterrows():
-            var_name = index
-            AC_type = Converter_data.at[index, 'AC_type']
-            DC_type = Converter_data.at[index, 'DC_type']
-            AC_node = Converter_data.at[index, 'AC_node']
-            DC_node = Converter_data.at[index, 'DC_node']
-            P_AC = Converter_data.at[index, 'P_MW_AC']
-            Q_AC = Converter_data.at[index, 'Q_AC']
-            P_DC = Converter_data.at[index, 'P_MW_DC']
-            Transformer_R = Converter_data.at[index, 'T_R_Ohm']
-            Transformer_X = Converter_data.at[index, 'T_X_mH']
-            Phase_Reactor_R = Converter_data.at[index, 'PR_R_Ohm']
-            Phase_Reactor_X = Converter_data.at[index, 'PR_X_mH']
-            Filter = Converter_data.at[index, 'Filter_uF']
-            Droop = Converter_data.at[index, 'Droop']
-            kV_base = Converter_data.at[index, 'AC_kV_base']
-            MVA_rating = Converter_data.at[index, 'MVA_rating']
-            n= Converter_data.at[index, 'Nconverter']
+            var_name         = index
+            AC_type          = Converter_data.at[index, 'AC_type']       if 'AC_type'        in Converter_data.columns else 'PV'
+            DC_type          = Converter_data.at[index, 'DC_type']       if 'DC_type'        in Converter_data.columns else 'Droop'
+            AC_node          = Converter_data.at[index, 'AC_node']      
+            DC_node          = Converter_data.at[index, 'DC_node']       
+            P_AC             = Converter_data.at[index, 'P_MW_AC']       if 'P_MW_AC'        in Converter_data.columns else 0
+            Q_AC             = Converter_data.at[index, 'Q_AC']          if 'Q_AC'           in Converter_data.columns else 0
+            P_DC             = Converter_data.at[index, 'P_MW_DC']       if 'P_MW_DC'        in Converter_data.columns else 0
+            Transformer_R    = Converter_data.at[index, 'T_R_Ohm']       if 'T_R_Ohm'        in Converter_data.columns else 0
+            Transformer_X    = Converter_data.at[index, 'T_X_mH']        if 'T_X_mH'         in Converter_data.columns else 0
+            Phase_Reactor_R  = Converter_data.at[index, 'PR_R_Ohm']      
+            Phase_Reactor_X  = Converter_data.at[index, 'PR_X_mH']       
+            Filter           = Converter_data.at[index, 'Filter_uF']     if 'Filter_uF'      in Converter_data.columns else 0
+            Droop            = Converter_data.at[index, 'Droop']         if 'Droop'          in Converter_data.columns else 0
+            kV_base          = Converter_data.at[index, 'AC_kV_base']    
+            MVA_rating       = Converter_data.at[index, 'MVA_rating']    if 'MVA_rating'     in Converter_data.columns else S_base*1.05
+            Ucmin           = Converter_data.at[index, 'Ucmin']          if 'Ucmin'          in Converter_data.columns else 0.85
+            Ucmax           = Converter_data.at[index, 'Ucmax']          if 'Ucmax'          in Converter_data.columns else 1.2
+            n               = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
+            pol             = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
 
             [T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu] = Converter_parameters(S_base, kV_base, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter)
 
@@ -339,7 +342,7 @@ def Create_grid_from_data_calc(S_base, AC_node_data, AC_line_data, DC_node_data,
             
            
             Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC,
-                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=1,polarity=n, name=str(var_name))
+                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=1,polarity=n,Ucmin=Ucmin,Ucmax=Ucmax ,name=str(var_name))
         Convertor_list = list(Converters.values())
 
     if DCDC_conv is None:
@@ -509,28 +512,28 @@ def Create_grid_from_data_pu(S_base, AC_node_data, AC_line_data, DC_node_data, D
         "Convertor data sorting"
         Converters = {}
         for index, row in Converter_data.iterrows():
-            var_name = index
-            AC_type = Converter_data.at[index, 'AC_type']
-            DC_type = Converter_data.at[index, 'DC_type']
-            AC_node = Converter_data.at[index, 'AC_node']
-            DC_node = Converter_data.at[index, 'DC_node']
-            P_AC = Converter_data.at[index, 'P_AC']
-            Q_AC = Converter_data.at[index, 'Q_AC']
-            P_DC = Converter_data.at[index, 'P_DC']
-            Transformer_R = Converter_data.at[index, 'T_R']
-            Transformer_X = Converter_data.at[index, 'T_X']
-            Phase_Reactor_R = Converter_data.at[index, 'PR_R']
-            Phase_Reactor_X = Converter_data.at[index, 'PR_X']
-            Filter = Converter_data.at[index, 'Filter']
-            Droop = Converter_data.at[index, 'Droop']
-            V_base = Converter_data.at[index, 'AC_kV_base']
-            MVA_max = Converter_data.at[index, 'MVA_rating']
-            Ucmin = Converter_data.at[index, 'Ucmin']
-            Ucmax = Converter_data.at[index, 'Ucmax']
-            n= Converter_data.at[index, 'Nconverter']
+            var_name        = index
+            AC_type         = Converter_data.at[index, 'AC_type']        if 'AC_type'        in Converter_data.columns else 'PV'
+            DC_type         = Converter_data.at[index, 'DC_type']        if 'DC_type'        in Converter_data.columns else 'Droop'
+            AC_node         = Converter_data.at[index, 'AC_node']               
+            DC_node         = Converter_data.at[index, 'DC_node']              
+            P_AC            = Converter_data.at[index, 'P_AC']           if 'P_AC'           in Converter_data.columns else 0
+            Q_AC            = Converter_data.at[index, 'Q_AC']           if 'Q_AC'           in Converter_data.columns else 0
+            P_DC            = Converter_data.at[index, 'P_DC']           if 'P_DC'           in Converter_data.columns else 0
+            Transformer_R   = Converter_data.at[index, 'T_R']            if 'T_R'            in Converter_data.columns else 0
+            Transformer_X   = Converter_data.at[index, 'T_X']            if 'T_X'            in Converter_data.columns else 0
+            Phase_Reactor_R = Converter_data.at[index, 'PR_R']           
+            Phase_Reactor_X = Converter_data.at[index, 'PR_X']          
+            Filter          = Converter_data.at[index, 'Filter']         if 'Filter'         in Converter_data.columns else 0
+            Droop           = Converter_data.at[index, 'Droop']          if 'Droop'          in Converter_data.columns else 0
+            V_base          = Converter_data.at[index, 'AC_kV_base']     if 'AC_kV_base'     in Converter_data.columns else 0
+            MVA_max         = Converter_data.at[index, 'MVA_rating']     if 'MVA_rating'     in Converter_data.columns else 1.5
+            Ucmin           = Converter_data.at[index, 'Ucmin']          if 'Ucmin'          in Converter_data.columns else 0.85
+            Ucmax           = Converter_data.at[index, 'Ucmax']          if 'Ucmax'          in Converter_data.columns else 1.2
+            n               = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
+            pol             = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
 
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R,
-                                                   Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, V_base, MVA_max=MVA_max,nConvP=1,polarity=n, name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, V_base, MVA_max=MVA_max,nConvP=n,polarity=pol, name=str(var_name))
         Convertor_list = list(Converters.values())
 
     if DCDC_conv is None:
@@ -1653,8 +1656,8 @@ class AC_DC_converter:
         AC_DC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
         
-        self.NumConvP=  polarity
-        self.cn_pol=    nConvP
+        self.NumConvP= nConvP
+        self.cn_pol=   polarity 
         
         self.Droop_rate = Droop
         
