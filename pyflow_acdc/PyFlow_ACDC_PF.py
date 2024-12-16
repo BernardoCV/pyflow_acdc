@@ -684,8 +684,8 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
 
     Pc_known = -np.copy(conv.P_DC)
     Qs_known = conv.Q_AC
-    Us = conv.U_s.item()
-    th_s = conv.th_s.item()
+    Us = conv.U_s
+    th_s = conv.th_s
 
     tol2 = 1
 
@@ -796,8 +796,8 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     
     Pc_known = -np.copy(conv.P_DC)
     Qs_known = np.copy(conv.Q_AC)
-    Us = conv.U_s.item()
-    th_s = conv.th_s.item()
+    Us = conv.U_s
+    th_s = conv.th_s
 
     tol2 = 1
 
