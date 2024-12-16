@@ -28,7 +28,10 @@ Sequential algorithm
 
 """
 
-pyf.ACDC_sequential(grid)
+pyf.ACDC_sequential(grid,QLimit=False)
+
+
+
 
 end_time = time.time()
 elapsed_time = end_time - start_time
