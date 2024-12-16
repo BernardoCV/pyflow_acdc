@@ -1,4 +1,4 @@
-Node_id,type,Voltage_0,Power_Gained,Power_load
-1,P,1,0,0
-2,Slack,1,0,0
-3,P,1,0,0
+Node_id,type,Voltage_0,Power_Gained,Power_load,kV_base
+1,P,1,0,0,345
+2,Slack,1,0,0,345
+3,P,1,0,0,345
