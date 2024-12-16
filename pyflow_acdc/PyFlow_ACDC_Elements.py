@@ -10,8 +10,8 @@ import numpy as np
 import sys
 
 import pandas as pd
-from PyFlow_ACDC_Class import*
-from PyFlow_ACDC_Results import*
+from .PyFlow_ACDC_Class import*
+from .PyFlow_ACDC_Results import*
 
 
 import os
