@@ -363,7 +363,7 @@ def generate_loading_code(grid,file_name):
     
     main_code = f"""
 
-import PyFlow_ACDC as pyf
+import pyflow_acdc as pyf
 import pandas as pd
 
 
