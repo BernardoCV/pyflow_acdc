@@ -81,29 +81,7 @@ def Stagg5MATACDC():
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in_pu=True)
     
-    # Assign Price Zones to Nodes
-    for index, row in nodes_AC.iterrows():
-        node_name = nodes_AC.at[index, 'Node_id']
-        price_zone = nodes_AC.at[index, 'PZ']
-        ACDC = 'AC'
-        if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
     
-    for index, row in nodes_DC.iterrows():
-        node_name = nodes_DC.at[index, 'Node_id']
-        price_zone = nodes_DC.at[index, 'PZ']
-        ACDC = 'DC'
-        if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
-    
-    # Add Generators
-    
-    
-    # Add Renewable Source Zones
-
-    
-    # Add Renewable Sources
-
     
     # Return the grid
     return grid,res
