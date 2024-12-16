@@ -10,15 +10,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 class Results:
-    def __init__(self, Grid, decimals=2, export=False):
+    def __init__(self, Grid, decimals=2, export=None):
         self.Grid = Grid
         self.dec = decimals
         self.export = export
 
     def options(self):
-        # Create an instance of the class
-        my_instance = self
-
         # Get all attributes (including methods) of the class
         all_attributes = dir(self)
 
@@ -49,12 +46,15 @@ class Results:
             self.Slack_AC()
 
         self.Power_loss()
-        if self.Grid.OPF_run == True:
+        if self.Grid.OPF_run :
             self.Ext_gen()
-            if any(node.extGrid == 3 for node in self.Grid.nodes_AC):
+            if any(node.RenSource for node in self.Grid.nodes_AC):
             
                 self.Ext_WPP()
-            self.Market()    
+            self.Price_Zone()    
+        if self.Grid.TEP_run:
+            self.TEP_N()
+            self.TEP_ts_res()
         print('------')
 
     def All_AC(self):
@@ -95,7 +95,7 @@ class Results:
                     table.add_row([f'DC Grid {i+1}', node.name])
 
         print('--------------')
-        print(f'Slack nodes')
+        print('Slack nodes')
         print(table)
 
     def Slack_AC(self):
@@ -109,7 +109,7 @@ class Results:
                     table.add_row([f'AC Grid {i+1}', node.name])
 
         print('--------------')
-        print(f'Slack nodes')
+        print('Slack nodes')
         print(table)
 
     def Slack_DC(self):
@@ -124,7 +124,7 @@ class Results:
                     slack += 1
 
         print('--------------')
-        print(f'Slack nodes')
+        print('Slack nodes')
         if slack == 0:
             print("No DC nodes are set as Slack")
         else:
@@ -159,13 +159,12 @@ class Results:
                 node = line.fromNode
                 G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                 Ploss = np.real(line.loss)*self.Grid.S_base
-                Qloss = np.imag(line.loss)*self.Grid.S_base
-                
+               
                      
                 i = line.fromNode.nodeNumber
                 j = line.toNode.nodeNumber
-                Sfrom = abs(self.Grid.Sij[i, j]*self.Grid.S_base)
-                Sto = abs(self.Grid.Sij[j, i]*self.Grid.S_base)
+                Sfrom = abs(line.fromS)*self.Grid.S_base
+                Sto   = abs(line.toS)*self.Grid.S_base
 
                 load = max(Sfrom, Sto)
                 
@@ -215,9 +214,8 @@ class Results:
             for conv in self.Grid.Converters_ACDC:
                 P_loss_ACDC += (conv.P_loss_tf+conv.P_loss)*self.Grid.S_base
                 tot += (conv.P_loss_tf+conv.P_loss)*self.Grid.S_base
-                s = 1
-
-            table.add_row([f'AC DC Converters', np.round(P_loss_ACDC, decimals=self.dec),""])
+         
+            table.add_row(['AC DC Converters', np.round(P_loss_ACDC, decimals=self.dec),""])
 
         if self.Grid.Converters_DCDC != None:
             P_loss_DCDC = 0
@@ -225,11 +223,11 @@ class Results:
                 P_loss_DCDC += (abs(conv.PowerTo-conv.Powerfrom))*self.Grid.S_base
                 tot += (abs(conv.PowerTo-conv.Powerfrom))*self.Grid.S_base
 
-            table.add_row([f'DC DC Converters', np.round(P_loss_DCDC, decimals=self.dec),""])
+            table.add_row(['DC DC Converters', np.round(P_loss_DCDC, decimals=self.dec),""])
 
         table.add_row(["Total loss", np.round(tot, decimals=self.dec),""])
         print('--------------')
-        print(f'Power loss')
+        print('Power loss')
         print(table)
 
     def Power_loss_AC(self):
@@ -241,8 +239,7 @@ class Results:
             node = line.fromNode
             G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
             Ploss = np.real(line.loss)*self.Grid.S_base
-            Qloss = np.imag(line.loss)*self.Grid.S_base
-
+            
             self.lossP_AC[G] += Ploss
 
         tot = 0
@@ -253,7 +250,7 @@ class Results:
 
         table.add_row(["Total loss", np.round(tot, decimals=self.dec)])
         print('--------------')
-        print(f'Power loss AC')
+        print('Power loss AC')
         print(table)
 
     def Power_loss_DC(self):
@@ -279,12 +276,12 @@ class Results:
 
         table.add_row(["Total loss", np.round(tot, decimals=self.dec)])
         print('--------------')
-        print(f'Power loss DC')
+        print('Power loss DC')
         print(table)
 
     def DC_bus(self):
         print('--------------')
-        print(f'Results DC')
+        print('Results DC')
         print('')
         table_all = pt()
         table_all.field_names = [
@@ -315,8 +312,8 @@ class Results:
 
             print(table)
 
-        if self.export == True:
-            csv_filename = 'DC_bus.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/DC_bus.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -324,7 +321,7 @@ class Results:
 
     def AC_Powerflow(self, Grid=None):
         print('--------------')
-        print(f'Results AC power')
+        print('Results AC power')
         print('')
         table_all = pt()
 
@@ -377,7 +374,7 @@ class Results:
 
                             table.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(node.QLi*self.Grid.S_base, decimals=self.dec), np.round(
                                 node.P_s*self.Grid.S_base, decimals=self.dec).item(), np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
-                            s = 1
+                          
                 print(table)
 
             elif Grid == None:
@@ -427,8 +424,8 @@ class Results:
                                 node.P_s*self.Grid.S_base, decimals=self.dec).item(), np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec), g+1])
 
                 print(table)
-        if self.export == True:
-            csv_filename = 'AC_Powerflow.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/AC_Powerflow.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -436,7 +433,7 @@ class Results:
 
     def AC_voltage(self):
         print('--------------')
-        print(f'Results AC bus voltage')
+        print('Results AC bus voltage')
         print('')
         table_all = pt()
         table_all.field_names = [
@@ -458,8 +455,8 @@ class Results:
             if len(table.rows) > 0:  # Check if the table is not None and has at least one row
                 print(table)
 
-        if self.export == True:
-            csv_filename = 'AC_voltage.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/AC_voltage.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -468,47 +465,41 @@ class Results:
     def AC_lines_current(self):
         
         print('--------------')
-        print(f'Results AC Lines Currents')
+        print('Results AC Lines Currents')
         table_all = pt()
         table_all.field_names = ["Line", "From bus", "To bus",
-                                 "i from (kA)", "i to (kA)", "Loading %", "Grid"]
+                                 "i from (kA)", "i to (kA)", "Loading %","Capacity [MVA]", "Grid"]
         for g in range(self.Grid.Num_Grids_AC):
             print(f'Grid AC {g+1}')
             tablei = pt()
             tablei.field_names = ["Line", "From bus", "To bus",
-                                  "i from (kA)", "i to (kA)", "Loading %"]
+                                  "i from (kA)", "i to (kA)", "Loading %","Capacity [MVA]"]
 
             for line in self.Grid.lines_AC:
                 if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                     i = line.fromNode.nodeNumber
                     j = line.toNode.nodeNumber
-                    I_base = self.Grid.S_base/line.V_base
+                    I_base = self.Grid.S_base/line.kV_base
 
-                    i_from = self.Grid.Iij_AC[i, j]*I_base/np.sqrt(3)
-                    p_from = self.Grid.Pij_AC[i, j]*self.Grid.S_base
-                    Q_from = self.Grid.Qij[i, j]*self.Grid.S_base
+                    i_from = line.i_from*I_base/np.sqrt(3)
 
-                    i_to = self.Grid.Iij_AC[j, i]*I_base/np.sqrt(3)
-                    p_to = self.Grid.Pij_AC[j, i]*self.Grid.S_base
-                    Q_to = self.Grid.Qij[j, i]*self.Grid.S_base
-
-                    Sfrom = abs(self.Grid.Sij[i, j]*self.Grid.S_base)
-                    Sto = abs(self.Grid.Sij[j, i]*self.Grid.S_base)
+                    i_to = line.i_to*I_base/np.sqrt(3)
+                    
+                    Sfrom = abs(line.fromS)*self.Grid.S_base
+                    Sto   = abs(line.toS)*self.Grid.S_base
 
                     load = max(Sfrom, Sto)/line.MVA_rating*100
-
-                    Ploss = np.real(line.loss)*self.Grid.S_base
-                    Qloss = np.imag(line.loss)*self.Grid.S_base
-
+                    if line.name == 'ICL4':
+                        s=1
                     tablei.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_from, decimals=self.dec), np.round(i_to, decimals=self.dec), np.round(load, decimals=self.dec)])
+                        i_from, decimals=self.dec), np.round(i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MVA_rating)])
                     table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_from, decimals=self.dec), np.round(i_to, decimals=self.dec), np.round(load, decimals=self.dec), g+1])
+                        i_from, decimals=self.dec), np.round(i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MVA_rating), g+1])
             if len(tablei.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablei)
 
-        if self.export == True:
-            csv_filename = 'AC_line_current.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/AC_line_current.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -517,7 +508,7 @@ class Results:
     def AC_lines_power(self, Grid=None):
         
         print('--------------')
-        print(f'Results AC Lines power')
+        print('Results AC Lines power')
         table_all = pt()
         table_all.field_names = ["Line", "From bus", "To bus",
                                  "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)", "Power loss (MW)", "Q loss (MVAR)", "Grid"]
@@ -534,21 +525,12 @@ class Results:
                     if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                         i = line.fromNode.nodeNumber
                         j = line.toNode.nodeNumber
-                        I_base = self.Grid.S_base/line.V_base
+                        p_from = np.real(line.fromS)*self.Grid.S_base
+                        Q_from = np.imag(line.fromS)*self.Grid.S_base
 
-                        i_from = self.Grid.Iij_AC[i, j]*I_base/np.sqrt(3)
-                        p_from = self.Grid.Pij_AC[i, j]*self.Grid.S_base
-                        Q_from = self.Grid.Qij[i, j]*self.Grid.S_base
+                        p_to = np.real(line.toS)*self.Grid.S_base
+                        Q_to = np.imag(line.toS)*self.Grid.S_base
 
-                        i_to = self.Grid.Iij_AC[j, i]*I_base/np.sqrt(3)
-                        p_to = self.Grid.Pij_AC[j, i]*self.Grid.S_base
-                        Q_to = self.Grid.Qij[j, i]*self.Grid.S_base
-
-                        Sfrom = abs(self.Grid.Sij[i, j]*self.Grid.S_base)
-                        Sto = abs(self.Grid.Sij[j, i]*self.Grid.S_base)
-
-                        load = max(Sfrom, Sto)/line.MVA_rating*100
-                        
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
 
@@ -567,20 +549,12 @@ class Results:
                     if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                         i = line.fromNode.nodeNumber
                         j = line.toNode.nodeNumber
-                        I_base = self.Grid.S_base/line.V_base
+                        
+                        p_from = np.real(line.fromS)*self.Grid.S_base
+                        Q_from = np.imag(line.fromS)*self.Grid.S_base
 
-                        i_from = self.Grid.Iij_AC[i, j]*I_base/np.sqrt(3)
-                        p_from = self.Grid.Pij_AC[i, j]*self.Grid.S_base
-                        Q_from = self.Grid.Qij[i, j]*self.Grid.S_base
-
-                        i_to = self.Grid.Iij_AC[j, i]*I_base/np.sqrt(3)
-                        p_to = self.Grid.Pij_AC[j, i]*self.Grid.S_base
-                        Q_to = self.Grid.Qij[j, i]*self.Grid.S_base
-
-                        Sfrom = abs(self.Grid.Sij[i, j]*self.Grid.S_base)
-                        Sto = abs(self.Grid.Sij[j, i]*self.Grid.S_base)
-
-                        load = max(Sfrom, Sto)/line.MVA_rating*100
+                        p_to = np.real(line.toS)*self.Grid.S_base
+                        Q_to = np.imag(line.toS)*self.Grid.S_base
 
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
@@ -593,15 +567,15 @@ class Results:
                 if len(tablep.rows) > 0:  # Check if the table is not None and has at least one row
                     print(tablep)
 
-        if self.export == True:
-            csv_filename = 'AC_line_power.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/AC_line_power.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
                 csvfile.write(csv_data)
     def Ext_gen(self):
         print('--------------')
-        print(f'External Generation optimization')
+        print('External Generation optimization')
         table = pt()
         Ptot=0
         Qtot=0
@@ -610,38 +584,36 @@ class Results:
         Stot=0
         Ltot=0
         costtot=0
-        table.field_names = ["Bus", "Power (MW)", "Reactive power (MVAR)","Price €/MWh","Loading %","Cost k€"]
-        for node in self.Grid.nodes_AC:
-            if node.extGrid == 1 or node.extGrid == 2:
-                Pgi=node.PGi_opt #+node.PGi*node.curtailment
-                if node.extGrid == 1:
-                    Pgi=0
-                Qgi=node.QGi_opt
-                S= np.sqrt(Pgi**2+Qgi**2)
-                Pgi*=self.Grid.S_base
-                Qgi*=self.Grid.S_base
-                if node.extGrid ==2:
-                    load=S/node.Max_pow_gen*100
-                    cost=Pgi*node.price/1000
-                else:
-                    load=S/np.abs(node.Min_pow_genR)*100
-                    cost=0
-                    
-                table.add_row([node.name, np.round(Pgi, decimals=self.dec), np.round(Qgi, decimals=self.dec),  np.round(node.price, decimals=self.dec),np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
-                Pabs+=abs(Pgi)
-                Qabs+=abs(Qgi)
-                Ptot+=Pgi
-                Qtot+=Qgi
-                Stot+=S
-                costtot+=cost
-                Ltot+=node.Max_pow_gen
+        table.field_names = ["Generator","Node" ,"Power (MW)", "Reactive power (MVAR)","Quadratic Price €/MWh^2","Linear Price €/MWh","Loading %","Cost k€"]
+        for gen in self.Grid.Generators:
+            Pgi=gen.PGen #+node.PGi_ren*node.curtailment
+            Qgi=gen.QGen
+            S= np.sqrt(Pgi**2+Qgi**2)
+            Pgi*=self.Grid.S_base
+            Qgi*=self.Grid.S_base
+            if gen.Max_S is None:
+                base=np.sqrt(gen.Max_pow_gen**2+max(abs(gen.Min_pow_genR),gen.Max_pow_genR)**2)
+            else:
+                base=gen.Max_S
+            load=S/base*100
+            cost=(Pgi**2*gen.qf+Pgi*gen.lf)/1000
+           
                 
+            table.add_row([gen.name,gen.Node_AC.name, np.round(Pgi, decimals=self.dec), np.round(Qgi, decimals=self.dec),  np.round(gen.qf, decimals=self.dec),  np.round(gen.lf, decimals=self.dec),np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
+            Pabs+=abs(Pgi)
+            Qabs+=abs(Qgi)
+            Ptot+=Pgi
+            Qtot+=Qgi
+            Stot+=S
+            costtot+=cost
+            Ltot+=gen.Max_pow_gen
+            
         if Ltot !=0:
             load=Stot/Ltot*100
         else:
             load=0
-        table.add_row(['Total', np.round(Ptot, decimals=self.dec), np.round(Qtot, decimals=self.dec),""," ", np.round(costtot, decimals=0)])
-        table.add_row(['Total abs', np.round(Pabs, decimals=self.dec), np.round(Qabs, decimals=self.dec), "",np.round(load, decimals=self.dec),""])
+        table.add_row(['Total',"", np.round(Ptot, decimals=self.dec), np.round(Qtot, decimals=self.dec),"",""," ", np.round(costtot, decimals=0)])
+        table.add_row(['Total abs',"", np.round(Pabs, decimals=self.dec), np.round(Qabs, decimals=self.dec), "","",np.round(load, decimals=self.dec),""])
         print(table)
     
     def Ext_WPP(self):
@@ -653,24 +625,33 @@ class Results:
         tcur=0
         totcost=0
         totcurcost=0
-        for node in self.Grid.nodes_AC:
-            if node.RenSource == True:
-                Pgi=node.PGi_ren*self.Grid.S_base
+        price=0
+        for rs in self.Grid.RenSources:
+                Pgi=rs.PGi_ren*self.Grid.S_base
                 bp+=Pgi
-                cur= (1-node.curtailment)*100
-                tcur+=Pgi*(1-node.curtailment)
-                PGicur=Pgi*(node.curtailment)
+                cur= (1-rs.gamma)*100
+                tcur+=Pgi*(1-rs.gamma)
+                PGicur=Pgi*(rs.gamma)
             
                 
-                if self.Grid.OnlyGen==True:
-                    cost=0
+                if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
+                   
+                    if rs.connected == 'AC':
+                        node_num = self.Grid.rs2node['AC'][rs.rsNumber]
+                        node = self.Grid.nodes_AC[node_num]
+                        price=node.price
+                    else:
+                        node_num = self.Grid.rs2node['DC'][rs.rsNumber]
+                        node = self.Grid.nodes_DC[node_num]
+                        price=node.price
+                    cost=PGicur*price/1000
                 else:
-                    cost= PGicur*node.price/1000
+                    cost=0 
                 if self.Grid.CurtCost==False:
                     curcost=0
                 else:    
                     curcost= (Pgi-PGicur)*node.price*(self.Grid.sigma)/1000
-                table.add_row([node.name, np.round(Pgi, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec),np.round(node.price, decimals=self.dec),np.round(cost, decimals=0),np.round(curcost, decimals=0)])
+                table.add_row([rs.name, np.round(Pgi, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec),np.round(price, decimals=self.dec),np.round(cost, decimals=0),np.round(curcost, decimals=0)])
                 totcost+=cost
                 totcurcost+=curcost
         
@@ -683,13 +664,177 @@ class Results:
 
         print(table)    
     
-    def Market(self):
-        print('--------------')
-        print('Market')
+    def TEP_ts_res(self):
+       
+        PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        
+        
         table = pt()
-        table.field_names = ["Market","Renewable Generation(MW)" ,"Generation (MW)", "Load (MW)","Import (MW)","Export (MW)","Price (€/MWh)"]
+        # Add columns to the PrettyTable
+        data = PN.fillna('')
+        field_names = [''] + [f'Net price zone power [MW] @ Case:{t}' for t in data.columns]
+        table.field_names = field_names
+        
+        # Add rows to the PrettyTable
+        for index, row in data.iterrows():
+            table.add_row([index] + row.tolist())
+            
+        print(table)
+        
+        table = pt()
+        # Add columns to the PrettyTable
+        data_SC = SC.fillna('')
+        field_names = [''] + [f'Social Cost [k€] @ Case:{t}' for t in data_SC.columns]
+        table.field_names = field_names
+        
+        # Add rows to the PrettyTable
+        for index, row in data_SC.iterrows():
+            table.add_row([index] + row.tolist())
+            
+        print(table)
+        
+        
+        table = pt()
+        # Add columns to the PrettyTable
+        data_price = price.fillna('')
+        field_names = [''] + [f'Price Zone Price [€/Mwh] @ Case:{t}' for t in data_price.columns]
+        table.field_names = field_names
+        
+        # Add rows to the PrettyTable
+        for index, row in data_price.iterrows():
+            table.add_row([index] + row.tolist())
+            
+        print(table)
+        
+        
+        table = pt()
+        # Add columns to the PrettyTable
+        data_curt = curt.fillna('')
+        field_names = [''] + [f'Curtialment [MW] @ Case:{t}' for t in data_curt.columns]
+        table.field_names = field_names
+        
+        # Add rows to the PrettyTable
+        for index, row in data_curt.iterrows():
+            table.add_row([index] + row.tolist())
+            
+        print(table)
+        
+        
+        
+        table = pt()
+        # Add columns to the PrettyTable
+        data_lines = lines.fillna('')
+        field_names = [''] + [f'Line loading [%] @ Case:{t}' for t in data_lines.columns]
+        table.field_names = field_names
+        
+        # Add rows to the PrettyTable
+        for index, row in data_lines.iterrows():
+            table.add_row([index] + row.tolist())
+            
+        print(table)
+        
+        
+        table = pt()
+        # Add columns to the PrettyTable
+        data_conv = conv.fillna('')
+        field_names = [''] + [f'Converter loading [%] @ Case:{t}' for t in data_conv.columns]
+        table.field_names = field_names
+        
+        # Add rows to the PrettyTable
+        for index, row in data_conv.iterrows():
+            table.add_row([index] + row.tolist())
+            
+        print(table)
+        
+        
+        
+        
+    
+    def TEP_N(self,p=True):
+        
+        table = pt()
+        table.field_names = ["Element","Type" ,"Initial", "Optimized N","Maximum","Optimized Power Rating [MW]","Expansion Cost [M€]"]
+        tot=0
+        tot_n=0
+        
+        for l in self.Grid.lines_AC_exp:
+            if l.np_line_opf:
+                element= l.name
+                ini= l.np_line_i
+                opt=l.np_line
+                pr= opt*l.MVA_rating
+                cost=((opt)*l.MVA_rating*l.Length_km*l.phi)*l.life_time*8760/(10**6)
+                tot+=cost
+                maxn=l.np_line_max
+                tot_n+=((opt)*l.MVA_rating*l.Length_km*l.phi)/1000
+                table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+        
+        
+        
+        for l in self.Grid.lines_DC:
+            if l.np_line_opf:
+                element= l.name
+                ini= l.np_line_i
+                opt=l.np_line
+                pr= opt*l.MW_rating
+                cost=((opt)*l.MW_rating*l.Length_km*l.phi)*l.life_time*8760/(10**6)
+                tot+=cost
+                maxn=l.np_line_max
+                tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
+                table.add_row([element, "DC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+                
+        
+        for cn in self.Grid.Converters_ACDC:
+            if cn.NUmConvP_opf:
+                element= cn.name
+                ini=cn.NumConvP_i
+                opt=cn.NumConvP
+                pr=opt*cn.MVA_max
+                cost=((opt)*cn.MVA_max*cn.phi)*cn.life_time*8760/(10**6)
+                tot+=cost
+                tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
+                maxn=cn.NumConvP_max
+                table.add_row([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+        
+        table.add_row(["Total", "" ,"","", "", "",np.round(tot, decimals=2)])
+        
+        print('--------------')
+        print('Transmission Expansion Problem')
+        print(table)
+        
+        PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        weight = SC.loc['Weight']
+        table=pt()
+        table.field_names = ["Price_Zone", "Normalized social cost[k€/h]", "Average price [€/MWh]"]
+        
+        
+        for m in self.Grid.Price_Zones:
+            from PyFlow_ACDC import Price_Zone
+            if type(m) is Price_Zone:
+                price_zone_weighted = SC.loc[m.name]
+                weighted_total = price_zone_weighted * weight
+                weighted_total = weighted_total.sum()
+                weighted_price = price.loc[m.name]* weight
+                weighted_price = weighted_price.sum()
+                table.add_row([m.name, np.round(weighted_total, decimals=2),np.round(weighted_price, decimals=2)])
+                
+        print(table)
+        
+        
+        table=pt()
+        table.field_names = ["Normalized social cost[k€/h]","Normalized investment [k€/h]","Normalized Total cost [k€/h]"]
+        
+        weighted_sum = SC.loc['Weighted SC'].sum()
+        table.add_row([np.round(weighted_sum, decimals=2), np.round(tot_n, decimals=2),np.round(weighted_sum+tot_n, decimals=2)])
+        print(table)
+        
+    def Price_Zone(self):
+        print('--------------')
+        print('Price_Zone')
+        table = pt()
+        table.field_names = ["Price_Zone","Renewable Generation(MW)" ,"Generation (MW)", "Load (MW)","Import (MW)","Export (MW)","Price (€/MWh)"]
         table2 = pt()
-        table2.field_names = ["Market","Social Cost [k€]","Renewable Gen Cost [k€]","Curtailent Cost [k€]","Generation Cost [k€]","Total Cost [k€]"]
+        table2.field_names = ["Price_Zone","Social Cost [k€]","Renewable Gen Cost [k€]","Curtailment Cost [k€]","Generation Cost [k€]","Total Cost [k€]"]
         
         tot_sc=0
         tot_Rgen_cost=0
@@ -698,9 +843,11 @@ class Results:
         tot_m_tot=0
         
         
-        for m in self.Grid.Markets:
-            Rgendisp= sum(node.PGi_ren for node in m.nodes_AC)*self.Grid.S_base
-            Rgen = sum(node.PGi_ren*node.curtailment for node in m.nodes_AC)*self.Grid.S_base
+        for m in self.Grid.Price_Zones:
+            
+            Rgen = sum(rs.PGi_ren * rs.gamma for node in m.nodes_AC for rs in node.connected_RenSource) * self.Grid.S_base
+            
+            
             gen = sum(node.PGi+node.PGi_opt for node in m.nodes_AC)*self.Grid.S_base
             load = sum(node.PLi for node in m.nodes_AC)*self.Grid.S_base
             ie = Rgen+gen-load
@@ -709,16 +856,16 @@ class Results:
             
             
             sc = (m.a*ie**2+ie*m.b)/1000
-            
-            if self.Grid.OnlyGen==True:
-                Rgen_cost=0
+            s=1
+            if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
+                Rgen_cost=Rgen*m.price/1000
             else:
-                Rgen_cost= Rgen*m.price/1000          
+                Rgen_cost= 0          
             gen_cost = gen*m.price/1000
             if self.Grid.CurtCost==False:
                 curt_cost=0
             else:  
-                curt_cost= (Rgendisp-Rgen)*m.price*(self.Grid.sigma)/1000
+                curt_cost= sum((rs.PGi_ren-rs.PGi_ren * rs.gamma)*rs.sigma*node.price for node in m.nodes_AC for rs in node.connected_RenSource)*self.Grid.S_base
             m_tot= Rgen_cost+gen_cost+curt_cost+sc
             
             tot_sc+=sc
@@ -747,28 +894,30 @@ class Results:
     def DC_lines_current(self):
         
         print('--------------')
-        print(f'Results DC Lines current')
+        print('Results DC Lines current')
         table_all = pt()
         table_all.field_names = [
-            "Line", "From bus", "To bus", "I (kA)", "Loading %", "Polarity", "Grid"]
+            "Line", "From bus", "To bus", "I (kA)", "Loading %","Capacity [MW]" ,"Polarity", "Grid"]
         for g in range(self.Grid.Num_Grids_DC):
             print(f'Grid DC {g+1}')
             tablei = pt()
 
             tablei.field_names = ["Line", "From bus",
-                                  "To bus", "I (kA)", "Loading %", "Polarity"]
+                                  "To bus", "I (kA)", "Loading %","Capacity [MW]", "Polarity"]
             tablei.align["Polarity"] = 'l'
 
             for line in self.Grid.lines_DC:
+                if line.np_line==0:
+                    continue
                 if self.Grid.Graph_line_to_Grid_index_DC[line] == g:
 
                     i = line.fromNode.nodeNumber
                     j = line.toNode.nodeNumber
-                    I_base = self.Grid.S_base/line.V_base
+                    I_base = self.Grid.S_base/line.kV_base
                     i_to = self.Grid.Iij_DC[j, i]*I_base
 
-                    p_to = self.Grid.Pij_DC[j, i]*self.Grid.S_base
-                    p_from = self.Grid.Pij_DC[i, j]*self.Grid.S_base
+                    p_to = line.toP*self.Grid.S_base/line.np_line
+                    p_from = line.fromP*self.Grid.S_base/line.np_line
 
                     load = max(p_to, p_from)/line.MW_rating*100
 
@@ -778,18 +927,17 @@ class Results:
                         pol = "Monopolar (symmetrically grounded)"
                     elif line.m_sm_b == 'b':
                         pol = "Bipolar"
-                    Ploss = np.real(line.loss)*self.Grid.S_base
 
                     tablei.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_to, decimals=self.dec), np.round(load, decimals=self.dec), pol])
+                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating) ,pol])
                     table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_to, decimals=self.dec), np.round(load, decimals=self.dec), pol, g+1])
+                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating), pol, g+1])
 
             if len(tablei.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablei)
 
-        if self.export == True:
-            csv_filename = 'DC_line_current.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/DC_line_current.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -798,7 +946,7 @@ class Results:
     def DC_lines_power(self):
         
         print('--------------')
-        print(f'Results DC Lines power')
+        print('Results DC Lines power')
         table_all = pt()
         table_all.field_names = ["Line", "From bus", "To bus",
                                  "P from (MW)", "P to (MW)", "Power loss (MW)", "Grid"]
@@ -810,20 +958,11 @@ class Results:
 
             for line in self.Grid.lines_DC:
                 if self.Grid.Graph_line_to_Grid_index_DC[line] == g:
-                    i = line.fromNode.nodeNumber
-                    j = line.toNode.nodeNumber
-                    I_base = self.Grid.S_base/line.V_base
-                    i_to = self.Grid.Iij_DC[j, i]*I_base
+                    
+                   
+                    p_to = line.toP*self.Grid.S_base
+                    p_from = line.fromP*self.Grid.S_base
 
-                    p_to = self.Grid.Pij_DC[j, i]*self.Grid.S_base
-                    p_from = self.Grid.Pij_DC[i, j]*self.Grid.S_base
-
-                    load = max(p_to, p_from)/line.MW_rating*100
-
-                    if line.pol == 1:
-                        pol = "monopolar (asymmetrically grounded)"
-                    elif line.pol == 2:
-                        pol = "monopolar (symmetrically grounded) or bipolar"
                     Ploss = np.real(line.loss)*self.Grid.S_base
 
                     tablep.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
@@ -834,8 +973,8 @@ class Results:
             if len(tablep.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablep)
 
-        if self.export == True:
-            csv_filename = 'DC_line_power.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/DC_line_power.csv'
             csv_data = table_all.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -845,8 +984,10 @@ class Results:
         table = pt()
         table2 = pt()
         table.field_names = ["Converter", "AC node", "DC node","Power s AC (MW)","Reactive s AC (MVAR)", "Power c AC (MW)", "Power DC(MW)", "Reactive power (MVAR)", "Power loss IGBTs (MW)", "Power loss AC elements (MW)"]
-        table2.field_names = ["Converter","AC control mode", "DC control mode","Loading %"]
+        table2.field_names = ["Converter","AC control mode", "DC control mode","Loading %","Capacity [MVA]"]
         for conv in self.Grid.Converters_ACDC:
+            if conv.NumConvP==0:
+                continue
             if conv.type == 'Slack':
                 P_DC = np.round(conv.Node_DC.P*self.Grid.S_base,
                                 decimals=self.dec)
@@ -860,10 +1001,10 @@ class Results:
             Ploss_tf = np.round(conv.P_loss_tf*self.Grid.S_base, decimals=self.dec)
             S = np.sqrt(P_s**2+Q_s**2)
             
-            loading= np.round(max(S,abs(P_DC))/conv.MVA_max*100, decimals=self.dec)
+            loading= np.round(max(S,abs(P_DC))/(conv.MVA_max*conv.NumConvP)*100, decimals=self.dec)
             table.add_row([conv.name, conv.Node_AC.name,
                           conv.Node_DC.name, P_s,Q_s ,P_c, P_DC, Q_c, P_loss, Ploss_tf])
-            table2.add_row([conv.name, conv.AC_type, conv.type,loading])
+            table2.add_row([conv.name, conv.AC_type, conv.type,loading,int(conv.MVA_max)])
 
         print('------------')
         print('AC DC Converters')
@@ -871,8 +1012,8 @@ class Results:
             print(table)
             print(table2)
 
-        if self.export == True:
-            csv_filename = 'Converter_results.csv'
+        if self.export is not None:
+            csv_filename = f'{self.export}/Converter_results.csv'
             csv_data = table.get_csv_string()
 
             with open(csv_filename, 'w', newline='') as csvfile:
@@ -880,33 +1021,26 @@ class Results:
 
     def Time_series_prob(self, element_name):
         a = self.Grid.Time_series
-        b = self.Grid.lines_AC
-        c = self.Grid.lines_DC
-
+        
         df_res = self.Grid.Time_series_res
         df_line_res = self.Grid.Time_series_line_res
-        df_grid_res = self.Grid.Time_series_grid_res
-
-        if self.Grid.VarPrice == True:
-            merged_df = pd.concat([df_res, df_line_res, df_grid_res,self.Grid.Time_series_price], axis=1)
-        else:
-            merged_df = pd.concat([df_res, df_line_res, df_grid_res], axis=1)
+        df_conv_res = self.Grid.Time_series_conv_res
+  
+        merged_df = pd.concat([df_res, df_line_res,df_conv_res], axis=1)
 
         for ts in a:
-            if ts.type != 'Slack':
-                if ts.name == element_name:
-
+             if ts.name == element_name:
                     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
                     # Plot PDF
-                    ax1.hist(ts.TS, bins=100, density=True,
+                    ax1.hist(ts.data, bins=100, density=True,
                              alpha=0.5, color='b')
                     ax1.set_title('Probability Density Function (PDF)')
                     ax1.set_xlabel(ts.name)
                     ax1.set_ylabel('Probability')
 
                     # Plot CDF
-                    sorted_data = np.sort(ts.TS)
+                    sorted_data = np.sort(ts.data)
                     cumulative_prob = np.linspace(0, 1, len(sorted_data))
 
                     # Plot the CDF as a line
@@ -951,30 +1085,38 @@ class Results:
 
         if self.Grid.Time_series_res.index[0] > start:
             start = self.Grid.Time_series_res.index[0]
+        
+        np_start = start - 1
+        np_end = end - 1
 
-        s = 1
-
-        genPg = [ts.name for ts in self.Grid.Time_series if (ts.type != 'Slack' and ts.type != 'Load')]
-        s = 1
-        self.Grid.Time_series_input.loc[start+1:end+1,genPg].plot(kind='line', title='Power fixed generation')
+        for ts in self.Grid.Time_series:
+           if ts.type  in ['WPP', 'OWPP','SF','REN']:
+               # Assuming ts.data is a pandas Series or a list of data points indexed by time
+               time_range = slice(np_start, np_end + 1)
+               # Plot ts.data (NumPy array indexed by np.index)
+               plt.plot(range(start, end + 1), ts.data[time_range], label=ts.name)
+        plt.title('Renewable sources (pu)')
         plt.xlabel('Time')
         plt.ylabel('PG Value (pu)')
         plt.legend(title='Source', bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()
 
-        LoadPg = [ts.name for ts in self.Grid.Time_series if ts.type == 'Load']
-        self.Grid.Time_series_input.loc[start+1:end+1,
-                                        LoadPg].plot(kind='line', title='Power Load')
+        for ts in self.Grid.Time_series:
+           if ts.type  in ['Load']:
+               # Assuming ts.data is a pandas Series or a list of data points indexed by time
+               time_range = slice(np_start, np_end + 1)
+               # Plot ts.data (NumPy array indexed by np.index)
+               plt.plot(range(start, end + 1), ts.data[time_range], label=ts.name)
+        plt.title('Load (pu)')
         plt.xlabel('Time')
         plt.ylabel('Load Value (pu)')
         plt.legend(title='Source', bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()
 
-        if self.Grid.VarPrice == True:
+        if self.Grid.VarPrice :
             price = [col for col in self.Grid.Time_series_price.columns]
-            s = 1
             self.Grid.Time_series_price.loc[start+1:end+1, price].plot(
-                kind='line', title='Price in different markets')
+                kind='line', title='Price in different price_zones')
             plt.xlabel('Time')
             plt.ylabel('Price (Eu/pu)')
             plt.legend(title='Source', bbox_to_anchor=(
@@ -984,70 +1126,62 @@ class Results:
           
 
         # Plotting Pg for Slack nodes
-        slack_colsPg_ = [
-            col for col in self.Grid.Time_series_res.columns if 'Pg_' in col]
-        self.Grid.Time_series_res.loc[start:end, slack_colsPg_].plot(
-            kind='line', title='Power generation')
+        slack_colsPg_ = [col for col in self.Grid.Time_series_res.columns if 'Pg_' in col]
+        PG_data= self.Grid.Time_series_res.loc[start:end, slack_colsPg_]
+        
+        legend_labels = [col.replace('Pg_', '') for col in slack_colsPg_]
+        
+        PG_data.plot(kind='line', title='Power generation')
         plt.xlabel('Time')
         plt.ylabel('PG Value (pu)')
-        plt.legend(title='Node', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend(title='Node', labels=legend_labels,bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()
 
         # Plotting Qg for Slack nodes
-        slack_colsQg_ = [
-            col for col in self.Grid.Time_series_res.columns if 'Qg_' in col]
-        self.Grid.Time_series_res.loc[start:end, slack_colsQg_].plot(
-            kind='line', title='Reactive power generation')
+        slack_colsQg_ = [col for col in self.Grid.Time_series_res.columns if 'Qg_' in col]
+        QF_data= self.Grid.Time_series_res.loc[start:end, slack_colsQg_]
+        
+        legend_labels = [col.replace('Qg_', '') for col in slack_colsQg_]
+        QF_data.plot(kind='line', title='Reactive power generation')
         plt.xlabel('Time')
         plt.ylabel('QG Value (pu)')
-        plt.legend(title='Node', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend(title='Node',  labels=legend_labels,bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()
 
-        # Plotting max for Converters
-        converter_cols = [
-            col for col in self.Grid.Time_series_res.columns if '_max' in col]
-        self.Grid.Time_series_res.loc[start:end, converter_cols].plot(
-            kind='line', title='Maximum power in each Converter')
-        plt.xlabel('Time')
-        plt.ylabel('Maximum power')
-        plt.legend(title='Converter', bbox_to_anchor=(
-            1.05, 1), loc='upper left')
-        plt.show()
-
+           
         # Plotting PDC for Converters
-        converter_cols = [
-            col for col in self.Grid.Time_series_res.columns if '_P_DC' in col]
-        self.Grid.Time_series_res.loc[start:end, converter_cols].plot(
-            kind='line', title='DC power in each Converter')
+        converter_cols = [col for col in self.Grid.Time_series_conv_res.columns if '_P_DC' in col]
+        P_DC_data=self.Grid.Time_series_conv_res.loc[start:end, converter_cols]
+        
+        legend_labels = [col.replace('_P_DC', '') for col in converter_cols]
+        P_DC_data.plot(kind='line', title='DC power in each Converter')
         plt.xlabel('Time')
         plt.ylabel('DC power')
-        plt.legend(title='Converter', bbox_to_anchor=(
-            1.05, 1), loc='upper left')
+        plt.legend(title='Converter',  labels=legend_labels, bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()
         
         if All ==True:
             # Plotting AC line Loads
             line_cols = [
-                col for col in self.Grid.Time_series_line_res.columns if 'Load_AC_' in col]
+                col for col in self.Grid.Time_series_line_res.columns if 'AC_Load_' in col]
             line_load_data = self.Grid.Time_series_line_res.loc[start:end, line_cols]
     
-            # Remove "Load_AC_" from legend labels
-            legend_labels = [col.replace('Load_AC_', '') for col in line_cols]
+            # Remove "AC_" from legend labels
+            legend_labels = [col.replace('AC_AC_Load_','') for col in line_cols]
     
             line_load_data.plot(kind='line', title='Power load in each AC Line')
             plt.xlabel('Time')
             plt.ylabel('Line load (pu of power)')
-            plt.legend(title='Line', labels=legend_labels,
-                       bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.legend(title='Line', labels=legend_labels,bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.show()
     
             # Plotting DC line Loads
             line_cols = [
-                col for col in self.Grid.Time_series_line_res.columns if 'Load_DC_' in col]
+                col for col in self.Grid.Time_series_line_res.columns if 'DC_Load_' in col]
             line_load_data = self.Grid.Time_series_line_res.loc[start:end, line_cols]
     
-            # Remove "Load_DC_" from legend labels
-            legend_labels = [col.replace('Load_DC_', '') for col in line_cols]
+            # Remove "DC_" from legend labels
+            legend_labels = [col.replace('DC_Load_', '') for col in line_cols]
     
             line_load_data.plot(kind='line', title='Power load in each  DC Line')
             plt.xlabel('Time')
@@ -1056,41 +1190,5 @@ class Results:
                        bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.show()
     
-            # Plotting AC line Loads
-            line_cols = [
-                col for col in self.Grid.Time_series_line_res.columns if 'Loss_AC_' in col]
-            line_load_data = self.Grid.Time_series_line_res.loc[start:end, line_cols]
     
-            # Remove "Load_AC_" from legend labels
-            legend_labels = [col.replace('Loss_AC_', '') for col in line_cols]
     
-            line_load_data.plot(kind='line', title='Power loss in each AC Line')
-            plt.xlabel('Time')
-            plt.ylabel('Line load (pu of power)')
-            plt.legend(title='Line', labels=legend_labels,
-                       bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.show()
-    
-            # Plotting DC line Loads
-            line_cols = [
-                col for col in self.Grid.Time_series_line_res.columns if 'Loss_DC_' in col]
-            line_load_data = self.Grid.Time_series_line_res.loc[start:end, line_cols]
-    
-            # Remove "Load_AC_" from legend labels
-            legend_labels = [col.replace('Loss_DC_', '') for col in line_cols]
-    
-            line_load_data.plot(kind='line', title='Power loss in each DC Line')
-            plt.xlabel('Time')
-            plt.ylabel('Line load (pu of power)')
-            plt.legend(title='Line', labels=legend_labels,
-                       bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.show()
-    
-            # Plotting line loss for each grid
-            grid_cols = [col for col in self.Grid.Time_series_grid_res.columns]
-            self.Grid.Time_series_grid_res.loc[start:end, grid_cols].plot(
-                kind='line', title='Power loss in each Grid')
-            plt.xlabel('Time')
-            plt.ylabel('Grid loss (pu of power)')
-            plt.legend(title='Grid', bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.show()

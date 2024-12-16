@@ -33,13 +33,20 @@ def cartz2pol(z):
     return r, theta
 
 
-def ACDC_sequential(grid, tol_lim=1e-6, maxIter=20, change_slack2Droop=False, QLimit=True):
+def AC_PowerFlow(grid, tol_lim=1e-8, maxIter=100):
+    load_flow_AC(grid, tol_lim, maxIter)
+    grid.Update_PQ_AC()
+    grid.Line_AC_calc()
+    
+    
+
+def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QLimit=True):
 
     tolerance = 1
     grid.iter_num_seq = 0
 
     for conv in grid.Converters_ACDC:
-        if conv.type != 'PAC':
+        if conv.type!= 'PAC':
             AC_node = conv.Node_AC
             DC_node = conv.Node_DC
             DC_node.Pconv = conv.P_DC
@@ -52,21 +59,23 @@ def ACDC_sequential(grid, tol_lim=1e-6, maxIter=20, change_slack2Droop=False, QL
 
     while tolerance > tol_lim and grid.iter_num_seq < maxIter:
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
-
+        
         load_flow_AC(grid)
 
         for conv in grid.Converters_ACDC:
-            if conv.type == 'PAC':
+            if conv.type== 'PAC':
+                PGi_ren = sum(rs.PGi_ren*rs.gamma for rs in conv.Node_AC.connected_RenSource)
+                PGi_opt = sum(gen.PGen for gen in conv.Node_AC.connected_gen)
+                QGi_opt = sum(gen.QGen for gen in conv.Node_AC.connected_gen)
                 if conv.Node_AC.stand_alone == True:
-                    conv.P_AC = -(conv.Node_AC.PGi*conv.Node_AC.curtailment+conv.Node_AC.PGi_opt-conv.Node_AC.PLi)
-                    conv.Q_AC = -(conv.Node_AC.QGi+conv.Node_AC.QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
-                    # print('non stand alone MG')
+                    conv.P_AC = -(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
+                    conv.Q_AC = -(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                 else:
                     if conv.AC_type == 'Slack':
-                        conv.P_AC = conv.Node_AC.P_INJ-(conv.Node_AC.PGi*conv.Node_AC.curtailment+conv.Node_AC.PGi_opt-conv.Node_AC.PLi)
-                        conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+conv.Node_AC.QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
+                        conv.P_AC = conv.Node_AC.P_INJ-(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
+                        conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                     if conv.AC_type == 'PV':
-                        conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+conv.Node_AC.QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
+                        conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                 flow_conv_P_AC(grid,conv)
 
         if QLimit == True:
@@ -90,14 +99,12 @@ def ACDC_sequential(grid, tol_lim=1e-6, maxIter=20, change_slack2Droop=False, QL
             DC_node = conv.Node_DC
 
             if conv.AC_type == 'PV':
-                conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi-AC_node.QLi+AC_node.Q_s_fx)
+                QGi_opt = sum(gen.QGen for gen in conv.Node_AC.connected_gen)
+                conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi+QGi_opt-AC_node.QLi+AC_node.Q_s_fx)
             conv.U_s = AC_node.V
             conv.th_s = AC_node.theta
             flow_conv(grid,conv)
-            if conv.name == 'CmA1':
-                s = 1
-
-        s = 1
+          
         Ps = np.copy(grid.Ps_AC)
         Ps_AC_new = np.copy(grid.Ps_AC_new)
         P_dif = Ps-Ps_AC_new
@@ -107,7 +114,7 @@ def ACDC_sequential(grid, tol_lim=1e-6, maxIter=20, change_slack2Droop=False, QL
         s = 1
         for node in grid.nodes_AC:
             node.P_s = Ps_AC_new[node.nodeNumber]
-            node.P_s_new = 0
+            grid.Ps_AC[node.nodeNumber] = np.copy(Ps_AC_new[node.nodeNumber])
         grid.Update_PQ_AC()
 
         # print(f'{iter_num} tolerance reached: {np.round(tolerance,decimals=12)}')
@@ -162,7 +169,7 @@ def Jacobian_DC(grid, V_DC, P):
 
     grid.J_DC = J
 
-def load_flow_DC(grid, tol_lim=1e-4, maxIter=20):
+def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
 
     iter_num = 0
 
@@ -269,10 +276,10 @@ def load_flow_DC(grid, tol_lim=1e-4, maxIter=20):
 
         for conv in grid.Converters_ACDC:
             n = conv.Node_DC.nodeNumber
-            if conv.type == 'Droop':
+            if conv.type== 'Droop':
                 conv.P_DC = P_known[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
                 s = 1
-            elif conv.type == 'Slack':
+            elif conv.type== 'Slack':
                 conv.Node_DC.Pconv = Pf[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
                 conv.P_DC = Pf[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
                 s = 1
@@ -374,7 +381,7 @@ def Jacobian_AC(grid, Voltages, Angles):
 
     f = 1
 
-def load_flow_AC(grid, tol_lim=1e-4, maxIter=100):
+def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
 
     Pnet = np.copy(grid.P_AC+grid.Ps_AC)
     Qnet = np.copy(grid.Q_AC+grid.Qs_AC)
@@ -455,13 +462,13 @@ def load_flow_AC(grid, tol_lim=1e-4, maxIter=100):
         for i in range(grid.nn_AC):
             if grid.nodes_AC[i].type != 'Slack':
                 s = 1
-                grid.nodes_AC[i].theta += dTh[k].item()
+                # grid.nodes_AC[i].theta += dTh[k].item()
                 angles[i] += dTh[k].item()
                 k += 1  # Move to the next element in dTh
         k = 0  # Index for dV vector
         for i in range(grid.nn_AC):
             if grid.nodes_AC[i].type == 'PQ':
-                grid.nodes_AC[i].V += dV[k].item()
+                # grid.nodes_AC[i].V += dV[k].item()
                 V[i] += dV[k].item()
                 k += 1  # Move to the next element in dV
 
@@ -508,12 +515,14 @@ def load_flow_AC(grid, tol_lim=1e-4, maxIter=100):
         i = node.nodeNumber
         node.P_INJ = Pf[i].item()
         node.Q_INJ = Qf[i].item()
+        node.V     = V[i].item()
+        node.theta = angles[i].item()
     grid.P_AC_INJ = np.vstack([node.P_INJ for node in grid.nodes_AC])
     grid.Q_INJ = np.vstack([node.Q_INJ for node in grid.nodes_AC])
-
+    s=1
 def flow_conv_P_AC(grid, conv):
-    Us = conv.Node_AC.V.item()
-    th_s = conv.Node_AC.theta.item()
+    Us = conv.Node_AC.V
+    th_s = conv.Node_AC.theta
 
     P_AC = conv.P_AC
     Q_AC = conv.Q_AC
@@ -521,62 +530,35 @@ def flow_conv_P_AC(grid, conv):
     Ztf = conv.Ztf
     Zc = conv.Zc
     Zf = conv.Zf
-    Bf = conv.Bf
 
-    Yeq = 1/(Zc+Ztf)
     Us_cart = pol2cartz(Us, th_s)
     Ss_cart = P_AC+1j*Q_AC
 
     Is = np.conj(Ss_cart/Us_cart)
 
-    Uf_cart = Us_cart+Ztf*Is
+    
 
     if Zf != 0:
+        Uf_cart = Us_cart+Ztf*Is
         Ic_cart = Us_cart/Zf+Is*(Zf+Ztf)/Zf
+        Uc_cart = Uf_cart+Zc*Ic_cart
+        
     else:
+        Uf_cart = 0 + 1j*0
         Ic_cart = Is
-    Uc_cart = Uf_cart+Zc*Ic_cart
-
+        Uc_cart = Us_cart+Ztf*Ic_cart
+        
+        # else:
+        #     [Uc, th_c] = [Us, th_s]
     [Uc, th_c] = cartz2pol(Uc_cart)
     [Uf, th_f] = cartz2pol(Uf_cart)
     [Ic, th_Ic] = cartz2pol(Ic_cart)
-
-    Gc = conv.Gc
-    Bc = conv.Bc
-    Gtf = conv.Gtf
-    Btf = conv.Btf
+    
 
     Sc = Uc_cart*np.conj(Ic_cart)
 
-    if Zf == 0:
-        # CHECK THIS
-        Ps1 = -Us*Us*Gc+Us*Uc*(Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
-        Qs1 = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
-
-        Pc1 = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
-        Qc1 = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
-    else:
-        Ps1 = -Us*Us*Gtf+Us*Uf * \
-            (Gtf*np.cos(th_s-th_f)+Btf*np.sin(th_s-th_f))
-        Qs1 = Us*Us*Btf+Us*Uf*(Gtf*np.sin(th_s-th_f)-Btf*np.cos(th_s-th_f))
-
-        Pc1 = Uc*Uc*Gc-Uf*Uc*(Gc*np.cos(th_f-th_c)-Bc*np.sin(th_f-th_c))
-        Qc1 = -Uc*Uc*Bc+Uf*Uc*(Gc*np.sin(th_f-th_c)+Bc*np.cos(th_f-th_c))
-
-        Psf1 = Uf*Uf*Gtf-Uf*Us * \
-            (Gtf*np.cos(th_s-th_f)-Btf*np.sin(th_s-th_f))
-        Qsf1 = -Uf*Uf*Btf+Uf*Us * \
-            (Gtf*np.sin(th_s-th_f)+Btf*np.cos(th_s-th_f))
-
-        Pcf1 = -Uf*Uf*Gc+Uf*Uc*(Gc*np.cos(th_f-th_c)+Bc*np.sin(th_f-th_c))
-        Qcf1 = Uf*Uf*Bc+Uf*Uc*(Gc*np.sin(th_f-th_c)-Bc*np.cos(th_f-th_c))
-
-        Qf1 = -Uf*Uf*Bf
-
     Pc = np.real(Sc)
-
-    Ic1 = np.sqrt(Pc1*Pc1+Qc1*Qc1)/Uc
-
+    
     # AC to DC
     if conv.P_AC > 0:  # DC to AC
         P_loss = conv.a_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic
@@ -589,12 +571,12 @@ def flow_conv_P_AC(grid, conv):
     conv.P_DC = P_DC
     conv.U_f = Uf
     conv.U_c = Uc
+    conv.th_f = th_f
+    conv.th_c = th_c
     conv.Node_DC.Pconv = P_DC
     conv.Node_AC.P_s = P_AC
     conv.Ic = Ic
-
-    if conv.name == 'CmA1':
-        s = 1
+    s=1
 
 def Jacobian_conv_notransformer(grid, conv, U_c, Pc, Qc, Ps, Qs):
     J_conv = np.zeros((2, 2))
@@ -696,12 +678,8 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
     Zc = conv.Zc / conv.NumConvP
 
     Zeq = Ztf+Zc
-    Yeq = 1/Zeq
-
+     
     Uc = conv.U_c
-    Gc = np.real(Yeq)
-    Bc = np.imag(Yeq)
-
     th_c = conv.th_c
 
     Pc_known = -np.copy(conv.P_DC)
@@ -714,35 +692,46 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
     while tol2 > tol_lim:
         tol = 1
         iter_num = 0
-        while tol > tol_lim and iter_num < maxIter:
-            iter_num += 1
-
-            Ps = -Us*Us*Gc+Us*Uc * \
-                (Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
-            Qs = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
-
+        
+        if Zeq != 0:
+            Yeq = 1/Zeq
+            Gc = np.real(Yeq)
+            Bc = np.imag(Yeq)
+            while tol > tol_lim and iter_num < maxIter:
+                
+                iter_num += 1
+    
+                Ps = -Us*Us*Gc+Us*Uc * \
+                    (Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
+                Qs = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
+    
+                Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
+                Qc = -Uc*Uc*Bc+Us*Uc * \
+                    (Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
+    
+                J_conv = Jacobian_conv_no_Filter(grid,conv, Uc, Pc, Qc, Ps, Qs)
+    
+                dPc = Pc_known-Pc
+                dQs = Qs_known-Qs
+    
+                M = np.array([dPc, dQs])
+    
+                X = np.linalg.solve(J_conv, M)
+    
+                th_c += X[0].item()
+    
+                Uc += X[1].item()*Uc
+    
+                tol = max(abs(M))
+    
             Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
-            Qc = -Uc*Uc*Bc+Us*Uc * \
-                (Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
-
-            J_conv = Jacobian_conv_no_Filter(grid,conv, Uc, Pc, Qc, Ps, Qs)
-
-            dPc = Pc_known-Pc
-            dQs = Qs_known-Qs
-
-            M = np.array([dPc, dQs])
-
-            X = np.linalg.solve(J_conv, M)
-
-            th_c += X[0].item()
-
-            Uc += X[1].item()*Uc
-
-            tol = max(abs(M))
-
-        Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
-        Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
-
+            Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
+        else:
+            Uc  =Us 
+            th_c=th_s
+            Pc  = Pc_known
+            Qc  = Qs_known
+            
         if iter_num > maxIter:
             print('')
             print(f'Warning  converter {conv.name} did not converge')
@@ -758,39 +747,44 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
         Pc_new = -conv.P_DC-P_loss
 
         tol2 = abs(Pc_known-Pc_new)
-
+        # print(tol2)
         Pc_known = np.copy(Pc_new)
 
-        if conv.name == 'CmE1':
-            s = 1
-
-    Ps = -Us*Us*Gc+Us*Uc*(Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
-    Qs = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
-
-    Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
-    Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
-
+    if Zeq != 0:
+        Yeq = 1/Zeq
+        Gc = np.real(Yeq)
+        Bc = np.imag(Yeq)
+        Ps = -Us*Us*Gc+Us*Uc*(Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
+        Qs = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
+    
+        Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
+        Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
+    else:
+        Ps=Pc
+        Qs=Qc
     conv.P_AC = Ps
     conv.Q_AC = Qs
-    conv.Node_AC.P_s_new = Ps
+    
     conv.Pc = Pc
     conv.Qc = Qc
+    
+    conv.U_c = Uc
+   
+    conv.th_c = th_c
+    
     Ps_old = conv.Node_AC.P_s
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
     n = conv.Node_AC.nodeNumber
-    conv.Node_AC.P_s_new += Ps
+    
     grid.Ps_AC_new[n] += Ps
-
-    if conv.name == 'CbA1':
-        s = 1
+    s=1
+ 
 
 def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     Uc = conv.U_c
     Gc = conv.Gc
 
-    
-    th_f = conv.th_f
     th_c = conv.th_c
     
 
@@ -817,7 +811,7 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
             Ps = -Us*Us*Gc+Us*Uc * \
                 (Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
             Qs = Us*Us*Bcf+Us*Uc * \
-                (Gc*np.sin(th_s-th_f)-Bc*np.cos(th_s-th_c))
+                (Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
 
             Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
             Qc = -Uc*Uc*Bc+Us*Uc * \
@@ -862,25 +856,26 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
         s = 1
 
     Ps = -Us*Us*Gc+Us*Uc*(Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
-    Qs = Us*Us*Bcf+Us*Uc*(Gc*np.sin(th_s-th_f)-Bc*np.cos(th_s-th_c))
+    Qs = Us*Us*Bcf+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
 
     Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
     Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
 
     conv.P_AC = Ps
     conv.Q_AC = Qs
-    conv.Node_AC.P_s_new = Ps
+    
     conv.Pc = Pc
     conv.Qc = Qc
-
+    
+    conv.U_c = Uc
+    conv.th_c = th_c
+   
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
-    conv.Node_AC.P_s_new += Ps
+  
     grid.Ps_AC_new[conv.Node_AC.nodeNumber] += Ps
 
-    if conv.name == 'CbA1':
-        s = 1
-
+   
 def flow_conv_complete(grid, conv, tol_lim, maxIter):
     Uc = conv.U_c
     
@@ -899,8 +894,8 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
     
     Pc_known = -np.copy(conv.P_DC)
     Qs_known = conv.Q_AC
-    Us = conv.U_s.item()
-    th_s = conv.th_s.item()
+    Us = conv.U_s
+    th_s = conv.th_s
 
     tol2 = 1
 
@@ -977,19 +972,21 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
     # CHECK THIs
     conv.P_AC = Ps
     conv.Q_AC = Qs
-    conv.Node_AC.P_s_new = Ps
+    
     conv.Pc = Pc
     conv.Qc = Qc
 
     conv.U_c = Uc
     conv.U_f = Uf
+    conv.th_c = th_c
+    conv.th_f = th_f
 
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
     conv.Ic = Ic
-    conv.Node_AC.P_s_new += Ps
+    
     grid.Ps_AC_new[conv.Node_AC.nodeNumber] += Ps
-
+    s=1
 def Converter_Qlimit(grid, conv):
 
     Us = conv.Node_AC.V
@@ -999,8 +996,8 @@ def Converter_Qlimit(grid, conv):
     conj_Zc = np.conj(conv.Zc/ conv.NumConvP)
     conj_Zf = np.conj(conv.Zf/ conv.NumConvP)
 
-    MVA_max = conv.MVA_max
-    Icmax = MVA_max
+    S_max = conv.MVA_max/grid.S_base
+    Icmax = S_max #assumes V = 1
 
     Ps = conv.P_AC
 
@@ -1008,16 +1005,25 @@ def Converter_Qlimit(grid, conv):
     S0v = 0
     Y1 = 0
     if conv.Z1 != 0:
-        Y1 = 1/conv.Z1
+        Y1 = (1/conv.Z1)*conv.NumConvP
 
     if conv.Zf != 0:
         r = Us*Icmax*np.abs(conj_Zf/(conj_Zf+conj_Ztf))
 
         S0 = -Us**2*(1/(conj_Zf+conj_Ztf))
-        Y2 = 1/conv.Z2
+        Y2 = (1/conv.Z2)*conv.NumConvP
         S0v = -Us**2*(np.conj(Y1)+np.conj(Y2))
         rVmin = Us*conv.Ucmin*np.abs(Y2)
         rVmax = Us*conv.Ucmax*np.abs(Y2)
+    elif conj_Ztf+conj_Zc ==0:
+        
+        
+        S0 = 0
+        S0v = 0
+        r = Us*Icmax
+        rVmin = Us*conv.Ucmin
+        rVmax = Us*conv.Ucmax
+        s=1
     else:
         r = Us*Icmax
         S0v = -Us**2*(1/(conj_Ztf+conj_Zc))
@@ -1037,7 +1043,7 @@ def Converter_Qlimit(grid, conv):
     Qs_minus = Q0-np.sqrt(r**2-(Ps-Po)**2)
 
     Qs_plusV = Q0V+np.sqrt(rVmax**2-(Ps-Po)**2)
-    Qs_minusV = Q0V+np.sqrt(rVmin**2-(Ps-Po)**2)
+    Qs_minusV = Q0V-np.sqrt(rVmin**2-(Ps-Po)**2)
 
     Qs_max = min(Qs_plus, Qs_plusV)
     Qs_min = max(Qs_minus, Qs_minusV)
@@ -1083,6 +1089,3 @@ def Converter_Qlimit(grid, conv):
         conv.AC_type = 'PQ'
         grid.npv = len(grid.pv_nodes)
         grid.npq = len(grid.pq_nodes)
-
-    if conv.name == 'CbC2':
-        s = 1
