@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.1.1"
+version = "0.1.2"
 license = {file = "LICENSE.txt"}
 requires-python = ">= 3.8"
 
@@ -45,7 +45,9 @@ dependencies = ["numpy",
                 "matplotlib",
                 "scipy",
                 "prettytable",
-                "plotly"]
+                "plotly",
+                "folium",
+                "geopandas"]
 
 [project.optional-dependencies]
 OPF = ["pyomo",
