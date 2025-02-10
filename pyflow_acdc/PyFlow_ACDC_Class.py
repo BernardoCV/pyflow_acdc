@@ -38,18 +38,36 @@ def cartz2pol(z):
     return r, theta
 
 class Grid:
-    def __init__(self, S_base: float, nodes_AC: list = None, lines_AC: list = None, Converters: list = None, nodes_DC: list = None, lines_DC: list = None, conv_DC: list = None):
+    def __init__(self, S_base: float, nodes_AC: list = None, lines_AC: list = None, Converters: list = None, nodes_DC: list = None, lines_DC: list = None):
         
-        self.Graph_toPlot= nx.Graph()
+        self.Graph_toPlot= nx.MultiGraph()
         self.node_positions={}
         self.S_base = S_base
 
-        self.nodes_AC = nodes_AC
-        self.lines_AC = lines_AC
+        self._nodes_AC = nodes_AC if nodes_AC else []
+        self._nodes_DC = nodes_DC if nodes_DC else []
+        
+        self._nodes_dict_AC = None  # Cache for AC nodes dictionary
+        self._pq_nodes = None  # Cache for PQ nodes
+        self._pv_nodes = None  # Cache for PV nodes
+        self._slack_nodes = None  # Cache for Slack nodes
+        
+        self._nodes_dict_DC = None  # Cache for DC nodes dictionary
+        self._PAC_nodes = None  
+        self._P_nodes = None  
+        self._droop_nodes = None  
+        self._slackDC_nodes = None  
+        
+        
+        self.lines_AC = lines_AC if lines_AC else []
         self.lines_AC_exp = []
         self.lines_AC_tf  = []
-        self.nle_AC = 0
-        self.nttf   = 0
+        
+        self.Converters_ACDC = Converters if Converters else []
+        
+        self.lines_DC = lines_DC if lines_DC else []
+    
+            
         self.slack_bus_number_AC = []
         self.slack_bus_number_DC = []
         
@@ -82,88 +100,22 @@ class Grid:
         self.CurtCost=False
 
         self.MixedBinCont = False
+        self.TEP_n_years = 25
+        self.TEP_discount_rate =0.02
         
-        self.Converters_ACDC = Converters
+        
+      
+ 
 
-        self.nodes_DC = nodes_DC
-        self.lines_DC = lines_DC
-        self.Converters_DCDC = conv_DC
-
-        if self.nodes_AC != None:
+        if self.nodes_AC:
             self.Update_Graph_AC()
-        if self.nodes_DC != None:
-            self.Update_Graph_DC()
-     
-        # AC grid
-
-        if self.lines_AC == None:
-            self.nl_AC = 0
-
-        else:
-            # number of lines
-            self.nl_AC = len(self.lines_AC)
-            # number of connections
-            self.nc_AC = self.nl_AC
-
-        if self.nodes_AC == None:
-            self.nn_AC = 0  # number of nodes
-
-            self.npq = 0
-            self.npv = 0
-        else:
-            self.nn_AC = len(self.nodes_AC)  # number of nodes
-
-            self.npq = len(self.pq_nodes)
-            self.npv = len(self.pv_nodes)
-            self.Ps_AC_new = np.zeros((self.nn_AC, 1))
-            s = 1
             self.Update_PQ_AC()
-            self.node_names_AC = {}
-            for node in self.nodes_AC:
-                self.node_names_AC[node.nodeNumber] = node.name
-            self.names_node_AC = {value: key for key, value in self.node_names_AC.items()}    
-        # DC grid
-        if self.nodes_DC == None:
-            self.nn_DC = 0
-            self.nP = 0
-            self.nDroop = 0
-
-        else:
-            self.nn_DC = len(self.nodes_DC)  # number of nodes
-            self.nPAC = len(self.PAC_nodes)
-            self.nP = len(self.P_nodes)
-            self.nDroop = len(self.droop_nodes)
-            self.nP = len(self.P_nodes)
-            self.nDroop = len(self.droop_nodes)
-
+           
+        if self.nodes_DC:
+            self.Update_Graph_DC()
             self.Update_P_DC()
-
-        if self.lines_DC == None:
-            self.nl_DC = 0
         else:
-            self.nl_DC = len(self.lines_DC)  # number of lines
-
-        # Converters
-
-        if self.Converters_ACDC == None:
-            self.nconv = 0
-        else:
-            self.nconv = len(self.Converters_ACDC)  # number of converters
-            self.nconvP = len(self.P_Conv)
-            self.nconvD = len(self.Droop_Conv)
-            self.nconvS = len(self.Slack_Conv)
-            self.conv_names_ACDC = {}
-            for conv in self.Converters_ACDC:
-                self.conv_names_ACDC[conv.ConvNumber] = conv.name
-
-            for conv in self.Converters_ACDC:
-
-                conv.basekA = S_base/(np.sqrt(3)*conv.AC_kV_base)
-                conv.a_conv = conv.a_conv_og/S_base
-                conv.b_conv = conv.b_conv_og*conv.basekA/S_base
-                conv.c_inver = conv.c_inver_og*conv.basekA**2/S_base
-                conv.c_rect = conv.c_rect_og*conv.basekA**2/S_base
-
+            self.Num_Grids_DC=0
         # #Call Y bus formula to fill matrix
         self.create_Ybus_AC()
         self.create_Ybus_DC()
@@ -173,58 +125,201 @@ class Grid:
         
         
         self.RenSource_zones=[]
+        self.RenSource_zones_dic={}
         self.RenSources =[]
         self.rs2node = {'DC': {},
                         'AC': {}}
         
         self.Time_series = []
+        self.Time_series_dic ={}
+        
         self.Price_Zones =[]
+        self.Price_Zones_dic ={}
       
+        self.Clusters ={}
         
-        
-        
-        
+    
         self.OPF_Price_Zones_constraints_used=False
         
    
         self.OWPP_node_to_ts={}
         # Node type differentiation
+        
+    
+    @property
+    def nodes_AC(self):
+        return self._nodes_AC
 
+    # Setter for AC nodes that updates the dictionary
+    @nodes_AC.setter
+    def nodes_AC(self, new_nodes_AC):
+        self._nodes_AC = new_nodes_AC
+        self._invalidate_node_caches()
+
+    # Property for DC nodes
+    @property
+    def nodes_DC(self):
+        return self._nodes_DC
+
+    # Setter for DC nodes that updates the dictionary
+    @nodes_DC.setter
+    def nodes_DC(self, new_nodes_DC):
+        self._nodes_DC = new_nodes_DC
+        self._invalidate_DC_caches()  # Invalidate cache when nodes change
+        
+    # Property to return dictionary of AC nodes
+    @property
+    def nodes_dict_AC(self):
+        if self._nodes_dict_AC is None:  # Rebuild if cache is invalid
+            self._nodes_dict_AC = {node.name: idx for idx, node in enumerate(self._nodes_AC)}
+        return self._nodes_dict_AC
+
+    # Property to return dictionary of DC nodes
+    @property
+    def nodes_dict_DC(self):
+        if self._nodes_dict_DC is None:  # Rebuild if cache is invalid
+            self._nodes_dict_DC = {node.name: idx for idx, node in enumerate(self._nodes_DC)}
+        return self._nodes_dict_DC
+
+    # Method to extend AC nodes
+    def extend_nodes_AC(self, new_nodes):
+        self._nodes_AC.extend(new_nodes)
+        self._invalidate_node_caches()  # Invalidate the cache
+
+    # Method to remove an AC node
+    def remove_nodes_AC(self, node):
+        self._nodes_AC.remove(node)
+        self._invalidate_node_caches()  # Invalidate the cache
+        
+    def _invalidate_node_caches(self):
+        """Reset all cached node lists when nodes_AC changes."""
+        self._pq_nodes = None
+        self._pv_nodes = None
+        self._slack_nodes = None
+        self._nodes_dict_AC = None
+        
+    # Method to extend DC nodes
+    def extend_nodes_DC(self, new_nodes):
+        self._nodes_DC.extend(new_nodes)
+        self._invalidate_DC_caches()  # Invalidate the cache
+
+    # Method to remove a DC node
+    def remove_nodes_DC(self, node):
+        self._nodes_DC.remove(node)
+        self._invalidate_DC_caches()  # Invalidate the cache    
+        
+    def _invalidate_DC_caches(self):
+        """Reset all cached DC node lists when nodes_DC changes."""
+        self._PAC_nodes = None
+        self._P_nodes = None
+        self._droop_nodes = None
+        self._slackDC_nodes = None
+        self._nodes_dict_DC = None        
+    # AC grid properties
+    @property
+    def nn_AC(self):
+        return len(self.nodes_AC) if self.nodes_AC is not None else 0  # Number of AC nodes
+    
+    @property
+    def npq(self):
+        return len(self.pq_nodes) if self.pq_nodes is not None else 0  # Number of PQ nodes
+    
+    @property
+    def npv(self):
+        return len(self.pv_nodes) if self.pv_nodes is not None else 0  # Number of PV nodes
+    
     @property
     def pq_nodes(self):
-        pq_nodes = [node for node in self.nodes_AC if node.type == 'PQ']
-        return pq_nodes
+        if self._pq_nodes is None:
+            self._pq_nodes = [node for node in self._nodes_AC if node.type == 'PQ']
+        return self._pq_nodes
 
     @property
     def pv_nodes(self):
-        pv_nodes = [node for node in self.nodes_AC if node.type == 'PV']
-        return pv_nodes
+        if self._pv_nodes is None:
+            self._pv_nodes = [node for node in self._nodes_AC if node.type == 'PV']
+        return self._pv_nodes
 
     @property
     def slack_nodes(self):
-        slack_nodes = [node for node in self.nodes_AC if node.type == 'Slack']
-        return slack_nodes
+        if self._slack_nodes is None:
+            self._slack_nodes = [node for node in self._nodes_AC if node.type == 'Slack']
+        return self._slack_nodes
+    
+    @property
+    def nl_AC(self):
+        return len(self.lines_AC) if self.lines_AC is not None else 0   
+    
+    @property
+    def nle_AC(self): 
+        return len(self.lines_AC_exp) if self.lines_AC_exp is not None else 0   
+    
+    @property
+    def nttf(self): 
+        return len(self.lines_AC_tf) if self.lines_AC_tf is not None else 0     
+    
+    # DC grid properties
+    @property
+    def nn_DC(self):
+        return len(self.nodes_DC) if self.nodes_DC is not None else 0  # Number of DC nodes
+    
+    @property
+    def nPAC(self):
+        return len(self.PAC_nodes) if self.PAC_nodes is not None else 0  # Number of PAC nodes
+    
+    @property
+    def nP(self):
+        return len(self.P_nodes) if self.P_nodes is not None else 0  # Number of P nodes
+    
+    @property
+    def nDroop(self):
+        return len(self.droop_nodes) if self.droop_nodes is not None else 0  # Number of droop nodes
 
     @property
     def PAC_nodes(self):
-        PAC_nodes = [node for node in self.nodes_DC if node.type == 'PAC']
-        return PAC_nodes
+        if self._PAC_nodes is None:
+            self._PAC_nodes = [node for node in self._nodes_DC if node.type == 'PAC']
+        return self._PAC_nodes
 
     @property
     def P_nodes(self):
-        P_nodes = [node for node in self.nodes_DC if node.type == 'P']
-        return P_nodes
+        if self._P_nodes is None:
+            self._P_nodes = [node for node in self._nodes_DC if node.type == 'P']
+        return self._P_nodes
 
     @property
     def droop_nodes(self):
-        droop_nodes = [node for node in self.nodes_DC if node.type == 'Droop']
-        return droop_nodes
+        if self._droop_nodes is None:
+            self._droop_nodes = [node for node in self._nodes_DC if node.type == 'Droop']
+        return self._droop_nodes
 
     @property
     def slackDC_nodes(self):
-        slackDC_nodes = [
-            node for node in self.nodes_DC if node.type == 'Slack']
-        return slackDC_nodes
+        if self._slackDC_nodes is None:
+            self._slackDC_nodes = [node for node in self._nodes_DC if node.type == 'Slack']
+        return self._slackDC_nodes  
+
+    @property
+    def nl_DC(self):
+        return len(self.lines_DC) if self.lines_DC is not None else 0   
+       
+    # ACDC Converter properties
+    @property
+    def nconv(self):
+        return len(self.Converters_ACDC) if self.Converters_ACDC is not None else 0  # Number of converters
+    
+    @property
+    def nconvP(self):
+        return len(self.P_Conv) if self.P_Conv is not None else 0  # Number of P converters
+    
+    @property
+    def nconvD(self):
+        return len(self.Droop_Conv) if self.Droop_Conv is not None else 0  # Number of Droop converters
+    
+    @property
+    def nconvS(self):
+        return len(self.Slack_Conv) if self.Slack_Conv is not None else 0  # Number of Slack converters
+
 
     @property
     def P_Conv(self):
@@ -242,10 +337,7 @@ class Grid:
         Droop_Conv = [
             conv for conv in self.Converters_ACDC if conv.type == 'Droop']
         return Droop_Conv
-
     
-    
-
     def Update_Graph_DC(self):
         self.Graph_DC = nx.Graph()
 
@@ -276,7 +368,7 @@ class Grid:
 
         for line in self.lines_DC:
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode, line=line)
-            self.Graph_DC.add_edge(line.fromNode, line.toNode)
+            self.Graph_DC.add_edge(line.fromNode, line.toNode,line=line)
 
         self.Grids_DC = list(nx.connected_components(self.Graph_DC))
         self.Num_Grids_DC = len(self.Grids_DC)
@@ -327,7 +419,7 @@ class Grid:
 
    
     def Update_Graph_AC(self):
-        self.Graph_AC = nx.Graph()
+        self.Graph_AC = nx.MultiGraph()
         
 
         "Checking for un used nodes "
@@ -359,19 +451,19 @@ class Grid:
 
         s = 1
 
-        
-
+    
         "Creating Graphs to differentiate Grids"
-        for line in self.lines_AC:
-            self.Graph_AC.add_edge(line.fromNode, line.toNode)
+        for line in self.lines_AC + self.lines_AC_exp+ self.lines_AC_tf:
+            self.Graph_AC.add_edge(line.fromNode, line.toNode,line=line)
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode,line=line)
             line.toNode.stand_alone = False
             line.fromNode.stand_alone = False
         
+        
+        
         for node in self.nodes_AC:
             if node.stand_alone:
                 node.type = 'Slack'
-            
                 self.Graph_AC.add_node(node)
                    
             
@@ -404,27 +496,32 @@ class Grid:
                     self.num_slackAC[i] += 1
             if self.num_slackAC[i] == 0:
                 print(f'For Grid AC {i+1} no slack bus found.')
-                sys.exit()
+                print(f'Please set one before any calculations')
+                # sys.exit()
             if self.num_slackAC[i] > 1:
                 print(
                     f'For Grid AC {i+1} more than one slack bus found, results may not be accurate')
         
         
         s = 1
+        
+    def get_linesAC_by_node(self, nodeNumber):
+        lines = [line for line in self.lines_AC if
+                 (line.toNode.nodeNumber == nodeNumber or line.fromNode.nodeNumber == nodeNumber)]
+        return lines
+
+    def get_linesDC_by_node(self, nodeNumber):
+        lines = [line for line in self.lines_DC if
+                 (line.toNode.nodeNumber == nodeNumber or line.fromNode.nodeNumber == nodeNumber)]
+        return lines
+
+    def get_lineDC_by_nodes(self, fromNode, toNode):
+        lines = [line for line in self.lines_DC if
+                 (line.toNode.nodeNumber == fromNode and line.fromNode.nodeNumber == toNode) or
+                 (line.toNode.nodeNumber == toNode and line.fromNode.nodeNumber == fromNode)]
+        return lines[0] if lines else None
 
     
-
-    # def Curtail_RE(self, curtail):
-    #     self.Time_series_statistics(curtail=curtail)
-    #     for ts in self.Time_series:
-    #         if  ts.type in :
-    #             Element = ts.name
-    #             cur = f'{curtail*100}%'
-
-    #             value = self.Stats.loc[Element, cur]
-
-    #             ts.data[ts.data > value] = value
-
     def Update_P_DC(self):
 
         self.P_DC = np.vstack([node.P_DC for node in self.nodes_DC])
@@ -444,8 +541,6 @@ class Grid:
         self.Ps_AC = np.vstack([node.P_s for node in self.nodes_AC])
         self.Qs_AC = np.vstack([node.Q_s for node in self.nodes_AC])
 
-        # self.P_AC_conv=np.vstack([conv.P_AC for conv in self.Converters_ACDC])
-        # self.Q_AC_conv=np.vstack([conv.Q_AC for conv in self.Converters_ACDC])
         s = 1
 
     def create_Ybus_AC(self):
@@ -474,10 +569,7 @@ class Grid:
             Ybus_nn[fromNode] += branch_ff
             Ybus_nn[toNode] += branch_tt
             
-            
-            s=1
-        
-       
+
         for m in range(self.nn_AC):
             node = self.nodes_AC[m]
 
@@ -554,25 +646,7 @@ class Grid:
                         print(f"Changing converter {conv.name} to Slack")
                 self.Update_P_DC()
 
-        self.nconvD = len(self.Droop_Conv)
-        self.nconvS = len(self.Slack_Conv)
-
     
-    def get_linesAC_by_node(self, nodeNumber):
-        lines = [line for line in self.lines_AC if
-                 (line.toNode.nodeNumber == nodeNumber or line.fromNode.nodeNumber == nodeNumber)]
-        return lines
-
-    def get_linesDC_by_node(self, nodeNumber):
-        lines = [line for line in self.lines_DC if
-                 (line.toNode.nodeNumber == nodeNumber or line.fromNode.nodeNumber == nodeNumber)]
-        return lines
-
-    def get_lineDC_by_nodes(self, fromNode, toNode):
-        lines = [line for line in self.lines_DC if
-                 (line.toNode.nodeNumber == fromNode and line.fromNode.nodeNumber == toNode) or
-                 (line.toNode.nodeNumber == toNode and line.fromNode.nodeNumber == fromNode)]
-        return lines[0] if lines else None
 
     def Line_AC_calc(self):
         try: 
@@ -649,39 +723,7 @@ class Grid:
 
         self.Iij_DC = Iij
         s = 1
-# class Reactive_AC:
-#     reacNumber=0
-#     names = set()
-    
-#     @classmethod
-#     def reset_class(cls):
-#         cls.reacNumber = 0
-#         cls.names = set()
-#     @property
-#     def name(self):
-#         return self._name
-#     def __init__(self,node,Min_pow_genR: float,Max_pow_genR: float,name=None):
-#         self.reacNumber = Reactive_AC.reacNumber
-#         Reactive_AC.reacNumber += 1
-#         self.Node_AC=node
-        
-#         self.Max_pow_genR=Max_pow_genR
-#         self.Min_pow_genR=Min_pow_genR
-        
-#         self.Node_AC.connected_Qgen.append(self)
-  
-#         self.QGen=0
-        
-        
-#         if name in Reactive_AC.names:
-#             Reactive_AC.reacNumber -= 1
-#             raise NameError("Already used name '%s'." % name)
-#         if name is None:
-#             self._name = str(self.Node_AC.name)
-#         else:
-#             self._name = name
 
-#         Reactive_AC.names.add(self.name)
         
         
 class Gen_AC:
@@ -698,11 +740,15 @@ class Gen_AC:
         return self._name
 
     
-    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,Pset:float=0,Qset:float=0,S_rated:float=None):
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other'):
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
-        self.Node_AC=node
-        
+        self.Node_AC=node.name
+        self.geometry= node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+        self.gen_type=gen_type
         self.Max_pow_gen=Max_pow_gen
         self.Min_pow_gen=Min_pow_gen
         self.Max_pow_genR=Max_pow_genR
@@ -715,7 +761,7 @@ class Gen_AC:
         
         self.price_zone_link = False
         
-        self.Node_AC.connected_gen.append(self)
+        node.connected_gen.append(self)
         
         self.PGen=Pset
         self.QGen=Qset
@@ -724,10 +770,15 @@ class Gen_AC:
         self.Qset=Qset
         
         if name in Gen_AC.names:
-            Gen_AC.genNumber -= 1
-            raise NameError("Already used name '%s'." % name)
+            count = 1
+            new_name = f"{name}_{count}"
+            
+            while new_name in Gen_AC.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
         if name is None:
-            self._name = str(self.Node_AC.name)
+            self._name = str(node.name)
         else:
             self._name = name
 
@@ -747,22 +798,30 @@ class Ren_Source:
         return self._name
 
     
-    def __init__(self,name,node,PGi_ren_base: float):
+    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind'):
         self.rsNumber = Ren_Source.rsNumber
         Ren_Source.rsNumber += 1
         
         self.connected= 'AC'
-        
+        self.rs_type = rs_type
         
         self.curtailable= True
        
         
-        self.Node=node
+        self.Node=node.name
+        
+        self.geometry= node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
         
         self.PGi_ren_base=PGi_ren_base
         self.PGi_ren = 0 
         self._PRGi_available=1
-        node.RenSource=False
+        
+        
+        self.TS_dict = {
+            'PRGi_available': None
+        }
         
         self.PGRi_linked=False
         self.Ren_source_zone=None
@@ -771,20 +830,25 @@ class Ren_Source:
         self.min_gamma = 0.0
         self.sigma=1.05
         
-        self.Qren = 0
+        self.QGi_ren = 0
         self.Qmax=0
         self.Qmin=0
         
         self.Max_S= None
             
-        self.Node.connected_RenSource.append(self)
-        self.Node.RenSource=True
+        node.connected_RenSource.append(self)
+        node.RenSource=True
         
         self.update_PGi_ren()
         
         if name in Ren_Source.names:
-            Ren_Source.rsNumber -= 1
-            raise NameError("Already used name '%s'." % name)
+            count = 1
+            new_name = f"{name}_{count}"
+            
+            while new_name in Ren_Source.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
         if name is None:
             self._name = str(self.Node.name)
         else:
@@ -792,6 +856,7 @@ class Ren_Source:
 
         Ren_Source.names.add(self.name)
         
+        self.hover_text = None
     @property
     def PRGi_available(self):
         return self._PRGi_available
@@ -844,6 +909,11 @@ class Node_AC:
         self.PLi_base = Power_load
         self._PLi_factor =1
         
+        self.TS_dict = {
+            'Load' : None,
+            'price': None,
+            }
+        
         self.QGi = Reactive_Gained
         self.QGi_opt =0
         self.QLi = Reactive_load
@@ -892,7 +962,8 @@ class Node_AC:
         self.y_coord=y_coord
         
         self.PZ = None
-
+        self.hover_text = None
+        self.geometry=None
         if name in Node_AC.names:
             Node_AC.nodeNumber -= 1
             raise NameError("Already used name '%s'." % name)
@@ -944,6 +1015,10 @@ class Node_DC:
         self.PLi_base = Power_load
         self._PLi_factor =1
         
+        self.TS_dict = {
+            'Load' : None,
+            'price': None,
+            }
         
         self.P_DC = self.PGi-self.PLi
         self.V = np.copy(self.V_ini)
@@ -968,8 +1043,8 @@ class Node_DC:
         self.y_coord=y_coord
         
         self.PZ = None
-        
-        
+        self.hover_text = None
+        self.geometry=None
         self.connected_RenSource=[]
         
         
@@ -1019,9 +1094,12 @@ class Line_AC:
             'Susceptance': self.B,
             'MVA_rating': self.MVA_rating,
             'kV_base': self.kV_base,
+            'Length_km':self.Length_km,
             'm': self.m,
             'shift': self.shift,
-            'name': self._name
+            'name': self._name,
+            'geometry':self.geometry,
+            'isTf': self.isTf
         }
     
     def remove(self):
@@ -1029,7 +1107,7 @@ class Line_AC:
         Line_AC.lineNumber -= 1  # Decrement the line number counter
         Line_AC.names.remove(self._name)  # Remove the line's name from the set
         
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC, Resistance: float, Reactance: float, Conductance: float, Susceptance: float, MVA_rating: float, kV_base: float,m:float=1, shift:float=0, name=None):
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC, Resistance: float, Reactance: float, Conductance: float, Susceptance: float, MVA_rating: float, kV_base: float,Length_km:float=1.0,m:float=1, shift:float=0, name=None,geometry=None,isTf=False):
         self.lineNumber = Line_AC.lineNumber
         Line_AC.lineNumber += 1
 
@@ -1050,6 +1128,12 @@ class Line_AC:
         self.fromS=0
         self.toS=0
         
+        self.loss =0
+        
+        self.geometry=geometry
+        self.direction = 'from'
+        
+        self.Length_km=Length_km
         
         tap= self.m * np.exp(1j*self.shift)            
         #Yft
@@ -1073,16 +1157,22 @@ class Line_AC:
             self._name = str(self.lineNumber)
         else:
             self._name = name
-
+            
+        self.hover_text = None  
+        
+        self.isTf = isTf
+        
+        if self.toNode.kV_base != self.fromNode.kV_base or self.m !=1 or self.shift !=0:
+            self.isTf=True
         Line_AC.names.add(self.name)
 
 class Exp_Line_AC(Line_AC):
     
-    def __init__(self, Length_km, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
-        self.Length_km=Length_km
         
+        self.direction = 'from'
         self.base_cost = None
         self.life_time = 1
         self.exp_inv=1
@@ -1093,7 +1183,7 @@ class Exp_Line_AC(Line_AC):
         self.np_line_i= 0
         self.np_line_max = 1
         self.np_line_opf=True
-        
+        self.hover_text = None
         
         self.toNode.connected_toExpLine.append(self)
         self.fromNode.connected_fromExpLine.append(self)
@@ -1117,6 +1207,7 @@ class TF_Line_AC:
 
         self.fromNode = fromNode
         self.toNode = toNode
+        self.direction = 'from'
         self.R = Resistance
         self.X = Reactance
         self.G = Conductance
@@ -1147,7 +1238,8 @@ class TF_Line_AC:
         self.toNode.connected_toTFLine.append(self)
         self.fromNode.connected_fromTFLine.append(self)
 
-
+        self.hover_text = None
+        self.isTf = True
         if name in TF_Line_AC.names:
             TF_Line_AC.trafNumber -= 1
             raise NameError("Already used name '%s'." % name)
@@ -1156,7 +1248,7 @@ class TF_Line_AC:
             self._name = str(self.lineNumber)
         else:
             self._name = name
-
+            
         TF_Line_AC.names.add(self.name)
         
 
@@ -1196,8 +1288,11 @@ class Line_DC:
 
         self.fromP=0
         self.toP=0        
+        self.direction = 'from'
         
         self.Length_km=km
+        
+        self.loss =0
         
         self.base_cost = None
         self.life_time = None
@@ -1212,8 +1307,8 @@ class Line_DC:
 
         self.kV_base = kV_base
          
-        
-        
+        self.hover_text = None
+        self.geometry=None
         if name in Line_DC.names:
             Line_DC.lineNumber -= 1
             raise NameError("Already used name '%s'." % name)
@@ -1316,9 +1411,9 @@ class AC_DC_converter:
         self.Node_DC.Pconv = self.P_DC
         
          
-        self.a_conv_og = lossa  * self.cn_pol # MVA
-        self.b_conv_og = lossb                  # kV
-        self.c_rect_og = losscrect  /self.cn_pol  # Ohm
+        self.a_conv_og  = lossa  * self.cn_pol # MVA
+        self.b_conv_og  = lossb                  # kV
+        self.c_rect_og  = losscrect  /self.cn_pol  # Ohm
         self.c_inver_og = losscinv /self.cn_pol  # Ohm
 
         # 1.103 0.887  2.885    4.371
@@ -1343,16 +1438,21 @@ class AC_DC_converter:
         self.OPF_fx=False
         self.OPF_fx_type='PDC'
         
-        if self.AC_type=='Slack' or self.type=='Slack':
+        if self.AC_type=='Slack':
             self.OPF_fx_type='None'
+            
         if self.AC_type == 'PV':
             if self.type == 'PAC':
                 self.OPF_fx_type='PV'
+            elif self.type == 'Slack':
+                self.OPF_fx_type='None'
             if self.Node_AC.type == 'PQ':
                 self.Node_AC.type = 'PV'
         if self.AC_type == 'PQ':
-            if self.type == 'PAC':
+            if  self.type == 'PAC':
                 self.OPF_fx_type='PQ'
+            else:
+                self.OPF_fx_type='Q'
             self.Node_AC.Q_s_fx += self.Q_AC
            
 
@@ -1393,7 +1493,8 @@ class AC_DC_converter:
             self.Z3 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Ztf
 
 
-
+        self.hover_text = None
+        self.geometry = None
 
         if name in AC_DC_converter.names:
             AC_DC_converter.ConvNumber -= 1
@@ -1477,6 +1578,10 @@ class Ren_source_zone:
            self.RenSources=[]
            self._PRGi_available=1
            
+           self.TS_dict = {
+               'PRGi_available': None
+           }
+           
            if name is None:
                self._name = str(self.ren_source_num)
            else:
@@ -1547,6 +1652,18 @@ class Price_Zone:
         self.c=c
         self.PGL_min=-np.inf
         self.PGL_max=np.inf
+        
+        
+        self.TS_dict = {
+            'Load' : None,
+            'price': None,
+            'a_CG': None,
+            'b_CG': None,
+            'c_CG': None,
+            'PGL_min': None,
+            'PGL_max': None
+        }
+        
         self.df= pd.DataFrame(columns=['time','a', 'b', 'c','price','PGL_min','PGL_max'])        
         self.df.set_index('time', inplace=True)
         self.mtdc_price_zones=[]
@@ -1658,13 +1775,13 @@ class MTDCPrice_Zone(Price_Zone):
             
             
             
-class TimeSeries_AC:
-    TS_AC_num = 0
+class TimeSeries:
+    TS_num = 0
     names = set()
     
     @classmethod
     def reset_class(cls):
-        cls.TS_AC_num = 0
+        cls.TS_num = 0
         cls.names = set()
     
     @property
@@ -1672,13 +1789,12 @@ class TimeSeries_AC:
         return self._name
 
     def __init__(self, element_type: str, element_name:str, data: float, name=None):
-        self.TS_AC_num = TimeSeries_AC.TS_AC_num
-        TimeSeries_AC.TS_AC_num += 1
+        self.TS_num = TimeSeries.TS_num
+        TimeSeries.TS_num += 1
         
         
         self.type = element_type
         self.element_name=element_name
-        self.TS_AC_num = TimeSeries_AC.TS_AC_num
         self.data = data
         
         s = 1
@@ -1687,4 +1803,4 @@ class TimeSeries_AC:
         else:
             self._name = name
 
-        TimeSeries_AC.names.add(self.name)
+        TimeSeries.names.add(self.name)
