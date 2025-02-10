@@ -7,6 +7,7 @@ Created on Thu Feb 15 13:23:18 2024
 
 import numpy as np
 import sys
+import time
 
 def pol2cart(r, theta):
     x = r*np.cos(theta)
@@ -34,14 +35,17 @@ def cartz2pol(z):
 
 
 def AC_PowerFlow(grid, tol_lim=1e-8, maxIter=100):
+    time_1 = time.time()
+    grid.Update_PQ_AC()
     load_flow_AC(grid, tol_lim, maxIter)
     grid.Update_PQ_AC()
     grid.Line_AC_calc()
-    
+    time_2 = time.time()
+    return time_2-time_1
     
 
-def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QLimit=True):
-
+def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QLimit=False):
+    time_1 = time.time()
     tolerance = 1
     grid.iter_num_seq = 0
 
@@ -130,6 +134,10 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
     grid.Line_AC_calc()
     grid.Line_DC_calc()
     
+    time_2=time.time()
+    t = time_2-time_1
+    
+    return t
 def Jacobian_DC(grid, V_DC, P):
     grid.slack_bus_number_DC = []
     J = np.zeros((grid.nn_DC, grid.nn_DC))
@@ -167,7 +175,7 @@ def Jacobian_DC(grid, V_DC, P):
         else:
             grid.slack_bus_number_DC.append(m)
 
-    grid.J_DC = J
+    return J
 
 def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
 
@@ -217,13 +225,13 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
         # print('------')
         dPa = P_known-P
 
-        Jacobian_DC(grid,V, P)
+        J_DC = Jacobian_DC(grid,V, P)
 
         if len(grid.slack_bus_number_DC) == 0:
-            J_modified = grid.J_DC
+            J_modified = J_DC
         else:
             J_modified = np.delete(
-                np.delete(grid.J_DC, grid.slack_bus_number_DC, 0), grid.slack_bus_number_DC, 1)
+                np.delete(J_DC, grid.slack_bus_number_DC, 0), grid.slack_bus_number_DC, 1)
             dPa = np.delete(dPa, grid.slack_bus_number_DC, 0)
 
         dV_V = np.linalg.solve(J_modified, dPa)
@@ -286,119 +294,75 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
     grid.Update_P_DC()
     s = 1
 
-def Jacobian_AC(grid, Voltages, Angles):
+def Jacobian_AC(grid, Voltages, Angles,P,Q):
     grid.slack_bus_number_AC = []
 
     V = Voltages
     th = Angles
-    # Derivate of P in respect to Theta
+    
+    slack_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'Slack'])
+    pv_indices    = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'PV'])
+    pq_indices    = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'PQ'])
+    non_slack_indices = np.sort(np.concatenate((pv_indices, pq_indices)))
 
-    J_11 = np.zeros((grid.nn_AC, grid.nn_AC))
+    
+    grid.slack_bus_number_AC = [grid.nodes_AC[i].nodeNumber for i in slack_indices]
 
-    # here m and n should be modified to include PV nodes  later on
+    Gm = np.real(grid.Ybus_AC)
+    Bm = np.imag(grid.Ybus_AC)
 
-    for i in range(grid.nn_AC):
-        m = grid.nodes_AC[i].nodeNumber
-        if grid.nodes_AC[i].type != 'Slack':
-            for k in range(grid.nn_AC):
-                n = grid.nodes_AC[k].nodeNumber
-                G = np.real(grid.Ybus_AC[m, n])
-                B = np.imag(grid.Ybus_AC[m, n])
-                if m == n:
-                    # = -Q - B * V^2
-                    J_11[i, k] = -grid.Q[m]-V[m]**2*B
+    # Precompute angle differences and trigonometric values
+    angle_diff = th[:, None] - th[None, :]
+    sin_theta = np.sin(angle_diff)
+    cos_theta = np.cos(angle_diff)
+    
+   
+    # Compute non-diagonal elements of J_11
+    J_11 = V[:, None] * V[None, :] * (Gm * sin_theta - Bm * cos_theta)
+    np.fill_diagonal(J_11, -Q - V**2 * Bm.diagonal())
+    J_11 = J_11[np.ix_(non_slack_indices, non_slack_indices)]
+    
 
-                else:
-                    # Vm*Vn* (G sin(θ_mn)-B cos(θ_mn)
-                    J_11[i, k] = V[m]*V[n] * \
-                        (G*np.sin(th[m]-th[n])-B*np.cos(th[m]-th[n]))
-        else:
-            grid.slack_bus_number_AC.append(m)
-    J_11 = np.delete(
-        np.delete(J_11, grid.slack_bus_number_AC, 0), grid.slack_bus_number_AC, 1)
+    J_12 = V[:, None] * (Gm * cos_theta + Bm * sin_theta)
+    np.fill_diagonal(J_12, P / V + np.diag(Gm) * V)
+    J_12 = J_12[np.ix_(non_slack_indices, pq_indices)]
 
-    J_12 = np.zeros((grid.nn_AC, grid.npq))
+    
+    J_21 = -V[:, None] * V[None, :] * (Gm * cos_theta + Bm * sin_theta)
+    np.fill_diagonal(J_21, P - V**2 * np.diag(Gm))
+    J_21 = J_21[np.ix_(pq_indices, non_slack_indices)]
+    
+    
+    
+    J_22 = V[:, None] * (Gm * sin_theta - Bm * cos_theta)
+    np.fill_diagonal(J_22, Q / V - np.diag(Bm) * V)
+    J_22 = J_22[np.ix_(pq_indices, pq_indices)]
+    
 
-    # here m and n should be modified to include PV nodes  later on
+    J_AC = np.vstack((np.hstack((J_11, J_12)), np.hstack((J_21, J_22))))
 
-    for i in range(grid.nn_AC):
-        m = grid.nodes_AC[i].nodeNumber
-        for k in range(grid.npq):
-            n = grid.pq_nodes[k].nodeNumber
-            G = np.real(grid.Ybus_AC[m, n])
-            B = np.imag(grid.Ybus_AC[m, n])
-            if m == n:
-                # P/V + G * V
-                J_12[i, k] = grid.P[m]/V[m] + G*V[m]
+    return J_AC
 
-            else:
-                # V * (G cos θ_mn + B sin θ_mn)
-                J_12[i, k] = V[m] * \
-                    (G*np.cos(th[m]-th[n])+B*np.sin(th[m]-th[n]))
 
-    J_12 = np.delete(J_12, grid.slack_bus_number_AC, 0)
 
-    J_21 = np.zeros((grid.npq, grid.nn_AC))
 
-    # here m and n should be modified to include PV nodes  later on
 
-    for i in range(grid.npq):
-        m = grid.pq_nodes[i].nodeNumber
-        for k in range(grid.nn_AC):
-            n = grid.nodes_AC[k].nodeNumber
-            G = np.real(grid.Ybus_AC[m, n])
-            B = np.imag(grid.Ybus_AC[m, n])
-            if m == n:
-                # P - G V^2
-                J_21[i, k] = grid.P[m]-V[m]**2*G
-
-                s = 1
-            else:
-                # - Vi *Vk *( G sin θ_mn + B cos θ_mn)
-                J_21[i, k] = -V[m]*V[n] * \
-                    (G*np.cos(th[m]-th[n])+B*np.sin(th[m]-th[n]))
-    J_21 = np.delete(J_21, grid.slack_bus_number_AC, 1)
-
-    J_22 = np.zeros((grid.npq, grid.npq))
-    # here m and n should be modified to include PV nodes  later on
-
-    for i in range(grid.npq):
-        m = grid.pq_nodes[i].nodeNumber
-        for k in range(grid.npq):
-            n = grid.pq_nodes[k].nodeNumber
-            G = np.real(grid.Ybus_AC[m, n])
-            B = np.imag(grid.Ybus_AC[m, n])
-            if m == n:
-                # Q /V - B*V
-                J_22[i, k] = grid.Q[m]/V[m]-B*V[m]
-                s = 1
-            else:
-                # V *(G sin θ_mn - B cos θ_mn )
-                J_22[i, k] = V[m] * \
-                    (G*np.sin(th[m]-th[n])-B*np.cos(th[m]-th[n]))
-    grid.J_AC = np.vstack(
-        (np.hstack((J_11, J_12)), np.hstack((J_21, J_22))))
-
-    f = 1
 
 def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
 
     Pnet = np.copy(grid.P_AC+grid.Ps_AC)
     Qnet = np.copy(grid.Q_AC+grid.Qs_AC)
 
-    angles = np.zeros(grid.nn_AC)
-    V = np.zeros(grid.nn_AC)
-
     # number of different node types
-
-    npv = len(grid.pv_nodes)
-    npq = len(grid.pq_nodes)
     nps = len(grid.slack_nodes)
 
-    for node in grid.nodes_AC:
-        V[node.nodeNumber] = node.V
-        angles[node.nodeNumber] = node.theta
+    V = np.array([node.V for node in grid.nodes_AC])
+    angles = np.array([node.theta for node in grid.nodes_AC])
+    
+    G = np.real(grid.Ybus_AC)
+    B = np.imag(grid.Ybus_AC)
 
+    
     tol = 1
     iter_num = 0
     while tol > tol_lim and iter_num < maxIter:
@@ -406,29 +370,40 @@ def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
 
         P = np.zeros((grid.nn_AC, 1))
         Q = np.zeros((grid.nn_AC, 1))
+        
+        # Compute pairwise angle differences
+        angle_diff = angles[:, None] - angles[None, :]  # Shape: (nn_AC, nn_AC)
+    
+        # Compute power components
+        cos_term = np.cos(angle_diff)
+        sin_term = np.sin(angle_diff)
+        
+        P = V[:, None] * V[None, :] * (G * cos_term + B * sin_term)
+        Q = V[:, None] * V[None, :] * (G * sin_term - B * cos_term)
+    
+        # Sum across rows to get the net P and Q for each node
+        P = P.sum(axis=1)
+        Q = Q.sum(axis=1)
+        
+        # for node in grid.nodes_AC:
+        #     i = node.nodeNumber
+        #     for k in range(grid.nn_AC):
+        #         G = np.real(grid.Ybus_AC[i, k])
+        #         B = np.imag(grid.Ybus_AC[i, k])
+        #         P[i] += V[i]*V[k] * \
+        #             (G*np.cos(angles[i]-angles[k]) +
+        #              B*np.sin(angles[i]-angles[k]))
+        #         Q[i] += V[i]*V[k] * \
+        #             (G*np.sin(angles[i]-angles[k]) -
+        #              B*np.cos(angles[i]-angles[k]))
 
-        for node in grid.nodes_AC:
-            i = node.nodeNumber
-            for k in range(grid.nn_AC):
-                G = np.real(grid.Ybus_AC[i, k])
-                B = np.imag(grid.Ybus_AC[i, k])
-                P[i] += V[i]*V[k] * \
-                    (G*np.cos(angles[i]-angles[k]) +
-                     B*np.sin(angles[i]-angles[k]))
-                Q[i] += V[i]*V[k] * \
-                    (G*np.sin(angles[i]-angles[k]) -
-                     B*np.cos(angles[i]-angles[k]))
-
-        # Power flow vector solve
-        grid.P = P
-        grid.Q = Q
 
         # Calculate changes in specified active and reactive power
-        dPa = Pnet-P
-        dQa = Qnet-Q
+        dPa = Pnet- P[:, None]
+        dQa = Qnet- Q[:, None]
         k = 0
 
-        Jacobian_AC(grid,V, angles)
+        J_AC = Jacobian_AC(grid,V, angles,P,Q)
 
         Q_del = []
         for node in grid.nodes_AC:
@@ -441,7 +416,7 @@ def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
 
         M = np.vstack((dP, dQ))
 
-        X = np.linalg.solve(grid.J_AC, M)
+        X = np.linalg.solve(J_AC, M)
 
         # Check for NaN values in the array
         nan_indices = np.isnan(X)
@@ -454,9 +429,7 @@ def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
             sys.exit()
         dTh = X[0:(grid.nn_AC-nps)]
         dV = X[grid.nn_AC-nps:]
-        # dTh = np.array((1,2,3,4,5))
-        # dV= np.array((1,2,3,4,5))
-
+      
         # Recall the updated voltage vector into the correct place
         k = 0  # Index for dV vector
         for i in range(grid.nn_AC):
@@ -797,7 +770,7 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     Pc_known = -np.copy(conv.P_DC)
     Qs_known = np.copy(conv.Q_AC)
     Us = conv.U_s
-    th_s = conv.th_s
+    th_s = conv.th_S
 
     tol2 = 1
 
@@ -1039,7 +1012,7 @@ def Converter_Qlimit(grid, conv):
     if sqrt < 0:
         print(f'Converter {conv.name} is over current capacity')
 
-    Qs_plus = Q0+np.sqrt(r**2-(Ps-Po)**2)
+    Qs_plus  = Q0+np.sqrt(r**2-(Ps-Po)**2)
     Qs_minus = Q0-np.sqrt(r**2-(Ps-Po)**2)
 
     Qs_plusV = Q0V+np.sqrt(rVmax**2-(Ps-Po)**2)
@@ -1087,5 +1060,4 @@ def Converter_Qlimit(grid, conv):
             elif Q_req < Qs_min:
                 conv.Node_AC.Q_s = Qs_min
         conv.AC_type = 'PQ'
-        grid.npv = len(grid.pv_nodes)
-        grid.npq = len(grid.pq_nodes)
+        
