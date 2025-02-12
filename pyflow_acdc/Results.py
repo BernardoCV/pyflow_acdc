@@ -809,7 +809,7 @@ class Results:
         
         
         for m in self.Grid.Price_Zones:
-            from PyFlow_ACDC import Price_Zone
+            from .Classes import Price_Zone
             if type(m) is Price_Zone:
                 price_zone_weighted = SC.loc[m.name]
                 weighted_total = price_zone_weighted * weight

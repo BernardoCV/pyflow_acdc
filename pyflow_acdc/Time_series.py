@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from scipy import stats as st
-
+import time
 
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
 
@@ -17,13 +17,17 @@ from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential
 
 try:
     import pyomo.environ as pyo
-    from .ACDC_OPF import (
+    from .ACDC_OPF_model import (
         OPF_createModel_ACDC,
-        ExportACDC_model_toPyflowACDC,
+        ExportACDC_model_toPyflowACDC)
+    
+    from .ACDC_OPF import (
         OPF_solve,
         OPF_obj,
         OPF_conv_results,
-        pack_variables
+        pack_variables,
+        Translate_pyf_OPF,
+        TS_parallel_OPF
     )
     pyomo_imp= True
     

@@ -22,7 +22,7 @@ def analyse_OPF(grid):
     
 
 def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
-    from PyFlow_ACDC_OPF import Translate_pyf_OPF 
+    from . import Translate_pyf_OPF 
     
     OnlyAC,TAP_tf = analyse_OPF(grid)
     
@@ -371,7 +371,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     "Price Zone equality constraints"
     
     def price_zone_price_formula(model,price_zone):
-        from PyFlow_ACDC import Price_Zone
+        from .Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             return model.price_zone_price[price_zone]==2*model.price_zone_a[price_zone]*model.PN[price_zone]*grid.S_base+model.price_zone_b[price_zone]
         else :
@@ -400,7 +400,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         return model.PN[price_zone] ==Pm_AC+Pm_DC
 
     def PZ_cost_of_generation(model,price_zone):
-        from PyFlow_ACDC import Price_Zone
+        from .Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             return model.SocialCost[price_zone]== model.price_zone_a[price_zone]*(model.PN[price_zone]*grid.S_base)**2+model.price_zone_b[price_zone]*(model.PN[price_zone]*grid.S_base)
         else:
@@ -408,7 +408,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         
         
     def Price_link(model,price_zone):
-        from PyFlow_ACDC import Price_Zone
+        from .Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             linked_price_zone=grid.Price_Zones[price_zone].linked_price_zone
             if linked_price_zone is not None:   
@@ -454,7 +454,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         
         model.price_zone_MTDC_link = pyo.ConstraintList()
         
-        from PyFlow_ACDC import MTDCPrice_Zone
+        from .Classes import MTDCPrice_Zone
         # Step 1: Define sets for the MTDC price_zones and linked price_zones
         model.MTDCPrice_Zones = pyo.Set(initialize=[m for m in model.M if isinstance(grid.Price_Zones[m], MTDCPrice_Zone)])
         

@@ -884,7 +884,7 @@ class Node_AC:
         return self._name
 
     def __init__(self, node_type: str, Voltage_0: float, theta_0: float,kV_base:float, Power_Gained: float=0, Reactive_Gained: float=0, Power_load: float=0, Reactive_load: float=0, name=None, Umin=0.9, Umax=1.1,Gs:float= 0,Bs:float=0,x_coord=None,y_coord=None):
-        # type: (1=PQ, 2=PV, 3=Slack)
+        
         self.nodeNumber = Node_AC.nodeNumber
         Node_AC.nodeNumber += 1
         self.type = node_type
@@ -1001,7 +1001,7 @@ class Node_DC:
         return self._name
 
     def __init__(self, node_type: str, Voltage_0: float, Power_Gained: float, Power_load: float,kV_base:float, name=None, Umin=0.95, Umax=1.05,x_coord=None,y_coord=None):
-        # type: (1=P, 2=Droop, 3=Slack)
+       
         self.nodeNumber = Node_DC.nodeNumber
         Node_DC.nodeNumber += 1
 
