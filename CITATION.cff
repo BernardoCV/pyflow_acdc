@@ -1,11 +1,15 @@
-# This CITATION.cff file was generated with cffinit.
-# Visit https://bit.ly/cffinit to generate yours today!
-
 cff-version: 1.2.0
 title: PyFlow ACDC
-message: >-
-  If you use this software, please cite:
-
+message: "If you use this software, please cite the following article."
+type: software
+authors:
+  - given-names: Bernardo
+    family-names: Castro Valerio
+    email: bernardo.castro@upc.edu
+    affiliation: CITCEA-UPC
+    orcid: "https://orcid.org/0009-0006-1619-9175"
+repository-code: "https://github.com/BernardoCV/pyflow_acdc"
+license: BSD-3-Clause
 references:
   - type: article
     authors:
