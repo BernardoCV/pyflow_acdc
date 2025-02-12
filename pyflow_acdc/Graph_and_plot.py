@@ -1004,7 +1004,7 @@ def plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",poly
     
     # Extract node data into a GeoDataFrame
     def extract_node_data(nodes):
-        from PyFlow_ACDC_Class import Node_AC
+        from .Classes import Node_AC
         node_data = []
         for node in nodes:
             subgraph_idx = subgraph_dict.get(node, None)

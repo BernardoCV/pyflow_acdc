@@ -260,8 +260,8 @@ def create_dictionaries(grid):
                     "Ucmax": conv.Ucmax,
                     
                 })
-    from PyFlow_ACDC_Class import MTDCPrice_Zone
-    from PyFlow_ACDC_Class import OffshorePrice_Zone
+    from .Classes import MTDCPrice_Zone
+    from .Classes import OffshorePrice_Zone
     # Step 1: Define sets for the MTDC price_zones and linked price_zones
     if grid.Price_Zones:
         for price_zone in getattr(grid, "Price_Zones", []):

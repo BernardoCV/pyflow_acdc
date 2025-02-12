@@ -384,7 +384,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
        return sum(model.SocialCost[price_zone] for price_zone in model.M)
    
     def formula_Offshoreprofit():
-        from PyFlow_ACDC import OffshorePrice_Zone
+        from .Classes import OffshorePrice_Zone
         if ObjRule['Renewable_profit']['w']==0:
             return 0
         nodes_with_RenSource = []
