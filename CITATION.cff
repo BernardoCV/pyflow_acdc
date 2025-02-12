@@ -4,14 +4,24 @@
 cff-version: 1.2.0
 title: PyFlow ACDC
 message: >-
-  If you use this software, please cite it using the
-  metadata from this file.
-type: software
-authors:
-  - given-names: Bernardo
-    family-names: Castro Valerio
-    email: bernardo.castro@upc.edu
-    affiliation: CITCEA-UPC
-    orcid: 'https://orcid.org/0009-0006-1619-9175'
-repository-code: 'https://github.com/BernardoCV/pyflow_acdc'
-license: BSD-3-Clause
+  If you use this software, please cite:
+
+references:
+  - type: article
+    authors:
+      - family-names: Valerio
+        given-names: Bernardo Castro
+      - family-names: Lacerda
+        given-names: Vinicius A.
+      - family-names: Cheah-Mane
+        given-names: Marc
+      - family-names: Gebraad
+        given-names: Pieter
+      - family-names: Gomis-Bellmunt
+        given-names: Oriol
+    title: An optimal power flow tool for AC/DC systems, applied to the analysis of the North Sea Grid for offshore wind integration
+    journal: IEEE Transactions on Power Systems
+    year: 2025
+    doi: 10.1109/TPWRS.2025.3533889
+    start: 1
+    end: 14
