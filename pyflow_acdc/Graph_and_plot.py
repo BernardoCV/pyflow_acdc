@@ -26,8 +26,7 @@ except:
     map_tac = False
 import sys
 
-__all__ = [
-    'plot_Graph',
+__all__ = ['plot_Graph',
     'plot_neighbour_graph',
     'plot_TS_res',
     'plot_folium']
