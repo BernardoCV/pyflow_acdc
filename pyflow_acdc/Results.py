@@ -35,7 +35,7 @@ class Results:
         self.AC_lines_current()
         self.AC_lines_power()
         
-        if self.Grid.nodes_DC != None:
+        if self.Grid.nodes_DC is not None:
             if self.Grid.nconv != 0:
                 self.Converter()
             self.DC_bus()
@@ -76,9 +76,6 @@ class Results:
         self.DC_lines_power()
         self.Slack_DC()
         self.Power_loss_DC()
-
-        if self.Grid.Converters_DCDC != None:
-            self.DC_converter()
 
     def Slack_All(self):
         table = pt()
@@ -130,30 +127,18 @@ class Results:
         else:
             print(table)
 
-    def DC_converter(self):
-        table = pt()
-
-        table.field_names = ["Converter", "From node", "To node",
-                             "Power from (MW)", "Power To (MW))", "Power Loss (MW)"]
-        for conv in self.Grid.Converters_DCDC:
-            convid = conv.name
-            fromnode = conv.fromNode.name
-            tonode = conv.toNode.name
-            fromMW = conv.Powerfrom*self.Grid.S_base
-            toMW = conv.PowerTo*self.Grid.S_base
-            loss = fromMW-toMW
-
-            table.add_row([convid, fromnode, tonode, np.round(fromMW, decimals=self.dec), np.round(
-                toMW, decimals=self.dec), np.round(loss, decimals=self.dec)])
-        print('-----------')
-        print('DC DC Coverters')
-        print(table)
 
     def Power_loss(self):
         table = pt()
         # Define the table headers
         table.field_names = ["Grid", "Power Loss (MW)","Load %"]
-        if self.Grid.nodes_AC != None:
+        generation=0 
+
+        if self.Grid.nodes_AC is not None:
+            for node in self.Grid.nodes_AC:
+                generation+=(node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)+sum(gen.PGen for gen in node.connected_gen))*self.Grid.S_base
+                        
+
             self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
             for line in self.Grid.lines_AC:
                 node = line.fromNode
@@ -181,7 +166,9 @@ class Results:
                 table.add_row([f'AC Grid {g+1}', np.round(self.lossP_AC[g], decimals=self.dec),np.round(gload, decimals=self.dec)])
                 tot += self.lossP_AC[g]
 
-        if self.Grid.nodes_DC != None:
+        if self.Grid.nodes_DC is not None:
+            for node in self.Grid.nodes_DC:
+                generation+= (node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource))*self.Grid.S_base
 
             self.lossP_DC = np.zeros(self.Grid.Num_Grids_DC)
 
@@ -209,7 +196,7 @@ class Results:
                 table.add_row([f'DC Grid {g+1}', np.round(self.lossP_DC[g], decimals=self.dec),np.round(gload, decimals=self.dec)])
                 tot += self.lossP_DC[g]
 
-        if self.Grid.Converters_ACDC != None:
+        if self.Grid.Converters_ACDC is not None:
             P_loss_ACDC = 0
             for conv in self.Grid.Converters_ACDC:
                 P_loss_ACDC += (conv.P_loss_tf+conv.P_loss)*self.Grid.S_base
@@ -217,15 +204,13 @@ class Results:
          
             table.add_row(['AC DC Converters', np.round(P_loss_ACDC, decimals=self.dec),""])
 
-        if self.Grid.Converters_DCDC != None:
-            P_loss_DCDC = 0
-            for conv in self.Grid.Converters_DCDC:
-                P_loss_DCDC += (abs(conv.PowerTo-conv.Powerfrom))*self.Grid.S_base
-                tot += (abs(conv.PowerTo-conv.Powerfrom))*self.Grid.S_base
 
-            table.add_row(['DC DC Converters', np.round(P_loss_DCDC, decimals=self.dec),""])
-
+        eff = (generation-tot)/generation*100
+        
         table.add_row(["Total loss", np.round(tot, decimals=self.dec),""])
+        table.add_row(["     ", "",""])
+        table.add_row(["Generation", np.round(generation, decimals=self.dec),""])
+        table.add_row(["Efficiency", f'{np.round(eff, decimals=0)}%',""])
         print('--------------')
         print('Power loss')
         print(table)
@@ -285,7 +270,9 @@ class Results:
         print('')
         table_all = pt()
         table_all.field_names = [
-            "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", "Power Converter DCDC (MW)", "Power injected (MW)", "Voltage (pu)", "Grid"]
+            "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", 
+            "Power injected (MW)", "Voltage (pu)", "Grid"]  # 7 fields
+
         for g in range(self.Grid.Num_Grids_DC):
             print(f'Grid DC {g+1}')
 
@@ -293,7 +280,8 @@ class Results:
 
             # Define the table headers
             table.field_names = [
-                "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", "Power Converter DCDC (MW)", "Power injected (MW)", "Voltage (pu)"]
+                "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", 
+                "Power injected (MW)", "Voltage (pu)"]  # 6 fields
 
             for node in self.Grid.nodes_DC:
                 if self.Grid.Graph_node_to_Grid_index_DC[node.nodeNumber] == g:
@@ -304,11 +292,23 @@ class Results:
                             else:
                                 node.PLi = abs(node.P_INJ)
                     conv  = np.round(node.P*self.Grid.S_base, decimals=self.dec)
-                    convDC =np.round(node.PconvDC *self.Grid.S_base, decimals=self.dec)
-                    table.add_row([node.name, np.round(node.PGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base,
-                                  decimals=self.dec), conv,convDC, np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.V, decimals=self.dec)])
-                    table_all.add_row([node.name, np.round(node.PGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base,
-                                      decimals=self.dec), conv,convDC, np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.V, decimals=self.dec), g+1])
+                    table.add_row([
+                        node.name, 
+                        np.round(node.PGi*self.Grid.S_base, decimals=self.dec), 
+                        np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
+                        conv,
+                        np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
+                        np.round(node.V, decimals=self.dec)
+                    ])
+                    table_all.add_row([
+                        node.name, 
+                        np.round(node.PGi*self.Grid.S_base, decimals=self.dec), 
+                        np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
+                        conv,
+                        np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
+                        np.round(node.V, decimals=self.dec),
+                        g+1
+                    ])
 
             print(table)
 
@@ -353,8 +353,14 @@ class Results:
                                 node.QGi = node.Q_INJ - \
                                     (node.Q_s+node.Q_s_fx)+node.QLi
 
-                            table.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(
-                                node.QLi*self.Grid.S_base, decimals=self.dec), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
+                            table.add_row([node.name, 
+                                           np.round(PGi*self.Grid.S_base, 
+                                            decimals=self.dec), 
+                                            np.round(QGi*self.Grid.S_base, decimals=self.dec), 
+                                            np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
+                                            np.round(node.QLi*self.Grid.S_base, decimals=self.dec), 
+                                            np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
+                                            np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
 
                 else:
                     # Define the table headers
@@ -372,8 +378,30 @@ class Results:
                             if node.type == 'PV':
                                 QGi = node.Q_INJ -(node.Q_s+node.Q_s_fx)+node.QLi
 
-                            table.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(node.QLi*self.Grid.S_base, decimals=self.dec), np.round(
-                                node.P_s*self.Grid.S_base, decimals=self.dec).item(), np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
+                            table.add_row([
+                                node.name,
+                                np.round(PGi*self.Grid.S_base, decimals=self.dec),
+                                np.round(QGi*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.PLi*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.QLi*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.P_s*self.Grid.S_base, decimals=self.dec).item(),
+                                np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(),
+                                np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)
+                            ])
+                            
+                            table_all.add_row([
+                                node.name,
+                                np.round(PGi*self.Grid.S_base, decimals=self.dec),
+                                np.round(QGi*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.PLi*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.QLi*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.P_s*self.Grid.S_base, decimals=self.dec).item(),
+                                np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(),
+                                np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec),
+                                np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec),
+                                g+1
+                            ])
                           
                 print(table)
 
@@ -405,7 +433,8 @@ class Results:
                 else:
                     # Define the table headers
                     table.field_names = ["Node", "Power Gen (MW)", "Reactive Gen (MVAR)", "Power Load (MW)", "Reactive Load (MVAR)",
-                                         "Power converters DC(MW)", "Reactive converters DC (MVAR)", "Power injected  (MW)", "Reactive injected  (MVAR)"]
+                                         "Power converters DC(MW)", "Reactive converters DC (MVAR)", "Power injected  (MW)",
+                                         "Reactive injected  (MVAR)"]
 
                     for node in self.Grid.nodes_AC:
                         if self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber] == g:
@@ -418,10 +447,25 @@ class Results:
                             if node.type == 'PV':
                                 QGi = node.Q_INJ -(node.Q_s+node.Q_s_fx)+node.QLi
 
-                            table.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(node.QLi*self.Grid.S_base, decimals=self.dec), np.round(
-                                node.P_s*self.Grid.S_base, decimals=self.dec).item(), np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
-                            table_all.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(node.QLi*self.Grid.S_base, decimals=self.dec), np.round(
-                                node.P_s*self.Grid.S_base, decimals=self.dec).item(), np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec), g+1])
+                            table.add_row([node.name, 
+                                           np.round(PGi*self.Grid.S_base, decimals=self.dec), 
+                                           np.round(QGi*self.Grid.S_base, decimals=self.dec), 
+                                           np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
+                                           np.round(node.QLi*self.Grid.S_base, decimals=self.dec), 
+                                           np.round(node.P_s*self.Grid.S_base, decimals=self.dec).item(),
+                                           np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), 
+                                           np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec),
+                                           np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
+                            table_all.add_row([node.name,
+                                               np.round(PGi*self.Grid.S_base, decimals=self.dec), 
+                                               np.round(QGi*self.Grid.S_base, decimals=self.dec), 
+                                               np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
+                                               np.round(node.QLi*self.Grid.S_base, decimals=self.dec), 
+                                               np.round(node.P_s*self.Grid.S_base, decimals=self.dec).item(), 
+                                               np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), 
+                                               np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
+                                               np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec), 
+                                               g+1])
 
                 print(table)
         if self.export is not None:
@@ -491,10 +535,26 @@ class Results:
                     load = max(Sfrom, Sto)/line.MVA_rating*100
                     if line.name == 'ICL4':
                         s=1
-                    tablei.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_from, decimals=self.dec), np.round(i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MVA_rating)])
-                    table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_from, decimals=self.dec), np.round(i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MVA_rating), g+1])
+                    tablei.add_row([
+                        line.name,
+                        line.fromNode.name,
+                        line.toNode.name,
+                        np.round(i_from, decimals=self.dec),
+                        np.round(i_to, decimals=self.dec),
+                        np.round(load, decimals=self.dec),
+                        int(line.MVA_rating)
+                    ])
+                    
+                    table_all.add_row([
+                        line.name,
+                        line.fromNode.name,
+                        line.toNode.name,
+                        np.round(i_from, decimals=self.dec),
+                        np.round(i_to, decimals=self.dec),
+                        np.round(load, decimals=self.dec),
+                        int(line.MVA_rating),
+                        g+1
+                    ])
             if len(tablei.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablei)
 
@@ -534,8 +594,17 @@ class Results:
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
 
-                        tablep.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(p_from, decimals=self.dec), np.round(Q_from, decimals=self.dec), np.round(
-                            p_to, decimals=self.dec), np.round(Q_to, decimals=self.dec), np.round(Ploss, decimals=self.dec), np.round(Qloss, decimals=self.dec)])
+                        tablep.add_row([
+                            line.name, 
+                            line.fromNode.name, 
+                            line.toNode.name, 
+                            np.round(p_from, decimals=self.dec), 
+                            np.round(Q_from, decimals=self.dec), 
+                            np.round(p_to, decimals=self.dec), 
+                            np.round(Q_to, decimals=self.dec), 
+                            np.round(Ploss, decimals=self.dec), 
+                            np.round(Qloss, decimals=self.dec)
+                        ])
 
             elif Grid == None:
 
@@ -559,8 +628,17 @@ class Results:
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
 
-                        tablep.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(p_from, decimals=self.dec), np.round(Q_from, decimals=self.dec), np.round(
-                            p_to, decimals=self.dec), np.round(Q_to, decimals=self.dec), np.round(Ploss, decimals=self.dec), np.round(Qloss, decimals=self.dec)])
+                        tablep.add_row([
+                            line.name, 
+                            line.fromNode.name, 
+                            line.toNode.name, 
+                            np.round(p_from, decimals=self.dec), 
+                            np.round(Q_from, decimals=self.dec), 
+                            np.round(p_to, decimals=self.dec), 
+                            np.round(Q_to, decimals=self.dec), 
+                            np.round(Ploss, decimals=self.dec), 
+                            np.round(Qloss, decimals=self.dec)
+                        ])
                         table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(p_from, decimals=self.dec), np.round(Q_from, decimals=self.dec), np.round(
                             p_to, decimals=self.dec), np.round(Q_to, decimals=self.dec), np.round(Ploss, decimals=self.dec), np.round(Qloss, decimals=self.dec), g+1])
 
