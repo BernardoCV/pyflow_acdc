@@ -734,7 +734,7 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
 
         tol2 = abs(Pc_known-Pc_new)
         # print(tol2)
-        Pc_known = np.copy(Pc_new)
+        Pc_known = Pc_new
 
     if Zeq != 0:
         Yeq = 1/Zeq

@@ -13,6 +13,7 @@ from .ACDC_PF import *
 from .ACDC_OPF import *
 from .Graph_and_plot import *
 from .Market_Coeff import *
+from .Grid_creator import *
 
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
@@ -95,7 +96,9 @@ __all__ = [
     'plot_folium',
     
     # Market Analysis
-    'calculate_market_coefficients'
+    'price_zone_data_pd',
+    'price_zone_coef_data',
+    'plot_curves'
 ]
 
 # Dynamically load all .py files in the 'cases/' folder

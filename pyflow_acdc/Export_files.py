@@ -175,6 +175,7 @@ def create_dictionaries(grid):
                     "x_coord": node.x_coord,
                     "y_coord": node.y_coord,
                     "PZ" :node.PZ,
+                    "geometry": node.geometry.wkt 
                 })
 
     # AC Lines
@@ -193,6 +194,7 @@ def create_dictionaries(grid):
                     "m": line.m,
                     "shift": line.shift,
                     "Line_id": line.name,
+                    "geometry": line.geometry.wkt
                 })
 
     # DC Nodes
@@ -211,6 +213,7 @@ def create_dictionaries(grid):
                     "x_coord":     node.x_coord,
                     "y_coord":     node.y_coord,
                     "PZ" :node.PZ,
+                    "geometry": node.geometry.wkt
                 })
 
     # DC Lines
@@ -230,7 +233,8 @@ def create_dictionaries(grid):
                     "kV_base":    line.kV_base,
                     "Length_km":         line.Length_km,
                     "Mono_Bi_polar":   pol,
-                    "Line_id":       line.name,
+                    "Line_id":       line.name,     
+                    "geometry": line.geometry.wkt
                 })
 
     # Converters
@@ -262,7 +266,7 @@ def create_dictionaries(grid):
                     "losscinv":   conv.c_inver_og*conv.cn_pol,
                     "Ucmin": conv.Ucmin,
                     "Ucmax": conv.Ucmax,
-                    
+                    "geometry": conv.geometry.wkt 
                 })
     from .Classes import MTDCPrice_Zone
     from .Classes import OffshorePrice_Zone
@@ -310,7 +314,7 @@ def create_dictionaries(grid):
             if gen:
                 data["Generators"].append({
                     "name": gen.name,
-                    "node": gen.Node_AC.name,
+                    "node": gen.Node_AC,
                     "Max_pow_gen":  gen.Max_pow_gen,
                     "Min_pow_gen":  gen.Min_pow_gen,
                     "Max_pow_genR": gen.Max_pow_genR,
@@ -330,7 +334,7 @@ def create_dictionaries(grid):
                         
                 data["RenSources"].append({
                     "ren_source_name" : ren_source.name,
-                    "node_name": ren_source.Node.name,
+                    "node_name": ren_source.Node,
                     "base": ren_source.PGi_ren_base,
                     "available": ren_source._PRGi_available,
                     "zone":       getattr(ren_source, "zone", None),
@@ -383,7 +387,7 @@ def {file_name}():
     {Converters_ACDC_code}
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in_pu=True)
+    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
     """
     
     if pz_code:
