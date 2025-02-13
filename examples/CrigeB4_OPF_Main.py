@@ -25,7 +25,7 @@ DC_line_data   = pd.read_csv('CigreB4/CigreB4_DC_line_data.csv')
 Converter_ACDC_data = pd.read_csv('CigreB4/CigreB4_Converter_data.csv')
 Converter_DCDC_data = pd.read_csv('CigreB4/CigreB4_DCDC_conv.csv')
 
-[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_ACDC_data,Converter_DCDC_data,data_in_pu=False)
+[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_ACDC_data,Converter_DCDC_data)
 for conv in grid.Converters_ACDC:
     conv.a_conv=0
     conv.b_conv=0
