@@ -57,10 +57,10 @@ def generate_add_price_zone_code(price_zone_data):
             code += f"    pyf.add_price_zone(grid,'{zone['name']}',{zone['price']},import_pu_L={zone['import_pu_L']},export_pu_G={zone['export_pu_G']},a={zone['a']},b={zone['b']},c={zone['c']},import_expand_pu={zone['import_expand_pu']})\n"
     for zone in price_zone_data:
         if zone["type"]== "offshore":
-            code += f"    pyf.add_offshore_price_zone(grid,{zone['main_price_zone']},{zone['name']})\n"
+            code += f"    pyf.add_offshore_price_zone(grid,'{zone['main_price_zone']}','{zone['name']}')\n"
     for zone in price_zone_data:
         if zone["type"]== "MTDC":
-            code += f"    pyf.add_MTDC_price_zone(grid, {zone['name']},linked_price_zones={zone['linked_price_zones']},pricing_strategy={zone['pricing_strategy']})\n"        
+            code += f"    pyf.add_MTDC_price_zone(grid, '{zone['name']}',linked_price_zones={zone['linked_price_zones']},pricing_strategy={zone['pricing_strategy']})\n"        
     
    
     return code
