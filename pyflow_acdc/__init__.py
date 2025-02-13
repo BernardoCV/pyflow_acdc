@@ -85,16 +85,14 @@ __all__ = [
     # Export
     'export_results_to_excel',
     'export_OPF_results_to_excel',
-    
+    'save_grid_to_file',
+    'save_grid_to_matlab',
     # Visualization
-    'plot_network',
+    
     'plot_Graph',
     'plot_neighbour_graph',
-    'plot_time_series',
     'plot_TS_res',
-    'plot_statistics',
     'plot_folium',
-    'plot_map',
     
     # Market Analysis
     'calculate_market_coefficients'
