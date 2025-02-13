@@ -172,9 +172,15 @@ def reset_all_class():
     Node_DC.reset_class()
     Line_AC.reset_class()
     Line_DC.reset_class()
+    TF_Line_AC.reset_class()  # Add this
     AC_DC_converter.reset_class()
     DC_DC_converter.reset_class()
     TimeSeries.reset_class()
+    Ren_source_zone.reset_class()  # Add this
+    # Add these classes:
+    Gen_AC.reset_class()
+    Ren_Source.reset_class()
+    Price_Zone.reset_class()
   
     
 def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real'):
