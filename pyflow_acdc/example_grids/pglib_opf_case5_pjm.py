@@ -65,7 +65,7 @@ def pglib_opf_case5_pjm():
 
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in_pu=True)
+    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
     
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():

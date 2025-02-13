@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from scipy import stats as st
+from scipy.cluster.hierarchy import linkage, fcluster
+from sklearn.cluster import KMeans
+
 import time
 
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
@@ -67,64 +70,163 @@ def Time_series_PF(grid):
         print("Sequential")
         grid.TS_ACDC_PF(grid)
 
+def cluster_TS(grid,n_clusters,algorithm ='Kmeans'):
+    if algorithm not in {'Kmeans','Ward'}:
+        algorithm='Kmeans'
+    #create data from grid
+    data = pd.DataFrame()
+    
+    for ts in grid.Time_series:
+        name = ts.name
+        ts_data = ts.data
+        if data.empty:
+            data[name] = ts_data
+            expected_length = len(ts_data)
+        else:
+            # Check if ts_data length matches the expected length
+            if len(ts_data) != expected_length:
+                print(f"Error: Length mismatch for time series '{name}'. Expected {expected_length}, got {len(ts_data)}. Time series not included")
+                continue
+            data[name] = ts_data
+  
+    
+    if algorithm == 'Kmeans':
+        cluster_Kmeans(grid,n_clusters,data)
+        
+    elif algorithm == 'Ward':
+        cluster_Ward(grid,n_clusters,data)
+        
+
+def cluster_Ward(grid,n_clusters,data):
+    new_columns = data.columns
+    
+    # Perform Ward's hierarchical clustering
+    linkage_matrix = linkage(data, method='ward')
+    data['Cluster'] = fcluster(linkage_matrix, n_clusters, criterion='maxclust')
+
+    # Calculate cluster centers
+    cluster_centers = []
+    for cluster_id in range(1, n_clusters + 1):
+        cluster_data = data[data['Cluster'] == cluster_id].iloc[:, :-1]  # Exclude cluster column
+        cluster_centers.append(cluster_data.mean().values)
+    cluster_centers = np.array(cluster_centers)
+
+    clusters = pd.DataFrame(cluster_centers, columns=new_columns)
+
+    # Calculate cluster counts and weights
+    cluster_counts = data['Cluster'].value_counts().sort_index()
+    total_count = len(data)
+    cluster_weights = cluster_counts / total_count
+
+    clusters.insert(0, 'Cluster Count', cluster_counts.values)
+    clusters.insert(1, 'Weight', cluster_weights.values)
+
+    # Add weights to grid
+    grid.Clusters[n_clusters] = clusters['Weight'].to_numpy(dtype=float)
+
+    # Add clustered data to time series
+    for ts in grid.Time_series:
+        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
+            ts.data_clustered = {}
+        name = ts.name
+        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
+
+    s = 1
+        
+def cluster_Kmeans(grid,n_clusters,data):
+    
+    
+    new_columns =data.columns
+      
+    kmeans = KMeans(n_clusters=n_clusters)
+    
+    # Fit the K-means model on the rows (steps)
+    data['Cluster'] = kmeans.fit_predict(data)
+    cluster_centers = kmeans.cluster_centers_
+    
+    clusters = pd.DataFrame(cluster_centers, columns=new_columns)
+    
+    cluster_counts = data['Cluster'].value_counts()
+    
+    total_count = len(data)
+    
+    # Calculate the weight (w) for each cluster
+    cluster_weights = cluster_counts / total_count
+    
+    
+    clusters.insert(0, 'Cluster Count', cluster_counts.values)
+    clusters.insert(1, 'Weight', cluster_weights.values)
+    
+
+    grid.Clusters[n_clusters] = clusters['Weight'].to_numpy(dtype=float)
+  
+    for ts in grid.Time_series:
+        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
+            ts.data_clustered = {}
+        name = ts.name
+        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
+    
+
+    s=1
+
   
 def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
     typ = ts.type
+    
+    # Pre-build dictionaries for fast lookups if not already present
+    if not hasattr(grid, 'Price_Zones_dict'):
+        grid.Price_Zones_dict = {pz.name: pz for pz in grid.Price_Zones}
+    if not hasattr(grid, 'nodes_AC_dict'):
+        grid.nodes_AC_dict = {node.name: node for node in grid.nodes_AC}
+    if not hasattr(grid, 'RenSource_zones_dict'):
+        grid.RenSource_zones_dict = {zone.name: zone for zone in grid.RenSource_zones}
+    if not hasattr(grid, 'RenSources_dict'):
+        grid.RenSources_dict = {rs.name: rs for rs in grid.RenSources}
+    
     if price_zone_restrictions:
-        if typ == 'a_CG':
-            for price_zone in grid.Price_Zones:
-                if ts.element_name == price_zone.name:
-                    price_zone.a = ts.data[idx]
-                    break
-        elif typ == 'b_CG':
-            for price_zone in grid.Price_Zones:
-                if ts.element_name == price_zone.name:
-                    price_zone.b = ts.data[idx]
-                    break
-        elif typ == 'c_CG':
-            for price_zone in grid.Price_Zones:
-                if ts.element_name == price_zone.name:
-                    price_zone.c = ts.data[idx]
-                    break
-        elif typ == 'PGL_min':
-            for price_zone in grid.Price_Zones:
-                if ts.element_name == price_zone.name:
-                    price_zone.PGL_min= ts.data[idx]
-                    break
-        elif typ == 'PGL_max':
-            for price_zone in grid.Price_Zones:
-                if ts.element_name == price_zone.name:
-                    price_zone.PGL_max= ts.data[idx]
-                    break
+        # Using dictionaries to directly access the Price Zone objects
+        price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
+        if price_zone:
+            if typ == 'a_CG':
+                price_zone.a = ts.data[idx]
+            elif typ == 'b_CG':
+                price_zone.b = ts.data[idx]
+            elif typ == 'c_CG':
+                price_zone.c = ts.data[idx]
+            elif typ == 'PGL_min':
+                price_zone.PGL_min = ts.data[idx]
+            elif typ == 'PGL_max':
+                price_zone.PGL_max = ts.data[idx]
+    
     if typ == 'price':
-        for price_zone in grid.Price_Zones:
-            if ts.element_name == price_zone.name:
-                price_zone.price = ts.data[idx]
-                break  # Stop after assigning to the correct price_zone
-        for node in grid.nodes_AC:
-            if ts.element_name == node.name:
-                node.price = ts.data[idx]
-                break  # Stop after assigning to the correct node    
+        # Directly access price zone and nodes using dictionaries
+        price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
+        if price_zone:
+            price_zone.price = ts.data[idx]
+        
+        node = grid.nodes_AC_dict.get(ts.element_name, None)
+        if node:
+            node.price = ts.data[idx]
     
     elif typ == 'Load':
-        for price_zone in grid.Price_Zones:
-            if ts.element_name == price_zone.name:
-                price_zone.PLi_factor = ts.data[idx]
-                break  # Stop after assigning to the correct price_zone
-        for node in grid.nodes_AC:
-            if ts.element_name == node.name:
-                node.PLi_factor = ts.data[idx]
-                break  # Stop after assigning to the correct node
-    elif typ in ['WPP', 'OWPP','SF','REN']:
-        for zone in grid.RenSource_zones:
-            if ts.element_name == zone.name:
-                zone.PRGi_available = ts.data[idx]
-                # print(ts.data[idx])
-                break  # Stop after assigning to the correct zone
-        for rs in grid.RenSources:
-            if ts.element_name == rs.name:
-                rs.PRGi_available = ts.data[idx]
-                break  # Stop after assigning to the correct node
+        # Directly access price zone and nodes using dictionaries
+        price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
+        if price_zone:
+            price_zone.PLi_factor = ts.data[idx]
+        
+        node = grid.nodes_AC_dict.get(ts.element_name, None)
+        if node:
+            node.PLi_factor = ts.data[idx]
+    
+    elif typ in ['WPP', 'OWPP', 'SF', 'REN']:
+        # Directly access RenSource_zones and RenSources using dictionaries
+        zone = grid.RenSource_zones_dict.get(ts.element_name, None)
+        if zone:
+            zone.PRGi_available = ts.data[idx]
+        
+        rs = grid.RenSources_dict.get(ts.element_name, None)
+        if rs:
+            rs.PRGi_available = ts.data[idx]
 
 def update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
