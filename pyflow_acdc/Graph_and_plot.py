@@ -10,6 +10,7 @@ from plotly import data
 from plotly.subplots import make_subplots
 from concurrent.futures import ThreadPoolExecutor
 import os
+from importlib import resources
 
 
 try:
@@ -1147,11 +1148,13 @@ def plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",poly
             # Ensure valid coordinates (lat, lon)
             if row['geometry'] and not row['geometry'].is_empty:
                 lat, lon = row['geometry'].y, row['geometry'].x
-                icon_path = f'folium/{typ}.png'
-
-                # Check if the icon image exists, otherwise use "Other.png"
-                if not os.path.exists(icon_path):
-                    icon_path = 'folium/Other.png'
+                try:
+                    # For Python 3.9+
+                    with resources.files('pyflow_acdc').joinpath('folium_images').joinpath(f'{typ}.png') as icon_path:
+                        icon_path = str(icon_path)
+                except Exception:
+                    # Fallback for older Python versions
+                    icon_path = os.path.join(os.path.dirname(__file__), 'folium_images', f'{typ}.png')
                     
                 folium.Marker(
                     location=(lat, lon),  # (lat, lon)

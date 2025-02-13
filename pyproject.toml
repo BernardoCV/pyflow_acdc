@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 
@@ -56,6 +56,12 @@ OPF = ["pyomo",
 
 [project.urls]
 Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.1.4.tar.gz"
+
+[tool.setuptools]
+packages = ["pyflow_acdc"]
+
+[tool.setuptools.package-data]
+"pyflow_acdc" = ["folium_images/*.png"]
 
 
 
