@@ -21,7 +21,7 @@ Converter_data = pd.read_csv('Stagg5MATACDC/MATACDC_Converter_data.csv')
 
 
 
-[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data,DC_node_data, DC_line_data, Converter_data)
+[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data,DC_node_data, DC_line_data, Converter_data,data_in = 'pu')
 
 """
 Sequential algorithm 
