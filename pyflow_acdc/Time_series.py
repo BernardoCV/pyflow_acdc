@@ -19,9 +19,11 @@ from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential
 __all__ = ['Time_series_PF',
            'TS_ACDC_PF',
            'TS_ACDC_OPF_parallel',
+           'TS_ACDC_OPF',
            'Time_series_statistics',
            'results_TS_OPF',
-           'cluster_TS']
+           'cluster_TS',
+           'update_grid_data']
 
 try:
     import pyomo.environ as pyo
@@ -578,6 +580,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     Time_series_Opt_res_P_conv_AC = []
     Time_series_Opt_res_Q_conv_AC = []
     Time_series_Opt_res_P_conv_DC = []
+    Time_series_Opt_res_P_Load    = []
     Time_series_Opt_res_P_extGrid = []
     Time_series_Opt_res_Q_extGrid =[]
     Time_series_Opt_curtailment   =[]
@@ -652,13 +655,14 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
       
         count += 1
         
-        [opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] = OPF_conv_results(model,grid)
+        [opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] = OPF_conv_results(model,grid)
         
         
         opt_res_curtailment['time'] = idx+1
         opt_res_P_conv_AC['time'] = idx+1
         opt_res_Q_conv_AC['time'] = idx+1
         opt_res_P_conv_DC['time'] = idx+1
+        opt_P_load['time']        = idx+1
         opt_res_P_extGrid['time'] = idx+1
         opt_res_Q_extGrid['time'] = idx+1
         opt_res_Loading_conv['time'] = idx+1
@@ -686,6 +690,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         Time_series_Opt_res_P_conv_AC.append(opt_res_P_conv_AC)
         Time_series_Opt_res_Q_conv_AC.append(opt_res_Q_conv_AC)
         Time_series_Opt_res_P_conv_DC.append(opt_res_P_conv_DC)
+        Time_series_Opt_res_P_Load.append(opt_P_load)
         Time_series_Opt_res_P_extGrid.append(opt_res_P_extGrid)
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
@@ -700,7 +705,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     t_modelexport = t2-t1
     touple = pack_variables(Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
                             Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
-                            Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,Time_series_price)
+                            Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
+                            Time_series_Opt_res_P_Load,Time_series_price)
     
     av_t_modelsolve = total_solve_time / count
     av_t_modelupdate=total_update_time / count
@@ -726,7 +732,8 @@ def save_TS_to_grid (grid,touple):
     # Create the DataFrame from the list of rows
     (Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
     Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
-    Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,Time_series_price)= touple
+    Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
+    Time_series_Opt_res_P_Load,Time_series_price)= touple
 
     def to_dataframe(data):
         return pd.DataFrame(data).set_index('time')
@@ -736,6 +743,7 @@ def save_TS_to_grid (grid,touple):
     grid.time_series_results['converter_p_ac'] = to_dataframe(Time_series_Opt_res_P_conv_AC)
     grid.time_series_results['converter_loading'] = to_dataframe(Time_series_conv_res)
     
+    grid.time_series_results['real_load_opf'] = to_dataframe(Time_series_Opt_res_P_Load)
     grid.time_series_results['real_power_opf'] = to_dataframe(Time_series_Opt_res_P_extGrid)
     grid.time_series_results['reactive_power_opf'] = to_dataframe(Time_series_Opt_res_Q_extGrid)
    
@@ -757,9 +765,21 @@ def save_TS_to_grid (grid,touple):
 
     grid.time_series_results['ac_line_loading'] = ac_line_res
     grid.time_series_results['dc_line_loading'] = dc_line_res
-
+    
+    grouped_columns_load = {}
     grouped_columns = {}   
     # Group columns based on prefix in external generation data
+    
+    for col in grid.time_series_results['real_load_opf'].columns:
+         prefix = ''.join(filter(str.isalpha, col))
+         if prefix not in grouped_columns_load:
+             grouped_columns_load[prefix] = []
+         grouped_columns_load[prefix].append(col)
+    Ext_Load_joined = pd.DataFrame()
+    for prefix, cols in grouped_columns_load.items():
+         Ext_Load_joined[f'{prefix}'] =grid.time_series_results['real_load_opf'][cols].sum(axis=1)
+    Ext_Load_joined['Total']=grid.time_series_results['real_load_opf'].sum(axis=1)
+    
     for col in grid.time_series_results['real_power_opf'].columns:
          if 'RenSource' in col:
             prefix = 'RenSource'  # Group all RenSource together
@@ -774,8 +794,9 @@ def save_TS_to_grid (grid,touple):
          Ext_Gen_joined[f'{prefix}'] =grid.time_series_results['real_power_opf'][cols].sum(axis=1)
          
          
-    Ext_Gen_joined = Ext_Gen_joined[[col for col in Ext_Gen_joined.columns if col != 'RenSource'] + ['RenSource']]
+    Ext_Gen_joined  = Ext_Gen_joined[[col for col in Ext_Gen_joined.columns if col != 'RenSource'] + ['RenSource']]
 
+    grid.time_series_results['real_load_by_zone']  = Ext_Load_joined
     grid.time_series_results['real_power_by_zone'] = Ext_Gen_joined
     grid.time_series_results['reactive_power_opf'].columns = grid.time_series_results['reactive_power_opf'].columns.str.replace('Reactor_' , '',regex=False)
     grid.time_series_results['real_power_opf'].columns = grid.time_series_results['real_power_opf'].columns.str.replace('RenSource_','', regex=False)
@@ -827,6 +848,7 @@ def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
             'converter_p_dc': grid.time_series_results['converter_p_dc'].add_suffix('_convP_DC'),
             'converter_q_ac': grid.time_series_results['converter_q_ac'].add_suffix('_convQ_AC'),
             'converter_p_ac': grid.time_series_results['converter_p_ac'].add_suffix('_convP_AC'),
+            'real_load_by_zone': grid.time_series_results['real_load_by_zone'].add_suffix('_PL_OPF'),
             'real_power_opf': grid.time_series_results['real_power_opf'].add_suffix('_P_OPF'),
             'reactive_power_opf': grid.time_series_results['reactive_power_opf'].add_suffix('_Q_OPF'),
             'curtailment': grid.time_series_results['curtailment'].add_suffix('_curtail'),
@@ -904,6 +926,7 @@ def results_TS_OPF(grid,excel_file_path,grid_names=None,stats=None,times=None):
         (grid.time_series_results['converter_p_dc']*grid.S_base).to_excel(writer, sheet_name='Converter P DC', index=True)
         (grid.time_series_results['converter_q_ac']*grid.S_base).to_excel(writer, sheet_name='Converter Q AC', index=True)
         (grid.time_series_results['converter_p_ac']*grid.S_base).to_excel(writer, sheet_name='Converter P AC', index=True)
+        (grid.time_series_results['real_load_by_zone']*grid.S_base).to_excel(writer, sheet_name='Real Load', index=True)
         (grid.time_series_results['real_power_opf']*grid.S_base).to_excel(writer, sheet_name='Real power OPF', index=True)
         (grid.time_series_results['reactive_power_opf']*grid.S_base).to_excel(writer, sheet_name='Reactive OPF', index=True)
         (grid.time_series_results['curtailment']* 100).to_excel(writer, sheet_name='Curtailment', index=True)

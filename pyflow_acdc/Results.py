@@ -677,7 +677,7 @@ class Results:
             cost=(Pgi**2*gen.qf+Pgi*gen.lf)/1000
            
                 
-            table.add_row([gen.name,gen.Node_AC.name, np.round(Pgi, decimals=self.dec), np.round(Qgi, decimals=self.dec),  np.round(gen.qf, decimals=self.dec),  np.round(gen.lf, decimals=self.dec),np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
+            table.add_row([gen.name,gen.Node_AC, np.round(Pgi, decimals=self.dec), np.round(Qgi, decimals=self.dec),  np.round(gen.qf, decimals=self.dec),  np.round(gen.lf, decimals=self.dec),np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
             Pabs+=abs(Pgi)
             Qabs+=abs(Qgi)
             Ptot+=Pgi
