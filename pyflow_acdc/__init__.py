@@ -119,6 +119,7 @@ __all__ = [
     'TS_ACDC_OPF_parallel',
     'Time_series_statistics',
     'results_TS_OPF',
+    'cluster_TS',
     
     # Export
     'export_results_to_excel',

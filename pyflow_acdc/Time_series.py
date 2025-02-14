@@ -20,7 +20,8 @@ __all__ = ['Time_series_PF',
            'TS_ACDC_PF',
            'TS_ACDC_OPF_parallel',
            'Time_series_statistics',
-           'results_TS_OPF']
+           'results_TS_OPF',
+           'cluster_TS']
 
 try:
     import pyomo.environ as pyo
@@ -506,40 +507,45 @@ def reset_to_initialize(model, initial_values):
             for index in var_obj:
                 var_obj[index].set_value(initial_values[var_obj.name].get(index, 0))
                 
-def modify_parameters(grid,model,Price_Zones):
-    
-    [AC_info,DC_info,Conv_info,Price_Zone_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
-    
+def modify_parameters(grid,model,OnlyAC,Price_Zones):
+    if  OnlyAC:
+        [AC_info,Price_Zone_info]=Translate_pyf_OPF(grid,OnlyAC,Price_Zones=Price_Zones)
+    else:
+        [AC_info,DC_info,_,Price_Zone_info]=Translate_pyf_OPF(grid,OnlyAC,Price_Zones=Price_Zones)    
 
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
+    _,AC_nodes_info,AC_lines_info,gen_info = AC_info
     lf,_,P_renSource = gen_info
     
     # lista_nodos_AC, lista_lineas_AC,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists
     _,_,_,_, P_know,Q_know,price = AC_nodes_info
-    S_lineAC_limit, = AC_lines_info
+    #S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
+    if not OnlyAC:
+        DC_Lists,DC_nodes_info,_ = DC_info
     
-    DC_Lists,DC_nodes_info,DC_lines_info = DC_info
-    
-    # lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
-    _, _ ,_,P_known_DC,price_dc  = DC_nodes_info
-    # P_lineDC_limit,NP_lineDC    = DC_lines_info
-    
+        # lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
+        _, _ ,_,P_known_DC,price_dc  = DC_nodes_info
+        # P_lineDC_limit,NP_lineDC    = DC_lines_info
         
-    # Conv_Lists, Conv_Volt = Conv_info
+            
+        # Conv_Lists, Conv_Volt = Conv_info
+        
+        # lista_conv,NumConvP_i = Conv_Lists
+        # u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
     
-    # lista_conv,NumConvP_i = Conv_Lists
-    # u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
-    
-    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
+    _,Price_Zone_lim = Price_Zone_info   
     
     # lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
-    price_zone_as,price_zone_bs,_, _ = Price_Zone_lim
+    price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
     
     if Price_Zones:
         for idx, val in price_zone_as.items():
             model.price_zone_a[idx].set_value(val)
         for idx, val in price_zone_bs.items():
             model.price_zone_b[idx].set_value(val)
+        for idx, val in PGL_min.items():
+            model.PGL_min[idx].set_value(val)
+        for idx, val in PGL_max.items():
+            model.PGL_max[idx].set_value(val)
     else:
         for idx, val in price.items():
             model.price[idx].set_value(val)
@@ -555,8 +561,9 @@ def modify_parameters(grid,model,Price_Zones):
         model.Q_known_AC[idx].set_value(val)
     for idx, val in P_renSource.items():
         model.P_renSource[idx].set_value(val)
-    for idx, val in P_known_DC.items():
-        model.P_known_DC[idx].set_value(val)
+    if not OnlyAC:
+        for idx, val in P_known_DC.items():
+            model.P_known_DC[idx].set_value(val)
     
     
                 

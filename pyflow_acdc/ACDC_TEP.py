@@ -162,7 +162,7 @@ def Expand_element(grid,name,N_i=None,N_max=None,Life_time=None,base_cost=None,p
     
     for l in grid.lines_AC:
         if name == l.name:
-            from .Classes import change_line_AC_to_expandable
+            from .Class_editor import change_line_AC_to_expandable
             change_line_AC_to_expandable(grid, name)
     
     

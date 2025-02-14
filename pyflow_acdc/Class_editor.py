@@ -4,7 +4,6 @@ Created on Fri Dec 15 15:24:42 2023
 @author: BernardoCastro
 """
 
-from scipy.io import loadmat
 import pandas as pd
 import numpy as np
 import sys
@@ -15,7 +14,6 @@ from .Results import*
 
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
-
 
 import os
 import importlib.util
