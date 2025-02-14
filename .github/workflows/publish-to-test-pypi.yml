@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/pyflow_acdc  # Replace <package-name> with your PyPI project name
+      url: https://pypi.org/p/pyflow_acdc
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -52,37 +52,6 @@ jobs:
         path: dist/
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-
-  github-release:
-    name: Create GitHub Release
-    needs:
-    - publish-to-pypi
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write  # IMPORTANT: mandatory for making GitHub Releases
-
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release create
-        '${{ github.ref_name }}'
-        --repo '${{ github.repository }}'
-        --notes ""
-    - name: Upload artifacts to GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release upload
-        '${{ github.ref_name }}' dist/**
-        --repo '${{ github.repository }}'
 
   publish-to-testpypi:
     name: Publish Python 🐍 distribution 📦 to TestPyPI
@@ -107,3 +76,35 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
+
+# github-release job commented out to avoid conflicts with manual releases
+#  github-release:
+#    name: Create GitHub Release
+#    needs:
+#    - publish-to-pypi
+#    runs-on: ubuntu-latest
+#
+#    permissions:
+#      contents: write  # IMPORTANT: mandatory for making GitHub Releases
+#
+#    steps:
+#    - name: Download all the dists
+#      uses: actions/download-artifact@v4
+#      with:
+#        name: python-package-distributions
+#        path: dist/
+#    - name: Create GitHub Release
+#      env:
+#        GITHUB_TOKEN: ${{ github.token }}
+#      run: >-
+#        gh release create
+#        '${{ github.ref_name }}'
+#        --repo '${{ github.repository }}'
+#        --notes ""
+#    - name: Upload artifacts to GitHub Release
+#      env:
+#        GITHUB_TOKEN: ${{ github.token }}
+#      run: >-
+#        gh release upload
+#        '${{ github.ref_name }}' dist/**
+#        --repo '${{ github.repository }}'
