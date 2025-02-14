@@ -306,7 +306,7 @@ def TEP_expansion_model(grid,export=None,costmodel='Linear',n_clusters=None,clus
     model.name        ="TEP MTDC AC/DC hybrid OPF"
     model.Time_frames = pyo.Set(initialize=range(1, n_clusters + 1))
     
-    print(list(model.Time_frames))
+    #print(list(model.Time_frames))
     model.submodel    = pyo.Block(model.Time_frames)
     model.conv        = pyo.Set(initialize=lista_conv)
     model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
@@ -408,7 +408,7 @@ def TEP_expansion_model(grid,export=None,costmodel='Linear',n_clusters=None,clus
     model_results,t_modelsolve= OPF_solve(model,grid)
     
     t1 = time.time()
-    TEP_res = ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering,export)   
+    TEP_res = ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering)   
     t2 = time.time()  
     t_modelexport = t2-t1
         
@@ -635,7 +635,7 @@ def get_weight_data(model, t):
     return pyo.value(model.weights[t])
 
 
-def ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering,export):
+def ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering):
     grid.V_AC =np.zeros(grid.nn_AC)
     grid.Theta_V_AC=np.zeros(grid.nn_AC)
     grid.V_DC=np.zeros(grid.nn_DC)
@@ -817,139 +817,156 @@ def ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering,export):
     flipped_data_conv = data_conv.set_index('Time_Frame').T 
     flipped_data_price = data_price.set_index('Time_Frame').T 
     
-    # Add weight information and total social cost at the end
-    flipped_data_SC.loc['Total SC'] = np.round(flipped_data_SC.sum(), decimals=2)
-    flipped_data_SC.loc[''] = [None] * flipped_data_SC.shape[1]  # Blank row
+    # Calculate Total SC
+    total_sc = np.round(flipped_data_SC.sum(), decimals=2)
+    
+    # Calculate Weighted SC
+    weighted_sc = np.round(total_sc * weights_row, decimals=2)
+    
+    # Create additional rows DataFrame
+    additional_rows = pd.DataFrame({
+        'Total SC': total_sc,
+        '': [None] * len(total_sc),  # Blank row
+        'Weight': weights_row,
+        'Weighted SC': weighted_sc
+    }).T
+    
+    # Combine original data with additional rows
+    flipped_data_SC = pd.concat([flipped_data_SC, additional_rows])
+    
     flipped_data_SC.loc['Weight'] = weights_row
     weighted_SC = flipped_data_SC.loc['Total SC'] * flipped_data_SC.loc['Weight']
     flipped_data_SC.loc['Weighted SC'] = np.round(weighted_SC, decimals=2)
     
     
     # Pack all variables into the final result
-    TEP_res = pack_variables(
+    TEP_res = pack_variables(clustering,n_clusters,
         flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price
     )
     grid.TEP_res=TEP_res
     
-    if export is not None:
-       
-        # Define the column names for the DataFrame
-        columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]","Unit cost [€/MVA]","Life time [years]", "phi [€/MVA-h]"]
-        
-        # Create an empty list to hold the data
-        data = []
-        
-        tot = 0
-        
-        # Loop through DC lines and add data to the list
-        for l in grid.lines_DC:
-            if l.np_line_opf:
-                element = l.name
-                ini = l.np_line_i
-                opt = l.np_line
-                pr = opt * l.MW_rating
-                cost = ((opt - ini) * l.MW_rating * l.Length_km * l.phi) * l.life_time * 8760 / 1000
-                
-                if l.cost_perMWkm is not None:
-                    unit_cost= l.Length_km*l.cost_perMWkm
-                elif l.base_cost is not None:
-                    unit_cost= l.base_cost /l.MW_rating
-                else:
-                    unit_cost = np.nan
-                    
-                phi = l.phi
-                
-                tot += cost
-                data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,l.life_time,phi])
-        
-        # Loop through ACDC converters and add data to the list
-        for cn in grid.Converters_ACDC:
-            if cn.NUmConvP_opf:
-                element = cn.name
-                ini = cn.NumConvP_i
-                opt = cn.NumConvP
-                pr = opt * cn.MVA_max
-                cost = ((opt - ini) * cn.MVA_max * cn.phi) * cn.life_time * 8760 / 1000
-                tot += cost
-                
-                if cn.cost_perMVA is not None:
-                    unit_cost= cn.cost_perMVA
-                elif cn.base_cost is not None:
-                    unit_cost= cn.base_cost /cn.MVA_max
-                else:
-                    unit_cost = np.nan
-                    
-                phi = cn.phi
-                
-                data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,cn.life_time,phi])
-        
-        # Create a pandas DataFrame with the collected data
-        df = pd.DataFrame(data, columns=columns)    
-       
-        
-       
-       
- 
-        data = {}
-
-        # Loop through RenSourceZones
-        for z in grid.RenSource_zones:
-            # Extract the zone name
-            zone_name = z.name
-            # Access the time series data for the specific 'PGRi' from the zone's TS_dict
-            if clustering:
-                time_series_data = grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters]
-            else:
-                time_series_data = grid.Time_series[z.TS_dict['PRGi_available']].data
-            
-            # Append the zone name and corresponding data as a row in the data list
-            data[zone_name]= time_series_data
-        
-        # Create a DataFrame named Availability_factors from the collected data
-        Availability_factors = pd.DataFrame(data)
-
-        data_L = {}
-
-        # Loop through 
-        for z in grid.Price_Zones:
-            
-            # Extract the zone name
-            zone_name = z.name
-            # Access the time series data for the specific 'PGRi' from the zone's TS_dict
-            if z.TS_dict is None or z.TS_dict.get('Load') is None:
-                continue
-            if clustering:
-                time_series_data = grid.Time_series[z.TS_dict['Load']].data_clustered[n_clusters]
-            else:
-                time_series_data = grid.Time_series[z.TS_dict['Load']].data
-            
-            # Append the zone name and corresponding data as a row in the data list
-            
-            data_L[zone_name]= time_series_data 
-        
-        # Create a DataFrame named Availability_factors from the collected data
-        Load_factors = pd.DataFrame(data)
-
-        flipped_AV=Availability_factors.T
-        flipped_LF = Load_factors.T
-        
-        with pd.ExcelWriter(f'{export}.xlsx') as writer:
-            df.to_excel(writer, sheet_name='TEP solution', index=True)
-            flipped_data_SC.to_excel(writer, sheet_name='Social Cost k€', index=True)
-            flipped_data_PN.to_excel(writer, sheet_name='Net price_zone power MW', index=True)
-            flipped_data_price.to_excel(writer, sheet_name='Price_Zone Price  € per MWh', index=True)
-            flipped_data_GEN.to_excel(writer, sheet_name='Power Generation MW', index=True)
-            flipped_data_curt.to_excel(writer, sheet_name='Curtailment MW', index=True)
-            flipped_data_curt_per.to_excel(writer, sheet_name='Curtailment %', index=True)
-            flipped_data_lines.to_excel(writer, sheet_name='Line loading %', index=True)
-            flipped_data_conv.to_excel(writer, sheet_name='Converter loading %', index=True)
-            flipped_AV.to_excel(writer, sheet_name='Availability Factors pu', index=True)
-            flipped_LF.to_excel(writer, sheet_name='Load Factors  pu', index=True)
-            
-            
-           
+      
     grid.Line_AC_calc()
     grid.Line_DC_calc()
     
     return TEP_res
+
+def export_TEP_results_to_excel(grid,export):
+    [clustering,n_clusters,flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
+        flipped_data_conv, flipped_data_price] = grid.TEP_res
+           # Define the column names for the DataFrame
+    columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]","Unit cost [€/MVA]","Life time [years]", "phi [€/MVA-h]"]
+    
+    # Create an empty list to hold the data
+    data = []
+    
+    tot = 0
+    
+    # Loop through DC lines and add data to the list
+    for l in grid.lines_DC:
+        if l.np_line_opf:
+            element = l.name
+            ini = l.np_line_i
+            opt = l.np_line
+            pr = opt * l.MW_rating
+            cost = ((opt - ini) * l.MW_rating * l.Length_km * l.phi) * l.life_time * 8760 / 1000
+            
+            if l.cost_perMWkm is not None:
+                unit_cost= l.Length_km*l.cost_perMWkm
+            elif l.base_cost is not None:
+                unit_cost= l.base_cost /l.MW_rating
+            else:
+                unit_cost = np.nan
+                
+            phi = l.phi
+            
+            tot += cost
+            data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,l.life_time,phi])
+    
+    # Loop through ACDC converters and add data to the list
+    for cn in grid.Converters_ACDC:
+        if cn.NUmConvP_opf:
+            element = cn.name
+            ini = cn.NumConvP_i
+            opt = cn.NumConvP
+            pr = opt * cn.MVA_max
+            cost = ((opt - ini) * cn.MVA_max * cn.phi) * cn.life_time * 8760 / 1000
+            tot += cost
+            
+            if cn.cost_perMVA is not None:
+                unit_cost= cn.cost_perMVA
+            elif cn.base_cost is not None:
+                unit_cost= cn.base_cost /cn.MVA_max
+            else:
+                unit_cost = np.nan
+                
+            phi = cn.phi
+            
+            data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,cn.life_time,phi])
+    
+    # Create a pandas DataFrame with the collected data
+    df = pd.DataFrame(data, columns=columns)    
+    
+    
+    
+    
+
+    data = {}
+
+    # Loop through RenSourceZones
+    for z in grid.RenSource_zones:
+        # Extract the zone name
+        zone_name = z.name
+        # Access the time series data for the specific 'PGRi' from the zone's TS_dict
+        if clustering:
+            time_series_data = grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters]
+        else:
+            time_series_data = grid.Time_series[z.TS_dict['PRGi_available']].data
+        
+        # Append the zone name and corresponding data as a row in the data list
+        data[zone_name]= time_series_data
+    
+    # Create a DataFrame named Availability_factors from the collected data
+    Availability_factors = pd.DataFrame(data)
+
+    data_L = {}
+
+    # Loop through 
+    for z in grid.Price_Zones:
+        
+        # Extract the zone name
+        zone_name = z.name
+        # Access the time series data for the specific 'PGRi' from the zone's TS_dict
+        if z.TS_dict is None or z.TS_dict.get('Load') is None:
+            continue
+        if clustering:
+            time_series_data = grid.Time_series[z.TS_dict['Load']].data_clustered[n_clusters]
+        else:
+            time_series_data = grid.Time_series[z.TS_dict['Load']].data
+        
+        # Append the zone name and corresponding data as a row in the data list
+        
+        data_L[zone_name]= time_series_data 
+    
+    # Create a DataFrame named Availability_factors from the collected data
+    Load_factors = pd.DataFrame(data)
+
+    flipped_AV=Availability_factors.T
+    flipped_LF = Load_factors.T
+    
+    
+
+
+    with pd.ExcelWriter(f'{export}.xlsx') as writer:
+        df.to_excel(writer, sheet_name='TEP solution', index=True)
+        flipped_data_SC.to_excel(writer, sheet_name='Social Cost k€', index=True)
+        flipped_data_PN.to_excel(writer, sheet_name='Net price_zone power MW', index=True)
+        flipped_data_price.to_excel(writer, sheet_name='Price_Zone Price  € per MWh', index=True)
+        flipped_data_GEN.to_excel(writer, sheet_name='Power Generation MW', index=True)
+        flipped_data_curt.to_excel(writer, sheet_name='Curtailment MW', index=True)
+        flipped_data_curt_per.to_excel(writer, sheet_name='Curtailment %', index=True)
+        flipped_data_lines.to_excel(writer, sheet_name='Line loading %', index=True)
+        flipped_data_conv.to_excel(writer, sheet_name='Converter loading %', index=True)
+        flipped_AV.to_excel(writer, sheet_name='Availability Factors pu', index=True)
+        flipped_LF.to_excel(writer, sheet_name='Load Factors  pu', index=True)

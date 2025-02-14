@@ -744,7 +744,7 @@ class Results:
     
     def TEP_ts_res(self):
        
-        PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        curt,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
         
         
         table = pt()
@@ -880,7 +880,7 @@ class Results:
         print('Transmission Expansion Problem')
         print(table)
         
-        PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        curt, curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
         weight = SC.loc['Weight']
         table=pt()
         table.field_names = ["Price_Zone", "Normalized social cost[k€/h]", "Average price [€/MWh]"]

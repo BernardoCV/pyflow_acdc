@@ -229,6 +229,7 @@ def update_lineACexp_hovertext(line,S_base,text):
             line_string = f"{fromnode} -> {tonode}"
         else:
             line_string = f"{fromnode} <- {tonode}"
+        Line_tf = 'Transformer' if line.isTf else 'Line'
         line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Lines: {np_line}"
     else:
         name= line.name
@@ -246,6 +247,7 @@ def update_lineACexp_hovertext(line,S_base,text):
             line_string = f"{fromnode} -> {tonode}"
         else:
             line_string = f"{fromnode} <- {tonode}"
+        Line_tf = 'Transformer' if line.isTf else 'Line'
         line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
 
 
@@ -306,7 +308,7 @@ def update_conv_hovertext(conv,S_base,text):
          fromnode = conv.Node_DC.name
          tonode = conv.Node_AC.name
          Sfrom= np.round(conv.P_DC, decimals=0)
-         Sto = np.round(np.sqrt(conv.P_AC**2+conv.Q_AC**2)*(conv.P_AC/np.abs(conv.P_AC)), decimals=0)
+         Sto = np.round(np.sqrt(conv.P_AC**2 + conv.Q_AC**2) * np.sign(conv.P_AC), decimals=0)
          load = max(np.abs(Sfrom), np.abs(Sto))*S_base/conv.MVA_max*100
          Loading = np.round(load, decimals=0).astype(int)
          if np.real(Sfrom) > 0:
