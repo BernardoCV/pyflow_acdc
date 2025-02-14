@@ -9,22 +9,31 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
+__all__ = [
+    'analyse_OPF',
+    'OPF_createModel_ACDC',
+    'ExportACDC_model_toPyflowACDC'
+]
+
 def analyse_OPF(grid):
     OnlyAC = True
     if grid.nn_DC!=0:
         OnlyAC = False
+    TEP_AC = False
+    if grid.nle_AC!=0:
+        TEP_AC = True
     TAP_tf = False
     if grid.nttf !=0:
         TAP_tf = True
     
     
-    return OnlyAC,TAP_tf
+    return OnlyAC,TEP_AC,TAP_tf
     
 
-def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
+def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     from . import Translate_pyf_OPF 
     
-    OnlyAC,TAP_tf = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     
     
     if OnlyAC:
@@ -53,10 +62,8 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         lista_conv,NumConvP_i = Conv_Lists
         u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
         
-    if MI is None: #Automatically fed from grid class
-        Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
-    else: #Manually fed
-        Price_Zone_Lists,Price_Zone_lim = MI
+    
+    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
     lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
     price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
     """
@@ -69,7 +76,8 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     model.nodes_AC   = pyo.Set(initialize=lista_nodos_AC)
     model.lines_AC   = pyo.Set(initialize=lista_lineas_AC)
     
-    model.lines_AC_exp = pyo.Set(initialize=lista_lineas_AC_exp)
+    if TEP_AC:
+        model.lines_AC_exp = pyo.Set(initialize=lista_lineas_AC_exp)
     if TAP_tf:
         model.lines_AC_tf  = pyo.Set(initialize=lista_lineas_AC_tf) 
     
@@ -140,13 +148,6 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     def Qren_bounds(model, node):
         nAC = grid.nodes_AC[node]
         if nAC.connected_RenSource == []:
-            return (0,0)
-        else:
-            return (None,None)
-    
-    def Pren_bounds_DC(model, node):
-        nDC = grid.nodes_DC[node]
-        if nDC.connected_RenSource == []:
             return (0,0)
         else:
             return (None,None)
@@ -253,6 +254,12 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         else:
             return (None,None)     
     
+    if TEP_AC:
+        model.Pto_Exp  = pyo.Var(model.nodes_AC,bounds=toExp_opt_bounds ,initialize=0)
+        model.Pfrom_Exp= pyo.Var(model.nodes_AC,bounds=fromExp_opt_bounds ,initialize=0)
+        model.Qto_Exp  = pyo.Var(model.nodes_AC,bounds=toExp_opt_bounds ,initialize=0)
+        model.Qfrom_Exp= pyo.Var(model.nodes_AC,bounds=fromExp_opt_bounds ,initialize=0)
+    
     if TAP_tf:
         model.Pto_TF   = pyo.Var(model.nodes_AC,bounds=toTF_opt_bounds ,initialize=0)
         model.Pfrom_TF = pyo.Var(model.nodes_AC,bounds=fromTF_opt_bounds ,initialize=0)
@@ -277,7 +284,8 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     #AC Lines variables
     def Sbounds_lines(model, line):
         return (-S_lineAC_limit[line], S_lineAC_limit[line])
-   
+    def Sbounds_lines_exp(model, line):
+        return (-S_lineACexp_limit[line], S_lineACexp_limit[line])
     def Sbounds_lines_tf(model, line):
         return (-S_lineACtf_limit[line], S_lineACtf_limit[line])
     
@@ -289,7 +297,12 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     model.QAC_to       = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
     model.QAC_from     = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
     model.PAC_line_loss= pyo.Var(model.lines_AC, initialize=0)
-    
+    if TEP_AC:
+        model.exp_PAC_to       = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
+        model.exp_PAC_from     = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
+        model.exp_QAC_to       = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
+        model.exp_QAC_from     = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
+        model.exp_PAC_line_loss= pyo.Var(model.lines_AC_exp, initialize=0)
     if TAP_tf:
         model.tf_PAC_to       = pyo.Var(model.lines_AC_tf, bounds=Sbounds_lines_tf, initialize=0)
         model.tf_PAC_from     = pyo.Var(model.lines_AC_tf, bounds=Sbounds_lines_tf, initialize=0)
@@ -310,7 +323,14 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
              return (None,None)
          else:
              return (0,0)
-    
+    def Pren_bounds_DC(model, node):
+        nDC = grid.nodes_DC[node]
+        if nDC.connected_RenSource == []:
+            return (0,0)
+        else:
+            return (None,None)
+
+
     if not OnlyAC:
         model.V_DC = pyo.Var(model.nodes_DC, bounds=lambda model, node: (u_min_dc[node], u_max_dc[node]), initialize=V_ini_DC)
         model.P_known_DC = pyo.Param(model.nodes_DC, initialize=P_known_DC,mutable=True)
@@ -362,10 +382,45 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     
    
     
-    if not OnlyAC:
-        model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC)
-        model.NumConvP = pyo.Param(model.conv,initialize=NumConvP_i)
-
+    "TEP variables"
+    
+    if not TEP: #No TEP and var  are set as parameters
+        if TEP_AC:    
+            model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)    
+        if not OnlyAC:
+            model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC)
+            model.NumConvP = pyo.Param(model.conv,initialize=NumConvP_i)
+    
+    else:
+        if TEP_AC:
+            def NPline_bounds_AC(model, line):
+                element=grid.lines_AC_exp[line]
+                if element.np_line_opf==False:
+                    return (NP_lineAC[line], NP_lineAC[line])
+                else:
+                    return (NP_lineAC[line], None)
+            
+            model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC)
+        
+ 
+        if not OnlyAC:
+            def NPline_bounds(model, line):
+                element=grid.lines_DC[line]
+                if element.np_line_opf==False:
+                    return (NP_lineDC[line], NP_lineDC[line])
+                else:
+                    return (NP_lineDC[line], None)
+            
+            model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC)
+            
+            def NPconv_bounds(model, conv):
+                element=grid.Converters_ACDC[conv]
+                if element.NUmConvP_opf==False:
+                    return (NumConvP_i[conv], NumConvP_i[conv])
+                else:
+                    return (NumConvP_i[conv], None)
+            
+            model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
     
     
     """EQUALITY CONSTRAINTS
@@ -393,8 +448,6 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
             return model.price_dc[node]==0
     
     
-    
-    
     def P_price_zone(model,price_zone):
         Pm_AC=sum(model.P_known_AC[node]   + model.PGi_ren[node] + model.PGi_opt[node] for node in price_zone2node['AC'][price_zone])
         Pm_DC=sum(model.P_known_DC[node_DC]+ model.PGi_ren_DC[node_DC] for node_DC in price_zone2node['DC'][price_zone])
@@ -407,7 +460,6 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
             return model.SocialCost[price_zone]== model.price_zone_a[price_zone]*(model.PN[price_zone]*grid.S_base)**2+model.price_zone_b[price_zone]*(model.PN[price_zone]*grid.S_base)
         else:
             return model.SocialCost[price_zone]==0
-        
         
     def Price_link(model,price_zone):
         from .Classes import Price_Zone
@@ -530,10 +582,12 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         P_var = model.P_known_AC[node] + model.PGi_ren[node] + model.PGi_opt[node]
         if not OnlyAC:
             P_var += model.P_conv_AC[node]
+        if TEP_AC:
+            P_sum += model.Pto_Exp[node]+model.Pfrom_Exp[node]
         if TAP_tf:
-            P_var += model.Pto_TF[node]+model.Pfrom_TF[node]
-        else:
-            return P_sum == P_var
+            P_sum += model.Pto_TF[node]+model.Pfrom_TF[node]
+        
+        return P_sum == P_var
 
     def Q_AC_node_rule(model, node):
 
@@ -545,10 +599,12 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         Q_var = model.Q_known_AC[node] + model.QGi_ren[node] + model.QGi_opt[node]
         if not OnlyAC:
             Q_var += model.Q_conv_AC[node]
+        if TEP_AC:
+            Q_sum += model.Qto_Exp[node]+model.Qfrom_Exp[node]
         if TAP_tf:
-            Q_var += model.Qto_TF[node]+model.Qfrom_TF[node]
-        else:
-            return Q_sum == Q_var
+            Q_sum += model.Qto_TF[node]+model.Qfrom_TF[node]
+        
+        return Q_sum == Q_var
 
     model.P_AC_node_constraint = pyo.Constraint(model.nodes_AC, rule=P_AC_node_rule)
     model.Q_AC_node_constraint = pyo.Constraint(model.nodes_AC, rule=Q_AC_node_rule)
@@ -580,6 +636,30 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
     model.Gen_QREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_QREN_rule) 
     
+    def toPexp_rule(model,node):
+       nAC = grid.nodes_AC[node]
+       toPexp = sum(model.exp_PAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)                  
+       return  model.Pto_Exp[node] ==  toPexp
+    def fromPexp_rule(model,node):
+       nAC = grid.nodes_AC[node]
+       fromPexp = sum(model.exp_PAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)                
+       return  model.Pfrom_Exp[node] ==   fromPexp
+    
+    def toQexp_rule(model,node):
+       nAC = grid.nodes_AC[node]
+       toQexp = sum(model.exp_QAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)                  
+       return  model.Qto_Exp[node] ==  toQexp
+    
+    def fromQexp_rule(model,node):
+       nAC = grid.nodes_AC[node]
+       fromQexp = sum(model.exp_QAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)                  
+       return  model.Qfrom_Exp[node] ==  fromQexp   
+   
+    if TEP_AC:
+        model.exp_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPexp_rule)
+        model.exp_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPexp_rule)
+        model.exp_Qto_constraint  = pyo.Constraint(model.nodes_AC, rule=toQexp_rule)
+        model.exp_Qfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromQexp_rule)
     
     def toPtf_rule(model,node):
        nAC = grid.nodes_AC[node]
@@ -604,9 +684,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
         model.Pfrom_TF_constraint = pyo.Constraint(model.nodes_AC, rule=fromPtf_rule)
         model.Qto_TF_constraint   = pyo.Constraint(model.nodes_AC, rule=toQtf_rule)
         model.Qfrom_TF_constraint = pyo.Constraint(model.nodes_AC, rule=fromQtf_rule)
-    
-
-    
+   
     # AC line equality constraints
     
     def P_to_AC_line(model,line):   
@@ -691,6 +769,88 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     model.Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC, rule=Q_from_AC_line)
     model.P_AC_loss_constraint     = pyo.Constraint(model.lines_AC, rule=P_loss_AC_rule)
     
+    def P_to_AC_line_exp(model,line):   
+       
+        l = grid.lines_AC[line]
+        f = l.fromNode.nodeNumber
+        t = l.toNode.nodeNumber
+        Vf=model.V_AC[f]
+        Vt=model.V_AC[t]
+        Gtt=np.real(l.Ybus_branch[1,1])
+        Gtf=np.real(l.Ybus_branch[1,0])
+        Btf=np.imag(l.Ybus_branch[1,0])
+        thf=model.thetha_AC[f]
+        tht=model.thetha_AC[t]
+        
+        Pto= Vt*Vt*Gtt + Vf*Vt*(Gtf*pyo.cos(tht - thf) + Btf*pyo.sin(tht - thf))
+       
+        
+        return model.exp_PAC_to[line] == Pto
+    
+    def P_from_AC_line_exp(model,line):       
+       l = grid.lines_AC[line]
+       f = l.fromNode.nodeNumber
+       t = l.toNode.nodeNumber
+       Vf=model.V_AC[f]
+       Vt=model.V_AC[t]
+       Gff=np.real(l.Ybus_branch[0,0])
+       Gft=np.real(l.Ybus_branch[0,1])
+       Bft=np.imag(l.Ybus_branch[0,1])
+       thf=model.thetha_AC[f]
+       tht=model.thetha_AC[t]
+       
+       Pfrom= Vf*Vf*Gff + Vf*Vt*(Gft*pyo.cos(thf - tht) + Bft*pyo.sin(thf - tht))
+
+       return model.exp_PAC_from[line] == Pfrom
+    
+    def Q_to_AC_line_exp(model,line):   
+        l = grid.lines_AC[line]
+        f = l.fromNode.nodeNumber
+        t = l.toNode.nodeNumber
+        Vf=model.V_AC[f]
+        Vt=model.V_AC[t]
+       
+        thf=model.thetha_AC[f]
+        tht=model.thetha_AC[t]
+        
+        Btt=np.imag(l.Ybus_branch[1,1])
+        Gtf=np.real(l.Ybus_branch[1,0])
+        Btf=np.imag(l.Ybus_branch[1,0])
+        
+        Qto   = -Vt*Vt*Btt + Vf*Vt*(Gtf*pyo.sin(tht - thf) - Btf*pyo.cos(tht - thf))
+         
+        
+        return model.exp_QAC_to[line] == Qto
+    
+    def Q_from_AC_line_exp(model,line):       
+       l = grid.lines_AC[line]
+       f = l.fromNode.nodeNumber
+       t = l.toNode.nodeNumber
+       Vf=model.V_AC[f]
+       Vt=model.V_AC[t]
+      
+       Bff=np.imag(l.Ybus_branch[0,0])
+       Gft=np.real(l.Ybus_branch[0,1])
+       Bft=np.imag(l.Ybus_branch[0,1])
+       thf=model.thetha_AC[f]
+       tht=model.thetha_AC[t]
+       
+
+       Qfrom = -Vf*Vf*Bff + Vf*Vt*(Gft*pyo.sin(thf - tht) - Bft*pyo.cos(thf - tht))
+      
+
+       return model.exp_QAC_from[line] == Qfrom
+    
+    def P_loss_AC_rule_exp(model,line):
+        return model.exp_PAC_line_loss[line]== model.exp_PAC_to[line]+model.PAC_from[line]
+    
+    
+    if TEP_AC:
+        model.exp_Pto_AC_line_constraint   = pyo.Constraint(model.lines_AC_exp, rule=P_to_AC_line_exp)
+        model.exp_Pfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=P_from_AC_line_exp)
+        model.exp_Qto_AC_line_constraint   = pyo.Constraint(model.lines_AC_exp, rule=Q_to_AC_line_exp)
+        model.exp_Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=Q_from_AC_line_exp)
+        model.exp_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_exp, rule=P_loss_AC_rule_exp)
     
     def P_to_AC_line_tf(model,trafo):   
         tf = grid.lines_AC_tf[trafo]
@@ -1193,7 +1353,17 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     
     model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
     model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
-   
+    
+    def S_to_AC_limit_rule_exp(model,line):
+        
+        return model.exp_PAC_to[line]**2+model.exp_QAC_to[line]**2 <= S_lineACexp_limit[line]**2
+    def S_from_AC_limit_rule_exp(model,line):
+        
+        return model.exp_PAC_from[line]**2+model.exp_QAC_from[line]**2 <= S_lineACexp_limit[line]**2
+    
+    if TEP_AC:
+        model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
+        model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
     
     def S_to_AC_limit_rule_tf(model,line):
         
@@ -1356,18 +1526,10 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
     if OnlyAC:
          return    
     
-    # Parallelize DC line processing
-    def process_line_DC(line):
-        line.np_line = np.float64(pyo.value(model.NumLinesDCP[line.lineNumber]))
-
-    with ThreadPoolExecutor() as executor:
-        executor.map(process_line_DC, grid.lines_DC)
-    
     # DC nodes
     grid.V_DC = np.zeros(grid.nn_DC)  
     V_DC_values       = {k: np.float64(pyo.value(v)) for k, v in model.V_DC.items()}
     P_conv_DC_values  = {k: np.float64(pyo.value(v)) for k, v in model.P_conv_DC.items()}
-    NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}
     
     # Parallelize DC node processing
     def process_node_DC(node):
@@ -1391,13 +1553,10 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
     Uc_values            = {k: np.float64(pyo.value(v)) for k, v in model.Uc.items()}
     Uf_values            = {k: np.float64(pyo.value(v)) for k, v in model.Uf.items()}
     
-    NumConvP_values      = {k: np.float64(pyo.value(v)) for k, v in model.NumConvP.items()}
-        
     
     # Parallelize converter processing
     def process_converter(conv):
         nconv = conv.ConvNumber
-        conv.NumConvP  = NumConvP_values[nconv]
         conv.P_DC      = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] * conv.NumConvP
         conv.P_AC      = P_conv_s_AC_values[nconv] * conv.NumConvP
         conv.Q_AC      = Q_conv_s_AC_values[nconv] * conv.NumConvP
