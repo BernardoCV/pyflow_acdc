@@ -31,7 +31,7 @@ def analyse_OPF(grid):
     
 
 def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
-    from . import Translate_pyf_OPF 
+    from .ACDC_OPF import Translate_pyf_OPF 
     
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     

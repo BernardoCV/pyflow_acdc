@@ -344,7 +344,7 @@ def calculate_price_zone_price_from_model(grid,model,idx):
     
     return price_zone_price
 
-def TS_ACDC_PF(grid, start=1, end=99999):
+def TS_ACDC_PF(grid, start=1, end=99999,print_step=False):
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     if TS_len < end:
@@ -363,7 +363,7 @@ def TS_ACDC_PF(grid, start=1, end=99999):
         grid.Pconv_save[conv.ConvNumber] = conv.P_DC
 
     while idx < max_time:
-        # print(idx+1)
+        
   
         for ts in grid.Time_series:
             update_grid_data(grid, ts, idx)
@@ -392,8 +392,8 @@ def TS_ACDC_PF(grid, start=1, end=99999):
         Time_series_line_res.append(line_data)
         Time_series_grid_loading.append(grid_data_loading)
     
-        
-        # print(idx+1)
+        if print_step:
+            print(idx+1)
         idx += 1
         
     # Create the DataFrame from the list of rows
@@ -419,7 +419,7 @@ def TS_ACDC_PF(grid, start=1, end=99999):
     grid.Time_series_ran = True
 
 
-def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restrictions=False,parallel=10):
+def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restrictions=False,parallel=10,print_step=False):
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     total_elapsed_time = 0
@@ -443,32 +443,35 @@ def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restriction
     Time_series_Opt_res_Q_extGrid=[]
     Time_series_Opt_curtailment =[]
     Time_series_conv_res=[]
-    
+    Time_series_Opt_res_P_Load = []
+
     while idx < max_time:
         # print('----')
         
         # Determine the range of iterations based on the parallel value
         current_range = min(parallel, max_time - idx)  # Ensures we don't exceed `end`
         
-        model,range_res,t,elapsed_time = TS_parallel_OPF(grid,idx,current_range,ObjRule=obj,Price_Zones=price_zone_restrictions)
+        model,range_res,t,elapsed_time = TS_parallel_OPF(grid,idx,current_range,ObjRule=obj,Price_Zones=price_zone_restrictions,print_step=print_step)
         total_elapsed_time+=elapsed_time
         count+=current_range
         [opt_res_Loading_conv_list,opt_res_Loading_lines_list,opt_res_Loading_grid_list,
          opt_res_P_conv_AC_list,opt_res_Q_conv_AC_list,opt_res_P_conv_DC_list,
-         opt_res_P_extGrid_list,opt_res_Q_extGrid_list,opt_res_curtailment_list,opt_res_price_list]= range_res
+         opt_res_P_extGrid_list,opt_res_P_Load_list,opt_res_Q_extGrid_list,
+         opt_res_curtailment_list,opt_res_price_list]= range_res
         
        
         Time_series_conv_res.extend(opt_res_Loading_conv_list)
         Time_series_Opt_res_P_conv_DC.extend(opt_res_P_conv_DC_list)
         Time_series_Opt_res_P_conv_AC.extend(opt_res_P_conv_AC_list)
         Time_series_Opt_res_Q_conv_AC.extend(opt_res_Q_conv_AC_list)
+        Time_series_Opt_res_P_Load.extend(opt_res_P_Load_list)
         Time_series_Opt_res_P_extGrid.extend(opt_res_P_extGrid_list)
         Time_series_Opt_res_Q_extGrid.extend(opt_res_Q_extGrid_list)
         Time_series_Opt_curtailment.extend(opt_res_curtailment_list)
         Time_series_line_res.extend(opt_res_Loading_lines_list)
         Time_series_grid_loading.extend(opt_res_Loading_grid_list)
         Time_series_price.extend(opt_res_price_list)
-        # print(idx+1)
+        
         idx += parallel
         
         
@@ -479,7 +482,8 @@ def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restriction
     
     touple = pack_variables(Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
                             Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
-                            Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,Time_series_price)
+                            Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
+                            Time_series_Opt_res_P_Load,Time_series_price)
     save_TS_to_grid (grid,touple)
     grid.OPF_run=True  
     grid.Time_series_ran = True
@@ -561,7 +565,7 @@ def modify_parameters(grid,model,OnlyAC,Price_Zones):
     
     
                 
-def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=False,expand=False):
+def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=False,expand=False,print_step=False):
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     total_solve_time  = 0
@@ -695,7 +699,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
         
-        print(idx+1)
+        if print_step:
+            print(idx+1)
         idx += 1
     
     
