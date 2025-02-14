@@ -131,8 +131,8 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False, TS=F
     return model, model_res , timing_info
 
 
-def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
-    from pyflow_acdc.Time_series import update_grid_data
+def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
+    from .Time_series import update_grid_data,modify_parameters
     
     weights_def = {
        'Ext_Gen': {'w': 0},
@@ -162,13 +162,21 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
         
     model = pyo.ConcreteModel()
     model.name="TS MTDC AC/DC hybrid OPF"
+    
+    
     model.Time_frames = pyo.Set(initialize=range(idx, idx + current_range))
     model.submodel = pyo.Block(model.Time_frames)
     # Run parallel iterations
-    s=1
+    base_model = pyo.ConcreteModel()
+    base_model = OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
+
     for i in range(current_range):
         t = idx + i
-        
+        if print_step:
+            print(t)
+        base_model_copy = base_model.clone()
+        model.submodel[t].transfer_attributes_from(base_model_copy)
+
         for ts in grid.Time_series:
             update_grid_data(grid, ts, t)
         
@@ -179,7 +187,7 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
                     price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
                     
             
-        OPF_createModel_ACDC(model.submodel[t],grid,PV_set,Price_Zones) 
+        modify_parameters(grid,model.submodel[t],False,True) 
         OPF_obj(model.submodel[t],grid,weights_def,OnlyGen)
         
 
@@ -195,6 +203,7 @@ def obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones) :
     opt_res_P_conv_DC_list = []
     opt_res_P_conv_AC_list =[]
     opt_res_Q_conv_AC_list =[]
+    opt_res_P_Load_list =[]
     opt_res_P_extGrid_list = []
     opt_res_curtailment_list = []
     opt_res_Q_extGrid_list = []
@@ -207,7 +216,7 @@ def obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones) :
         t = idx + i
         # print(t+1)
         
-        (opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, 
+        (opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,
          opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv) = OPF_conv_results(model.submodel[t], grid)
         
         opt_res_Loading_lines,opt_res_Loading_grid=OPF_line_res (model.submodel[t],grid)
@@ -227,6 +236,7 @@ def obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones) :
         opt_res_Q_conv_AC['time'] = t + 1
         opt_res_P_extGrid['time'] = t + 1
         opt_res_Q_extGrid['time']=t+1
+        opt_P_load['time']        = t+1
         opt_res_Loading_conv['time'] = t + 1
         opt_res_Loading_lines['time'] = t + 1
         opt_res_Loading_grid['time'] =t+1
@@ -238,6 +248,7 @@ def obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones) :
         opt_res_Q_conv_AC_list.append(opt_res_Q_conv_AC)
         
         opt_res_P_extGrid_list.append(opt_res_P_extGrid)
+        opt_res_P_Load_list.append(opt_P_load)
         opt_res_curtailment_list.append(opt_res_curtailment)
         opt_res_Q_extGrid_list.append(opt_res_Q_extGrid)
         opt_res_Loading_conv_list.append(opt_res_Loading_conv)
@@ -248,7 +259,8 @@ def obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones) :
     # After processing all time steps, pack the results into tuples
     touple = (opt_res_Loading_conv_list,opt_res_Loading_lines_list,opt_res_Loading_grid_list,
              opt_res_P_conv_AC_list,opt_res_Q_conv_AC_list,opt_res_P_conv_DC_list,
-             opt_res_P_extGrid_list,opt_res_Q_extGrid_list,opt_res_curtailment_list,opt_res_price_list)
+             opt_res_P_extGrid_list,opt_res_P_Load_list,opt_res_Q_extGrid_list,
+             opt_res_curtailment_list,opt_res_price_list)
     
     
     return touple

@@ -161,10 +161,13 @@ def update_lineDC_hovertext(line,S_base,text):
         name= line.name
         fromnode = line.fromNode.name
         tonode = line.toNode.name
-        Pfrom= np.round(line.fromP/line.np_line, decimals=dec)
-        Pto = np.round(line.toP/line.np_line, decimals=dec)
-        
-        load = max(np.abs(Pfrom), np.abs(Pto))*S_base/(line.MW_rating)*100
+        Pfrom= np.round(line.fromP, decimals=dec)
+        Pto = np.round(line.toP, decimals=dec)
+        np_line = np.round(line.np_line, decimals=1)
+        if np_line == 0:
+            load = 0
+        else:
+            load = max(np.abs(Pfrom), np.abs(Pto))*S_base/(line.MW_rating*line.np_line)*100
         Loading = np.round(load, decimals=dec)
         if Pfrom > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -182,7 +185,7 @@ def update_lineDC_hovertext(line,S_base,text):
         if np_line == 0:
             load = 0
         else:
-            load = max(Pfrom, Pto)/(line.MW_rating*line.np_line)*100
+            load = max(np.abs(Pfrom), np.abs(Pto))/(line.MW_rating*line.np_line)*100
         Loading = np.round(load, decimals=0).astype(int)
         
         if Pfrom > 0:
