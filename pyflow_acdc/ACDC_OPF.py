@@ -717,6 +717,7 @@ def OPF_conv_results(model,grid):
     opt_res_P_conv_AC = {}
     opt_res_Q_conv_AC = {}
     opt_res_Loading_conv={}
+    opt_P_load = {}
     opt_res_P_extGrid = {}
     opt_res_Q_extGrid  = {}
     opt_res_curtailment ={}
@@ -742,14 +743,23 @@ def OPF_conv_results(model,grid):
     with ThreadPoolExecutor() as executor:
         executor.map(process_converter, grid.Converters_ACDC)
     
-    
+    Pload_values = {k: np.float64(pyo.value(v)) for k, v in model.P_known_AC.items()}
     PGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen.items()}
     QGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.QGi_gen.items()}
     gamma_values = {k: np.float64(pyo.value(v)) for k, v in model.gamma.items()}
     Pren_values  = {k: np.float64(pyo.value(v)) for k, v in model.P_renSource.items()}
     Qren_values  = {k: np.float64(pyo.value(v)) for k, v in model.Q_renSource.items()}
     
-       
+    def process_load(node):
+        nAC= node.nodeNumber
+        name = node.name
+        
+        opt_P_load[name]= -Pload_values[nAC]
+        
+        
+    with ThreadPoolExecutor() as executor:
+        executor.map(process_load, grid.nodes_AC)
+    
     def process_element(element):
         if hasattr(element, 'genNumber'):  # Generator
             name = element.name
@@ -771,7 +781,7 @@ def OPF_conv_results(model,grid):
         executor.map(process_element, elements)
         
             
-    return (opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, 
+    return (opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,
                 opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment, 
                 opt_res_Loading_conv)
 
