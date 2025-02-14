@@ -10,10 +10,39 @@ from .Class_editor import *
 from .Export_files import *
 from .Time_series import *
 from .ACDC_PF import *
-from .ACDC_OPF import *
+
+
 from .Graph_and_plot import *
 from .Market_Coeff import *
 from .Grid_creator import *
+from .Classes import *
+
+# Try to import OPF module if pyomo is available
+try:
+    import pyomo.environ
+    from .ACDC_OPF import *
+    from .ACDC_TEP import *
+    HAS_OPF = True
+except ImportError:
+    HAS_OPF = False
+    import warnings
+    warnings.warn(
+        "Pyomo is not installed. OPF functionality will not be available. "
+        "To use OPF features, install optional dependencies with: "
+        "pip install pyflow-acdc[OPF]"
+    )
+
+try:
+    import dash
+    from .Graph_Dash import *
+    HAS_DASH = True
+except ImportError:
+    HAS_DASH = False
+    import warnings
+    warnings.warn(
+        "Dash is not installed. Dash functionality will not be available."
+        "To use OPF features, install optional dependencies with: "
+        "pip install pyflow-acdc[Dash] ")
 
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
@@ -76,6 +105,14 @@ __all__ = [
     'OPF_conv_results',
     'Translate_pyf_OPF',
     
+    # TEP
+    'TEP_expansion_model',
+    'update_grid_price_zone_data',
+    'expand_elements_from_pd',
+    'update_attributes',
+    'Expand_element',
+    'Translate_pd_TEP'
+
     # Time Series Analysis
     'Time_series_PF',
     'TS_ACDC_PF',
@@ -98,7 +135,9 @@ __all__ = [
     # Market Analysis
     'price_zone_data_pd',
     'price_zone_coef_data',
-    'plot_curves'
+    'plot_curves',
+
+    'run_dash',
 ]
 
 # Dynamically load all .py files in the 'cases/' folder

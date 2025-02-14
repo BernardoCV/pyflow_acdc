@@ -52,7 +52,7 @@ dependencies = ["numpy",
 [project.optional-dependencies]
 OPF = ["pyomo",
          "ipopt"]
-
+Dash = ["dash"]
 
 [project.urls]
 
