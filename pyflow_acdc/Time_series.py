@@ -25,7 +25,7 @@ __all__ = ['Time_series_PF',
 
 try:
     import pyomo.environ as pyo
-    from .ACDC_OPF_model import (
+    from .ACDC_OPF_model import (analyse_OPF,
         OPF_createModel_ACDC,
         ExportACDC_model_toPyflowACDC)
     
@@ -41,14 +41,6 @@ try:
     
 except ImportError:    
     pyomo_imp= False
-weights_def = {
-    'Ext_Gen'         : {'w': 1},
-    'Energy_cost'     : {'w': 0},
-    'AC_losses'       : {'w': 1},
-    'DC_losses'       : {'w': 1},
-    'Converter_Losses': {'w': 1},
-    'Curtailment_Red' : {'w': 1}
-}
 
 
 def find_value_from_cdf(cdf, x):
@@ -623,6 +615,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     model = pyo.ConcreteModel()
     model.name="TS AC/DC hybrid OPF"
     
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     
     t1 = time.time()
     model= OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)
@@ -648,7 +641,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t1= time.time()          
         reset_to_initialize(model, initial_values)
     
-        modify_parameters(grid,model,price_zone_restrictions)
+        modify_parameters(grid,model,OnlyAC,price_zone_restrictions)
         t2= time.time()  
         t_modelupdate = t2-t1
         

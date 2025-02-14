@@ -9,6 +9,12 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
+__all__ = [
+    'analyse_OPF',
+    'OPF_createModel_ACDC',
+    'ExportACDC_model_toPyflowACDC'
+]
+
 def analyse_OPF(grid):
     OnlyAC = True
     if grid.nn_DC!=0:
