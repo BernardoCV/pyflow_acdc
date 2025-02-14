@@ -116,10 +116,12 @@ __all__ = [
     # Time Series Analysis
     'Time_series_PF',
     'TS_ACDC_PF',
+    'TS_ACDC_OPF',
     'TS_ACDC_OPF_parallel',
     'Time_series_statistics',
     'results_TS_OPF',
     'cluster_TS',
+    'update_grid_data',
     
     # Export
     'export_results_to_excel',

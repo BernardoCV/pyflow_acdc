@@ -19,9 +19,11 @@ from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential
 __all__ = ['Time_series_PF',
            'TS_ACDC_PF',
            'TS_ACDC_OPF_parallel',
+           'TS_ACDC_OPF',
            'Time_series_statistics',
            'results_TS_OPF',
-           'cluster_TS']
+           'cluster_TS',
+           'update_grid_data']
 
 try:
     import pyomo.environ as pyo
