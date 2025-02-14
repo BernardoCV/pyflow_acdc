@@ -104,6 +104,8 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     if  Price_Zones:
         model.M = pyo.Set(initialize=lista_M)
         model.PN = pyo.Var(model.M,bounds=Price_Zone_P_bounds,initialize=0)
+        model.PGL_min= pyo.Param(model.M,initialize=PGL_min,mutable=True)
+        model.PGL_max= pyo.Param(model.M,initialize=PGL_max,mutable=True)
         # model.PN_load = pyo.Var(model.M)
         model.price = pyo.Var(model.nodes_AC,initialize=price)
         model.price_dc = pyo.Var(model.nodes_DC,initialize=price_dc)
@@ -1147,9 +1149,9 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,MI=None):
     "Price_Zone inequality constraints"
     
     def import_rule(model,price_zone):
-        return model.PN[price_zone] >= PGL_min[price_zone]
+        return model.PN[price_zone] >= model.PGL_min[price_zone]
     def export_rule(model,price_zone):
-        return model.PN[price_zone] <= PGL_max[price_zone]
+        return model.PN[price_zone] <= model.PGL_max[price_zone]
     
     
     if Price_Zones:
