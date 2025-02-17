@@ -747,7 +747,7 @@ class Results:
     
     def TEP_ts_res(self):
        
-        curt,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
         
         
         table = pt()
