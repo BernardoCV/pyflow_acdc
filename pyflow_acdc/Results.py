@@ -9,6 +9,9 @@ from prettytable import PrettyTable as pt
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from .Classes import Price_Zone
+
+
 class Results:
     def __init__(self, Grid, decimals=2, export=None):
         self.Grid = Grid
@@ -880,30 +883,54 @@ class Results:
         print('Transmission Expansion Problem')
         print(table)
         
-        curt, curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
         weight = SC.loc['Weight']
         table=pt()
-        table.field_names = ["Price_Zone", "Normalized social cost[k€/h]", "Average price [€/MWh]"]
+        table.field_names = ["Price_Zone", "Normalized Cost Generation[k€/h]", "Average price [€/MWh]","Present Value Cost Gen [M€]"]
         
-        
+        n_years = self.Grid.TEP_n_years
+        discount_rate = self.Grid.TEP_discount_rate
         for m in self.Grid.Price_Zones:
-            from .Classes import Price_Zone
             if type(m) is Price_Zone:
                 price_zone_weighted = SC.loc[m.name]
                 weighted_total = price_zone_weighted * weight
                 weighted_total = weighted_total.sum()
                 weighted_price = price.loc[m.name]* weight
                 weighted_price = weighted_price.sum()
-                table.add_row([m.name, np.round(weighted_total, decimals=2),np.round(weighted_price, decimals=2)])
+                present_value=0
+                for year in range(1, n_years + 1):
+                    # Discount each yearly cash flow and add to the present value
+                    s=1
+                    present_value += (weighted_total * 8760) / ((1 + discount_rate) ** year)/1000
+                
+                
+                
+                table.add_row([m.name, np.round(weighted_total, decimals=2),np.round(weighted_price, decimals=2),np.round(present_value, decimals=2)])
                 
         print(table)
         
         
         table=pt()
-        table.field_names = ["Normalized social cost[k€/h]","Normalized investment [k€/h]","Normalized Total cost [k€/h]"]
+        table.field_names = ["Normalized Cost Generation[k€/h]","Normalized investment [k€/h]","Normalized Total cost [k€/h]"]
         
         weighted_sum = SC.loc['Weighted SC'].sum()
+        
         table.add_row([np.round(weighted_sum, decimals=2), np.round(tot_n, decimals=2),np.round(weighted_sum+tot_n, decimals=2)])
+        print(table)
+        
+        
+        table=pt()
+        table.field_names = ["Present Value Cost Generation[M€]","Investment [M€]","NPV [M€]"]
+        tot_pv=0
+        for year in range(1, n_years + 1):
+            # Discount each yearly cash flow and add to the present value
+            s=1
+            tot_pv += (weighted_sum * 8760) / ((1 + discount_rate) ** year)/1000
+        table.add_row([
+            f"{np.round(tot_pv, decimals=2):,}".replace(',', ' '),
+            f"{np.round(tot, decimals=2):,}".replace(',', ' '),
+            f"{-np.round(tot_pv + tot, decimals=2):,}".replace(',', ' ')
+        ])  
         print(table)
         
     def Price_Zone(self):

@@ -9,6 +9,7 @@ import importlib.util
 from .Class_editor import *
 from .Export_files import *
 from .Time_series import *
+from .Time_series_clustering import *
 from .ACDC_PF import *
 
 

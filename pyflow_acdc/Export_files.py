@@ -8,6 +8,7 @@ Created on Mon Dec  2 18:23:52 2024
 import numpy as np
 import pandas as pd
 import os
+from .Classes import MTDCPrice_Zone, OffshorePrice_Zone
 
 __all__ = [
     'save_grid_to_file',
@@ -268,8 +269,7 @@ def create_dictionaries(grid):
                     "Ucmax": conv.Ucmax,
                     "geometry": conv.geometry.wkt 
                 })
-    from .Classes import MTDCPrice_Zone
-    from .Classes import OffshorePrice_Zone
+    
     # Step 1: Define sets for the MTDC price_zones and linked price_zones
     if grid.Price_Zones:
         for price_zone in getattr(grid, "Price_Zones", []):

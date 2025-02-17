@@ -249,7 +249,7 @@ def TEP_expansion_model(grid,export=None,costmodel='Linear',n_clusters=None,clus
     grid.TEP_discount_rate =discount_rate
     clustering = False
     if n_clusters is not None:
-        cluster_TS(grid,n_clusters,cluster_algorithm)
+        n_clusters,_ = cluster_TS(grid,n_clusters,cluster_algorithm)
         clustering = True
     else:
         n_clusters = len(grid.Time_series[0].data)

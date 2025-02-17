@@ -9,12 +9,13 @@ import numpy as np
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from scipy import stats as st
-from scipy.cluster.hierarchy import linkage, fcluster
-from sklearn.cluster import KMeans
+
 
 import time
 
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
+from .Time_series_clustering import cluster_TS
+
 
 __all__ = ['Time_series_PF',
            'TS_ACDC_PF',
@@ -65,106 +66,8 @@ def Time_series_PF(grid):
         print("Sequential")
         grid.TS_ACDC_PF(grid)
 
-def cluster_TS(grid,n_clusters,algorithm ='Kmeans'):
-    if algorithm not in {'Kmeans','Ward'}:
-        algorithm='Kmeans'
-    #create data from grid
-    data = pd.DataFrame()
-    
-    for ts in grid.Time_series:
-        name = ts.name
-        ts_data = ts.data
-        if data.empty:
-            data[name] = ts_data
-            expected_length = len(ts_data)
-        else:
-            # Check if ts_data length matches the expected length
-            if len(ts_data) != expected_length:
-                print(f"Error: Length mismatch for time series '{name}'. Expected {expected_length}, got {len(ts_data)}. Time series not included")
-                continue
-            data[name] = ts_data
-  
-    
-    if algorithm == 'Kmeans':
-        cluster_Kmeans(grid,n_clusters,data)
-        
-    elif algorithm == 'Ward':
-        cluster_Ward(grid,n_clusters,data)
-        
 
-def cluster_Ward(grid,n_clusters,data):
-    new_columns = data.columns
-    
-    # Perform Ward's hierarchical clustering
-    linkage_matrix = linkage(data, method='ward')
-    data['Cluster'] = fcluster(linkage_matrix, n_clusters, criterion='maxclust')
 
-    # Calculate cluster centers
-    cluster_centers = []
-    for cluster_id in range(1, n_clusters + 1):
-        cluster_data = data[data['Cluster'] == cluster_id].iloc[:, :-1]  # Exclude cluster column
-        cluster_centers.append(cluster_data.mean().values)
-    cluster_centers = np.array(cluster_centers)
-
-    clusters = pd.DataFrame(cluster_centers, columns=new_columns)
-
-    # Calculate cluster counts and weights
-    cluster_counts = data['Cluster'].value_counts().sort_index()
-    total_count = len(data)
-    cluster_weights = cluster_counts / total_count
-
-    clusters.insert(0, 'Cluster Count', cluster_counts.values)
-    clusters.insert(1, 'Weight', cluster_weights.values)
-
-    # Add weights to grid
-    grid.Clusters[n_clusters] = clusters['Weight'].to_numpy(dtype=float)
-
-    # Add clustered data to time series
-    for ts in grid.Time_series:
-        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
-            ts.data_clustered = {}
-        name = ts.name
-        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
-
-    s = 1
-        
-def cluster_Kmeans(grid,n_clusters,data):
-    
-    
-    new_columns =data.columns
-      
-    kmeans = KMeans(n_clusters=n_clusters)
-    
-    # Fit the K-means model on the rows (steps)
-    data['Cluster'] = kmeans.fit_predict(data)
-    cluster_centers = kmeans.cluster_centers_
-    
-    clusters = pd.DataFrame(cluster_centers, columns=new_columns)
-    
-    cluster_counts = data['Cluster'].value_counts()
-    
-    total_count = len(data)
-    
-    # Calculate the weight (w) for each cluster
-    cluster_weights = cluster_counts / total_count
-    
-    
-    clusters.insert(0, 'Cluster Count', cluster_counts.values)
-    clusters.insert(1, 'Weight', cluster_weights.values)
-    
-
-    grid.Clusters[n_clusters] = clusters['Weight'].to_numpy(dtype=float)
-  
-    for ts in grid.Time_series:
-        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
-            ts.data_clustered = {}
-        name = ts.name
-        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
-    
-
-    s=1
-
-  
 def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
     typ = ts.type
     
@@ -943,3 +846,7 @@ def results_TS_OPF(grid,excel_file_path,grid_names=None,stats=None,times=None):
  
         if stats is not None:
             stats.to_excel(writer, sheet_name='stats', index=True)
+
+
+
+
