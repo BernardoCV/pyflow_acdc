@@ -891,7 +891,7 @@ def change_S_base(grid,Sbase_new):
     Sbase_old = grid.S_base
     rate = Sbase_old/Sbase_new
     for line in grid.lines_AC:
-        line.Ybus_branch /= rate
+        line.S_base = Sbase_new
         
     for node in grid.nodes_AC:
         node.PGi *= rate 

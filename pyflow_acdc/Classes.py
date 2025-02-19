@@ -10,7 +10,7 @@ import sys
 import networkx as nx
 import pandas as pd
 import numpy as np
-
+from .Class_editor import Cable_parameters
 
 
 def pol2cart(r, theta):
@@ -1107,24 +1107,43 @@ class Line_AC:
         Line_AC.lineNumber -= 1  # Decrement the line number counter
         Line_AC.names.remove(self._name)  # Remove the line's name from the set
         
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC, Resistance: float, Reactance: float, Conductance: float, Susceptance: float, MVA_rating: float, kV_base: float,Length_km:float=1.0,m:float=1, shift:float=0, name=None,geometry=None,isTf=False):
+    def get_cable_parameters(self, Cable_type:str,S_base:float,Length_km:float,N_cables:int):
+        data = cable_data_set[Cable_type]
+        R,X,G,B,MVA_rating = Cable_parameters(S_base, data['R'], data['L_mH'], data['C_uF'], data['G_uS'], data['A_rating'], data['kV_base'], Length_km,N_cables)
+        return R,X,G,B,MVA_rating
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC,Cable_type:str ='Custom' ,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,S_base:float=100,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False):
         self.lineNumber = Line_AC.lineNumber
         Line_AC.lineNumber += 1
+        
+        self.S_base = S_base
+        self.S_base_i = S_base
+        self.Length_km = Length_km
+        self.N_cables = N_cables
 
         self.fromNode = fromNode
         self.toNode = toNode
+        self.kV_base = toNode.kV_base
+
         self.R = Resistance
         self.X = Reactance
         self.G = Conductance
         self.B = Susceptance
-        self.Z = self.R + self.X * 1j
-        self.Y = self.G + self.B * 1j
-        self.kV_base = kV_base
         self.MVA_rating = MVA_rating
+        
+        # Set Cable_type
+        self._Cable_type = Cable_type
+        
+        # If not Costum, update parameters
+        if Cable_type != 'Costum':
+            self.Cable_type = Cable_type
         
         self.m =m
         self.shift = shift
-        
+        self.tap= self.m * np.exp(1j*self.shift)  
+
+        self.Ybus_branch = None
+        self._calculate_Ybus_branch() 
+
         self.fromS=0
         self.toS=0
         
@@ -1133,22 +1152,7 @@ class Line_AC:
         self.geometry=geometry
         self.direction = 'from'
         
-        self.Length_km=Length_km
         
-        tap= self.m * np.exp(1j*self.shift)            
-        #Yft
-        branch_ft = -(1/self.Z)/np.conj(tap)
-        
-        #Ytf
-        branch_tf = -(1/self.Z)/tap
-        
-        branch_ff=(1/self.Z+self.Y/2)/(self.m**2)
-        branch_tt=(1/self.Z+self.Y/2)
-        
-        self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
-        
-        
-
         if name in Line_AC.names:
             Line_AC.lineNumber -= 1
             raise NameError("Already used name '%s'." % name)
@@ -1165,6 +1169,57 @@ class Line_AC:
         if self.toNode.kV_base != self.fromNode.kV_base or self.m !=1 or self.shift !=0:
             self.isTf=True
         Line_AC.names.add(self.name)
+   
+    @property
+    def S_base(self):
+        return self._S_base
+    
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):  
+            old_S_base = self._S_base
+            rate = old_S_base / new_S_base
+            if self.Ybus_branch is not None and old_S_base != new_S_base:
+                self.Ybus_branch /= rate
+        self._S_base = new_S_base
+
+    def _calculate_Ybus_branch(self):
+        """
+        Calculate the branch admittance matrix (Ybus_branch).
+        
+        The matrix is structured as:
+        [[Yff  Yft]
+         [Ytf  Ytt]]
+        
+        where:
+        - Yff: admittance at from-bus to from-bus
+        - Yft: admittance at from-bus to to-bus
+        - Ytf: admittance at to-bus to from-bus
+        - Ytt: admittance at to-bus to to-bus
+        """
+        self.Z = self.R + self.X * 1j
+        self.Y = self.G + self.B * 1j       
+        
+        branch_ft = -(1/self.Z)/np.conj(self.tap)
+        branch_tf = -(1/self.Z)/self.tap
+        branch_ff=(1/self.Z+self.Y/2)/(self.m**2)
+        branch_tt=(1/self.Z+self.Y/2)
+        
+        self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
+        
+    @property
+    def Cable_type(self):
+        return self._Cable_type
+    
+    @Cable_type.setter
+    def Cable_type(self, new_type):
+        self._Cable_type = new_type
+        if new_type != 'Costum':
+            self.R, self.X, self.G, self.B, self.MVA_rating = self.get_cable_parameters(
+                new_type, self._S_base, self.Length_km, self.N_cables)
+            self._calculate_Ybus_branch()    
 
 class Exp_Line_AC(Line_AC):
     
