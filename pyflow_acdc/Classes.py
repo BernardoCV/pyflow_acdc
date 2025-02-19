@@ -10,7 +10,10 @@ import sys
 import networkx as nx
 import pandas as pd
 import numpy as np
-from .Class_editor import Cable_parameters
+
+import yaml
+import os
+from pathlib import Path
 
 
 def pol2cart(r, theta):
@@ -1073,6 +1076,26 @@ class Node_DC:
 class Line_AC:
     lineNumber = 0
     names = set()
+    # Load cable database at class level
+    _cable_database = None
+    
+    @classmethod
+    def load_cable_database(cls):
+        """Load cable database from YAML files if not already loaded."""
+        if cls._cable_database is None:
+            # Get the path to the Cable_database directory
+            module_dir = Path(__file__).parent.parent
+            cable_dir = module_dir / 'Cable_database'
+            
+            data_dict = {}
+            # Read all YAML files in the directory
+            for yaml_file in cable_dir.glob('*.yaml'):
+                with open(yaml_file, 'r') as f:
+                    data = yaml.safe_load(f)
+                    data_dict.update(data)
+            
+            # Convert to pandas DataFrame
+            cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
 
     @classmethod
     def reset_class(cls):
@@ -1107,11 +1130,30 @@ class Line_AC:
         Line_AC.lineNumber -= 1  # Decrement the line number counter
         Line_AC.names.remove(self._name)  # Remove the line's name from the set
         
-    def get_cable_parameters(self, Cable_type:str,S_base:float,Length_km:float,N_cables:int):
-        data = cable_data_set[Cable_type]
-        R,X,G,B,MVA_rating = Cable_parameters(S_base, data['R'], data['L_mH'], data['C_uF'], data['G_uS'], data['A_rating'], data['kV_base'], Length_km,N_cables)
-        return R,X,G,B,MVA_rating
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC,Cable_type:str ='Custom' ,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,S_base:float=100,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False):
+    def get_cable_parameters(self, Cable_type, S_base, Length_km, N_cables,kV_base):
+        from .Class_editor import Cable_parameters
+        """Get cable parameters from the database."""
+        # Ensure database is loaded
+        self.load_cable_database()
+        
+        if Cable_type not in self._cable_database.index:
+            raise ValueError(f"Cable type '{Cable_type}' not found in database")
+        
+        # Get cable data
+        cable_data = self._cable_database.loc[Cable_type]
+        
+        # Calculate parameters
+        R_Ohm = cable_data['R_Ohm'] 
+        L_mH = cable_data['L_mH'] 
+        C_uF = cable_data['C_uF'] 
+        G_uS = cable_data['G_uS'] 
+        A_rating = cable_data['A_rating']
+        km = Length_km
+
+        R,X,G,B,MVA_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables)
+        return R, X, G, B, MVA_rating
+    
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,S_base:float=100,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,Cable_type:str ='Custom'):
         self.lineNumber = Line_AC.lineNumber
         Line_AC.lineNumber += 1
         
@@ -1133,8 +1175,8 @@ class Line_AC:
         # Set Cable_type
         self._Cable_type = Cable_type
         
-        # If not Costum, update parameters
-        if Cable_type != 'Costum':
+        # If not Custom, update parameters
+        if Cable_type != 'Custom':
             self.Cable_type = Cable_type
         
         self.m =m
@@ -1183,8 +1225,19 @@ class Line_AC:
             rate = old_S_base / new_S_base
             if self.Ybus_branch is not None and old_S_base != new_S_base:
                 self.Ybus_branch /= rate
-        self._S_base = new_S_base
-
+        self._S_base = new_S_base        
+    @property
+    def Cable_type(self):
+        return self._Cable_type
+    
+    @Cable_type.setter
+    def Cable_type(self, new_type):
+        self._Cable_type = new_type
+        if new_type != 'Custom':
+            self.R, self.X, self.G, self.B, self.MVA_rating = self.get_cable_parameters(
+                new_type, self._S_base, self.Length_km, self.N_cables,self.kV_base)
+            self._calculate_Ybus_branch()  
+              
     def _calculate_Ybus_branch(self):
         """
         Calculate the branch admittance matrix (Ybus_branch).
@@ -1208,19 +1261,6 @@ class Line_AC:
         branch_tt=(1/self.Z+self.Y/2)
         
         self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
-        
-    @property
-    def Cable_type(self):
-        return self._Cable_type
-    
-    @Cable_type.setter
-    def Cable_type(self, new_type):
-        self._Cable_type = new_type
-        if new_type != 'Costum':
-            self.R, self.X, self.G, self.B, self.MVA_rating = self.get_cable_parameters(
-                new_type, self._S_base, self.Length_km, self.N_cables)
-            self._calculate_Ybus_branch()    
-
 class Exp_Line_AC(Line_AC):
     
     def __init__(self, *args, **kwargs):
@@ -1859,3 +1899,5 @@ class TimeSeries:
             self._name = name
 
         TimeSeries.names.add(self.name)
+
+    
