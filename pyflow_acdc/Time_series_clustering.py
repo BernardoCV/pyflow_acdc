@@ -1,18 +1,51 @@
-from scipy.cluster.hierarchy import linkage, fcluster
-from sklearn.cluster import KMeans, DBSCAN, OPTICS
+from sklearn.cluster import KMeans, DBSCAN, OPTICS, AgglomerativeClustering, SpectralClustering, HDBSCAN
 from sklearn.preprocessing import StandardScaler
 from sklearn_extra.cluster import KMedoids
 import pandas as pd
 import numpy as np
 
 
-__all__ = ['cluster_TS','cluster_Kmeans','cluster_Ward','cluster_DBSCAN','cluster_OPTICS','cluster_Kmedoids']
+__all__ = ['cluster_TS',
+           'cluster_Kmeans',
+           'cluster_Ward',
+           'cluster_DBSCAN',
+           'cluster_OPTICS',
+           'cluster_Kmedoids',
+           'cluster_Spectral',
+           'cluster_HDBSCAN']
+
+def get_cluster_sizes(data):
+    """
+    Helper function to calculate cluster sizes.
+    
+    Parameters:
+    -----------
+    data : pandas.DataFrame
+        Data with 'Cluster' column containing cluster assignments
+    
+    Returns:
+    --------
+    list
+        Number of points in each cluster, sorted by cluster index
+    """
+    if 'Cluster' not in data.columns:
+        raise ValueError("Data must contain a 'Cluster' column")
+        
+    cluster_counts = data['Cluster'].value_counts().sort_index()
+    sizes = cluster_counts.values.tolist()
+    
+    # Print warning if any clusters are empty
+    n_clusters = len(set(data['Cluster']))
+    if len(sizes) != n_clusters:
+        print(f"Warning: Some clusters are empty. Found {len(sizes)} non-empty clusters out of {n_clusters}")
+    
+    return sizes
 
 def cluster_TS(grid,n_clusters,algorithm ='Kmeans'):
 
     algorithm = algorithm.lower()
     #check if algorithm is valid    
-    if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids'}:
+    if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan'}:
         algorithm='kmeans'
         print(f"Algorithm {algorithm} not found, using Kmeans")
     #create data from grid
@@ -42,6 +75,10 @@ def cluster_TS(grid,n_clusters,algorithm ='Kmeans'):
         n_clusters, clusters = cluster_OPTICS(grid,n_clusters,data)
     elif algorithm == 'kmedoids':
         clusters = cluster_Kmedoids(grid,n_clusters,data)
+    elif algorithm == 'spectral':
+        clusters = cluster_Spectral(grid, n_clusters, data)
+    elif algorithm == 'hdbscan':
+        n_clusters, clusters = cluster_HDBSCAN(grid, n_clusters, data)
     return n_clusters, clusters
     
 def _process_clusters(grid, data, cluster_centers, n_clusters, new_columns):
@@ -153,15 +190,18 @@ def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.0
     cluster_centers = scaler.inverse_transform(cluster_centers_scaled)
     
     # Print clustering results
-    print_clustering_results("OPTICS", actual_clusters, {
+    cluster_sizes = get_cluster_sizes(data)
+    noise_points = len(data[data['Cluster'] == -1])
+    noise_percentage = (noise_points / len(data)) * 100
+    
+    specific_info = {
+        "Cluster sizes": cluster_sizes,
         "Found clusters": actual_clusters,
         "Maximum allowed": n_clusters,
-        "Final xi": best_xi
-    })
-    if -1 in unique_clusters:
-        noise_points = len(data[data['Cluster'] == -1])
-        noise_percentage = (noise_points / len(data)) * 100
-        print(f"- Number of noise points: {noise_points} ({noise_percentage:.1f}%)")
+        "Final xi": best_xi,
+        "Noise points": (noise_points, noise_percentage)
+    }
+    print_clustering_results("OPTICS", actual_clusters, specific_info)
     
     # Process and return results
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
@@ -221,21 +261,36 @@ def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5):
     cluster_centers = scaler.inverse_transform(cluster_centers_scaled)
     
     # Print clustering results
-    print_clustering_results("DBSCAN", actual_clusters, {
+    cluster_sizes = get_cluster_sizes(data)
+    noise_points = len(data[data['Cluster'] == -1])
+    noise_percentage = (noise_points / len(data)) * 100
+    
+    specific_info = {
+        "Cluster sizes": cluster_sizes,
         "Found clusters": actual_clusters,
         "Maximum allowed": n_clusters,
-        "Final eps": best_eps
-    })
-    if -1 in unique_clusters:
-        noise_points = len(data[data['Cluster'] == -1])
-        noise_percentage = (noise_points / len(data)) * 100
-        print(f"- Number of noise points: {noise_points} ({noise_percentage:.1f}%)")
+        "Final eps": best_eps,
+        "Noise points": (noise_points, noise_percentage)
+    }
+    print_clustering_results("DBSCAN", actual_clusters, specific_info)
     
     # Always call _process_clusters with valid results
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
     return actual_clusters, processed_results
 
 def cluster_Ward(grid, n_clusters, data):
+    """
+    Perform Ward's hierarchical clustering using AgglomerativeClustering.
+    
+    Parameters:
+    -----------
+    grid : Grid object
+        The grid object to update
+    n_clusters : int
+        Number of clusters
+    data : pandas.DataFrame
+        Data to cluster
+    """
     new_columns = data.columns
     
     # Scale the data
@@ -243,26 +298,35 @@ def cluster_Ward(grid, n_clusters, data):
     data_scaled = scaler.fit_transform(data)
     data_scaled = pd.DataFrame(data_scaled, columns=data.columns)
     
-    # Perform Ward's hierarchical clustering on scaled data
-    linkage_matrix = linkage(data_scaled, method='ward')
-    data['Cluster'] = fcluster(linkage_matrix, n_clusters, criterion='maxclust')
+    # Perform Ward's hierarchical clustering on scaled dat
+    ward = AgglomerativeClustering(
+        n_clusters=n_clusters,
+        linkage='ward',
+        compute_distances=True  # Enables distance computation
+    )
+    data['Cluster'] = ward.fit_predict(data_scaled)
     
     # Calculate cluster centers in scaled space
     cluster_centers_scaled = []
-    cluster_sizes = []
-    for cluster_id in range(1, n_clusters + 1):
+    cluster_sizes = get_cluster_sizes(data)
+    
+    for cluster_id in range(n_clusters):
         cluster_data = data_scaled[data['Cluster'] == cluster_id]
         cluster_centers_scaled.append(cluster_data.mean(axis=0))
-        cluster_sizes.append(len(cluster_data))
     cluster_centers_scaled = np.array(cluster_centers_scaled)
     
     # Transform centers back to original scale
     cluster_centers = scaler.inverse_transform(cluster_centers_scaled)
     
-    # Print clustering results
-    print_clustering_results("Ward hierarchical", n_clusters, {
-        "Cluster sizes": cluster_sizes
-    })
+    # Get additional metrics
+    distances = ward.distances_  # Available if compute_distances=True
+    
+    specific_info = {
+        "Cluster sizes": cluster_sizes,
+        "Maximum merge distance": float(max(distances)) if len(distances) > 0 else 0,
+        "Average merge distance": float(np.mean(distances)) if len(distances) > 0 else 0
+    }
+    print_clustering_results("Ward hierarchical", n_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
     return n_clusters, processed_results
@@ -283,7 +347,9 @@ def cluster_Kmeans(grid, n_clusters, data):
     cluster_centers = scaler.inverse_transform(kmeans.cluster_centers_)
     
     # Print clustering results
+    cluster_sizes = get_cluster_sizes(data)
     specific_info = {
+        "Cluster sizes": cluster_sizes,
         "Inertia": kmeans.inertia_,
         "Iterations": kmeans.n_iter_
     }
@@ -337,7 +403,9 @@ def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', m
     cluster_centers = data.iloc[medoid_indices, :-1].values  # Exclude 'Cluster' column
     
     # Print clustering results
+    cluster_sizes = get_cluster_sizes(data)
     specific_info = {
+        "Cluster sizes": cluster_sizes,
         "Method": method,
         "Initialization": init,
         "Inertia": kmedoids.inertia_
@@ -345,7 +413,151 @@ def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', m
     print_clustering_results("K-medoids", n_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
-    return processed_results
+    return n_clusters, processed_results
+
+def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0):
+    """
+    Perform Spectral clustering on the data.
+    
+    Parameters:
+    -----------
+    grid : Grid object
+        The grid object to update
+    n_clusters : int
+        Number of clusters
+    data : pandas.DataFrame
+        Data to cluster
+    n_init : int, default=10
+        Number of times the k-means algorithm will be run with different centroid seeds
+    assign_labels : {'kmeans', 'discretize'}, default='kmeans'
+        Strategy to assign labels in the embedding space
+    affinity : {'rbf', 'nearest_neighbors', 'precomputed'}, default='rbf'
+        How to construct the affinity matrix
+    gamma : float, default=1.0
+        Kernel coefficient for rbf kernel
+    """
+    new_columns = data.columns
+    
+    # Scale the data
+    scaler = StandardScaler()
+    data_scaled = scaler.fit_transform(data)
+    data_scaled = pd.DataFrame(data_scaled, columns=data.columns)
+    
+    spectral = SpectralClustering(
+        n_clusters=n_clusters,
+        n_init=n_init,
+        assign_labels=assign_labels,
+        affinity=affinity,
+        gamma=gamma,
+        random_state=42
+    )
+    
+    # Fit and predict
+    data['Cluster'] = spectral.fit_predict(data_scaled)
+    
+    # Calculate cluster centers in scaled space
+    cluster_centers_scaled = []
+    cluster_sizes = get_cluster_sizes(data)
+    
+    for cluster_id in range(n_clusters):
+        cluster_data = data_scaled[data['Cluster'] == cluster_id]
+        cluster_centers_scaled.append(cluster_data.mean(axis=0))
+    cluster_centers_scaled = np.array(cluster_centers_scaled)
+    
+    # Transform centers back to original scale
+    cluster_centers = scaler.inverse_transform(cluster_centers_scaled)
+    
+    # Get affinity matrix properties
+    affinity_matrix = spectral.affinity_matrix_
+    connectivity = (affinity_matrix > 0).sum() / (affinity_matrix.shape[0] * affinity_matrix.shape[1])
+    
+    specific_info = {
+        "Cluster sizes": cluster_sizes,
+        "Affinity": affinity,
+        "Label assignment": assign_labels,
+        "Gamma": gamma,
+        "Connectivity density": f"{connectivity:.2%}",
+        "Average affinity": f"{affinity_matrix.mean():.4f}"
+    }
+    print_clustering_results("Spectral", n_clusters, specific_info)
+    
+    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
+    return n_clusters, processed_results
+
+def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None, cluster_selection_method='eom'):
+    """
+    Perform HDBSCAN clustering on the data.
+    
+    Parameters:
+    -----------
+    grid : Grid object
+        The grid object to update
+    n_clusters : int
+        Soft constraint on number of clusters (HDBSCAN determines optimal number)
+    data : pandas.DataFrame
+        Data to cluster
+    min_cluster_size : int, default=5
+        The minimum size of clusters
+    min_samples : int, default=None
+        The number of samples in a neighborhood for a point to be a core point
+    cluster_selection_method : {'eom', 'leaf'}, default='eom'
+        The method used to select clusters
+    """
+    new_columns = data.columns
+    
+    # Scale the data
+    scaler = StandardScaler()
+    data_scaled = scaler.fit_transform(data)
+    data_scaled = pd.DataFrame(data_scaled, columns=data.columns)
+    
+    # If min_samples not specified, use min_cluster_size
+    if min_samples is None:
+        min_samples = min_cluster_size
+    
+    # Initialize HDBSCAN
+    from sklearn.cluster import HDBSCAN
+    clusterer = HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        min_samples=min_samples,
+        cluster_selection_method=cluster_selection_method
+    )
+    
+    # Fit and predict
+    data['Cluster'] = clusterer.fit_predict(data_scaled)
+    
+    # Get actual number of clusters (excluding noise points marked as -1)
+    actual_clusters = len(set(data['Cluster'][data['Cluster'] >= 0]))
+    
+    # Calculate cluster centers in scaled space
+    cluster_centers_scaled = []
+    unique_clusters = sorted(set(data['Cluster']))
+    for cluster_id in unique_clusters:
+        cluster_data = data_scaled[data['Cluster'] == cluster_id]
+        cluster_centers_scaled.append(cluster_data.mean().values)
+    cluster_centers_scaled = np.array(cluster_centers_scaled)
+    
+    # Transform centers back to original scale
+    cluster_centers = scaler.inverse_transform(cluster_centers_scaled)
+    
+    # Get cluster sizes and noise points
+    cluster_sizes = get_cluster_sizes(data)
+    noise_points = len(data[data['Cluster'] == -1])
+    noise_percentage = (noise_points / len(data)) * 100
+    
+    specific_info = {
+        "Found clusters": actual_clusters,
+        "Target clusters": n_clusters,
+        "Cluster sizes": cluster_sizes,
+        "Noise points": (noise_points, noise_percentage),
+        "Min cluster size": min_cluster_size,
+        "Min samples": min_samples,
+        "Selection method": cluster_selection_method,
+        "Probabilities available": hasattr(clusterer, 'probabilities_')
+    }
+    print_clustering_results("HDBSCAN", actual_clusters, specific_info)
+    
+    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
+    return actual_clusters, processed_results
 
 def print_clustering_results(algorithm, n_clusters, specific_info):
     """Helper function to print clustering results in a standardized format."""
