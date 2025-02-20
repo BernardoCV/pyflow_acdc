@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 from concurrent.futures import ThreadPoolExecutor
 import os
 from importlib import resources
-
+from .Classes import Node_AC
 
 try:
     import geopandas as gpd
@@ -1015,7 +1015,7 @@ def plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",poly
     
     # Extract node data into a GeoDataFrame
     def extract_node_data(nodes):
-        from .Classes import Node_AC
+        
         node_data = []
         for node in nodes:
             subgraph_idx = subgraph_dict.get(node, None)

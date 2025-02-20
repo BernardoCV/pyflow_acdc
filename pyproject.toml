@@ -47,7 +47,9 @@ dependencies = ["numpy",
                 "prettytable",
                 "plotly",
                 "folium",
-                "geopandas"]
+                "geopandas",
+                "scikit-learn-extra",
+                "scikit-learn"]
 
 [project.optional-dependencies]
 OPF = ["pyomo",
