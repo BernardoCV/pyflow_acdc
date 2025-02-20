@@ -1152,7 +1152,7 @@ class Line_AC:
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
-        
+        Cable_type = Cable_type.replace(' ', '_')
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
         
@@ -1165,9 +1165,8 @@ class Line_AC:
         C_uF = cable_data['C_uF_km'] 
         G_uS = cable_data['G_uS_km'] 
         A_rating = cable_data['A_rating']
-        km = Length_km
-
-        R,X,G,B,MVA_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables)
+      
+        R,X,G,B,MVA_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, Length_km,N_cables)
         return R, X, G, B, MVA_rating
     
     def __init__(self, fromNode: Node_AC, toNode: Node_AC,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,S_base:float=100,Cable_type:str ='Custom'):
@@ -1189,19 +1188,18 @@ class Line_AC:
         self.B = Susceptance
         self.MVA_rating = MVA_rating
         
+        self.m =m
+        self.shift = shift
+        self.tap= self.m * np.exp(1j*self.shift)  
+        
         # Set Cable_type
         self._Cable_type = Cable_type
         
         # If not Custom, update parameters
         if Cable_type != 'Custom':
             self.Cable_type = Cable_type
-        
-        self.m =m
-        self.shift = shift
-        self.tap= self.m * np.exp(1j*self.shift)  
-
-        self.Ybus_branch = None
-        self._calculate_Ybus_branch() 
+        else:
+            self._calculate_Ybus_branch() 
 
         self.fromS=0
         self.toS=0
@@ -1252,7 +1250,7 @@ class Line_AC:
         self._Cable_type = new_type
         if new_type != 'Custom':
             self.R, self.X, self.G, self.B, self.MVA_rating = self.get_cable_parameters(
-                new_type, self._S_base, self.Length_km, self.N_cables,self.kV_base)
+                new_type, self.S_base, self.Length_km, self.N_cables,self.kV_base)
             self._calculate_Ybus_branch()  
               
     def _calculate_Ybus_branch(self):
@@ -1411,7 +1409,7 @@ class Line_DC:
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
-        
+        Cable_type = Cable_type.replace(' ', '_')
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
         
@@ -1434,7 +1432,7 @@ class Line_DC:
         Line_DC.lineNumber += 1
 
         self.m_sm_b = polarity
-
+        self.S_base = S_base
         if polarity == 'm':
             self.pol = 1
         elif polarity == 'b' or polarity == 'sm':
@@ -1454,7 +1452,8 @@ class Line_DC:
 
         self.R = Resistance
         self.MW_rating = MW_rating
-        
+        self.Length_km=km
+
         self._Cable_type = Cable_type
 
         if Cable_type != 'Custom':
@@ -1464,9 +1463,7 @@ class Line_DC:
         self.fromP=0
         self.toP=0        
         self.direction = 'from'
-        
-        self.Length_km=km
-        
+ 
         self.loss =0
         
         self.base_cost = None
@@ -1511,7 +1508,7 @@ class Line_DC:
     def Cable_type(self, new_type):
         self._Cable_type = new_type
         if new_type != 'Custom':
-            self.R, self.MW_rating = self.get_cable_parameters(new_type, self._S_base, self.Length_km, self.N_cables,self.kV_base)
+            self.R, self.MW_rating = self.get_cable_parameters(new_type, self.S_base, self.Length_km, self.np_line,self.kV_base)
            
 class AC_DC_converter:
     ConvNumber = 0
