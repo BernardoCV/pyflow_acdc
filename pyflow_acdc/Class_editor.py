@@ -217,7 +217,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         grid.Update_Graph_AC()
         
     else:    
-        line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,Length_km,m, shift, name,S_base=grid.S_base)
+        line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating,Length_km,m, shift, name,S_base=grid.S_base)
         
         grid.lines_AC.append(line)
         grid.create_Ybus_AC()
@@ -274,8 +274,7 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     s=1    
 
 def add_line_DC(grid, fromNode, toNode, Resistance_pu, MW_rating,km=1, polarity='m', name=None,geometry=None):
-    kV_base=toNode.kV_base
-    line = Line_DC(fromNode, toNode, Resistance_pu, MW_rating, kV_base,km, polarity, name)
+    line = Line_DC(fromNode, toNode, Resistance_pu, MW_rating,km, polarity, name)
     grid.lines_DC.append(line)
     grid.create_Ybus_DC()
     if geometry is not None:

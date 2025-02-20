@@ -73,8 +73,12 @@ class Grid:
         
         self.Converters_ACDC = Converters if Converters else []
         
-        self.lines_DC = lines_DC if lines_DC else []
-    
+        self.lines_DC = []
+        if lines_DC:
+            for line in lines_DC:
+                # Set grid's S_base for each line
+                line.S_base = self.S_base
+                self.lines_DC.append(line)
             
         self.slack_bus_number_AC = []
         self.slack_bus_number_DC = []
