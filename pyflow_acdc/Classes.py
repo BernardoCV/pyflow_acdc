@@ -62,7 +62,12 @@ class Grid:
         self._slackDC_nodes = None  
         
         
-        self.lines_AC = lines_AC if lines_AC else []
+        self.lines_AC = []
+        if lines_AC:
+            for line in lines_AC:
+                # Set grid's S_base for each line
+                line.S_base = self.S_base
+                self.lines_AC.append(line)
         self.lines_AC_exp = []
         self.lines_AC_tf  = []
         
@@ -589,13 +594,12 @@ class Grid:
             fromNode = line.fromNode.nodeNumber
             toNode = line.toNode.nodeNumber
 
-            self.Ybus_DC[fromNode, toNode] -= 1/line.Z
+            self.Ybus_DC[fromNode, toNode] -= 1/line.R
             self.Ybus_DC[toNode, fromNode] = self.Ybus_DC[fromNode, toNode]
 
         # Diagonal elements
         for m in range(self.nn_DC):
-            self.Ybus_DC[m, m] = -self.Ybus_DC[:,
-                                               m].sum() if self.Ybus_DC[:, m].sum() != 0 else 1.0
+            self.Ybus_DC[m, m] = -self.Ybus_DC[:,m].sum() if self.Ybus_DC[:, m].sum() != 0 else 1.0
 
     def Check_SlacknDroop(self, change_slack2Droop):
         for conv in self.Converters_ACDC:
@@ -1076,7 +1080,6 @@ class Node_DC:
 class Line_AC:
     lineNumber = 0
     names = set()
-    # Load cable database at class level
     _cable_database = None
     
     @classmethod
@@ -1091,11 +1094,22 @@ class Line_AC:
             # Read all YAML files in the directory
             for yaml_file in cable_dir.glob('*.yaml'):
                 with open(yaml_file, 'r') as f:
-                    data = yaml.safe_load(f)
-                    data_dict.update(data)
+                    cable_data = yaml.safe_load(f)
+                    if cable_data:
+                        # Each file has one cable
+                        cable_name = list(cable_data.keys())[0]
+                        specs = cable_data[cable_name]
+                        
+                        # Only include AC cables
+                        if specs.get('Type', 'AC') == 'AC':
+                            data_dict[cable_name] = specs
             
-            # Convert to pandas DataFrame
-            cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+            if data_dict:
+                # Convert to pandas DataFrame
+                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+                print(f"Loaded {len(data_dict)} AC cables into database")
+            else:
+                print("No AC cable data found in any YAML files")
 
     @classmethod
     def reset_class(cls):
@@ -1134,7 +1148,6 @@ class Line_AC:
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
-        self.load_cable_database()
         
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
@@ -1153,7 +1166,7 @@ class Line_AC:
         R,X,G,B,MVA_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables)
         return R, X, G, B, MVA_rating
     
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,S_base:float=100,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,Cable_type:str ='Custom'):
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,S_base:float=100,Cable_type:str ='Custom'):
         self.lineNumber = Line_AC.lineNumber
         Line_AC.lineNumber += 1
         
@@ -1350,6 +1363,36 @@ class TF_Line_AC:
 class Line_DC:
     lineNumber = 0
     names = set()
+    _cable_database = None
+    
+    @classmethod
+    def load_cable_database(cls):
+        """Load cable database from YAML files if not already loaded."""
+        if cls._cable_database is None:
+            # Get the path to the Cable_database directory
+            module_dir = Path(__file__).parent.parent
+            cable_dir = module_dir / 'Cable_database'
+            
+            data_dict = {}
+            # Read all YAML files in the directory
+            for yaml_file in cable_dir.glob('*.yaml'):
+                with open(yaml_file, 'r') as f:
+                    cable_data = yaml.safe_load(f)
+                    if cable_data:
+                        # Each file has one cable
+                        cable_name = list(cable_data.keys())[0]
+                        specs = cable_data[cable_name]
+                        
+                        # Only include AC cables
+                        if specs.get('Type', 'DC') == 'DC':
+                            data_dict[cable_name] = specs
+            
+            if data_dict:
+                # Convert to pandas DataFrame
+                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+                print(f"Loaded {len(data_dict)} DC cables into database")
+            else:
+                print("No DC cable data found in any YAML files")
 
     @classmethod
     def reset_class(cls):
@@ -1360,7 +1403,29 @@ class Line_DC:
     def name(self):
         return self._name
 
-    def __init__(self, fromNode: Node_DC, toNode: Node_DC, Resistance: float, MW_rating: float, kV_base: float,km:float=1, polarity='m', name=None):
+    def get_cable_parameters(self, Cable_type, S_base, Length_km, N_cables,kV_base):
+        from .Class_editor import Cable_parameters
+        """Get cable parameters from the database."""
+        # Ensure database is loaded
+        
+        if Cable_type not in self._cable_database.index:
+            raise ValueError(f"Cable type '{Cable_type}' not found in database")
+        
+        # Get cable data
+        cable_data = self._cable_database.loc[Cable_type]
+        
+        # Calculate parameters
+        R_Ohm = cable_data['R_Ohm_km'] 
+        L_mH = 0
+        C_uF = 0
+        G_uS = 0
+        A_rating = cable_data['A_rating']
+        km = Length_km
+
+        R, _, _, _, MW_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,1)
+        return R, MW_rating
+    
+    def __init__(self, fromNode: Node_DC, toNode: Node_DC, Resistance: float=0.001, MW_rating: float=9999,km:float=1, polarity='m', name=None,N_cables=1,Cable_type:str='Custom',S_base:float=100):
         self.lineNumber = Line_DC.lineNumber
         Line_DC.lineNumber += 1
 
@@ -1376,10 +1441,21 @@ class Line_DC:
 
         self.fromNode = fromNode
         self.toNode = toNode
+        self.kV_base = toNode.kV_base
+
+        self.np_line=N_cables
+        self.np_line_i= N_cables
+        self.np_line_max = N_cables
+        self.np_line_opf=False
+
         self.R = Resistance
         self.MW_rating = MW_rating
         
-        self.Z = self.R
+        self._Cable_type = Cable_type
+
+        if Cable_type != 'Custom':
+            self.Cable_type=Cable_type
+        
 
         self.fromP=0
         self.toP=0        
@@ -1394,13 +1470,7 @@ class Line_DC:
         self.exp_inv=1
         self.cost_perMWkm = None
         self.phi=1
-        
-        self.np_line=1
-        self.np_line_i= 1
-        self.np_line_max = 1
-        self.np_line_opf=False
-
-        self.kV_base = kV_base
+               
          
         self.hover_text = None
         self.geometry=None
@@ -1415,6 +1485,30 @@ class Line_DC:
 
         Line_DC.names.add(self.name)
 
+    @property
+    def S_base(self):
+        return self._S_base
+    
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):  
+            old_S_base = self._S_base
+            rate = old_S_base / new_S_base
+            if self.R is not None and old_S_base != new_S_base:
+                self.R *= rate
+        self._S_base = new_S_base        
+    @property
+    def Cable_type(self):
+        return self._Cable_type
+    
+    @Cable_type.setter
+    def Cable_type(self, new_type):
+        self._Cable_type = new_type
+        if new_type != 'Custom':
+            self.R, self.MW_rating = self.get_cable_parameters(new_type, self._S_base, self.Length_km, self.N_cables,self.kV_base)
+           
 class AC_DC_converter:
     ConvNumber = 0
     names = set()
@@ -1870,6 +1964,7 @@ class MTDCPrice_Zone(Price_Zone):
             
             
             
+            
 class TimeSeries:
     TS_num = 0
     names = set()
@@ -1901,3 +1996,5 @@ class TimeSeries:
         TimeSeries.names.add(self.name)
 
     
+Line_AC.load_cable_database()
+Line_DC.load_cable_database()

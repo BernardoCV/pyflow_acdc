@@ -1,0 +1,22 @@
+# Cable specifications
+# Units:
+#   - Resistance: ohm/km
+#   - Inductance: mH/km
+#   - Capacitance: µF/km
+#   - Conductance: µS/km
+#   - Current rating: A
+#   - Power rating: MVA
+#   - Nominal voltage: kV
+#   - conductor_size: mm^2
+#   - Type: AC or DC
+NREL_XLPE_630mm_66kV:
+  R_Ohm_km: 0.04
+  L_mH_km: 0.35
+  C_uF_km: 0.3
+  G_uS_km: 0.0
+  A_rating: 775.0
+  MVA_rating: 88.59439880714807
+  Nominal_voltage_kV: 66.0
+  conductor_size: 630
+  Type: AC
+  Reference: NREL

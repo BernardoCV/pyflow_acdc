@@ -1,0 +1,22 @@
+# Cable specifications
+# Units:
+#   - Resistance: ohm/km
+#   - Inductance: mH/km
+#   - Capacitance: µF/km
+#   - Conductance: µS/km
+#   - Current rating: A
+#   - Power rating: MVA
+#   - Nominal voltage: kV
+#   - conductor_size: mm^2
+#   - Type: AC or DC
+ABB_Cu_XLPE_300mm2_30kV:
+  R_Ohm_km: 0.07556663790499275
+  L_mH_km: 0.36
+  C_uF_km: 0.26
+  G_uS_km: 0.0
+  A_rating: 530.0
+  MVA_rating: 27.53960784034515
+  Nominal_voltage_kV: 30.0
+  conductor_size: 300
+  Type: AC
+  Reference: ABB

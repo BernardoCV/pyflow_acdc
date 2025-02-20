@@ -217,7 +217,8 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         grid.Update_Graph_AC()
         
     else:    
-        line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,Length_km,m, shift, name)
+        line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,Length_km,m, shift, name,S_base=grid.S_base)
+        
         grid.lines_AC.append(line)
         grid.create_Ybus_AC()
         grid.Update_Graph_AC()
