@@ -1,8 +1,14 @@
 from sklearn.cluster import KMeans, DBSCAN, OPTICS, AgglomerativeClustering, SpectralClustering, HDBSCAN
+from sklearn.metrics import silhouette_score, davies_bouldin_score, pairwise_distances
 from sklearn.preprocessing import StandardScaler
 from sklearn_extra.cluster import KMedoids
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import time as time
+from pathlib import Path
+from scipy.spatial.distance import cdist
+
 
 
 __all__ = ['cluster_TS',
@@ -12,7 +18,8 @@ __all__ = ['cluster_TS',
            'cluster_OPTICS',
            'cluster_Kmedoids',
            'cluster_Spectral',
-           'cluster_HDBSCAN']
+           'cluster_HDBSCAN',
+           'run_clustering_analysis_and_plot']
 
 def get_cluster_sizes(data):
     """
@@ -41,16 +48,15 @@ def get_cluster_sizes(data):
     
     return sizes
 
-def cluster_TS(grid,n_clusters,algorithm ='Kmeans'):
-
+def cluster_TS(grid, n_clusters, algorithm='Kmeans'):
     algorithm = algorithm.lower()
     #check if algorithm is valid    
     if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan'}:
         algorithm='kmeans'
         print(f"Algorithm {algorithm} not found, using Kmeans")
+    
     #create data from grid
     data = pd.DataFrame()
-    
     for ts in grid.Time_series:
         name = ts.name
         ts_data = ts.data
@@ -63,24 +69,25 @@ def cluster_TS(grid,n_clusters,algorithm ='Kmeans'):
                 print(f"Error: Length mismatch for time series '{name}'. Expected {expected_length}, got {len(ts_data)}. Time series not included")
                 continue
             data[name] = ts_data
-  
     
     if algorithm == 'kmeans':
-        clusters = cluster_Kmeans(grid,n_clusters,data)
+        clusters, returns, labels = cluster_Kmeans(grid, n_clusters, data)
     elif algorithm == 'ward':
-        clusters = cluster_Ward(grid,n_clusters,data)
-    elif algorithm == 'dbscan':
-        n_clusters, clusters = cluster_DBSCAN(grid,n_clusters,data)
-    elif algorithm == 'optics':
-        n_clusters, clusters = cluster_OPTICS(grid,n_clusters,data)
+        clusters, returns, labels = cluster_Ward(grid, n_clusters, data)
     elif algorithm == 'kmedoids':
-        clusters = cluster_Kmedoids(grid,n_clusters,data)
+        clusters, returns, labels = cluster_Kmedoids(grid, n_clusters, data)
     elif algorithm == 'spectral':
-        clusters = cluster_Spectral(grid, n_clusters, data)
+        clusters, returns, labels = cluster_Spectral(grid, n_clusters, data)
+    elif algorithm == 'dbscan':
+        n_clusters, clusters, returns, labels = cluster_DBSCAN(grid, n_clusters, data)
+    elif algorithm == 'optics':
+        n_clusters, clusters, returns, labels = cluster_OPTICS(grid, n_clusters, data)    
     elif algorithm == 'hdbscan':
-        n_clusters, clusters = cluster_HDBSCAN(grid, n_clusters, data)
-    return n_clusters, clusters
+        n_clusters, clusters, returns, labels = cluster_HDBSCAN(grid, n_clusters, data)
     
+
+    return n_clusters, clusters, returns, labels
+
 def _process_clusters(grid, data, cluster_centers, n_clusters, new_columns):
     """
     Process clustering results and update grid with cluster information.
@@ -176,6 +183,7 @@ def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.0
     
     # Use best result
     data['Cluster'] = best_labels
+    labels = data['Cluster']
     actual_clusters = len(set(best_labels[best_labels >= 0]))
     
     # Calculate cluster centers in scaled space
@@ -201,11 +209,11 @@ def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.0
         "Final xi": best_xi,
         "Noise points": (noise_points, noise_percentage)
     }
-    print_clustering_results("OPTICS", actual_clusters, specific_info)
+    CoV = print_clustering_results("OPTICS", actual_clusters, specific_info)
     
     # Process and return results
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
-    return actual_clusters, processed_results
+    return actual_clusters, processed_results, CoV, [data_scaled,labels]
 
 
 def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5):
@@ -247,6 +255,7 @@ def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5):
     
     # Use best result
     data['Cluster'] = best_result
+    labels = data['Cluster']
     actual_clusters = len(set(best_result[best_result >= 0]))
     
     # Calculate cluster centers in scaled space
@@ -272,11 +281,11 @@ def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5):
         "Final eps": best_eps,
         "Noise points": (noise_points, noise_percentage)
     }
-    print_clustering_results("DBSCAN", actual_clusters, specific_info)
+    CoV = print_clustering_results("DBSCAN", actual_clusters, specific_info)
     
     # Always call _process_clusters with valid results
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
-    return actual_clusters, processed_results
+    return actual_clusters, processed_results, CoV, [data_scaled,labels]
 
 def cluster_Ward(grid, n_clusters, data):
     """
@@ -305,7 +314,7 @@ def cluster_Ward(grid, n_clusters, data):
         compute_distances=True  # Enables distance computation
     )
     data['Cluster'] = ward.fit_predict(data_scaled)
-    
+    labels = data['Cluster']
     # Calculate cluster centers in scaled space
     cluster_centers_scaled = []
     cluster_sizes = get_cluster_sizes(data)
@@ -326,10 +335,10 @@ def cluster_Ward(grid, n_clusters, data):
         "Maximum merge distance": float(max(distances)) if len(distances) > 0 else 0,
         "Average merge distance": float(np.mean(distances)) if len(distances) > 0 else 0
     }
-    print_clustering_results("Ward hierarchical", n_clusters, specific_info)
+    CoV = print_clustering_results("Ward hierarchical", n_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
-    return n_clusters, processed_results
+    return  processed_results, CoV, [data_scaled,labels]
 
 def cluster_Kmeans(grid, n_clusters, data):
     new_columns = data.columns
@@ -342,6 +351,7 @@ def cluster_Kmeans(grid, n_clusters, data):
     # Fit KMeans on scaled data
     kmeans = KMeans(n_clusters=n_clusters)
     data['Cluster'] = kmeans.fit_predict(data_scaled)
+    labels = data['Cluster']
     
     # Get cluster centers and transform back to original scale
     cluster_centers = scaler.inverse_transform(kmeans.cluster_centers_)
@@ -353,10 +363,10 @@ def cluster_Kmeans(grid, n_clusters, data):
         "Inertia": kmeans.inertia_,
         "Iterations": kmeans.n_iter_
     }
-    print_clustering_results("K-means", n_clusters, specific_info)
+    CoV = print_clustering_results("K-means", n_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
-    return n_clusters, processed_results
+    return  processed_results, [CoV,kmeans.inertia_,kmeans.n_iter_], [data_scaled,labels]
 
 def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', max_iter=300):
     """
@@ -395,7 +405,8 @@ def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', m
         max_iter=max_iter
     )
     data['Cluster'] = kmedoids.fit_predict(data_scaled)
-    
+    labels = data['Cluster']
+
     # Get medoid indices
     medoid_indices = kmedoids.medoid_indices_
     
@@ -410,10 +421,10 @@ def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', m
         "Initialization": init,
         "Inertia": kmedoids.inertia_
     }
-    print_clustering_results("K-medoids", n_clusters, specific_info)
+    CoV = print_clustering_results("K-medoids", n_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
-    return n_clusters, processed_results
+    return  processed_results, [CoV,kmedoids.inertia_], [data_scaled,labels]
 
 def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0):
     """
@@ -454,7 +465,7 @@ def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', 
     
     # Fit and predict
     data['Cluster'] = spectral.fit_predict(data_scaled)
-    
+    labels = data['Cluster']
     # Calculate cluster centers in scaled space
     cluster_centers_scaled = []
     cluster_sizes = get_cluster_sizes(data)
@@ -479,10 +490,10 @@ def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', 
         "Connectivity density": f"{connectivity:.2%}",
         "Average affinity": f"{affinity_matrix.mean():.4f}"
     }
-    print_clustering_results("Spectral", n_clusters, specific_info)
+    CoV = print_clustering_results("Spectral", n_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
-    return n_clusters, processed_results
+    return  processed_results, CoV, [data_scaled,labels]
 
 def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None, cluster_selection_method='eom'):
     """
@@ -514,8 +525,7 @@ def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None
     if min_samples is None:
         min_samples = min_cluster_size
     
-    # Initialize HDBSCAN
-    from sklearn.cluster import HDBSCAN
+    # Initialize HDBSCA
     clusterer = HDBSCAN(
         min_cluster_size=min_cluster_size,
         min_samples=min_samples,
@@ -524,7 +534,7 @@ def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None
     
     # Fit and predict
     data['Cluster'] = clusterer.fit_predict(data_scaled)
-    
+    labels = data['Cluster']
     # Get actual number of clusters (excluding noise points marked as -1)
     actual_clusters = len(set(data['Cluster'][data['Cluster'] >= 0]))
     
@@ -554,16 +564,61 @@ def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None
         "Selection method": cluster_selection_method,
         "Probabilities available": hasattr(clusterer, 'probabilities_')
     }
-    print_clustering_results("HDBSCAN", actual_clusters, specific_info)
+    CoV = print_clustering_results("HDBSCAN", actual_clusters, specific_info)
     
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
-    return actual_clusters, processed_results
+    return actual_clusters, processed_results , CoV, [data_scaled,labels]
+
+
+def dunn_index(X, labels):
+    """
+    Compute the Dunn Index for clustering results.
+
+    Parameters:
+        X (array-like): Data points (n_samples, n_features).
+        labels (array-like): Cluster labels for each data point.
+
+    Returns:
+        float: Dunn Index value (higher is better).
+    """
+    unique_labels = np.unique(labels)
+    num_clusters = len(unique_labels)
+
+    if num_clusters < 2:
+        return 0  # Dunn Index is undefined for a single cluster
+
+    # Compute intra-cluster distances (max within-cluster distance)
+    intra_dists = []
+    for label in unique_labels:
+        cluster_points = X[labels == label]
+        if len(cluster_points) > 1:
+            intra_dists.append(np.max(pairwise_distances(cluster_points)))
+        else:
+            intra_dists.append(0)  # Single-point cluster
+
+    max_intra_dist = np.max(intra_dists) if intra_dists else 0
+
+    # Compute inter-cluster distances (min distance between different clusters)
+    inter_dists = []
+    for i in range(num_clusters):
+        for j in range(i + 1, num_clusters):
+            cluster_i = X[labels == unique_labels[i]]
+            cluster_j = X[labels == unique_labels[j]]
+            dist_matrix = cdist(cluster_i, cluster_j)  # Compute distances between clusters
+            inter_dists.append(np.min(dist_matrix))
+
+    min_inter_dist = np.min(inter_dists) if inter_dists else 0
+
+    if max_intra_dist == 0:
+        return 0
+    
+    return min_inter_dist / max_intra_dist
 
 def print_clustering_results(algorithm, n_clusters, specific_info):
     """Helper function to print clustering results in a standardized format."""
     print(f"\n{algorithm} clustering results:")
     print(f"- Number of clusters: {n_clusters}")
-    
+    CoV=0
     # Print algorithm-specific information
     for key, value in specific_info.items():
         if isinstance(value, (int, str)):
@@ -572,9 +627,179 @@ def print_clustering_results(algorithm, n_clusters, specific_info):
             print(f"- {key}: {value:.2f}")
         elif isinstance(value, list):
             print(f"- {key}: {value}")
+            
             if key == "Cluster sizes":
+                CoV = np.std(value)/np.mean(value)
                 print(f"  • Average: {np.mean(value):.1f}")
                 print(f"  • Std dev: {np.std(value):.1f}")
+                print(f"  • CoV    : {CoV:.1f}")
         elif isinstance(value, tuple):
             count, percentage = value
             print(f"- {key}: {count} ({percentage:.1f}%)")
+    return CoV    
+
+def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48]):
+       
+    
+    results = {
+        'algorithm': [],
+        'n_clusters': [],
+        'time_taken': [],
+        'Coefficient of Variation': [],
+        'inertia': [],
+        'silhouette_score': [],
+        'dunn_index': [],
+        'davies_bouldin': []
+    }
+    
+    for algo in algorithms:
+        print(f"\nTesting {algo}...")
+        for n in n_clusters_list:
+            print(f"  Clusters: {n}")
+            
+            start_time = time.time()
+            try:
+                _,_,CoV,info = cluster_TS(grid, algorithm=algo, n_clusters=n)
+                data_scaled,labels = info
+                if algo == 'kmeans':
+                    CoV, inertia, n_iter_ = CoV
+                elif algo == 'kmedoids':
+                    CoV, inertia = CoV
+                else:
+                    inertia = 0
+                time_taken = time.time() - start_time
+
+                if labels is not None and len(np.unique(labels)) > 1:
+                    sil_score = silhouette_score(data_scaled,labels)
+                    dunn_idx = dunn_index(data_scaled,labels)
+                    db_score = davies_bouldin_score(data_scaled,labels)
+                else:
+                    sil_score = dunn_idx = db_score = 0
+
+                results['algorithm'].append(algo)
+                results['n_clusters'].append(n)
+                results['time_taken'].append(time_taken)
+                results['Coefficient of Variation'].append(CoV)
+                results['inertia'].append(inertia)
+                results['silhouette_score'].append(sil_score)
+                results['dunn_index'].append(dunn_idx)
+                results['davies_bouldin'].append(db_score)
+                
+                print(f"    Time: {time_taken:.2f}s")
+                
+            except Exception as e:
+                print(f"    Error with {algo}, n={n}: {str(e)}")
+                continue
+    
+    df_results = pd.DataFrame(results)
+    Path(save_path).mkdir(parents=True, exist_ok=True)
+    
+    # Updated summary to use correct columns
+    summary_df = df_results[['algorithm', 'n_clusters', 'time_taken', 'Coefficient of Variation','inertia','silhouette_score','dunn_index','davies_bouldin']]
+    summary_df.to_csv(f'{save_path}/clustering_summary.csv', index=False)
+ 
+    
+    return df_results
+
+# Usage:
+# results = run_clustering_analysis(grid)
+
+# To analyze results:
+def plot_clustering_results(df= None,results_path='clustering_results'):
+    
+    if df is None:
+        df = pd.read_csv(f'{results_path}/clustering_summary.csv')
+    
+    # 1. Time comparison plot
+    plt.figure(figsize=(10, 6))
+    for algo in df['algorithm'].unique():
+        data = df[df['algorithm'] == algo]
+        plt.plot(data['n_clusters'], data['time_taken'], 
+                marker='o', label=algo)
+    plt.title('Clustering Time vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Time (seconds)')
+    plt.tight_layout()
+    plt.savefig(f'{results_path}/time_comparison.svg')
+    plt.close()
+    
+    # 2. Standard deviation plot
+    plt.figure(figsize=(10, 6))
+    for algo in df['algorithm'].unique():
+        data = df[df['algorithm'] == algo]
+        plt.plot(data['n_clusters'], data['Coefficient of Variation'], 
+                marker='o', label=algo)
+    plt.title('Standard Deviation vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Coefficient of Variation')
+    plt.tight_layout()
+    plt.savefig(f'{results_path}/cov_comparison.svg')
+    plt.close()
+    
+    # 3. Inertia plot (kmeans and kmedoids only)
+    plt.figure(figsize=(10, 6))
+    kmeans_data = df[df['algorithm'] == 'kmeans']
+    kmedoids_data = df[df['algorithm'] == 'kmedoids']
+    
+    plt.plot(kmeans_data['n_clusters'], kmeans_data['inertia'], 
+            marker='o', label='k-means', linestyle='-')
+    plt.plot(kmedoids_data['n_clusters'], kmedoids_data['inertia'], 
+            marker='s', label='k-medoids', linestyle='-')
+    
+    plt.title('Inertia vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Inertia')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f'{results_path}/inertia_comparison.svg')
+    plt.close()
+    
+    # 4. Silhouette score plot
+    plt.figure(figsize=(10, 6))
+    for algo in df['algorithm'].unique():
+        data = df[df['algorithm'] == algo]
+        plt.plot(data['n_clusters'], data['silhouette_score'], 
+                marker='o', label=algo)
+    plt.title('Silhouette Score vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Silhouette Score')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f'{results_path}/silhouette_comparison.svg')
+    plt.close()     
+    
+    # 5. Dunn index plot
+    plt.figure(figsize=(10, 6))
+    for algo in df['algorithm'].unique():
+        data = df[df['algorithm'] == algo]
+        plt.plot(data['n_clusters'], data['dunn_index'], 
+                marker='o', label=algo)
+    plt.title('Dunn Index vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Dunn Index')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f'{results_path}/dunn_index_comparison.svg')
+    plt.close() 
+    
+    # 6. Davies-Bouldin index plot
+    plt.figure(figsize=(10, 6))
+    for algo in df['algorithm'].unique():
+        data = df[df['algorithm'] == algo]  
+        plt.plot(data['n_clusters'], data['davies_bouldin'], 
+                marker='o', label=algo)
+    plt.title('Davies-Bouldin Index vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Davies-Bouldin Index')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f'{results_path}/davies_bouldin_comparison.svg')
+    plt.close()
+    
+    # 7. Summary plot
+    plt.figure(figsize=(10, 6))
+    
+
+def run_clustering_analysis_and_plot(grid,algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],path='clustering_results'):
+    results = run_clustering_analysis(grid,path,algorithms,n_clusters_list)
+    plot_clustering_results(results,path)

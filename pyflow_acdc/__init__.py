@@ -124,6 +124,7 @@ __all__ = [
     'Time_series_statistics',
     'results_TS_OPF',
     'cluster_TS',
+    'run_clustering_analysis_and_plot',
     'update_grid_data',
     
     # Export

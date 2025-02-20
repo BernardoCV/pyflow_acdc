@@ -14,7 +14,6 @@ from scipy import stats as st
 import time
 
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
-from .Time_series_clustering import cluster_TS
 
 
 __all__ = ['Time_series_PF',
@@ -23,7 +22,6 @@ __all__ = ['Time_series_PF',
            'TS_ACDC_OPF',
            'Time_series_statistics',
            'results_TS_OPF',
-           'cluster_TS',
            'update_grid_data']
 
 try:

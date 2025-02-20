@@ -243,13 +243,14 @@ def Translate_pd_TEP(grid):
 
 def TEP_expansion_model(grid,export=None,costmodel='Linear',n_clusters=None,cluster_algorithm='Kmeans',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02):
     
-    from .Time_series import cluster_TS, modify_parameters
-    
+    from .Time_series import  modify_parameters
+    from .Time_series_clustering import cluster_TS
+
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
     clustering = False
     if n_clusters is not None:
-        n_clusters,_ = cluster_TS(grid,n_clusters,cluster_algorithm)
+        n_clusters,_,_ = cluster_TS(grid,n_clusters,cluster_algorithm)
         clustering = True
     else:
         n_clusters = len(grid.Time_series[0].data)
