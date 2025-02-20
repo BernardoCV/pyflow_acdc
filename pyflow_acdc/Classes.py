@@ -1143,10 +1143,10 @@ class Line_AC:
         cable_data = self._cable_database.loc[Cable_type]
         
         # Calculate parameters
-        R_Ohm = cable_data['R_Ohm'] 
-        L_mH = cable_data['L_mH'] 
-        C_uF = cable_data['C_uF'] 
-        G_uS = cable_data['G_uS'] 
+        R_Ohm = cable_data['R_Ohm_km'] 
+        L_mH = cable_data['L_mH_km'] 
+        C_uF = cable_data['C_uF_km'] 
+        G_uS = cable_data['G_uS_km'] 
         A_rating = cable_data['A_rating']
         km = Length_km
 
