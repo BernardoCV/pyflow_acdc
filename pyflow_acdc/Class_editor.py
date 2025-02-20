@@ -187,7 +187,7 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
        
     return node
     
-def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu'):
+def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu',Cable_type:str ='Custom'):
     kV_base=toNode.kV_base
     if L_mH_km is not None:
         data_in = 'Real'
@@ -217,7 +217,8 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         grid.Update_Graph_AC()
         
     else:    
-        line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,Length_km,m, shift, name)
+        line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating,Length_km,m, shift,N_cables, name,S_base=grid.S_base,Cable_type=Cable_type)
+        
         grid.lines_AC.append(line)
         grid.create_Ybus_AC()
         grid.Update_Graph_AC()
@@ -272,9 +273,16 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     grid.create_Ybus_AC()
     s=1    
 
-def add_line_DC(grid, fromNode, toNode, Resistance_pu, MW_rating,km=1, polarity='m', name=None,geometry=None):
-    kV_base=toNode.kV_base
-    line = Line_DC(fromNode, toNode, Resistance_pu, MW_rating, kV_base,km, polarity, name)
+def add_line_DC(grid, fromNode, toNode, Resistance_pu=0.001, MW_rating=9999,Length_km=1, polarity='m', name=None,geometry=None,Cable_type:str ='Custom'):
+    if isinstance(polarity, int):
+        if polarity == 1:
+            polarity = 'm'
+        elif polarity == 2:
+            polarity = 'b'
+        else:
+            print(f"Invalid polarity value: {polarity}")
+            return
+    line = Line_DC(fromNode, toNode, Resistance_pu, MW_rating,Length_km, polarity, name,Cable_type=Cable_type)
     grid.lines_DC.append(line)
     grid.create_Ybus_DC()
     if geometry is not None:

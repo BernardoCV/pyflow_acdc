@@ -215,7 +215,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
             isTF = True if  'transformer_id' in AC_line_data.columns else False
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
-                                         Reactance, Conductance, Susceptance, MVA_rating, kV_base,km,m,shift ,name=str(var_name))
+                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -257,7 +257,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             
             
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
-                                         Reactance, Conductance, Susceptance, MVA_rating, kV_base,km,m,shift ,name=str(var_name))
+                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name))
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -293,7 +293,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
             isTF = True if  'transformer_id' in AC_line_data.columns else False
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
-                                         Reactance, Conductance, Susceptance, MVA_rating, kV_base,km,m,shift,name=str(var_name))
+                                         Reactance, Conductance, Susceptance, MVA_rating, km,m,shift,name=str(var_name),S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -389,7 +389,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             
             
             geometry      = DC_line_data.at[index, 'geometry']        if 'geometry'    in DC_line_data.columns else None
-            DC_lines[var_name] = Line_DC(fromNode, toNode, Resistance, MW_rating, kV_base, km, pol,name=str(var_name))
+            DC_lines[var_name] = Line_DC(fromNode, toNode, Resistance, MW_rating, km, pol,name=str(var_name),N_cables=N_cables,S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -426,7 +426,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             
             
             geometry      = DC_line_data.at[index, 'geometry']        if 'geometry'    in DC_line_data.columns else None
-            DC_lines[var_name] = Line_DC(fromNode, toNode, Resistance, MW_rating, kV_base, km, pol,name=str(var_name))
+            DC_lines[var_name] = Line_DC(fromNode, toNode, Resistance, MW_rating, km, pol,name=str(var_name),N_cables=N_cables,S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -454,7 +454,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             L_mH = 0
             C_uF = 0
             G_uS = 0
-            [Resistance, _, _, _, MW_rating] = Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=N_cables)
+            [Resistance, _, _, _, MW_rating] = Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1)
             
             if pol == 'm':
                 pol_val = 1
@@ -465,7 +465,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             MW_rating=MW_rating*pol_val
             geometry      = DC_line_data.at[index, 'geometry']        if 'geometry'    in DC_line_data.columns else None
             
-            DC_lines[var_name] = Line_DC(fromNode, toNode, Resistance, MW_rating, kV_base, km, pol,name=str(var_name))
+            DC_lines[var_name] = Line_DC(fromNode, toNode, Resistance, MW_rating, km, pol,name=str(var_name),N_cables=N_cables,S_base=S_base)
             
             if geometry is not None:
                 if isinstance(geometry, str): 
@@ -736,7 +736,7 @@ def Create_grid_from_mat(matfile):
             km=1
             
             AC_lines[var_name] = Line_AC(AC_nodes[fromNode], AC_nodes[toNode], Resistance,
-                                         Reactance, Conductance, Susceptance, MVA_rating, kV_base,km,m,shift ,name=str(var_name))
+                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
         AC_lines_list = list(AC_lines.values())
 
     if DC_node_data is None:
@@ -785,7 +785,7 @@ def Create_grid_from_mat(matfile):
                 pol = 'b'
             else:
                 pol = 'sm'
-            DC_lines[var_name] = Line_DC(DC_nodes[fromNode], DC_nodes[toNode], Resistance, MW_rating, kV_base, polarity=pol, name=str(var_name))
+            DC_lines[var_name] = Line_DC(DC_nodes[fromNode], DC_nodes[toNode], Resistance, MW_rating, polarity=pol, name=str(var_name),S_base=S_base)
         DC_lines_list = list(DC_lines.values())
 
     if Converter_data is None:
@@ -891,7 +891,7 @@ def change_S_base(grid,Sbase_new):
     Sbase_old = grid.S_base
     rate = Sbase_old/Sbase_new
     for line in grid.lines_AC:
-        line.Ybus_branch /= rate
+        line.S_base = Sbase_new
         
     for node in grid.nodes_AC:
         node.PGi *= rate 

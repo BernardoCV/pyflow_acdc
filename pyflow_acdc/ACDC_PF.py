@@ -212,6 +212,7 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
         P1 = np.zeros((grid.nn_DC, 1))
         Pf = np.zeros((grid.nn_DC, 1))
         pol = 1
+        npar = 1
         for node in grid.nodes_DC:
 
             i = node.nodeNumber
@@ -222,7 +223,8 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
                     if Y != 0:
                         line = grid.get_lineDC_by_nodes(i, k)
                         pol = line.pol
-                    Y = -Y
+                        npar = line.np_line
+                    Y = -npar*Y
                     P[i] += pol*V[i]*(V[i]-V[k])*Y
 
         for node in grid.nodes_DC:
