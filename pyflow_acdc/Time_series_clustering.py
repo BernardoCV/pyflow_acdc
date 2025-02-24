@@ -178,7 +178,7 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
     plt.close()
 
 
-def cluster_TS(grid, n_clusters,time_series=[], algorithm='Kmeans'):
+def cluster_TS(grid, n_clusters,time_series=[], algorithm='Kmeans',print_details=True):
     algorithm = algorithm.lower()
     #check if algorithm is valid    
     if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan'}:
@@ -203,19 +203,19 @@ def cluster_TS(grid, n_clusters,time_series=[], algorithm='Kmeans'):
     data = filter_data(grid,time_series)
     
     if algorithm == 'kmeans':
-        clusters, returns, labels = cluster_Kmeans(grid, n_clusters, data,ts_types=time_series)
+        clusters, returns, labels = cluster_Kmeans(grid, n_clusters, data,ts_types=time_series,print_details=print_details)
     elif algorithm == 'ward':
-        clusters, returns, labels = cluster_Ward(grid, n_clusters, data,ts_types=time_series)
+        clusters, returns, labels = cluster_Ward(grid, n_clusters, data,ts_types=time_series,print_details=print_details)
     elif algorithm == 'kmedoids':
-        clusters, returns, labels = cluster_Kmedoids(grid, n_clusters, data,ts_types=time_series)
+        clusters, returns, labels = cluster_Kmedoids(grid, n_clusters, data,ts_types=time_series,print_details=print_details)
     elif algorithm == 'spectral':
-        clusters, returns, labels = cluster_Spectral(grid, n_clusters, data,ts_types=time_series)
+        clusters, returns, labels = cluster_Spectral(grid, n_clusters, data,ts_types=time_series,print_details=print_details)
     elif algorithm == 'dbscan':
-        n_clusters, clusters, returns, labels = cluster_DBSCAN(grid, n_clusters, data,ts_types=time_series)
+        n_clusters, clusters, returns, labels = cluster_DBSCAN(grid, n_clusters, data,ts_types=time_series,print_details=print_details)
     elif algorithm == 'optics':
-        n_clusters, clusters, returns, labels = cluster_OPTICS(grid, n_clusters, data,ts_types=time_series)    
+        n_clusters, clusters, returns, labels = cluster_OPTICS(grid, n_clusters, data,ts_types=time_series,print_details=print_details)    
     elif algorithm == 'hdbscan':
-        n_clusters, clusters, returns, labels = cluster_HDBSCAN(grid, n_clusters, data,ts_types=time_series)
+        n_clusters, clusters, returns, labels = cluster_HDBSCAN(grid, n_clusters, data,ts_types=time_series,print_details=print_details)
     
 
     return n_clusters, clusters, returns, labels
@@ -262,7 +262,7 @@ def _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_ty
     
     return clusters
 
-def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.05,ts_types=[]):
+def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.05,ts_types=[],print_details=True): 
     """
     Perform OPTICS clustering on the data with maximum number of clusters constraint.
     
@@ -342,14 +342,19 @@ def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.0
         "Final xi": best_xi,
         "Noise points": (noise_points, noise_percentage)
     }
-    CoV = print_clustering_results("OPTICS", actual_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("OPTICS", actual_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     # Process and return results
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns,ts_types)
     return actual_clusters, processed_results, CoV, [data_scaled,labels]
 
 
-def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5,ts_types=[]):
+def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5,ts_types=[],print_details=True):
     """
     Perform DBSCAN clustering on the data with maximum number of clusters.
     """
@@ -414,13 +419,18 @@ def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5,ts_typ
         "Final eps": best_eps,
         "Noise points": (noise_points, noise_percentage)
     }
-    CoV = print_clustering_results("DBSCAN", actual_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("DBSCAN", actual_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     # Always call _process_clusters with valid results
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns,ts_types)
     return actual_clusters, processed_results, CoV, [data_scaled,labels]
 
-def cluster_Ward(grid, n_clusters, data,ts_types=[]):
+def cluster_Ward(grid, n_clusters, data,ts_types=[],print_details=True):
     """
     Perform Ward's hierarchical clustering using AgglomerativeClustering.
     
@@ -468,12 +478,17 @@ def cluster_Ward(grid, n_clusters, data,ts_types=[]):
         "Maximum merge distance": float(max(distances)) if len(distances) > 0 else 0,
         "Average merge distance": float(np.mean(distances)) if len(distances) > 0 else 0
     }
-    CoV = print_clustering_results("Ward hierarchical", n_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("Ward hierarchical", n_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, CoV, [data_scaled,labels]
 
-def cluster_Kmeans(grid, n_clusters, data,ts_types=[]):
+def cluster_Kmeans(grid, n_clusters, data,ts_types=[],print_details=True):
     new_columns = data.columns
     
     # Scale the data
@@ -496,12 +511,17 @@ def cluster_Kmeans(grid, n_clusters, data,ts_types=[]):
         "Inertia": kmeans.inertia_,
         "Iterations": kmeans.n_iter_
     }
-    CoV = print_clustering_results("K-means", n_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("K-means", n_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, [CoV,kmeans.inertia_,kmeans.n_iter_], [data_scaled,labels]
 
-def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', max_iter=300,ts_types=[]):
+def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', max_iter=300,ts_types=[],print_details=True):
     """
     Perform K-Medoids clustering on the data.
     
@@ -554,12 +574,17 @@ def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', m
         "Initialization": init,
         "Inertia": kmedoids.inertia_
     }
-    CoV = print_clustering_results("K-medoids", n_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("K-medoids", n_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, [CoV,kmedoids.inertia_], [data_scaled,labels]
 
-def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0,ts_types=[]):
+def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0,ts_types=[],print_details=True):
     """
     Perform Spectral clustering on the data.
     
@@ -623,12 +648,17 @@ def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', 
         "Connectivity density": f"{connectivity:.2%}",
         "Average affinity": f"{affinity_matrix.mean():.4f}"
     }
-    CoV = print_clustering_results("Spectral", n_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("Spectral", n_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, CoV, [data_scaled,labels]
 
-def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None, cluster_selection_method='eom',ts_types=[]):
+def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None, cluster_selection_method='eom',ts_types=[],print_details=True):
     """
     Perform HDBSCAN clustering on the data.
     
@@ -697,7 +727,12 @@ def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None
         "Selection method": cluster_selection_method,
         "Probabilities available": hasattr(clusterer, 'probabilities_')
     }
-    CoV = print_clustering_results("HDBSCAN", actual_clusters, specific_info)
+    if print_details:
+        CoV = print_clustering_results("HDBSCAN", actual_clusters, specific_info)
+    else:
+        # Calculate CoV from cluster sizes
+        cluster_sizes = specific_info["Cluster sizes"]
+        CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
     
     processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns,ts_types)
     return actual_clusters, processed_results , CoV, [data_scaled,labels]
@@ -771,7 +806,7 @@ def print_clustering_results(algorithm, n_clusters, specific_info):
             print(f"- {key}: {count} ({percentage:.1f}%)")
     return CoV    
 
-def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],time_series=[]):
+def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],time_series=[],print_details=True):
        
     
     results = {
@@ -792,7 +827,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
             
             start_time = time.time()
             try:
-                _,_,CoV,info = cluster_TS(grid, algorithm=algo, n_clusters=n,time_series=time_series)
+                _,_,CoV,info = cluster_TS(grid, algorithm=algo, n_clusters=n,time_series=time_series,print_details=print_details)
                 data_scaled,labels = info
                 if algo == 'kmeans':
                     CoV, inertia, n_iter_ = CoV
@@ -964,13 +999,13 @@ def run_clustering_analysis_and_plot(grid,algorithms = ['kmeans', 'kmedoids', 'w
 def Time_series_cluster_relationship(grid, ts1_name=None, ts2_name=None,price_zone=None,ts_type=None, algorithm='kmeans', 
                             take_into_account_time_series=[], 
                             number_of_clusters=2, path='clustering_results', 
-                            format='svg'):
+                            format='svg',print_details=False):
     """
     Plot two time series with their cluster assignments in different colors.
     """
     # Get clusters
     n_clusters, clusters, returns, labels = cluster_TS(
-        grid, number_of_clusters,time_series=take_into_account_time_series, algorithm=algorithm)
+        grid, number_of_clusters,time_series=take_into_account_time_series, algorithm=algorithm,print_details=False)
     data_scaled,labels = labels
 
     if ts1_name is not None:    
@@ -1070,4 +1105,5 @@ def plot_clustered_timeseries_single(ts1,ts2,algorithm,n_clusters,path,labels,ts
     plt.ylabel(ts2_name)
     plt.legend()
     plt.savefig(f'{path}/clustered_relationship_{algorithm}_{n_clusters}.png')
+    plt.show()
     plt.close()
