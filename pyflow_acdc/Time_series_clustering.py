@@ -19,7 +19,8 @@ __all__ = ['cluster_TS',
            'cluster_Kmedoids',
            'cluster_Spectral',
            'cluster_HDBSCAN',
-           'run_clustering_analysis_and_plot']
+           'run_clustering_analysis_and_plot',
+           'identify_correlations']
 
 def get_cluster_sizes(data):
     """
@@ -48,7 +49,136 @@ def get_cluster_sizes(data):
     
     return sizes
 
-def cluster_TS(grid, n_clusters, algorithm='Kmeans'):
+def filter_data(grid,time_series):
+    data = pd.DataFrame()
+    for ts in grid.Time_series:
+        if ts.type in time_series:
+            name = ts.name
+            ts_data = ts.data
+            if data.empty:
+                data[name] = ts_data
+                expected_length = len(ts_data)
+            else:
+                # Check if ts_data length matches the expected length
+                if len(ts_data) != expected_length:
+                    print(f"Error: Length mismatch for time series '{name}'. Expected {expected_length}, got {len(ts_data)}. Time series not included")
+                    continue
+                data[name] = ts_data        
+    return data
+
+def identify_correlations(grid,time_series=[], threshold=0.8):
+    """
+    Identify highly correlated time series variables.
+    
+    Parameters:
+        grid: Grid object containing time series
+        threshold: Correlation coefficient threshold (default: 0.8)
+    
+    Returns:
+        dict: Dictionary containing:
+            - correlation_matrix: Full correlation matrix
+            - high_correlations: List of tuples (var1, var2, corr_value) for highly correlated pairs
+            - groups: List of groups of correlated variables
+    """
+    # Create DataFrame from time series
+    if time_series == []:
+        time_series = [
+                'a_CG',     # Price zone cost generation parameter a
+                'b_CG',     # Price zone cost generation parameter b
+                'c_CG',     # Price zone cost generation parameter c
+                'PGL_min',  # Price zone minimum generation limit
+                'PGL_max',  # Price zone maximum generation limit
+                'price',    # Price for price zones and AC nodes
+                'Load',     # Load factor for price zones and AC nodes
+                'WPP',      # Wind Power Plant availability
+                'OWPP',     # Offshore Wind Power Plant availability
+                'SF',       # Solar Farm availability
+                'REN'       # Generic Renewable source availability
+            ]
+    data = filter_data(grid,time_series)
+    
+    # Calculate correlation matrix
+    corr_matrix = data.corr()
+    
+    # Find highly correlated pairs
+    high_corr = []
+    for i in range(len(corr_matrix.columns)):
+        for j in range(i+1, len(corr_matrix.columns)):
+            corr = abs(corr_matrix.iloc[i, j])
+            if corr > threshold:
+                var1 = corr_matrix.columns[i]
+                var2 = corr_matrix.columns[j]
+                high_corr.append((var1, var2, corr))
+    
+    # Group correlated variables
+    groups = []
+    used_vars = set()
+    
+    for var1, var2, corr in high_corr:
+        # Find if any existing group contains either variable
+        found_group = False
+        for group in groups:
+            if var1 in group or var2 in group:
+                group.add(var1)
+                group.add(var2)
+                found_group = True
+                break
+        
+        # If no existing group found, create new group
+        if not found_group:
+            groups.append({var1, var2})
+        
+        used_vars.add(var1)
+        used_vars.add(var2)
+    
+    # Print results
+    print(f"\nHighly correlated variables (|correlation| > {threshold}):")
+    for var1, var2, corr in high_corr:
+        print(f"{var1:20} - {var2:20}: {corr:.3f}")
+    
+    print("\nCorrelated groups:")
+    for i, group in enumerate(groups, 1):
+        print(f"Group {i}: {', '.join(sorted(group))}")
+    
+    return {
+        'correlation_matrix': corr_matrix,
+        'high_correlations': high_corr,
+        'groups': groups
+    }
+
+def plot_correlation_matrix(corr_matrix, save_path=None):
+    """
+    Plot correlation matrix as a heatmap.
+    
+    Parameters:
+        corr_matrix: Pandas DataFrame with correlation matrix
+        save_path: Path to save the plot (optional)
+    """
+    plt.figure(figsize=(12, 10))
+    
+    # Create heatmap
+    plt.imshow(corr_matrix, cmap='RdBu', aspect='equal', vmin=-1, vmax=1)
+    
+    # Add labels
+    plt.colorbar()
+    plt.xticks(range(len(corr_matrix.columns)), corr_matrix.columns, rotation=90)
+    plt.yticks(range(len(corr_matrix.columns)), corr_matrix.columns)
+    
+    # Add correlation values
+    for i in range(len(corr_matrix.columns)):
+        for j in range(len(corr_matrix.columns)):
+            plt.text(j, i, f'{corr_matrix.iloc[i, j]:.2f}',
+                    ha='center', va='center')
+    
+    plt.title('Correlation Matrix of Time Series')
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path)
+    plt.close()
+
+
+def cluster_TS(grid, n_clusters,time_series=[], algorithm='Kmeans'):
     algorithm = algorithm.lower()
     #check if algorithm is valid    
     if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan'}:
@@ -56,39 +186,41 @@ def cluster_TS(grid, n_clusters, algorithm='Kmeans'):
         print(f"Algorithm {algorithm} not found, using Kmeans")
     
     #create data from grid
-    data = pd.DataFrame()
-    for ts in grid.Time_series:
-        name = ts.name
-        ts_data = ts.data
-        if data.empty:
-            data[name] = ts_data
-            expected_length = len(ts_data)
-        else:
-            # Check if ts_data length matches the expected length
-            if len(ts_data) != expected_length:
-                print(f"Error: Length mismatch for time series '{name}'. Expected {expected_length}, got {len(ts_data)}. Time series not included")
-                continue
-            data[name] = ts_data
+    if time_series == []:
+        time_series = [
+                'a_CG',     # Price zone cost generation parameter a
+                'b_CG',     # Price zone cost generation parameter b
+                'c_CG',     # Price zone cost generation parameter c
+                'PGL_min',  # Price zone minimum generation limit
+                'PGL_max',  # Price zone maximum generation limit
+                'price',    # Price for price zones and AC nodes
+                'Load',     # Load factor for price zones and AC nodes
+                'WPP',      # Wind Power Plant availability
+                'OWPP',     # Offshore Wind Power Plant availability
+                'SF',       # Solar Farm availability
+                'REN'       # Generic Renewable source availability
+            ]
+    data = filter_data(grid,time_series)
     
     if algorithm == 'kmeans':
-        clusters, returns, labels = cluster_Kmeans(grid, n_clusters, data)
+        clusters, returns, labels = cluster_Kmeans(grid, n_clusters, data,ts_types=time_series)
     elif algorithm == 'ward':
-        clusters, returns, labels = cluster_Ward(grid, n_clusters, data)
+        clusters, returns, labels = cluster_Ward(grid, n_clusters, data,ts_types=time_series)
     elif algorithm == 'kmedoids':
-        clusters, returns, labels = cluster_Kmedoids(grid, n_clusters, data)
+        clusters, returns, labels = cluster_Kmedoids(grid, n_clusters, data,ts_types=time_series)
     elif algorithm == 'spectral':
-        clusters, returns, labels = cluster_Spectral(grid, n_clusters, data)
+        clusters, returns, labels = cluster_Spectral(grid, n_clusters, data,ts_types=time_series)
     elif algorithm == 'dbscan':
-        n_clusters, clusters, returns, labels = cluster_DBSCAN(grid, n_clusters, data)
+        n_clusters, clusters, returns, labels = cluster_DBSCAN(grid, n_clusters, data,ts_types=time_series)
     elif algorithm == 'optics':
-        n_clusters, clusters, returns, labels = cluster_OPTICS(grid, n_clusters, data)    
+        n_clusters, clusters, returns, labels = cluster_OPTICS(grid, n_clusters, data,ts_types=time_series)    
     elif algorithm == 'hdbscan':
-        n_clusters, clusters, returns, labels = cluster_HDBSCAN(grid, n_clusters, data)
+        n_clusters, clusters, returns, labels = cluster_HDBSCAN(grid, n_clusters, data,ts_types=time_series)
     
 
     return n_clusters, clusters, returns, labels
 
-def _process_clusters(grid, data, cluster_centers, n_clusters, new_columns):
+def _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types):
     """
     Process clustering results and update grid with cluster information.
     
@@ -122,14 +254,15 @@ def _process_clusters(grid, data, cluster_centers, n_clusters, new_columns):
     
     # Update time series with clustered data
     for ts in grid.Time_series:
-        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
-            ts.data_clustered = {}
-        name = ts.name
-        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
+        if ts.type in ts_types:
+            if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
+                ts.data_clustered = {}
+            name = ts.name
+            ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
     
     return clusters
 
-def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.05):
+def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.05,ts_types=[]):
     """
     Perform OPTICS clustering on the data with maximum number of clusters constraint.
     
@@ -212,11 +345,11 @@ def cluster_OPTICS(grid, n_clusters, data, min_samples=2, max_eps=np.inf, xi=0.0
     CoV = print_clustering_results("OPTICS", actual_clusters, specific_info)
     
     # Process and return results
-    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns,ts_types)
     return actual_clusters, processed_results, CoV, [data_scaled,labels]
 
 
-def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5):
+def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5,ts_types=[]):
     """
     Perform DBSCAN clustering on the data with maximum number of clusters.
     """
@@ -284,10 +417,10 @@ def cluster_DBSCAN(grid, n_clusters, data, min_samples=2, initial_eps=0.5):
     CoV = print_clustering_results("DBSCAN", actual_clusters, specific_info)
     
     # Always call _process_clusters with valid results
-    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns,ts_types)
     return actual_clusters, processed_results, CoV, [data_scaled,labels]
 
-def cluster_Ward(grid, n_clusters, data):
+def cluster_Ward(grid, n_clusters, data,ts_types=[]):
     """
     Perform Ward's hierarchical clustering using AgglomerativeClustering.
     
@@ -337,10 +470,10 @@ def cluster_Ward(grid, n_clusters, data):
     }
     CoV = print_clustering_results("Ward hierarchical", n_clusters, specific_info)
     
-    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, CoV, [data_scaled,labels]
 
-def cluster_Kmeans(grid, n_clusters, data):
+def cluster_Kmeans(grid, n_clusters, data,ts_types=[]):
     new_columns = data.columns
     
     # Scale the data
@@ -365,10 +498,10 @@ def cluster_Kmeans(grid, n_clusters, data):
     }
     CoV = print_clustering_results("K-means", n_clusters, specific_info)
     
-    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, [CoV,kmeans.inertia_,kmeans.n_iter_], [data_scaled,labels]
 
-def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', max_iter=300):
+def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', max_iter=300,ts_types=[]):
     """
     Perform K-Medoids clustering on the data.
     
@@ -423,10 +556,10 @@ def cluster_Kmedoids(grid, n_clusters, data, method='alternate', init='build', m
     }
     CoV = print_clustering_results("K-medoids", n_clusters, specific_info)
     
-    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, [CoV,kmedoids.inertia_], [data_scaled,labels]
 
-def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0):
+def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0,ts_types=[]):
     """
     Perform Spectral clustering on the data.
     
@@ -492,10 +625,10 @@ def cluster_Spectral(grid, n_clusters, data, n_init=10, assign_labels='kmeans', 
     }
     CoV = print_clustering_results("Spectral", n_clusters, specific_info)
     
-    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, n_clusters, new_columns,ts_types)
     return  processed_results, CoV, [data_scaled,labels]
 
-def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None, cluster_selection_method='eom'):
+def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None, cluster_selection_method='eom',ts_types=[]):
     """
     Perform HDBSCAN clustering on the data.
     
@@ -566,7 +699,7 @@ def cluster_HDBSCAN(grid, n_clusters, data, min_cluster_size=5, min_samples=None
     }
     CoV = print_clustering_results("HDBSCAN", actual_clusters, specific_info)
     
-    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns)
+    processed_results = _process_clusters(grid, data, cluster_centers, actual_clusters, new_columns,ts_types)
     return actual_clusters, processed_results , CoV, [data_scaled,labels]
 
 
@@ -638,7 +771,7 @@ def print_clustering_results(algorithm, n_clusters, specific_info):
             print(f"- {key}: {count} ({percentage:.1f}%)")
     return CoV    
 
-def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48]):
+def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],time_series=[]):
        
     
     results = {
@@ -659,7 +792,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
             
             start_time = time.time()
             try:
-                _,_,CoV,info = cluster_TS(grid, algorithm=algo, n_clusters=n)
+                _,_,CoV,info = cluster_TS(grid, algorithm=algo, n_clusters=n,time_series=time_series)
                 data_scaled,labels = info
                 if algo == 'kmeans':
                     CoV, inertia, n_iter_ = CoV
@@ -705,101 +838,236 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
 # results = run_clustering_analysis(grid)
 
 # To analyze results:
-def plot_clustering_results(df= None,results_path='clustering_results'):
+def plot_clustering_results(df= None,results_path='clustering_results',format='svg'):
+    # Convert 8.25 cm to inches and maintain ratio
+    width_cm = 8.25
+    ratio = 6/10  # Original height/width ratio
+    width_inches = width_cm / 2.54
+    height_inches = width_inches * ratio
+    
+    # Set global plotting parameters
+    plt.rcParams.update({
+        'figure.figsize': (width_inches, height_inches),
+        'font.size': 8,
+        'axes.labelsize': 8,
+        'axes.titlesize': 8,
+        'xtick.labelsize': 8,
+        'ytick.labelsize': 8,
+        'legend.fontsize': 8,
+        'lines.markersize': 4,
+        'lines.linewidth': 1
+    })
     
     if df is None:
         df = pd.read_csv(f'{results_path}/clustering_summary.csv')
     
+    def format_axes(ax):
+        # Remove top and right spines
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+    
     # 1. Time comparison plot
-    plt.figure(figsize=(10, 6))
+    plt.figure()
+    ax = plt.gca()
     for algo in df['algorithm'].unique():
         data = df[df['algorithm'] == algo]
-        plt.plot(data['n_clusters'], data['time_taken'], 
+        ax.plot(data['n_clusters'], data['time_taken'], 
                 marker='o', label=algo)
-    plt.title('Clustering Time vs Number of Clusters')
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Time (seconds)')
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Time (seconds)')
+    ax.legend()
+    format_axes(ax)
     plt.tight_layout()
-    plt.savefig(f'{results_path}/time_comparison.svg')
+    plt.savefig(f'{results_path}/time_comparison.{format}', dpi=300, bbox_inches='tight')
     plt.close()
     
     # 2. Standard deviation plot
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots()
     for algo in df['algorithm'].unique():
         data = df[df['algorithm'] == algo]
-        plt.plot(data['n_clusters'], data['Coefficient of Variation'], 
+        ax.plot(data['n_clusters'], data['Coefficient of Variation'], 
                 marker='o', label=algo)
-    plt.title('Standard Deviation vs Number of Clusters')
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Coefficient of Variation')
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Coefficient of Variation')
+    ax.legend()
+    format_axes(ax)
     plt.tight_layout()
-    plt.savefig(f'{results_path}/cov_comparison.svg')
+    plt.savefig(f'{results_path}/cov_comparison.{format}', dpi=300, bbox_inches='tight')
     plt.close()
     
-    # 3. Inertia plot (kmeans and kmedoids only)
-    plt.figure(figsize=(10, 6))
+    # 3. Inertia plot
+    fig, ax = plt.subplots()
     kmeans_data = df[df['algorithm'] == 'kmeans']
     kmedoids_data = df[df['algorithm'] == 'kmedoids']
     
-    plt.plot(kmeans_data['n_clusters'], kmeans_data['inertia'], 
+    ax.plot(kmeans_data['n_clusters'], kmeans_data['inertia'], 
             marker='o', label='k-means', linestyle='-')
-    plt.plot(kmedoids_data['n_clusters'], kmedoids_data['inertia'], 
+    ax.plot(kmedoids_data['n_clusters'], kmedoids_data['inertia'], 
             marker='s', label='k-medoids', linestyle='-')
     
-    plt.title('Inertia vs Number of Clusters')
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Inertia')
-    plt.legend()
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Inertia')
+    ax.legend()
+    format_axes(ax)
     plt.tight_layout()
-    plt.savefig(f'{results_path}/inertia_comparison.svg')
+    plt.savefig(f'{results_path}/inertia_comparison.{format}', dpi=300, bbox_inches='tight')
     plt.close()
     
     # 4. Silhouette score plot
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots()
     for algo in df['algorithm'].unique():
         data = df[df['algorithm'] == algo]
-        plt.plot(data['n_clusters'], data['silhouette_score'], 
+        ax.plot(data['n_clusters'], data['silhouette_score'], 
                 marker='o', label=algo)
-    plt.title('Silhouette Score vs Number of Clusters')
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Silhouette Score')
-    plt.legend()
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Silhouette Score')
+    ax.legend()
+    format_axes(ax)
     plt.tight_layout()
-    plt.savefig(f'{results_path}/silhouette_comparison.svg')
+    plt.savefig(f'{results_path}/silhouette_comparison.{format}', dpi=300, bbox_inches='tight')
     plt.close()     
     
     # 5. Dunn index plot
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots()
     for algo in df['algorithm'].unique():
         data = df[df['algorithm'] == algo]
-        plt.plot(data['n_clusters'], data['dunn_index'], 
+        ax.plot(data['n_clusters'], data['dunn_index'], 
                 marker='o', label=algo)
-    plt.title('Dunn Index vs Number of Clusters')
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Dunn Index')
-    plt.legend()
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Dunn Index')
+    ax.legend()
+    format_axes(ax)
     plt.tight_layout()
-    plt.savefig(f'{results_path}/dunn_index_comparison.svg')
+    plt.savefig(f'{results_path}/dunn_index_comparison.{format}', dpi=300, bbox_inches='tight')
     plt.close() 
     
     # 6. Davies-Bouldin index plot
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots()
     for algo in df['algorithm'].unique():
         data = df[df['algorithm'] == algo]  
-        plt.plot(data['n_clusters'], data['davies_bouldin'], 
+        ax.plot(data['n_clusters'], data['davies_bouldin'], 
                 marker='o', label=algo)
-    plt.title('Davies-Bouldin Index vs Number of Clusters')
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Davies-Bouldin Index')
-    plt.legend()
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Davies-Bouldin Index')
+    ax.legend()
+    format_axes(ax)
     plt.tight_layout()
-    plt.savefig(f'{results_path}/davies_bouldin_comparison.svg')
+    plt.savefig(f'{results_path}/davies_bouldin_comparison.{format}', dpi=300, bbox_inches='tight')
     plt.close()
     
-    # 7. Summary plot
-    plt.figure(figsize=(10, 6))
-    
+  
 
-def run_clustering_analysis_and_plot(grid,algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],path='clustering_results'):
-    results = run_clustering_analysis(grid,path,algorithms,n_clusters_list)
-    plot_clustering_results(results,path)
+def run_clustering_analysis_and_plot(grid,algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],path='clustering_results',time_series=[],plot_format='svg'):
+    results = run_clustering_analysis(grid,path,algorithms,n_clusters_list,time_series)
+    plot_clustering_results(results,path,format=plot_format)
+
+def Time_series_cluster_relationship(grid, ts1_name=None, ts2_name=None,price_zone=None,ts_type=None, algorithm='kmeans', 
+                            take_into_account_time_series=[], 
+                            number_of_clusters=2, path='clustering_results', 
+                            format='svg'):
+    """
+    Plot two time series with their cluster assignments in different colors.
+    """
+    # Get clusters
+    n_clusters, clusters, returns, labels = cluster_TS(
+        grid, number_of_clusters,time_series=take_into_account_time_series, algorithm=algorithm)
+    data_scaled,labels = labels
+
+    if ts1_name is not None:    
+        ts1 = grid.Time_series[grid.Time_series_dic[ts1_name]].data
+        if ts2_name is not None:
+            ts2 = grid.Time_series[grid.Time_series_dic[ts2_name]].data
+            plot_clustered_timeseries_single(ts1,ts2,algorithm,n_clusters,path,labels,ts1_name,ts2_name)
+            return
+        else:
+            for ts in grid.Time_series.values():
+                if ts.name != ts1_name:
+                    ts2 = ts.data
+                    ts2_name = ts.name
+                    plot_clustered_timeseries_single(ts1,ts2,algorithm,n_clusters,path,labels,ts1_name,ts2_name)
+            return
+    elif price_zone is not None:
+        PZ = grid.Price_Zones_dic[price_zone]
+        # Collect all time series in a list
+        ts_list = []
+        ts_names = []
+        for ts_idx in grid.Price_Zones[PZ].TS_dict.values():
+            if ts_idx is None:
+                continue
+            ts = grid.Time_series[ts_idx]
+            
+            ts_list.append(ts.data)
+            ts_names.append(ts.name)
+        
+        # Create plots for all pairs
+        for i, ts1 in enumerate(ts_list):
+            for j, ts2 in enumerate(ts_list[i+1:], start=i+1):
+                plot_clustered_timeseries_single(
+                    ts1=ts1,
+                    ts2=ts2,
+                    algorithm=algorithm,
+                    n_clusters=n_clusters,
+                    path=path,
+                    labels=labels,
+                    ts1_name=ts_names[i],
+                    ts2_name=ts_names[j]
+                )
+    elif ts_type is not None:
+        # Collect all time series of the specified type
+        ts_list = []
+        ts_names = []
+        for ts in grid.Time_series:
+            if ts.type == ts_type:
+                ts_list.append(ts.data)
+                ts_names.append(ts.name)
+        
+        # Create plots for all pairs
+        for i, ts1 in enumerate(ts_list):
+            for j, ts2 in enumerate(ts_list[i+1:], start=i+1):
+                plot_clustered_timeseries_single(
+                    ts1=ts1,
+                    ts2=ts2,
+                    algorithm=algorithm,
+                    n_clusters=n_clusters,
+                    path=path,
+                    labels=labels,
+                    ts1_name=ts_names[i],
+                    ts2_name=ts_names[j]
+                )
+    else:
+        print('No valid input provided')
+
+def plot_clustered_timeseries_single(ts1,ts2,algorithm,n_clusters,path,labels,ts1_name,ts2_name): 
+    # Get the time series data
+    # Set up figure dimensions
+    width_cm = 8.25
+    width_inches = width_cm / 2.54
+    height_inches = width_inches 
+    
+    # Set global plotting parameters
+    plt.rcParams.update({
+        'figure.figsize': (width_inches, height_inches),
+        'font.size': 8,
+        'axes.labelsize': 8,
+        'axes.titlesize': 8,
+        'xtick.labelsize': 8,
+        'ytick.labelsize': 8,
+        'legend.fontsize': 8,
+        'lines.markersize': 4,
+        'lines.linewidth': 1
+    })
+    
+    # Create color map for clusters
+    colors = plt.cm.tab10(np.linspace(0, 1, n_clusters))
+    
+    # Plot time series relationship
+    plt.figure()
+    for i in range(n_clusters):
+        mask = labels == i
+        plt.plot(ts1[mask], ts2[mask], 'o', 
+                color=colors[i], label=f'Cluster {i}')
+    plt.xlabel(ts1_name)
+    plt.ylabel(ts2_name)
+    plt.legend()
+    plt.savefig(f'{path}/clustered_relationship_{algorithm}_{n_clusters}.png')
+    plt.close()

@@ -125,6 +125,7 @@ __all__ = [
     'results_TS_OPF',
     'cluster_TS',
     'run_clustering_analysis_and_plot',
+    'identify_correlations',
     'update_grid_data',
     
     # Export
