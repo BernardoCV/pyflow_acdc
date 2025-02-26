@@ -8,9 +8,11 @@ import pandas as pd
 import numpy as np
 import sys
 import copy
-import pandas as pd
 from .Classes import*
 from .Results import*
+import yaml
+
+
 
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
@@ -801,6 +803,107 @@ def assign_ConvToPrice_Zone(Grid, conv_name, new_price_zone_name):
         # Add node to the new price_zone
         if conv_to_reassign not in new_price_zone.ConvACDC:
             new_price_zone.ConvACDC.append(conv_to_reassign)            
+
+def expand_cable_database(data, format='yaml', save_yalm=False):
+    """
+    Expand the cable database by adding new cable specifications.
+    
+    Args:
+        data: Either a path to YAML file, DataFrame, or dictionary with cable specifications
+        format: 'yaml' or 'pandas' (default: 'yaml')
+        output_path: Optional path to save the new YAML file (default: None)
+        # Cable specifications
+
+    Units:
+       - Resistance: ohm/km
+       - Inductance: mH/km
+       - Capacitance: �F/km
+       - Conductance: �S/km
+       - Current rating: A
+       - Power rating: MVA
+       - Nominal voltage: kV
+       - conductor_size: mm^2
+       - Type: AC or DC
+
+    Example YAML format:
+
+    NEW_CABLE_TYPE:
+        R_Ohm_km: 0.001
+        L_mH_km: 0.001
+        C_uF_km: 0.001
+        G_uS_km: 0.001
+        A_rating: 333
+        Nominal_voltage_kV: 60
+        MVA_rating: sqrt(3)*Nominal_voltage_kV*A_rating/1000
+        conductor_size: 100
+        Type: AC or DC
+        Reference: REFERENCE
+    """
+    
+    # Get the path to the Cable_database directory
+    module_dir = Path(__file__).parent.parent
+    cable_dir = module_dir / 'Cable_database'
+    
+    if format.lower() == 'yaml':
+        if isinstance(data, (str, Path)):
+            with open(data, 'r') as f:
+                new_cables = yaml.safe_load(f)
+        elif isinstance(data, dict):
+            new_cables = data
+        else:
+            raise ValueError("For YAML format, data must be either a file path or dictionary")
+            
+    elif format.lower() == 'pandas':
+        if isinstance(data, pd.DataFrame):
+            new_cables = data.to_dict(orient='index')
+        elif isinstance(data, (str, Path)):
+            df = pd.read_csv(data)
+            new_cables = df.to_dict(orient='index')
+        else:
+            raise ValueError("For pandas format, data must be either a DataFrame or file path")
+    
+   
+    if save_yalm:
+        # Save each cable type as a separate file
+        for cable_name, cable_specs in new_cables.items():
+            # Create a single-cable dictionary
+            cable_data = {cable_name: cable_specs}
+            
+            # Create file path using cable name
+            output_file = cable_dir / f"{cable_name}.yaml"
+            
+            # Save to YAML file
+            with open(output_file, 'w') as f:
+                yaml.dump(cable_data, f, sort_keys=False)
+            
+            print(f"Saved cable {cable_name} to {output_file}")
+    
+    # split ac and dc cables
+    new_cables_ac = {}
+    new_cables_dc = {}
+    for key, value in new_cables.items():
+        if value['Type'] == 'AC':
+            new_cables_ac[key] = value
+        else:
+            new_cables_dc[key] = value
+    
+    # Update the cable database
+    if Line_DC._cable_database is None:
+        Line_DC.load_cable_database()
+    if Line_AC._cable_database is None:
+        Line_AC.load_cable_database()
+    # Add new cables to existing database
+    Line_DC._cable_database = pd.concat([
+        Line_DC._cable_database,
+        pd.DataFrame.from_dict(new_cables_dc, orient='index')
+    ])
+    Line_AC._cable_database = pd.concat([
+        Line_AC._cable_database,
+        pd.DataFrame.from_dict(new_cables_ac, orient='index')
+    ])
+
+
+    print(f"Added {len(new_cables_ac)} new cables to AC and {len(new_cables_dc)} new cables to DC database")
 
 
 

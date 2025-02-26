@@ -1,0 +1,22 @@
+# Cable specifications
+# Units:
+#   - Resistance: ohm/km
+#   - Inductance: mH/km
+#   - Capacitance: µF/km
+#   - Conductance: µS/km
+#   - Current rating: A
+#   - Power rating: MVA
+#   - Nominal voltage: kV
+#   - conductor_size: mm^2
+#   - Type: AC or DC
+CIGRE_DC_OHL_200kV:
+  R_Ohm_km: 0.0133
+  L_mH_km: 0.8273
+  C_uF_km: 0.0139
+  G_uS_km: 0
+  A_rating: 3000.0
+  MVA_rating: 600.0
+  Nominal_voltage_kV: 200.0
+  conductor_size: null
+  Type: DC
+  Reference: CIGRE B4
