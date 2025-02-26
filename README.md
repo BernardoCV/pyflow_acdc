@@ -60,3 +60,16 @@ git pull origin main
 ```
 
 To merge your changes into the main branch please contact the repository owner.
+
+For OPF you will need to install the following packages:
+```bash
+pip install pyomo
+pip install ipopt
+
+```
+
+For Dash you will need to install the following packages:
+```bash
+pip install dash
+
+```
