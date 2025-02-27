@@ -349,6 +349,12 @@ class Grid:
         Droop_Conv = [
             conv for conv in self.Converters_ACDC if conv.type == 'Droop']
         return Droop_Conv
+    @property
+    def check_stand_alone_is_slack(self):
+        for node in self.nodes_AC:
+            if node.stand_alone:
+                node.type = 'Slack'
+        
     
     def Update_Graph_DC(self):
         self.Graph_DC = nx.Graph()
@@ -470,12 +476,9 @@ class Grid:
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode,line=line)
             line.toNode.stand_alone = False
             line.fromNode.stand_alone = False
-        
-        
-        
+
         for node in self.nodes_AC:
             if node.stand_alone:
-                node.type = 'Slack'
                 self.Graph_AC.add_node(node)
                    
             
@@ -506,7 +509,7 @@ class Grid:
             for node in self.Grids_AC[i]:
                 if node.type == 'Slack':
                     self.num_slackAC[i] += 1
-            if self.num_slackAC[i] == 0:
+            if self.num_slackAC[i] == 0 and self.lines_AC != []:
                 print(f'For Grid AC {i+1} no slack bus found.')
                 print(f'Please set one before any calculations')
                 # sys.exit()

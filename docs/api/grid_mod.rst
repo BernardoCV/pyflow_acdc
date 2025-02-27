@@ -16,66 +16,100 @@ Add AC Node
    Adds an AC node to the grid.
 
    .. list-table::
-      :widths: 20 10 70
+      :widths: 20 10 50 10 10
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
+        - Default
+        - Units
       * - ``grid``
         - Grid
         - Grid to modify
+        - Required
+        - -
       * - ``kV_base``
         - float
-        - Base voltage in kV
+        - Base voltage
+        - Required
+        - kV
       * - ``node_type``
         - str
         - Node type ('PQ', 'PV', or 'Slack')
+        - 'PQ'
+        - -
       * - ``Voltage_0``
         - float
         - Initial voltage magnitude in p.u.
+        - 1.01
+        - p.u.
       * - ``theta_0``
         - float
-        - Initial voltage angle in radians
+        - Initial voltage angle
+        - 0.01
+        - rad
       * - ``Power_Gained``
         - float
-        - Active power generation in p.u.
+        - Active power generation
+        - 0
+        - p.u.
       * - ``Reactive_Gained``
         - float
-        - Reactive power generation in p.u.
+        - Reactive power generation
+        - 0
+        - p.u.
       * - ``Power_load``
         - float
-        - Active power load in p.u.
+        - Active power load
+        - 0
+        - p.u.
       * - ``Reactive_load``
         - float
-        - Reactive power load in p.u.
+        - Reactive power load
+        - 0
+        - p.u.
       * - ``name``
         - str
         - Node name
+        - None
+        - -
       * - ``Umin``
         - float
-        - Minimum voltage magnitude in p.u.
+        - Minimum voltage magnitude
+        - 0.9
+        - p.u.
       * - ``Umax``
         - float
-        - Maximum voltage magnitude in p.u.
+        - Maximum voltage magnitude
+        - 1.1
+        - p.u.
       * - ``Gs``
         - float
-        - Shunt conductance in p.u.
+        - Shunt conductance
+        - 0
+        - p.u.
       * - ``Bs``
         - float
-        - Shunt susceptance in p.u.
+        - Shunt susceptance
+        - 0
+        - p.u.
       * - ``x_coord``
         - float
         - X coordinate for plotting
+        - None
+        - -
       * - ``y_coord``
         - float
         - Y coordinate for plotting
+        - None
+        - -
       * - ``geometry``
         - Geometry
         - Shapely geometry object
-      * - Returns
-        - Node_AC
-        - Created AC node
+        - None
+        - -
+  
 
    **Example**
 
@@ -83,87 +117,209 @@ Add AC Node
 
        node = pyf.add_AC_node(grid, kV_base=400, name='bus1', node_type='PQ')
 
+       #OR
+
+       node1 = pyf.Node_AC('PQ', 1, 0,66, Power_Gained=0.5, name='Bus1')
+
+       grid.nodes_AC.append(node1)
+
 
 Add AC Line
 ^^^^^^^^^^^^
-
 .. py:function:: add_line_AC(grid, fromNode, toNode, MVA_rating=None, r=0, x=0, b=0, g=0, R_Ohm_km=None, L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None, m=1, shift=0, name=None, tap_changer=False, Expandable=False, N_cables=1, Length_km=1, geometry=None, data_in='pu', Cable_type='Custom')
 
    Adds an AC line to the grid.
 
    .. list-table::
-      :widths: 20 10 70
+      :widths: 15 10 50 10 15
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
+        - Default
+        - Unit
       * - ``grid``
         - Grid
         - Grid to modify
+        - Required
+        - -
       * - ``fromNode``
         - Node_AC
         - Source node
+        - Required
+        - -
       * - ``toNode``
         - Node_AC
         - Destination node
-      * - ``MVA_rating``
-        - float
-        - Line rating in MVA
-      * - ``r, x, b, g``
-        - float
-        - Line parameters in p.u.
-      * - ``R_Ohm_km``
-        - float
-        - Resistance per km
-      * - ``L_mH_km``
-        - float
-        - Inductance per km
-      * - ``C_uF_km``
-        - float
-        - Capacitance per km
-      * - ``G_uS_km``
-        - float
-        - Conductance per km
-      * - ``A_rating``
-        - float
-        - Current rating in Amperes
+        - Required
+        - -
       * - ``m``
         - float
         - Transformer ratio
+        - 1
+        - -
       * - ``shift``
         - float
         - Phase shift angle
+        - 0
+        - radians
       * - ``tap_changer``
         - bool
-        - If True, creates transformer
+        - If True, creates tap changer transformer
+        - False
+        - -
       * - ``Expandable``
         - bool
         - If True, creates expandable line
+        - False
+        - -
       * - ``N_cables``
         - int
         - Number of parallel cables
-      * - ``Length_km``
-        - float
-        - Line length in km
+        - 1
+        - -
       * - ``geometry``
         - Geometry
         - Shapely geometry object
+        - None
+        - -  
       * - ``data_in``
         - str
         - Input format ('pu', 'Ohm', 'Real')
+        - 'pu'
+        - -
+      
+   For lines with data_in = 'pu':
+
+   .. list-table::
+      :widths: 15 10 50 10 15
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+        - Unit
+      * - ``r, x, b, g``
+        - float
+        - Line parameters in p.u.
+        - 0
+        - p.u.
+      * - ``MVA_rating``
+        - float
+        - Line rating in MVA
+        - Required
+        - MVA  
+
+   For lines with data_in = 'Ohm':
+
+   .. list-table::
+      :widths: 15 10 50 10 15
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+        - Unit
+      * - ``r, x, b, g``
+        - float
+        - Line parameters in Ω
+        - 0
+        - Ω
+      * - ``MVA_rating``
+        - float
+        - Line rating in MVA
+        - Required
+        - MVA
+
+   For lines with data_in = 'Real':
+
+   .. list-table::
+      :widths: 15 10 50 10 15
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+        - Unit
+      * - ``R_Ohm_km``
+        - float
+        - Resistance 
+        - None
+        - Ω/km
+      * - ``L_mH_km``
+        - float
+        - Inductance 
+        - None
+        - mH/km
+      * - ``C_uF_km``
+        - float
+        - Capacitance 
+        - 0
+        - μF/km
+      * - ``G_uS_km``
+        - float
+        - Conductance 
+        - 0
+        - μS/km
+      * - ``A_rating``
+        - float
+        - Current rating 
+        - None
+        - A
+      * - ``Length_km``
+        - float
+        - Line length
+        - 1
+        - km
+   For pre defined cable types database
+
+   .. list-table::
+      :widths: 15 10 50 10 15
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+        - Unit
       * - ``Cable_type``
         - str
         - Cable specification name
-      * - Returns
-        - Line_AC
-        - Created AC line
+        - Required
+        - -
+      * - ``Length_km`` 
+        - float
+        - Line length
+        - 1
+        - km    
 
    **Example**
 
    .. code-block:: python
 
-       line = pyf.add_line_AC(grid, node1, node2, R_Ohm_km=0.1, L_mH_km=0.4, Length_km=10)
+       import pyflow_acdc as pyf
+       #Create nodes
+       node1 = pyf.Node_AC('PQ', 1, 0,66, Power_Gained=0.5, name='Bus1')
+       node2 = pyf.Node_AC('Slack', 1, 0,66,name='Bus2')
+
+       #Create grid
+       grid = pyf.Grid(100,nodes_AC=[node1,node2])
+
+       #For data_in = 'pu' 
+       line_pu = pyf.add_line_AC(grid, node1, node2, r=0.029, x=0.0032,b=0.0022, Length_km=10,MVA_rating=50)
+
+       #For data_in = 'Ohm'
+       line_ohm = pyf.add_line_AC(grid, node1, node2, r=1.2632, x=0.1393,b=0.0000505, Length_km=10,MVA_rating=50, data_in='Ohm')
+
+       #For data_in = 'Real'
+       line_real = pyf.add_line_AC(grid, node1, node2, R_Ohm_km=0.128, L_mH_km=0.443,C_uF_km=0.163, G_uS_km=0.0, Length_km=10, A_rating=445,data_in='Real')
+
+       #For pre defined cable types database
+       line_db = pyf.add_line_AC(grid, node1, node2, Cable_type='NREL_XLPE_185mm_66kV',Length_km=10)
 
 Add DC Node
 ^^^^^^^^^^^^
