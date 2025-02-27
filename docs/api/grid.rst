@@ -3,6 +3,8 @@ Grid Creation
 
 This module provides functions for creating and manipulating power system grids.
 
+functions are found in pyflow_acdc.Grid_creator
+
 Core Grid Class
 --------------
 

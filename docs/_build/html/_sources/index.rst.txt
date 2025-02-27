@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 PyFlow ACDC Documentation
-=======================
+=========================
 
 Welcome to PyFlow ACDC's documentation!
 
@@ -14,7 +14,7 @@ Welcome to PyFlow ACDC's documentation!
 
    installation
    usage
-   examples
+
 
 .. toctree::
    :maxdepth: 2
@@ -22,12 +22,13 @@ Welcome to PyFlow ACDC's documentation!
 
    api/modelling
    api/grid
+   api/grid_mod
    api/pf
    api/opf
    api/plotting
 
 Quick Start
-----------
+-----------
 
 Basic installation::
 

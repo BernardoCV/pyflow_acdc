@@ -250,31 +250,42 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="create_sub_grid">
 <span class="sig-name descname"><span class="pre">create_sub_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Area</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Area_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polygon_coords</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#create_sub_grid" title="Link to this definition">¶</a></dt>
-<dd><p>Creates a sub-grid from a larger grid based on area or coordinates. At the moment only works unidirectionally, initial grid is useless after creation of sub-grid. Sub-grid is created as a new grid object. can be created from Area objects, area object names or polygon coordinates.
-.. list-table:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>:widths: 20 10 70
-:header-rows: 1
-
-* - Parameter
-  - Type
-  - Description
-* - ``grid``
-  - Grid
-  - Original grid
-* - ``Area``
-  - list of Area objects
-  - Area object defining sub-grid
-* - ``Area_name``
-  - list of str
-  - Name of area for sub-grid
-* - ``polygon_coords``
-  - polygon coordinates
-  - Coordinates defining sub-grid boundary
-* - Returns
-  - list[Grid, Results]
-  - Sub-grid and Results objects
-</pre></div>
-</div>
+<dd><p>Creates a sub-grid from a larger grid based on area or coordinates. At the moment only works unidirectionally, initial grid is useless after creation of sub-grid. Sub-grid is created as a new grid object. can be created from Area objects, area object names or polygon coordinates.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Original grid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Area</span></code></p></td>
+<td><p>list of Area objects</p></td>
+<td><p>Area object defining sub-grid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Area_name</span></code></p></td>
+<td><p>list of str</p></td>
+<td><p>Name of area for sub-grid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">polygon_coords</span></code></p></td>
+<td><p>polygon coordinates</p></td>
+<td><p>Coordinates defining sub-grid boundary</p></td>
+</tr>
+<tr class="row-even"><td><p>Returns</p></td>
+<td><p>list[Grid, Results]</p></td>
+<td><p>Sub-grid and Results objects</p></td>
+</tr>
+</tbody>
+</table>
 <p><strong>Example</strong></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">subgrid</span><span class="p">,</span> <span class="n">results</span> <span class="o">=</span> <span class="n">create_sub_grid</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">Area_name</span><span class="o">=</span><span class="s2">&quot;Zone1&quot;</span><span class="p">)</span>
 </pre></div>

@@ -174,6 +174,7 @@ Create Sub Grid
 .. py:function:: create_sub_grid(grid, Area=None, Area_name=None, polygon_coords=None)
 
    Creates a sub-grid from a larger grid based on area or coordinates. At the moment only works unidirectionally, initial grid is useless after creation of sub-grid. Sub-grid is created as a new grid object. can be created from Area objects, area object names or polygon coordinates.
+   
    .. list-table::
       :widths: 20 10 70
       :header-rows: 1
