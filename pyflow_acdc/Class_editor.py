@@ -198,15 +198,15 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         
         Resistance_pu = r / Z_base if r!=0 else 0.00001
         Reactance_pu  = x  / Z_base if x!=0  else 0.00001
-        Conductance_pu = b*Z_base
-        Susceptance_pu = g*Z_base
+        Conductance_pu = g*Z_base
+        Susceptance_pu = b*Z_base
     elif data_in== 'Real': 
        [Resistance_pu, Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating] = Cable_parameters(grid.S_base, R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating, kV_base, Length_km,N_cables=N_cables)
     else:
         Resistance_pu = r if r!=0 else 0.00001
         Reactance_pu  = x if x!=0  else 0.00001
-        Conductance_pu = b
-        Susceptance_pu = g
+        Conductance_pu = g
+        Susceptance_pu = b
     
     
     if tap_changer:
