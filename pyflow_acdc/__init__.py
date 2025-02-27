@@ -49,6 +49,15 @@ except ImportError:
 
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
+
+    # Grid
+    'Grid', 
+    'Node_AC',
+    'Node_DC',
+    'Line_AC',
+    'Line_DC',
+    'AC_DC_converter',
+
     # Add Grid Elements
     'add_AC_node',
     'add_DC_node',

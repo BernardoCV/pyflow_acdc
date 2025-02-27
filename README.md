@@ -73,3 +73,15 @@ For Dash you will need to install the following packages:
 pip install dash
 
 ```
+
+
+## Documentation
+
+To build the documentation:
+```bash
+cd docs
+pip install -r requirements.txt
+make html
+```
+
+The documentation will be available in `docs/_build/html/index.html`
