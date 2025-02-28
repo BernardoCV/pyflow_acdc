@@ -394,13 +394,13 @@
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">R_Ohm_km</span></code></p></td>
 <td><p>float</p></td>
 <td><p>Resistance</p></td>
-<td><p>None</p></td>
+<td><p>Required</p></td>
 <td><p>Ω/km</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">L_mH_km</span></code></p></td>
 <td><p>float</p></td>
 <td><p>Inductance</p></td>
-<td><p>None</p></td>
+<td><p>Required</p></td>
 <td><p>mH/km</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">C_uF_km</span></code></p></td>
@@ -418,7 +418,7 @@
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">A_rating</span></code></p></td>
 <td><p>float</p></td>
 <td><p>Current rating</p></td>
-<td><p>None</p></td>
+<td><p>Required</p></td>
 <td><p>A</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Length_km</span></code></p></td>
@@ -497,73 +497,126 @@
 <dd><p>Adds a DC node to the grid.</p>
 <table class="docutils align-default">
 <colgroup>
-<col style="width: 20.0%" />
+<col style="width: 15.0%" />
 <col style="width: 10.0%" />
-<col style="width: 70.0%" />
+<col style="width: 50.0%" />
+<col style="width: 10.0%" />
+<col style="width: 15.0%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>Parameter</p></th>
 <th class="head"><p>Type</p></th>
 <th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Unit</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
 <td><p>Grid</p></td>
 <td><p>Grid to modify</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">kV_base</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Base voltage in kV</p></td>
+<td><p>Base voltage</p></td>
+<td><p>Required</p></td>
+<td><p>kV</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">node_type</span></code></p></td>
 <td><p>str</p></td>
 <td><p>Node type (‘P’, ‘Slack’, or ‘Droop’)</p></td>
+<td><p>‘P’</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Voltage_0</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Initial voltage magnitude in p.u.</p></td>
+<td><p>Initial voltage magnitude</p></td>
+<td><p>1.01</p></td>
+<td><p>p.u.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Power_Gained</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Power generation in p.u.</p></td>
+<td><p>Power generation</p></td>
+<td><p>0</p></td>
+<td><p>p.u.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Power_load</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Power load in p.u.</p></td>
+<td><p>Power load</p></td>
+<td><p>0</p></td>
+<td><p>p.u.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
 <td><p>str</p></td>
 <td><p>Node name</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Umin</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Minimum voltage magnitude in p.u.</p></td>
+<td><p>Minimum voltage magnitude</p></td>
+<td><p>0.95</p></td>
+<td><p>p.u.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Umax</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Maximum voltage magnitude in p.u.</p></td>
+<td><p>Maximum voltage magnitude</p></td>
+<td><p>1.05</p></td>
+<td><p>p.u.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">x_coord</span></code></p></td>
 <td><p>float</p></td>
 <td><p>X coordinate for plotting</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">y_coord</span></code></p></td>
 <td><p>float</p></td>
 <td><p>Y coordinate for plotting</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">geometry</span></code></p></td>
 <td><p>Geometry</p></td>
 <td><p>Shapely geometry object</p></td>
-</tr>
-<tr class="row-even"><td><p>Returns</p></td>
-<td><p>Node_DC</p></td>
-<td><p>Created DC node</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Example</strong></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">node</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_DC_node</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">kV_base</span><span class="o">=</span><span class="mi">320</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;dc_bus1&#39;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+<span class="c1">#Create grid</span>
+<span class="n">grid</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">Grid</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+
+<span class="c1">#Create DC node</span>
+<span class="n">node</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_DC_node</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">kV_base</span><span class="o">=</span><span class="mi">525</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;dc_bus1&#39;</span><span class="p">)</span>
+
+<span class="c1">#OR</span>
+
+<span class="n">node1</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">Node_DC</span><span class="p">(</span><span class="s1">&#39;P&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">525</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Bus1&#39;</span><span class="p">)</span>
+
+<span class="n">grid</span><span class="o">.</span><span class="n">nodes_DC</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node1</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -577,65 +630,120 @@
 <dd><p>Adds a DC line to the grid.</p>
 <table class="docutils align-default">
 <colgroup>
-<col style="width: 20.0%" />
+<col style="width: 15.0%" />
 <col style="width: 10.0%" />
-<col style="width: 70.0%" />
+<col style="width: 50.0%" />
+<col style="width: 10.0%" />
+<col style="width: 15.0%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>Parameter</p></th>
 <th class="head"><p>Type</p></th>
 <th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Unit</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
 <td><p>Grid</p></td>
 <td><p>Grid to modify</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fromNode</span></code></p></td>
 <td><p>Node_DC</p></td>
 <td><p>Source node</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">toNode</span></code></p></td>
 <td><p>Node_DC</p></td>
 <td><p>Destination node</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Resistance_pu</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Line resistance in p.u.</p></td>
+<td><p>Line resistance</p></td>
+<td><p>0.001</p></td>
+<td><p>p.u.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MW_rating</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Power rating in MW</p></td>
+<td><p>Power rating</p></td>
+<td><p>9999</p></td>
+<td><p>MW</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Length_km</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Line length in km</p></td>
+<td><p>Line length</p></td>
+<td><p>1</p></td>
+<td><p>km</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">polarity</span></code></p></td>
 <td><p>str</p></td>
-<td><p>‘m’ for monopolar, ‘b’ for bipolar</p></td>
+<td><p>‘m’ for asymmetric monopolar,’sm’ for symmetric monopolar, ‘b’ for bipolar</p></td>
+<td><p>‘m’</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
 <td><p>str</p></td>
 <td><p>Line name</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">geometry</span></code></p></td>
 <td><p>Geometry</p></td>
 <td><p>Shapely geometry object</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Cable_type</span></code></p></td>
 <td><p>str</p></td>
 <td><p>Cable specification name</p></td>
-</tr>
-<tr class="row-even"><td><p>Returns</p></td>
-<td><p>Line_DC</p></td>
-<td><p>Created DC line</p></td>
+<td><p>‘Custom’</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Example</strong></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">line</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_line_DC</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">node1</span><span class="p">,</span> <span class="n">node2</span><span class="p">,</span> <span class="n">MW_rating</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">polarity</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+<span class="c1">#Create grid</span>
+<span class="n">grid</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">Grid</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+
+<span class="c1">#Create nodes</span>
+<span class="n">node1</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_DC_node</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="mi">525</span><span class="p">)</span>
+<span class="n">node2</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_DC_node</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="mi">525</span><span class="p">)</span>
+
+<span class="n">line</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_line_DC</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">node1</span><span class="p">,</span> <span class="n">node2</span><span class="p">,</span> <span class="n">Resistance_pu</span><span class="o">=</span><span class="mf">0.0000318</span><span class="p">,</span> <span class="n">MW_rating</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">polarity</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">Length_km</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1">#OR</span>
+<span class="n">node3</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_DC_node</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="mi">525</span><span class="p">)</span>
+<span class="n">node4</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_DC_node</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="mi">525</span><span class="p">)</span>
+
+<span class="n">line_db</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_line_DC</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">node3</span><span class="p">,</span> <span class="n">node4</span><span class="p">,</span> <span class="n">Cable_type</span><span class="o">=</span><span class="s1">&#39;NREL_HVDC_2500mm_525kV&#39;</span><span class="p">,</span> <span class="n">polarity</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">Length_km</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -649,73 +757,222 @@
 <dd><p>Adds an AC/DC converter to the grid.</p>
 <table class="docutils align-default">
 <colgroup>
-<col style="width: 20.0%" />
+<col style="width: 15.0%" />
 <col style="width: 10.0%" />
-<col style="width: 70.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+<col style="width: 10.0%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>Parameter</p></th>
 <th class="head"><p>Type</p></th>
 <th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Unit</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
 <td><p>Grid</p></td>
 <td><p>Grid to modify</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AC_node</span></code></p></td>
 <td><p>Node_AC</p></td>
 <td><p>AC side node</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DC_node</span></code></p></td>
 <td><p>Node_DC</p></td>
 <td><p>DC side node</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AC_type</span></code></p></td>
 <td><p>str</p></td>
-<td><p>AC control type (‘PV’, ‘PQ’)</p></td>
+<td><p>AC control type (‘PV’, ‘PQ’, ‘Slack’)</p></td>
+<td><p>‘PV’</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DC_type</span></code></p></td>
 <td><p>str</p></td>
-<td><p>DC control type</p></td>
+<td><p>DC control type (‘P’, ‘Slack’, ‘Droop’)</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">P_AC_MW</span></code></p></td>
 <td><p>float</p></td>
 <td><p>AC active power setpoint</p></td>
+<td><p>0</p></td>
+<td><p>MW</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Q_AC_MVA</span></code></p></td>
 <td><p>float</p></td>
 <td><p>AC reactive power setpoint</p></td>
+<td><p>0</p></td>
+<td><p>MVAr</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">P_DC_MW</span></code></p></td>
 <td><p>float</p></td>
 <td><p>DC power setpoint</p></td>
+<td><p>0</p></td>
+<td><p>MW</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MVA_max</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Transformer_resistance</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Transformer resistance</p></td>
+<td><p>0</p></td>
+<td><p>pu</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Transformer_reactance</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Transformer reactance</p></td>
+<td><p>0</p></td>
+<td><p>pu</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Phase_Reactor_R</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Phase reactor resistance</p></td>
+<td><p>0</p></td>
+<td><p>pu</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Phase_Reactor_X</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Phase reactor reactance</p></td>
+<td><p>0</p></td>
+<td><p>pu</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Filter</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Filter susceptance</p></td>
+<td><p>0</p></td>
+<td><p>pu</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Droop</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Droop constant</p></td>
+<td><p>0</p></td>
+<td><p>pu</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kV_base</span></code></p></td>
+<td><p>float</p></td>
+<td><p>AC side base voltage</p></td>
+<td><p>None</p></td>
+<td><p>kV</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MVA_max</span></code></p></td>
 <td><p>float</p></td>
 <td><p>Converter rating</p></td>
+<td><p>None</p></td>
+<td><p>MVA</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nConvP</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nConvP</span></code></p></td>
 <td><p>int</p></td>
 <td><p>Number of parallel converters</p></td>
+<td><p>1</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">geometry</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">geometry</span></code></p></td>
 <td><p>Geometry</p></td>
 <td><p>Shapely geometry object</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
-<tr class="row-odd"><td><p>Returns</p></td>
+<tr class="row-even"><td><p>Returns</p></td>
 <td><p>AC_DC_converter</p></td>
 <td><p>Created converter</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
+<p>For AC side control type:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">AC_type</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">DC_type</span></code></p></th>
+<th class="head"><p>Requiered Values</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Slack</p></td>
+<td><p>PAC</p></td>
+<td><p>None</p></td>
+</tr>
+<tr class="row-odd"><td><p>PQ</p></td>
+<td><p>Any</p></td>
+<td><p>Q_AC_MVA</p></td>
+</tr>
+<tr class="row-even"><td><p>PV</p></td>
+<td><p>Any</p></td>
+<td><p>None</p></td>
+</tr>
+</tbody>
+</table>
+<p>For DC side control type:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">DC_type</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">AC_type</span></code></p></th>
+<th class="head"><p>Requiered Values</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>P</p></td>
+<td><p>PQ, PV</p></td>
+<td><p>P_DC_MW</p></td>
+</tr>
+<tr class="row-odd"><td><p>Droop</p></td>
+<td><p>PQ, PV</p></td>
+<td><p>P_DC_MW , Droop</p></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <p><strong>Example</strong></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conv</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">add_ACDC_converter</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">ac_node</span><span class="p">,</span> <span class="n">dc_node</span><span class="p">,</span> <span class="n">MVA_max</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre></div>
 </div>
-</dd></dl>
-
 </section>
 <section id="add-generator">
 <h3>Add Generator<a class="headerlink" href="#add-generator" title="Link to this heading">¶</a></h3>

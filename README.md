@@ -77,6 +77,8 @@ pip install dash
 
 ## Documentation
 
+This is being built but not yet completed, any questions please contact the repository owner.
+
 To build the documentation:
 ```bash
 cd docs

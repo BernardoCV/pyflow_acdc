@@ -248,12 +248,12 @@ Add AC Line
       * - ``R_Ohm_km``
         - float
         - Resistance 
-        - None
+        - Required
         - Ω/km
       * - ``L_mH_km``
         - float
         - Inductance 
-        - None
+        - Required
         - mH/km
       * - ``C_uF_km``
         - float
@@ -268,13 +268,14 @@ Add AC Line
       * - ``A_rating``
         - float
         - Current rating 
-        - None
+        - Required
         - A
       * - ``Length_km``
         - float
         - Line length
         - 1
         - km
+   
    For pre defined cable types database
 
    .. list-table::
@@ -329,57 +330,92 @@ Add DC Node
    Adds a DC node to the grid.
 
    .. list-table::
-      :widths: 20 10 70
+      :widths: 15 10 50 10 15
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
+        - Default
+        - Unit
       * - ``grid``
         - Grid
         - Grid to modify
+        - Required
+        - -
       * - ``kV_base``
         - float
-        - Base voltage in kV
+        - Base voltage
+        - Required
+        - kV
       * - ``node_type``
         - str
         - Node type ('P', 'Slack', or 'Droop')
+        - 'P'
+        - -
       * - ``Voltage_0``
         - float
-        - Initial voltage magnitude in p.u.
+        - Initial voltage magnitude
+        - 1.01
+        - p.u.
       * - ``Power_Gained``
         - float
-        - Power generation in p.u.
+        - Power generation
+        - 0
+        - p.u.
       * - ``Power_load``
         - float
-        - Power load in p.u.
+        - Power load
+        - 0
+        - p.u.
       * - ``name``
         - str
         - Node name
+        - None
+        - -
       * - ``Umin``
         - float
-        - Minimum voltage magnitude in p.u.
+        - Minimum voltage magnitude
+        - 0.95
+        - p.u.
       * - ``Umax``
         - float
-        - Maximum voltage magnitude in p.u.
+        - Maximum voltage magnitude
+        - 1.05
+        - p.u.
       * - ``x_coord``
         - float
         - X coordinate for plotting
+        - None
+        - -
       * - ``y_coord``
         - float
         - Y coordinate for plotting
+        - None
+        - -
       * - ``geometry``
         - Geometry
         - Shapely geometry object
-      * - Returns
-        - Node_DC
-        - Created DC node
+        - None
+        - -
+   
 
    **Example**
 
    .. code-block:: python
 
-       node = pyf.add_DC_node(grid, kV_base=320, name='dc_bus1')
+       import pyflow_acdc as pyf
+       #Create grid
+       grid = pyf.Grid(100)
+
+       #Create DC node  
+       node = pyf.add_DC_node(grid, kV_base=525, name='dc_bus1')  
+
+       #OR
+
+       node1 = pyf.Node_DC('P', 1, 0,0,525,name='Bus1')
+
+       grid.nodes_DC.append(node1)
 
 
 Add DC Line
@@ -390,51 +426,85 @@ Add DC Line
    Adds a DC line to the grid.
 
    .. list-table::
-      :widths: 20 10 70
+      :widths: 15 10 50 10 15
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
+        - Default
+        - Unit
       * - ``grid``
         - Grid
         - Grid to modify
+        - Required
+        - -
       * - ``fromNode``
         - Node_DC
         - Source node
+        - Required
+        - -
       * - ``toNode``
         - Node_DC
         - Destination node
+        - Required
+        - -
       * - ``Resistance_pu``
         - float
-        - Line resistance in p.u.
+        - Line resistance 
+        - 0.001
+        - p.u.
       * - ``MW_rating``
         - float
-        - Power rating in MW
+        - Power rating 
+        - 9999
+        - MW
       * - ``Length_km``
         - float
-        - Line length in km
+        - Line length
+        - 1
+        - km
       * - ``polarity``
         - str
-        - 'm' for monopolar, 'b' for bipolar
+        - 'm' for asymmetric monopolar,'sm' for symmetric monopolar, 'b' for bipolar
+        - 'm'
+        - -
       * - ``name``
         - str
         - Line name
+        - None
+        - -
       * - ``geometry``
         - Geometry
         - Shapely geometry object
+        - None
+        - -
       * - ``Cable_type``
         - str
         - Cable specification name
-      * - Returns
-        - Line_DC
-        - Created DC line
+        - 'Custom'
+        - -
+     
 
    **Example**
 
    .. code-block:: python
 
-       line = pyf.add_line_DC(grid, node1, node2, MW_rating=1000, polarity='b')
+      import pyflow_acdc as pyf
+      #Create grid
+      grid = pyf.Grid(100)
+
+      #Create nodes
+      node1 = pyf.add_DC_node(grid, 525)
+      node2 = pyf.add_DC_node(grid, 525)
+
+      line = pyf.add_line_DC(grid, node1, node2, Resistance_pu=0.0000318, MW_rating=1000, polarity='b', Length_km=10)
+
+      #OR
+      node3 = pyf.add_DC_node(grid, 525)
+      node4 = pyf.add_DC_node(grid, 525) 
+
+      line_db = pyf.add_line_DC(grid, node3, node4, Cable_type='NREL_HVDC_2500mm_525kV', polarity='b', Length_km=10)
 
 Add AC/DC Converter
 ^^^^^^^^^^^^^^^^^^^^
@@ -444,54 +514,150 @@ Add AC/DC Converter
    Adds an AC/DC converter to the grid.
 
    .. list-table::
-      :widths: 20 10 70
+      :widths: 15 10 50 15 10
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
+        - Default
+        - Unit
       * - ``grid``
         - Grid
         - Grid to modify
+        - Required
+        - -
       * - ``AC_node``
         - Node_AC
         - AC side node
+        - Required
+        - -
       * - ``DC_node``
         - Node_DC
         - DC side node
+        - Required
+        - -
       * - ``AC_type``
         - str
-        - AC control type ('PV', 'PQ')
+        - AC control type ('PV', 'PQ', 'Slack')
+        - 'PV'
+        - -
       * - ``DC_type``
         - str
-        - DC control type
+        - DC control type ('P', 'Slack', 'Droop')
+        - None
+        - -
       * - ``P_AC_MW``
         - float
         - AC active power setpoint
+        - 0
+        - MW
       * - ``Q_AC_MVA``
         - float
         - AC reactive power setpoint
+        - 0
+        - MVAr
       * - ``P_DC_MW``
         - float
         - DC power setpoint
+        - 0
+        - MW
+      * - ``Transformer_resistance``
+        - float
+        - Transformer resistance
+        - 0
+        - pu
+      * - ``Transformer_reactance``
+        - float
+        - Transformer reactance
+        - 0
+        - pu
+      * - ``Phase_Reactor_R``
+        - float
+        - Phase reactor resistance
+        - 0
+        - pu
+      * - ``Phase_Reactor_X``
+        - float
+        - Phase reactor reactance
+        - 0
+        - pu
+      * - ``Filter``
+        - float
+        - Filter susceptance
+        - 0
+        - pu
+      * - ``Droop``
+        - float
+        - Droop constant
+        - 0
+        - pu
+      * - ``kV_base``
+        - float
+        - AC side base voltage
+        - None
+        - kV
       * - ``MVA_max``
         - float
         - Converter rating
+        - None
+        - MVA
       * - ``nConvP``
         - int
         - Number of parallel converters
+        - 1
+        - -
       * - ``geometry``
         - Geometry
         - Shapely geometry object
+        - None
+        - -
       * - Returns
         - AC_DC_converter
         - Created converter
+        - -
+        - -
 
-   **Example**
+   For Power Flow AC side control type:   
 
-   .. code-block:: python
+   .. list-table::
+      :widths: 10 10 80
+      :header-rows: 1
 
-       conv = pyf.add_ACDC_converter(grid, ac_node, dc_node, MVA_max=1000)
+      * - ``AC_type``
+        - ``DC_type``
+        - Additional requiered Values
+      * - Slack
+        - PAC
+        - None
+      * - PQ
+        - PAC
+        - ``Q_AC_MVA``
+      * - PV
+        - PAC
+        - ``P_AC_MW``
+
+   For Power Flow DC side control type:  
+
+   .. list-table::
+      :widths: 10 10 80
+      :header-rows: 1
+
+      * - ``DC_type``
+        - ``AC_type``
+        - Requiered Values
+      * - P
+        - PQ, PV
+        - ``P_DC_MW``
+      * - Droop
+        - PQ, PV
+        - ``P_DC_MW`` , ``Droop``
+
+**Example**
+
+.. code-block:: python
+
+    conv = pyf.add_ACDC_converter(grid, ac_node, dc_node, MVA_max=1000)
 
 Add Generator
 ^^^^^^^^^^^^^^

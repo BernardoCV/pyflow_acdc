@@ -240,6 +240,13 @@ Key Attributes:
      - float
      - y-coordinate, preferably in latitude decimal format
 
+Example Usage:
+    .. code-block:: python
+
+        import pyflow_acdc as pyf
+        # Create an DC node
+        node = pyf.Node_DC('P', 1, 0,0,525,name='Bus1')
+
 
 DC line modelling
 ^^^^^^^^^^^^^^^^^

@@ -286,7 +286,7 @@ def add_line_DC(grid, fromNode, toNode, Resistance_pu=0.001, MW_rating=9999,Leng
             return
     line = Line_DC(fromNode, toNode, Resistance_pu, MW_rating,Length_km, polarity, name,Cable_type=Cable_type)
     grid.lines_DC.append(line)
-    grid.create_Ybus_DC()
+    
     if geometry is not None:
        if isinstance(geometry, str): 
             geometry = loads(geometry)  
@@ -297,7 +297,7 @@ def add_line_DC(grid, fromNode, toNode, Resistance_pu=0.001, MW_rating=9999,Leng
 
 def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
     if MVA_max is None:
-        MVA_max= grid.S_base*10
+        MVA_max= grid.S_base*100
     if kV_base is None:
         kV_base = AC_node.kV_base
     if DC_type is None:
