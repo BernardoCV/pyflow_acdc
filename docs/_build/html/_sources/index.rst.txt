@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. image:: _static/logo_dark.svg
+.. image:: images/logo_dark.svg
    :align: right
    :width: 300px
 
