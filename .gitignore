@@ -26,10 +26,7 @@ htmlcov/
 
 # Documentation
 docs/_build/
-docs/api/_autosummary/
-docs/*.html
-docs/*.pdf
-docs/_templates/
+
 
 
 
