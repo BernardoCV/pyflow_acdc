@@ -349,6 +349,12 @@ class Grid:
         Droop_Conv = [
             conv for conv in self.Converters_ACDC if conv.type == 'Droop']
         return Droop_Conv
+    @property
+    def check_stand_alone_is_slack(self):
+        for node in self.nodes_AC:
+            if node.stand_alone:
+                node.type = 'Slack'
+        
     
     def Update_Graph_DC(self):
         self.Graph_DC = nx.Graph()
@@ -470,12 +476,9 @@ class Grid:
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode,line=line)
             line.toNode.stand_alone = False
             line.fromNode.stand_alone = False
-        
-        
-        
+
         for node in self.nodes_AC:
             if node.stand_alone:
-                node.type = 'Slack'
                 self.Graph_AC.add_node(node)
                    
             
@@ -506,7 +509,7 @@ class Grid:
             for node in self.Grids_AC[i]:
                 if node.type == 'Slack':
                     self.num_slackAC[i] += 1
-            if self.num_slackAC[i] == 0:
+            if self.num_slackAC[i] == 0 and self.lines_AC != []:
                 print(f'For Grid AC {i+1} no slack bus found.')
                 print(f'Please set one before any calculations')
                 # sys.exit()
@@ -882,6 +885,38 @@ class Ren_Source:
    
     
 class Node_AC:  
+    """
+    Attributes
+    ----------
+    node_type : str
+        Node type ('Slack' or 'PQ' or 'PV')
+    Voltage_0 : float
+        Initial voltage magnitude in pu
+    theta_0 : float
+        Initial voltage angle in radians
+    kV_base : float
+        Base voltage in kV
+    Power_Gained : float
+        Active power injection in pu
+    Reactive_Gained : float
+        Reactive power injection in pu
+    Power_load : float
+        Active power demand in pu
+    Reactive_load : float
+        Reactive power demand in pu
+    Umin : float
+        Minimum voltage magnitude in p.u.
+    Umax : float
+        Maximum voltage magnitude in p.u.
+    Gs : float
+        Shunt conductance in p.u.
+    Bs : float
+        Shunt susceptance in p.u.
+    x_coord : float
+        x-coordinate, preferably in longitude decimal format
+    y_coord : float
+        y-coordinate, preferably in latitude decimal format
+    """    
     nodeNumber = 0
     names = set()
     
@@ -999,6 +1034,28 @@ class Node_AC:
         self.PLi = self.PLi_base * self._PLi_factor
         
 class Node_DC:
+    """
+    Attributes
+    ----------
+    node_type : str
+        Node type ('Slack' or 'P' or 'Droop' or 'PAC')
+    Voltage_0 : float
+        Initial voltage magnitude in pu     
+    Power_Gained : float
+        Active power injection in pu
+    Power_load : float
+        Active power demand in pu
+    kV_base : float
+        Base voltage in kV
+    Umin : float
+        Minimum voltage magnitude in p.u.
+    Umax : float
+        Maximum voltage magnitude in p.u.
+    x_coord : float
+        x-coordinate, preferably in longitude decimal format
+    y_coord : float
+        y-coordinate, preferably in latitude decimal format
+    """
     nodeNumber = 0
     names = set()
     
@@ -1082,6 +1139,43 @@ class Node_DC:
          self.PLi = self.PLi_base * self._PLi_factor
          
 class Line_AC:
+    """
+    Attributes
+    ----------
+    fromNode : Node_AC
+        The starting node of the line
+    toNode : Node_AC
+        The ending node of the line
+    Resistance : float
+        Resistance of the line in pu
+    Reactance : float
+        Reactance of the line in pu
+    Conductance : float
+        Conductance of the line in pu
+    Susceptance : float
+        Susceptance of the line in pu
+    MVA_rating : float
+        MVA rating of the line
+    Length_km : float
+        Length of the line in km
+    m : float
+        Number of conductors in the line
+    shift : float
+        Phase shift of the line in radians
+    N_cables : int
+        Number of cables in the line
+    name : str
+        Name of the line
+    geometry : str
+        Geometry of the line
+    isTf : bool
+        True if the line is a transformer, False otherwise
+    S_base : float
+        Base power of the line in MVA
+    Cable_type : str
+        Type of cable in the line
+    
+    """    
     lineNumber = 0
     names = set()
     _cable_database = None
@@ -1363,6 +1457,28 @@ class TF_Line_AC:
         
 
 class Line_DC:
+    """
+    Attributes
+    ----------
+    fromNode : Node_DC
+        The starting node of the line
+    toNode : Node_DC
+        The ending node of the line
+    Resistance : float
+        Resistance of the line in pu    
+    MW_rating : float
+        MVA rating of the line
+    km : float
+        Length of the line in km
+    polarity : str
+        Polarity of the line ('m' or 'b' or 'sm')   
+    N_cables : int
+        Number of cables in the line
+    Cable_type : str
+        Type of cable in the line
+    S_base : float
+        Base power of the line in MVA
+    """
     lineNumber = 0
     names = set()
     _cable_database = None
@@ -1511,6 +1627,59 @@ class Line_DC:
             self.R, self.MW_rating = self.get_cable_parameters(new_type, self.S_base, self.Length_km, self.np_line,self.kV_base)
            
 class AC_DC_converter:
+    """
+    Attributes
+    ----------
+    AC_type : str
+        Type of AC node ('Slack' or 'PV' or 'PQ')
+    DC_type : str
+        Type of DC node ('Slack' or 'P' or 'Droop' or 'PAC')           
+    AC_node : Node_AC
+        AC node connected to the converter
+    DC_node : Node_DC
+        DC node connected to the converter
+    P_AC : float
+        Active power injection in AC node in pu
+    Q_AC : float
+        Reactive power injection in AC node in pu
+    P_DC : float
+        Active power injection in DC node in pu
+    Transformer_resistance : float
+        Transformer resistance in pu
+    Transformer_reactance : float
+        Transformer reactance in pu
+    Phase_Reactor_R : float
+        Phase reactor resistance in pu
+    Phase_Reactor_X : float
+        Phase reactor reactance in pu
+    Filter : float
+        Filter in pu
+    Droop : float
+        Droop in pu
+    kV_base : float
+        Base voltage in kV
+    MVA_max : float
+        Maximum MVA rating of the converter
+    nConvP : float
+        Number of parallel converters
+    polarity : int
+        Polarity of the converter (1 or -1)
+    lossa : float
+        No load loss factor for active power
+    lossb : float
+        Linear currentr loss factor 
+    losscrect : float
+        Switching loss factor for rectifier
+    losscinv : float
+        Switching loss factor for inverter
+    Ucmin : float
+        Minimum voltage magnitude in pu
+    Ucmax : float
+        Maximum voltage magnitude in pu
+    name : str
+        Name of the converter
+    """
+    
     ConvNumber = 0
     names = set()
     

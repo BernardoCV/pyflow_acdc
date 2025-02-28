@@ -385,15 +385,17 @@ def _process_clusters(grid, data, cluster_centers):
     
     Parameters:
     -----------
-    grid : Grid object
-        The grid object to update
+    grid : pandapower.Grid
+        The power system grid object to be updated with cluster information
     data : pandas.DataFrame
-        Data with cluster assignments
+        Time series data used for clustering
     cluster_centers : numpy.ndarray
-        Centers of the clusters
-    n_clusters : int
-        Number of clusters
-    
+        Array containing the centroids/medoids of each cluster
+        
+    Returns:
+    --------
+    grid : pandapower.Grid
+        Updated grid object with cluster information
     """
     new_columns = [col for col in data.columns if col != 'Cluster']
     n_clusters = len(cluster_centers)

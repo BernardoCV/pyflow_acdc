@@ -18,8 +18,7 @@ try:
     import folium
     import branca
     from folium.plugins import Draw,MarkerCluster,AntPath
-    from shapely.geometry import LineString
-    from shapely.geometry import Point
+    from shapely.geometry import LineString , MultiPoint, Point
     import webbrowser
     map_tac = True
 except:
@@ -711,8 +710,8 @@ def plot_TS_res(grid, start, end, plotting_choice=None, grid_names=None):
         print("5: AC line loading")
         print("6: DC line loading")
         print("7: AC/DC Converters")
-        print("8: Power Generation by generator (area chart)")
-        print("9: Power Generation by price zone (area chart)")
+        print("8: Power Generation by generator area chart")
+        print("9: Power Generation by price zone area chart")
         
         choice = int(input("Enter a number between 1 and 9: "))
         if choice == 1:
@@ -1269,6 +1268,101 @@ def plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",poly
     # Automatically open the map in the default web browser
     webbrowser.open(f"file://{abs_map_filename}")
     return m
+
+def save_network_svg(grid, name='grid_network', width=1000, height=800):
+    """Save the network as SVG file"""
+    try:
+        import svgwrite
+
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Will save as: {os.path.abspath(f'{name}.svg')}")
+        # Create SVG drawing
+        dwg = svgwrite.Drawing(f"{name}.svg", size=(f'{width}px', f'{height}px'), profile='tiny')
+        
+        # Get all geometries and their bounds
+        all_bounds = []
+        
+        # Add lines
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC:
+            if hasattr(line, 'geometry') and line.geometry:
+                all_bounds.append(line.geometry.bounds)
+                
+        # Add nodes
+        for node in grid.nodes_AC + grid.nodes_DC:
+            if hasattr(node, 'geometry') and node.geometry:
+                all_bounds.append(node.geometry.bounds)
+                
+        # Add generators and renewable sources
+        for gen in grid.Generators + grid.RenSources:
+            if hasattr(gen, 'geometry') and gen.geometry:
+                all_bounds.append(gen.geometry.bounds)
+        
+        # Calculate overall bounds
+        if all_bounds:
+            minx = min(bound[0] for bound in all_bounds)
+            miny = min(bound[1] for bound in all_bounds)
+            maxx = max(bound[2] for bound in all_bounds)
+            maxy = max(bound[3] for bound in all_bounds)
+        else:
+            print("No geometries found to plot")
+            return
+
+        # Calculate scaling factors
+        padding = 50  # pixels of padding
+        scale_x = (width - 2*padding) / (maxx - minx)
+        scale_y = (height - 2*padding) / (maxy - miny)
+        scale = min(scale_x, scale_y)
+        
+        def transform_coords(x, y):
+            """Transform coordinates to SVG space"""
+            return (
+                padding + (x - minx) * scale,
+                height - (padding + (y - miny) * scale)  # Flip Y axis
+            )
+        
+        # Draw AC lines
+        for line in grid.lines_AC + grid.lines_AC_tf:
+            if hasattr(line, 'geometry') and line.geometry:
+                coords = list(line.geometry.coords)
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]  # Remove last "L "
+                
+                color = "black" if getattr(line, 'isTf', False) else "red"
+                dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2, fill='none'))
+        
+        # Draw DC lines
+        for line in grid.lines_DC:
+            if hasattr(line, 'geometry') and line.geometry:
+                coords = list(line.geometry.coords)
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]
+                dwg.add(dwg.path(d=path_data, stroke='blue', stroke_width=2, fill='none'))
+        
+        # Draw nodes
+        for node in grid.nodes_AC + grid.nodes_DC:
+            if hasattr(node, 'geometry') and node.geometry:
+                x, y = node.geometry.x, node.geometry.y
+                svg_x, svg_y = transform_coords(x, y)
+                color = "black" if isinstance(node, Node_AC) else "purple"
+                dwg.add(dwg.circle(center=(svg_x, svg_y), r=3, 
+                                 fill=color, stroke=color))
+        
+                
+        # Save the SVG file
+        dwg.save()
+        print(f"Network saved as {name}.svg")
+        
+    except ImportError as e:
+        print(f"Could not save SVG: {e}. Please install svgwrite package.")
+
+
+    return 
 
 
     

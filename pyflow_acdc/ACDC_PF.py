@@ -42,6 +42,7 @@ def cartz2pol(z):
 def AC_PowerFlow(grid, tol_lim=1e-8, maxIter=100):
     time_1 = time.time()
     grid.Update_PQ_AC()
+    grid.check_stand_alone_is_slack()
     load_flow_AC(grid, tol_lim, maxIter)
     grid.Update_PQ_AC()
     grid.Line_AC_calc()
@@ -73,7 +74,8 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
             s = 1
             
     grid.Update_PQ_AC()
-
+    grid.check_stand_alone_is_slack()
+    
     while tolerance > tol_lim and grid.iter_num_seq < maxIter:
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
         
