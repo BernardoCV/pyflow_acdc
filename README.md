@@ -63,6 +63,17 @@ git pull origin main
 
 To merge your changes into the main branch please contact the repository owner.
 
+For Clustering you will need to install the following packages:
+```bash
+pip install numpy <2.0.0
+pip install scikit-learn-extra
+pip install scikit-learn
+```
+For mapping you will need to install the following packages:
+```bash
+pip install folium
+```
+
 For OPF you will need to install the following packages:
 ```bash
 pip install pyomo
