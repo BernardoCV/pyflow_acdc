@@ -13,10 +13,12 @@ Requirements
     * prettytable
     * plotly
     * geopandas
-    * scikit-learn-extra
-    * scikit-learn
+    * pyyaml
 
 * Optional dependencies:
+    * Clustering:
+     * scikit-learn-extra
+     * scikit-learn
     * Mapping:
      * folium
     * Optimal power flow:  

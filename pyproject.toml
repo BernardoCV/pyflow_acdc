@@ -47,13 +47,16 @@ dependencies = ["numpy",
                 "prettytable",
                 "plotly",
                 "geopandas",
-                "scikit-learn-extra",
-                "scikit-learn"]
+                "pyyaml"]
 
 [project.optional-dependencies]
+Clustering = ["numpy <2.0.0",
+              "scikit-learn-extra",
+              "scikit-learn"]
 mapping = ["folium"]
 
-OPF = ["pyomo",
+OPF = ["numpy <2.0.0",
+        "pyomo",
          "ipopt"]
 Dash = ["dash"]
 

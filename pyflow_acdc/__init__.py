@@ -13,7 +13,6 @@ from .Classes import *
 from .Export_files import *
 from .Time_series import *
 
-from .Time_series_clustering import *
 from .ACDC_PF import *
 
 from .Graph_and_plot import *
@@ -22,7 +21,6 @@ from .Market_Coeff import *
 
 # Try to import OPF module if pyomo is available
 try:
-    import pyomo.environ
     from .ACDC_OPF import *
     from .ACDC_TEP import *
     HAS_OPF = True
@@ -36,7 +34,6 @@ except ImportError:
     )
 
 try:
-    import dash
     from .Graph_Dash import *
     HAS_DASH = True
 except ImportError:
@@ -48,7 +45,6 @@ except ImportError:
         "pip install pyflow-acdc[Dash] ")
 
 try:
-    import folium
     from .Mapping import *
     HAS_MAPPING = True
 except ImportError:
@@ -58,6 +54,17 @@ except ImportError:
         "folium is not installed. Mapping functionality will not be available."
         "To use mapping features, install optional dependencies with: "
         "pip install pyflow-acdc[mapping] ")
+
+try:
+    from .Time_series_clustering import *
+    HAS_CLUSTERING = True
+except ImportError:
+    HAS_CLUSTERING = False
+    import warnings
+    warnings.warn(
+        "scikit-learn-extra and scikit-learn are not installed. Clustering functionality will not be available."
+        "To use clustering features, install optional dependencies with: "
+        "pip install pyflow-acdc[Clustering] ") 
 
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
