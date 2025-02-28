@@ -347,7 +347,8 @@ class Grid:
         Droop_Conv = [
             conv for conv in self.Converters_ACDC if conv.type == 'Droop']
         return Droop_Conv
-    @property
+    
+    
     def check_stand_alone_is_slack(self):
         for node in self.nodes_AC:
             if node.stand_alone:

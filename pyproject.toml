@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.2.5"
+version = "0.2.6"
 license = {file = "LICENSE.txt"}
 requires-python = ">= 3.9"
 
@@ -62,14 +62,15 @@ Dash = ["dash"]
 
 [project.urls]
 
-Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.2.5.tar.gz"
+Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.2.6.tar.gz"
 
 
 [tool.setuptools]
 packages = ["pyflow_acdc"]
 
 [tool.setuptools.package-data]
-"pyflow_acdc" = ["folium_images/*.png"]
-
-
+"pyflow_acdc" = [
+    "folium_images/*.png",
+    "Cable_database/*.yaml"
+]
 

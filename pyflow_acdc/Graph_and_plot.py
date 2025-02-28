@@ -13,7 +13,7 @@ from .Classes import Node_AC
 
 __all__ = ['plot_Graph',
     'plot_neighbour_graph',
-    'plot_TS_res'
+    'plot_TS_res',
     'save_network_svg']
 
 def update_ACnode_hovertext(node,S_base,text):
