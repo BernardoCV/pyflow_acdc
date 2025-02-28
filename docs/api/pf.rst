@@ -1,6 +1,8 @@
 Power Flow Module
 =================
 
+This page has been pre-filled with the functions that are available in the PF module by AI, please check the code for more details.
+
 This module provides functions for AC, DC and AC/DC power flow analysis.
 
 functions are found in pyflow_acdc.ACDC_PF

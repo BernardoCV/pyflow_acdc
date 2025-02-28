@@ -12,7 +12,7 @@ AC node modelling
 ^^^^^^^^^^^^^^^^^
 
 .. figure:: ../images/AC_node_model.svg
-   :width: 300
+   :width: 250
    :alt: AC node model
    :align: center
 
@@ -239,7 +239,7 @@ DC node modelling
 ^^^^^^^^^^^^^^^^^
 
 .. figure:: ../images/DC_node_model.svg
-   :width: 300
+   :width: 250
    :alt: DC node model
    :align: center
 
@@ -550,7 +550,7 @@ Renewable Source Modelling
 ---------------------------
 
 .. figure:: ../images/Ren_sources_model.svg
-   :width: 400
+   :width: 250
    :alt: Renewable source model
    :align: center
 
@@ -600,12 +600,12 @@ Key Attributes:
    * - Type
      - Figure for folium plotting
    * - Wind
-     - .. image:: ../../pyflow_acdc/folium_images/wind.svg
+     - .. image:: ../images/wind.svg
          :width: 100
          :alt: Wind source icon
          :align: center
    * - Solar
-     - .. image:: ../../pyflow_acdc/folium_images/solar.svg
+     - .. image:: ../images/solar.svg
          :width: 100
          :alt: Solar source icon
          :align: center
@@ -616,7 +616,7 @@ Generator Modelling
 --------------------
 
 .. figure:: ../images/Gen_model.svg
-   :width: 400
+   :width: 250
    :alt: Generator model
    :align: center
 
@@ -664,67 +664,61 @@ Key Attributes:
      - Figure for folium plotting
      - Default cost
    * - Hydro
-     - .. image:: ../../pyflow_acdc/folium_images/hydro.svg
+     - .. image:: ../images/hydro.svg
          :width: 100
          :alt: Hydro source icon
          :align: center
      - 
-   * - Gas
-     - .. image:: ../../pyflow_acdc/folium_images/gas.svg
-         :width: 100
-         :alt: Gas source icon
-         :align: center
-     - 
    * - Nuclear
-     - .. image:: ../../pyflow_acdc/folium_images/nuclear.svg
+     - .. image:: ../images/nuclear.svg
          :width: 100
          :alt: Nuclear source icon
          :align: center
      - 
    * - Coal
-     - .. image:: ../../pyflow_acdc/folium_images/coal.svg
+     - .. image:: ../images/coal.svg
          :width: 100
          :alt: Coal source icon
          :align: center
      - 
    * - Solid Biomass
-     - .. image:: ../../pyflow_acdc/folium_images/Solid_Biomass.svg
+     - .. image:: ../images/Solid_Biomass.svg
          :width: 100
          :alt: Solid Biomass source icon
          :align: center
      - 
    * - Geothermal
-     - .. image:: ../../pyflow_acdc/folium_images/Geothermal.svg
+     - .. image:: ../images/Geothermal.svg
          :width: 100
          :alt: Geothermal source icon
          :align: center
      - 
    * - Lignite
-     - .. image:: ../../pyflow_acdc/folium_images/Lignite.svg
+     - .. image:: ../images/Lignite.svg
          :width: 100
          :alt: Lignite source icon
          :align: center
      - 
    * - Natural Gas
-     - .. image:: ../../pyflow_acdc/folium_images/Natural_Gas.svg
+     - .. image:: ../images/Natural_Gas.svg
          :width: 100
          :alt: Natural Gas source icon
          :align: center
      - 
    * - Oil
-     - .. image:: ../../pyflow_acdc/folium_images/Oil.svg
+     - .. image:: ../images/Oil.svg
          :width: 100
          :alt: Oil source icon
          :align: center
      - 
    * - Waste
-     - .. image:: ../../pyflow_acdc/folium_images/Waste.svg
+     - .. image:: ../images/Waste.svg
          :width: 100
          :alt: Waste source icon
          :align: center
      - 
    * - Other
-     - .. image:: ../../pyflow_acdc/folium_images/gen.svg
+     - .. image:: ../images/gen.svg
          :width: 100
          :alt: Other source icon
          :align: center
@@ -733,6 +727,8 @@ Key Attributes:
 Price Zone Modelling
 ---------------------
 
+
+
 .. figure:: ../images/prize_zone_model.svg
    :width: 400
    :alt: Price zone model
@@ -740,10 +736,27 @@ Price Zone Modelling
 
    Price zone model
 
+Price zone model is taken from [3]_. The cost of generation quadratic curve is calculated in :doc:`market_coef`.
+
 Class Reference: :class:`pyflow_acdc.Classes.Price_Zone`
 
 Key Attributes:
 
 
 
-.. include:: ../refs.rst
+References
+----------
+
+.. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
+       "An optimal power flow tool for AC/DC systems, applied to the analysis of the
+       North Sea Grid for offshore wind integration" in IEEE Transactions on Power
+       Systems, doi: 10.1109/TPWRS.2023.3533889.
+
+.. [2] D. Zimmerman, C. E. Murillo-Sanchez, and R. J. Thomas, "MATPOWER: Steady-
+       State Operations, Planning and Analysis Tools for Power Systems Research and
+       Education," Power Systems, IEEE Transactions on, vol. 26, no. 1, pp. 12–19,
+       Feb. 2011.
+
+.. [3] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
+       "Optimizing Offshore Wind Integration through Multi-Terminal DC Grids: A
+       Market-Based OPF Framework for the North Sea Interconnectors"

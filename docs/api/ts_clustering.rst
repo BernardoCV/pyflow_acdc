@@ -1,6 +1,8 @@
 Time Series Clustering
 =====================
 
+This page has been pre-filled with the functions that are available in the Time Series Clustering module by AI, please check the code for more details.
+
 This module provides functions for clustering time series data using various algorithms [2]_.
 
 functions are found in pyflow_acdc.Time_series_clustering

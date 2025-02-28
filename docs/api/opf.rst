@@ -1,6 +1,8 @@
 Optimal Power Flow Module
 =========================
 
+This page has been pre-filled with the functions that are available in the OPF module by AI, please check the code for more details.
+
 This module provides functions for AC/DC hybrid optimal power flow analysis [1]_.
 
 functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_model
@@ -148,3 +150,10 @@ Results Processing
 
 
 
+References
+----------
+
+.. [1] B.C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
+       "An optimal power flow tool for AC/DC systems, applied to the analysis of the
+       North Sea Grid for offshore wind integration" in IEEE Transactions on Power
+       Systems, doi: 10.1109/TPWRS.2023.3533889.

@@ -1,6 +1,8 @@
 Time Series Module
 =================
 
+This page has been pre-filled with the functions that are available in the Time Series module by AI, please check the code for more details.
+
 This module provides functions for time series analysis of power flows and optimal power flow.
 
 functions are found in pyflow_acdc.Time_series

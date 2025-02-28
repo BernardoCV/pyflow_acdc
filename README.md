@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/BernardoCV/pyflow-acdc/main/docs/_static/logo.png" align="right" width="200px">
+
 # PyFlow ACDC
 A python-based tool for the design and analysis of hybrid AC/DC grids
 
@@ -28,7 +30,7 @@ To run examples, download the folder to your repository including the csv folder
 
 2. Clone the repository:
 ```bash
-git clone https://github.com/adored-project/pyflow_acdc.git
+git clone https://github.com/BernardoCV/pyflow_acdc.git
 cd pyflow_acdc
 ```
 

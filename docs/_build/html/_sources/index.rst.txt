@@ -3,10 +3,16 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-PyFlow ACDC Documentation
-=========================
+.. image:: _static/logo_dark.svg
+   :align: right
+   :width: 300px
+
+PyFlow ACDC
+===========
 
 Welcome to PyFlow ACDC's documentation!
+
+This documentation is under active development if any questions arise please contact the authors.
 
 .. toctree::
    :maxdepth: 2
@@ -28,6 +34,8 @@ Welcome to PyFlow ACDC's documentation!
    api/plotting
    api/ts
    api/ts_clustering
+   api/market_coef
+   api/export_files
 
 Quick Start
 -----------
