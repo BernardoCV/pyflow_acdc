@@ -56,8 +56,8 @@ html_title = project
 # Theme options
 html_theme_options = {
     "sidebar_hide_name": True,
-    "light_logo": "logo.svg",    # Logo for light mode
-    "dark_logo": "logo_dark.svg", # Logo for dark mode
+    "light_logo": "images/logo.svg",    # Logo for light mode
+    "dark_logo": "images/logo_dark.svg", # Logo for dark mode
     "navigation_with_keys": True,
     "announcement": "This documentation is under active development.",
 }
