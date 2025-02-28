@@ -5,14 +5,12 @@ Created on Thu Oct 24 09:06:32 2024
 @author: BernardoCastro
 """
 
-import csv
 import sys
 import networkx as nx
 import pandas as pd
 import numpy as np
 
 import yaml
-import os
 from pathlib import Path
 
 

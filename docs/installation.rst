@@ -12,12 +12,13 @@ Requirements
     * scipy
     * prettytable
     * plotly
-    * folium
     * geopandas
     * scikit-learn-extra
     * scikit-learn
 
 * Optional dependencies:
+    * Mapping:
+     * folium
     * Optimal power flow:  
      * pyomo
      * ipopt
@@ -66,6 +67,11 @@ Making Changes
 
 Additional Dependencies
 ---------------------
+For Mapping functionality
+^^^^^^^^^^^^^^^^^^^^
+Install the following packages::
+
+    pip install folium
 
 For OPF functionality
 ^^^^^^^^^^^^^^^^^^^^

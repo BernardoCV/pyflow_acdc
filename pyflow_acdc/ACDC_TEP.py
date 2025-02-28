@@ -12,7 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,ExportACDC_model_toPyflowACDC
+from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF
 from .ACDC_OPF import OPF_solve
 
 

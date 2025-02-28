@@ -3,6 +3,9 @@
 AC/DC Power Flow calculations module.
 Provides functions for AC and AC/DC power flow analysis.
 """
+import numpy as np
+import sys
+import time
 
 __all__ = [
     'AC_PowerFlow',
@@ -10,9 +13,7 @@ __all__ = [
     'ACDC_sequential',
 ]
 
-import numpy as np
-import sys
-import time
+
 
 def pol2cart(r, theta):
     x = r*np.cos(theta)

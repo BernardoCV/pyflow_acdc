@@ -8,7 +8,6 @@ import pyomo.environ as pyo
 
 import time
 from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
 
 
 from  .ACDC_OPF_model import *

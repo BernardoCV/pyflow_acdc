@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.2.3"
+version = "0.2.5"
 license = {file = "LICENSE.txt"}
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 
 authors = [
    {name = "Bernardo Castro Valerio", email = "bernardo.castro@upc.edu"}]
@@ -46,19 +46,20 @@ dependencies = ["numpy",
                 "scipy",
                 "prettytable",
                 "plotly",
-                "folium",
                 "geopandas",
                 "scikit-learn-extra",
                 "scikit-learn"]
 
 [project.optional-dependencies]
+mapping = ["folium"]
+
 OPF = ["pyomo",
          "ipopt"]
 Dash = ["dash"]
 
 [project.urls]
 
-Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.2.3.tar.gz"
+Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.2.5.tar.gz"
 
 
 [tool.setuptools]

@@ -47,6 +47,18 @@ except ImportError:
         "To use OPF features, install optional dependencies with: "
         "pip install pyflow-acdc[Dash] ")
 
+try:
+    import folium
+    from .Mapping import *
+    HAS_MAPPING = True
+except ImportError:
+    HAS_MAPPING = False
+    import warnings
+    warnings.warn(
+        "folium is not installed. Mapping functionality will not be available."
+        "To use mapping features, install optional dependencies with: "
+        "pip install pyflow-acdc[mapping] ")
+
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
 
@@ -147,7 +159,7 @@ __all__ = [
     'plot_Graph',
     'plot_neighbour_graph',
     'plot_TS_res',
-    'plot_folium',
+    'save_network_svg',
     
     # Market Analysis
     'price_zone_data_pd',
