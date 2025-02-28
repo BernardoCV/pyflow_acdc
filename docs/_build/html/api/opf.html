@@ -35,11 +35,202 @@
             
   <section id="optimal-power-flow-module">
 <h1>Optimal Power Flow Module<a class="headerlink" href="#optimal-power-flow-module" title="Link to this heading">¶</a></h1>
-<section id="ac-optimal-power-flow">
-<h2>AC Optimal Power Flow<a class="headerlink" href="#ac-optimal-power-flow" title="Link to this heading">¶</a></h2>
+<p>This module provides functions for AC/DC hybrid optimal power flow analysis <a href="#id2"><span class="problematic" id="id1">[1]_</span></a>.</p>
+<p>functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_model</p>
+<section id="ac-dc-hybrid-optimal-power-flow">
+<h2>AC/DC Hybrid Optimal Power Flow<a class="headerlink" href="#ac-dc-hybrid-optimal-power-flow" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="OPF_ACDC">
+<span class="sig-name descname"><span class="pre">OPF_ACDC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ObjRule</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PV_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">OnlyGen</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Price_Zones</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">TS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#OPF_ACDC" title="Link to this definition">¶</a></dt>
+<dd><p>Performs AC/DC hybrid optimal power flow calculation.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 50.0%" />
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to optimize</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ObjRule</span></code></p></td>
+<td><p>dict</p></td>
+<td><p>Objective function weights</p></td>
+<td><p>None</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PV_set</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Enable PV setpoint optimization</p></td>
+<td><p>False</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OnlyGen</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Only optimize generation</p></td>
+<td><p>True</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Price_Zones</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Enable price zone constraints</p></td>
+<td><p>False</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TS</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Time series optimization</p></td>
+<td><p>False</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p>Returns</p></td>
+<td><p>tuple</p></td>
+<td><p>(model, results, timing)</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Objective Function Weights</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Weight</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Ext_Gen</span></code></p></td>
+<td><p>External generation cost</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Energy_cost</span></code></p></td>
+<td><p>Energy cost</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Curtailment_Red</span></code></p></td>
+<td><p>Renewable curtailment reduction</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AC_losses</span></code></p></td>
+<td><p>AC transmission losses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DC_losses</span></code></p></td>
+<td><p>DC transmission losses</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Converter_Losses</span></code></p></td>
+<td><p>Converter losses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PZ_cost_of_generation</span></code></p></td>
+<td><p>Price zone generation cost</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Renewable_profit</span></code></p></td>
+<td><p>Renewable generation profit</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Gen_set_dev</span></code></p></td>
+<td><p>Generator setpoint deviation</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">weights</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;Energy_cost&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="s1">&#39;AC_losses&#39;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="s1">&#39;DC_losses&#39;</span><span class="p">:</span> <span class="mf">0.1</span>
+<span class="p">}</span>
+<span class="n">model</span><span class="p">,</span> <span class="n">results</span><span class="p">,</span> <span class="n">timing</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">OPF_ACDC</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">ObjRule</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 </section>
-<section id="acdc-hybrid-optimal-power-flow">
-<h2>ACDC hybrid optimal power flow<a class="headerlink" href="#acdc-hybrid-optimal-power-flow" title="Link to this heading">¶</a></h2>
+<section id="model-components">
+<h2>Model Components<a class="headerlink" href="#model-components" title="Link to this heading">¶</a></h2>
+<section id="variables">
+<h3>Variables<a class="headerlink" href="#variables" title="Link to this heading">¶</a></h3>
+<p>The optimization model includes variables for:</p>
+<ul class="simple">
+<li><p>AC node voltages and angles</p></li>
+<li><p>DC node voltages</p></li>
+<li><p>Generator active/reactive power</p></li>
+<li><p>Renewable generation and curtailment</p></li>
+<li><p>Line flows</p></li>
+<li><p>Converter power flows</p></li>
+<li><p>Price zone variables</p></li>
+</ul>
+</section>
+<section id="constraints">
+<h3>Constraints<a class="headerlink" href="#constraints" title="Link to this heading">¶</a></h3>
+<p>The model enforces constraints for:</p>
+<ul class="simple">
+<li><p>AC power flow equations</p></li>
+<li><p>DC power flow equations</p></li>
+<li><p>Generator limits</p></li>
+<li><p>Line thermal limits</p></li>
+<li><p>Voltage limits</p></li>
+<li><p>Converter operation limits</p></li>
+<li><p>Price zone balancing</p></li>
+</ul>
+</section>
+</section>
+<section id="results-processing">
+<h2>Results Processing<a class="headerlink" href="#results-processing" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="obtain_results_TSOPF">
+<span class="sig-name descname"><span class="pre">obtain_results_TSOPF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">current_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Price_Zones</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#obtain_results_TSOPF" title="Link to this definition">¶</a></dt>
+<dd><p>Processes time series OPF results.</p>
+<p>Returns dictionaries containing:</p>
+<ul class="simple">
+<li><p>Converter power flows (AC and DC side)</p></li>
+<li><p>Generator dispatch</p></li>
+<li><p>Line loadings</p></li>
+<li><p>Price zone results</p></li>
+<li><p>Renewable curtailment</p></li>
+<li><p>System losses</p></li>
+</ul>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">results</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">obtain_results_TSOPF</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="mi">24</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">Price_Zones</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 </section>
 </section>
 
@@ -77,14 +268,19 @@
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="modelling.html">System Modelling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="grid.html">Grid Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modelling.html#references">References</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid.html">Grid Creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid_mod.html">Grid Modifications</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pf.html">Power Flow Module</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Optimal Power Flow Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#ac-optimal-power-flow">AC Optimal Power Flow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#acdc-hybrid-optimal-power-flow">ACDC hybrid optimal power flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ac-dc-hybrid-optimal-power-flow">AC/DC Hybrid Optimal Power Flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#model-components">Model Components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#results-processing">Results Processing</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="plotting.html">Plotting Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts.html">Time Series Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts_clustering.html">Time Series Clustering</a></li>
 </ul>
 
 <div class="relations">

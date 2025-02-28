@@ -26,6 +26,8 @@ Welcome to PyFlow ACDC's documentation!
    api/pf
    api/opf
    api/plotting
+   api/ts
+   api/ts_clustering
 
 Quick Start
 -----------

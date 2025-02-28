@@ -15,7 +15,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Optimal Power Flow Module" href="opf.html" />
-    <link rel="prev" title="Grid Module" href="grid.html" />
+    <link rel="prev" title="Grid Modifications" href="grid_mod.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -35,14 +35,242 @@
             
   <section id="power-flow-module">
 <h1>Power Flow Module<a class="headerlink" href="#power-flow-module" title="Link to this heading">¶</a></h1>
+<p>This module provides functions for AC, DC and AC/DC power flow analysis.</p>
+<p>functions are found in pyflow_acdc.ACDC_PF</p>
 <section id="ac-power-flow">
 <h2>AC Power Flow<a class="headerlink" href="#ac-power-flow" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="AC_PowerFlow">
+<span class="sig-name descname"><span class="pre">AC_PowerFlow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_lim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxIter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#AC_PowerFlow" title="Link to this definition">¶</a></dt>
+<dd><p>Performs AC power flow calculation.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 50.0%" />
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to analyze</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tol_lim</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Convergence tolerance</p></td>
+<td><p>1e-8</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">maxIter</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Maximum iterations</p></td>
+<td><p>100</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Returns</p></td>
+<td><p>float</p></td>
+<td><p>Computation time</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+<td><p>seconds</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">time</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">AC_PowerFlow</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 </section>
 <section id="dc-power-flow">
 <h2>DC Power Flow<a class="headerlink" href="#dc-power-flow" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="DC_PowerFlow">
+<span class="sig-name descname"><span class="pre">DC_PowerFlow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_lim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxIter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#DC_PowerFlow" title="Link to this definition">¶</a></dt>
+<dd><p>Performs DC power flow calculation.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 50.0%" />
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to analyze</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tol_lim</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Convergence tolerance</p></td>
+<td><p>1e-8</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">maxIter</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Maximum iterations</p></td>
+<td><p>100</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Returns</p></td>
+<td><p>float</p></td>
+<td><p>Computation time</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+<td><p>seconds</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">time</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">DC_PowerFlow</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 </section>
-<section id="sequential-power-flow">
-<h2>Sequential Power Flow<a class="headerlink" href="#sequential-power-flow" title="Link to this heading">¶</a></h2>
+<section id="sequential-ac-dc-power-flow">
+<h2>Sequential AC/DC Power Flow<a class="headerlink" href="#sequential-ac-dc-power-flow" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ACDC_sequential">
+<span class="sig-name descname"><span class="pre">ACDC_sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_lim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxIter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">change_slack2Droop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">QLimit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ACDC_sequential" title="Link to this definition">¶</a></dt>
+<dd><p>Performs sequential AC/DC power flow calculation.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 50.0%" />
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to analyze</p></td>
+<td><p>Required</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tol_lim</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Convergence tolerance</p></td>
+<td><p>1e-8</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">maxIter</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Maximum iterations</p></td>
+<td><p>20</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">change_slack2Droop</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Change slack to droop control</p></td>
+<td><p>False</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">QLimit</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Enable converter Q limits</p></td>
+<td><p>False</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Returns</p></td>
+<td><p>float</p></td>
+<td><p>Computation time</p></td>
+<td><ul class="simple">
+<li></li>
+</ul>
+</td>
+<td><p>seconds</p></td>
+</tr>
+</tbody>
+</table>
+<p>The sequential solver performs the following steps:</p>
+<ol class="arabic simple">
+<li><p>AC power flow</p></li>
+<li><p>Update converter power flows</p></li>
+<li><p>DC power flow</p></li>
+<li><p>Repeat until convergence</p></li>
+</ol>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">time</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">ACDC_sequential</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">QLimit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Notes</strong></p>
+<ul class="simple">
+<li><p>For grids with both AC and DC components, sequential solver is recommended</p></li>
+<li><p>Converter Q limits can be enabled to respect reactive power constraints</p></li>
+<li><p>Droop control can be enabled for DC voltage regulation</p></li>
+</ul>
+</dd></dl>
+
 </section>
 </section>
 
@@ -80,11 +308,12 @@
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="modelling.html">System Modelling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="grid.html">Grid Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid.html">Grid Creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid_mod.html">Grid Modifications</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Power Flow Module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#ac-power-flow">AC Power Flow</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#dc-power-flow">DC Power Flow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sequential-power-flow">Sequential Power Flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sequential-ac-dc-power-flow">Sequential AC/DC Power Flow</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="opf.html">Optimal Power Flow Module</a></li>
@@ -95,7 +324,7 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="grid.html" title="previous chapter">Grid Module</a></li>
+      <li>Previous: <a href="grid_mod.html" title="previous chapter">Grid Modifications</a></li>
       <li>Next: <a href="opf.html" title="next chapter">Optimal Power Flow Module</a></li>
   </ul></li>
 </ul>
