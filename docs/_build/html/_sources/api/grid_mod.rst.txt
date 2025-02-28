@@ -618,7 +618,7 @@ Add AC/DC Converter
         - -
         - -
 
-   For AC side control type:   
+   For Power Flow AC side control type:   
 
    .. list-table::
       :widths: 10 10 80
@@ -626,18 +626,18 @@ Add AC/DC Converter
 
       * - ``AC_type``
         - ``DC_type``
-        - Requiered Values
+        - Additional requiered Values
       * - Slack
         - PAC
         - None
       * - PQ
-        - Any
-        - Q_AC_MVA
+        - PAC
+        - ``Q_AC_MVA``
       * - PV
-        - Any
-        - None
+        - PAC
+        - ``P_AC_MW``
 
-   For DC side control type:  
+   For Power Flow DC side control type:  
 
    .. list-table::
       :widths: 10 10 80
@@ -648,10 +648,10 @@ Add AC/DC Converter
         - Requiered Values
       * - P
         - PQ, PV
-        - P_DC_MW
+        - ``P_DC_MW``
       * - Droop
         - PQ, PV
-        - P_DC_MW , Droop
+        - ``P_DC_MW`` , ``Droop``
 
 **Example**
 

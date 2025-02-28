@@ -48,7 +48,19 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'furo'
+html_title = project 
+# Remove or comment out the general html_logo setting
+# html_logo = '_static/logo.svg'
+
+# Theme options
+html_theme_options = {
+    "sidebar_hide_name": True,
+    "light_logo": "logo.svg",    # Logo for light mode
+    "dark_logo": "logo_dark.svg", # Logo for dark mode
+    "navigation_with_keys": True,
+    "announcement": "This documentation is under active development.",
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
