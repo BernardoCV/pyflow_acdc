@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/BernardoCV/pyflow-acdc/main/docs/images/logo.png" align="right" width="200px">
+<img src="https://raw.githubusercontent.com/BernardoCV/pyflow-acdc/main/docs/images/logo_dark.png" align="right" width="200px">
 
 # PyFlow ACDC
 A python-based tool for the design and analysis of hybrid AC/DC grids
