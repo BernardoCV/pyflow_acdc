@@ -8,6 +8,7 @@ S_base=100 #MVA
 
 [grid,res]=pyf.PEI_grid()
 
+pyf.plot_folium(grid)
 """
 Sequential algorithm 
 

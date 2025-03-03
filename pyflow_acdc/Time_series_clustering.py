@@ -53,7 +53,7 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
         time_series = [
                 'a_CG',     # Price zone cost generation parameter a
                 'b_CG',     # Price zone cost generation parameter b
-                'c_CG',     # Price zone cost generation parameter c
+                #'c_CG',     # Price zone cost generation parameter c
                 'PGL_min',  # Price zone minimum generation limit
                 'PGL_max',  # Price zone maximum generation limit
                 'price',    # Price for price zones and AC nodes
@@ -63,7 +63,7 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
                 'SF',       # Solar Farm availability
                 'REN'       # Generic Renewable source availability
             ]
-    if central_market == []:
+    if central_market == [] or central_market is  None:
         central_market = set(grid.Price_Zones_dic.keys())
     PZ_centrals = [grid.Price_Zones[grid.Price_Zones_dic[cm]] for cm in central_market]
 
@@ -233,7 +233,7 @@ def identify_correlations(grid,time_series=[], correlation_threshold=0,cv_thresh
             scale_groups = corrolation_decisions[2]
         columns_to_drop = []
 
-        if clean_groups == True:    
+        if clean_groups:    
             if method == '1':
                 print("\nUsing highest variance method:")
                 for group in groups:
@@ -352,9 +352,10 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
 def cluster_TS(grid, n_clusters, time_series=[],central_market=[], algorithm='Kmeans', cv_threshold=0 ,correlation_threshold=0.8,print_details=False,corrolation_decisions=[]):
     algorithm = algorithm.lower()
     #check if algorithm is valid    
-    if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan'}:
-        algorithm='kmeans'
+    if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan','pam_hierarchical'}:
         print(f"Algorithm {algorithm} not found, using Kmeans")
+        algorithm='kmeans'
+        
     
         
     [data_scaled,scaler, data],_ = identify_correlations(grid,time_series=time_series, correlation_threshold=correlation_threshold,cv_threshold=cv_threshold,central_market=central_market,print_details=print_details,corrolation_decisions=corrolation_decisions)
@@ -727,7 +728,7 @@ def print_clustering_results(algorithm, n_clusters, specific_info):
             print(f"- {key}: {count} ({percentage:.1f}%)")
     return CoV    
 
-def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],time_series=[],print_details=False,corrolation_decisions=[True,'2',True]):
+def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'pam_hierarchical'],n_clusters_list = [1, 4, 8, 16, 24, 48],time_series=[],print_details=False,ts_options=[None,0,0.8],corrolation_decisions=[True,'2',True],plotting=False, plotting_options=[None,'.png'],identifier=None):
        
     
     results = {
@@ -748,7 +749,8 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
             
             start_time = time.time()
             try:
-                _,_,CoV,info = cluster_TS(grid, algorithm=algo, n_clusters=n,time_series=time_series,print_details=print_details,corrolation_decisions=corrolation_decisions)
+                
+                _,_,CoV,info = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=ts_options[0],algorithm=algo, cv_threshold=ts_options[1] ,correlation_threshold=ts_options[2],print_details=print_details,corrolation_decisions=corrolation_decisions)
                 data_scaled,labels = info
                 if algo == 'kmeans':
                     CoV, inertia, n_iter_ = CoV
@@ -762,6 +764,80 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
                     sil_score = silhouette_score(data_scaled,labels)
                     dunn_idx = dunn_index(data_scaled,labels)
                     db_score = davies_bouldin_score(data_scaled,labels)
+                    
+                    if plotting:
+                        # Convert 8.25 cm to inches and maintain ratio
+                        width_cm = 8.25
+                        ratio = 6/10
+                        width_inches = width_cm / 2.54
+                        height_inches = width_inches * ratio
+
+                        # Set publication-quality plotting parameters
+                        plt.style.use('seaborn-v0_8-whitegrid')
+                        plt.rcParams.update({
+                            'figure.figsize': (width_inches, height_inches),
+                            'font.family': 'serif',
+                            'font.size': 8,
+                            'axes.labelsize': 8,
+                            'axes.titlesize': 8,
+                            'xtick.labelsize': 7,
+                            'ytick.labelsize': 7,
+                            'legend.fontsize': 7,
+                            'lines.markersize': 4,
+                            'lines.linewidth': 1,
+                            'grid.alpha': 0.3
+                        })
+
+                        # Calculate CoV using data_scaled
+                        if plotting_options[0] is None:
+                            covs = np.std(data_scaled, axis=0) / np.mean(np.abs(data_scaled), axis=0)
+                            highest_cov_idx = np.argmax(covs)
+                            var_name = data_scaled.columns[highest_cov_idx]
+                            print(f"Plotting time series with highest CoV: {var_name} (CoV = {covs.iloc[highest_cov_idx]:.3f})")
+                        else:
+                            var_name = plotting_options[0]
+                            highest_cov_idx = data_scaled.columns.get_loc(var_name)
+                            print(f"Plotting specified time series: {var_name}")
+                        
+                        # Create figure and apply formatting
+                        fig, ax = plt.subplots()
+                        max_colors = 8  # Set2 colormap has 8 distinct colors
+                        colors = plt.cm.Set2(np.linspace(0, 1, max_colors))
+                        markers = ['+', 'x', '*', '^', 'v', '<', '>', 's']  # Backup markers when colors repeat
+                        
+                        # Plot clusters with consistent styling
+                        for i in range(n):
+                            mask = labels == i
+                            time_points = np.arange(len(data_scaled))[mask]
+                            values = data_scaled.iloc[mask, highest_cov_idx]
+                            
+                            # If we've exceeded the number of colors, start cycling markers
+                            current_marker = '+' if i < max_colors else markers[((i - max_colors) % len(markers))]
+                            
+                            ax.scatter(time_points, values, 
+                                     marker=current_marker,
+                                     color=colors[i % max_colors],
+                                     alpha=.8, 
+                                     s=16)
+                        
+                        # Format axes
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
+                        ax.grid(True, linestyle='--', alpha=0.3)
+                        ax.tick_params(direction='out', length=3, width=0.8)
+                        
+                        ax.set_xlabel('Time')
+                        ax.set_ylabel(f'Value (standardized) of {var_name}')
+                        ax.set_title(f'Time Series Clustering\n{algo}, {n} clusters')
+                        
+                        plt.tight_layout()
+                        
+                        # Save plot with consistent settings
+                        plt.savefig(f'{save_path}/timeseries_clustering_{algo}_{n}_{identifier}.{plotting_options[1]}', 
+                                  dpi=300,
+                                  bbox_inches='tight',
+                                  pad_inches=0.1)
+                        plt.close()
                 else:
                     sil_score = dunn_idx = db_score = 0
 
@@ -785,7 +861,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
     
     # Updated summary to use correct columns
     summary_df = df_results[['algorithm', 'n_clusters', 'time_taken', 'Coefficient of Variation','inertia','silhouette_score','dunn_index','davies_bouldin']]
-    summary_df.to_csv(f'{save_path}/clustering_summary.csv', index=False)
+    summary_df.to_csv(f'{save_path}/clustering_summary_{identifier}.csv', index=False)
  
     
     return df_results
@@ -794,128 +870,102 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
 # results = run_clustering_analysis(grid)
 
 # To analyze results:
-def plot_clustering_results(df= None,results_path='clustering_results',format='svg'):
+def plot_clustering_results(df=None, results_path='clustering_results', format='svg',identifier=None):
+    """
+    Plot clustering analysis results with publication-quality formatting.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame, optional
+        DataFrame containing clustering results. If None, loads from results_path
+    results_path : str, default='clustering_results'
+        Path to save the generated plots
+    format : str, default='svg'
+        Output format for plots ('svg', 'png', etc.)
+    """
     # Convert 8.25 cm to inches and maintain ratio
     width_cm = 8.25
     ratio = 6/10  # Original height/width ratio
     width_inches = width_cm / 2.54
     height_inches = width_inches * ratio
     
-    # Set global plotting parameters
+    # Set publication-quality plotting parameters
+    plt.style.use('seaborn-v0_8-whitegrid')
     plt.rcParams.update({
         'figure.figsize': (width_inches, height_inches),
+        'font.family': 'serif',
         'font.size': 8,
         'axes.labelsize': 8,
         'axes.titlesize': 8,
-        'xtick.labelsize': 8,
-        'ytick.labelsize': 8,
-        'legend.fontsize': 8,
+        'xtick.labelsize': 7,
+        'ytick.labelsize': 7,
+        'legend.fontsize': 7,
         'lines.markersize': 4,
-        'lines.linewidth': 1
+        'lines.linewidth': 1,
+        'grid.alpha': 0.3
     })
     
     if df is None:
         df = pd.read_csv(f'{results_path}/clustering_summary.csv')
     
     def format_axes(ax):
-        # Remove top and right spines
+        """Apply consistent formatting to plot axes"""
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+        ax.grid(True, linestyle='--', alpha=0.3)
+        ax.tick_params(direction='out', length=3, width=0.8)
     
-    # 1. Time comparison plot
-    plt.figure()
-    ax = plt.gca()
-    for algo in df['algorithm'].unique():
-        data = df[df['algorithm'] == algo]
-        ax.plot(data['n_clusters'], data['time_taken'], 
-                marker='o', label=algo)
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('Time (seconds)')
-    ax.legend()
-    format_axes(ax)
-    plt.tight_layout()
-    plt.savefig(f'{results_path}/time_comparison.{format}', dpi=300, bbox_inches='tight')
-    plt.close()
+    # Define consistent color palette
+    algorithms = df['algorithm'].unique()
+    colors = plt.cm.Set2(np.linspace(0, 1, len(algorithms)))
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p']
     
-    # 2. Standard deviation plot
-    fig, ax = plt.subplots()
-    for algo in df['algorithm'].unique():
-        data = df[df['algorithm'] == algo]
-        ax.plot(data['n_clusters'], data['Coefficient of Variation'], 
-                marker='o', label=algo)
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('Coefficient of Variation')
-    ax.legend()
-    format_axes(ax)
-    plt.tight_layout()
-    plt.savefig(f'{results_path}/cov_comparison.{format}', dpi=300, bbox_inches='tight')
-    plt.close()
+    # Create plots with consistent styling
+    metrics = [
+        ('time_taken', 'Time (seconds)'),
+        ('Coefficient of Variation', 'Coefficient of Variation'),
+        ('inertia', 'Inertia'),
+        ('silhouette_score', 'Silhouette Score'),
+        ('dunn_index', 'Dunn Index'),
+        ('davies_bouldin', 'Davies-Bouldin Index')
+    ]
     
-    # 3. Inertia plot
-    fig, ax = plt.subplots()
-    kmeans_data = df[df['algorithm'] == 'kmeans']
-    kmedoids_data = df[df['algorithm'] == 'kmedoids']
-    
-    ax.plot(kmeans_data['n_clusters'], kmeans_data['inertia'], 
-            marker='o', label='k-means', linestyle='-')
-    ax.plot(kmedoids_data['n_clusters'], kmedoids_data['inertia'], 
-            marker='s', label='k-medoids', linestyle='-')
-    
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('Inertia')
-    ax.legend()
-    format_axes(ax)
-    plt.tight_layout()
-    plt.savefig(f'{results_path}/inertia_comparison.{format}', dpi=300, bbox_inches='tight')
-    plt.close()
-    
-    # 4. Silhouette score plot
-    fig, ax = plt.subplots()
-    for algo in df['algorithm'].unique():
-        data = df[df['algorithm'] == algo]
-        ax.plot(data['n_clusters'], data['silhouette_score'], 
-                marker='o', label=algo)
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('Silhouette Score')
-    ax.legend()
-    format_axes(ax)
-    plt.tight_layout()
-    plt.savefig(f'{results_path}/silhouette_comparison.{format}', dpi=300, bbox_inches='tight')
-    plt.close()     
-    
-    # 5. Dunn index plot
-    fig, ax = plt.subplots()
-    for algo in df['algorithm'].unique():
-        data = df[df['algorithm'] == algo]
-        ax.plot(data['n_clusters'], data['dunn_index'], 
-                marker='o', label=algo)
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('Dunn Index')
-    ax.legend()
-    format_axes(ax)
-    plt.tight_layout()
-    plt.savefig(f'{results_path}/dunn_index_comparison.{format}', dpi=300, bbox_inches='tight')
-    plt.close() 
-    
-    # 6. Davies-Bouldin index plot
-    fig, ax = plt.subplots()
-    for algo in df['algorithm'].unique():
-        data = df[df['algorithm'] == algo]  
-        ax.plot(data['n_clusters'], data['davies_bouldin'], 
-                marker='o', label=algo)
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('Davies-Bouldin Index')
-    ax.legend()
-    format_axes(ax)
-    plt.tight_layout()
-    plt.savefig(f'{results_path}/davies_bouldin_comparison.{format}', dpi=300, bbox_inches='tight')
-    plt.close()
-    
-  
+    for metric, ylabel in metrics:
+        fig, ax = plt.subplots()
+        
+        for idx, algo in enumerate(algorithms):
+            data = df[df['algorithm'] == algo]
+            ax.plot(data['n_clusters'], data[metric],
+                   marker=markers[idx % len(markers)],
+                   color=colors[idx],
+                   label=algo,
+                   markersize=4,
+                   linewidth=1)
+        
+        ax.set_xlabel('Number of Clusters')
+        ax.set_ylabel(ylabel)
+        
+        # Adjust legend
+        ax.legend(bbox_to_anchor=(0.5, 1.15),
+                 loc='upper center',
+                 ncol=2,
+                 frameon=False)
+        
+        format_axes(ax)
+        plt.tight_layout()
+        
+        # Save plot
+        metric_name = metric.lower().replace('_', '-')
+        plt.savefig(f'{results_path}/{metric_name}-comparison_{identifier}.{format}',
+                   dpi=300,
+                   bbox_inches='tight',
+                   pad_inches=0.1)
+        plt.close()
 
-def run_clustering_analysis_and_plot(grid,algorithms = ['kmeans', 'kmedoids', 'ward', 'dbscan', 'hdbscan'],n_clusters_list = [1, 4, 8, 16, 24, 48],path='clustering_results',time_series=[],plot_format='svg'):
-    results = run_clustering_analysis(grid,path,algorithms,n_clusters_list,time_series)
-    plot_clustering_results(results,path,format=plot_format)
+def run_clustering_analysis_and_plot(grid,algorithms = ['kmeans', 'kmedoids', 'ward', 'pam_hierarchical'],n_clusters_list = [1, 4, 8, 16, 24, 48],path='clustering_results',time_series=[],print_details=False,ts_options=[None,0,0.8],corrolation_decisions=[True,'2',True],plotting_options=[None,'svg'],identifier=None):
+    
+    results = run_clustering_analysis(grid,path,algorithms,n_clusters_list,time_series,print_details,ts_options,corrolation_decisions,plotting=True, plotting_options=plotting_options,identifier=identifier)
+    plot_clustering_results(results,path,format=plotting_options[1],identifier=identifier)
 
 def Time_series_cluster_relationship(grid, ts1_name=None, ts2_name=None,price_zone=None,ts_type=None, algorithm='kmeans', 
                             take_into_account_time_series=[], 
