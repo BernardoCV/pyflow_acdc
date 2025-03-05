@@ -1216,26 +1216,7 @@ class Line_AC:
     @property
     def name(self):
         return self._name
-    
-    def get_relevant_attributes(self):
-        """Method to return only the relevant attributes for the subclass."""
-        return {
-            'fromNode': self.fromNode,
-            'toNode': self.toNode,
-            'Resistance': self.R,
-            'Reactance': self.X,
-            'Conductance': self.G,
-            'Susceptance': self.B,
-            'MVA_rating': self.MVA_rating,
-            'kV_base': self.kV_base,
-            'Length_km':self.Length_km,
-            'm': self.m,
-            'shift': self.shift,
-            'name': self._name,
-            'geometry':self.geometry,
-            'isTf': self.isTf
-        }
-    
+        
     def remove(self):
         """Method to handle line removal from the class-level attributes."""
         Line_AC.lineNumber -= 1  # Decrement the line number counter
@@ -1374,7 +1355,7 @@ class Exp_Line_AC(Line_AC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
-        
+        self.kV_base = self.fromNode.kV_base
         self.direction = 'from'
         self.base_cost = None
         self.life_time = 1
