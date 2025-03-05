@@ -1190,7 +1190,7 @@ class Line_AC:
             data_dict = {}
             # Read all YAML files in the directory
             for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r') as f:
+                with open(yaml_file, 'r', encoding='latin-1') as f:
                     cable_data = yaml.safe_load(f)
                     if cable_data:
                         # Each file has one cable
@@ -1474,7 +1474,7 @@ class Line_DC:
             data_dict = {}
             # Read all YAML files in the directory
             for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r') as f:
+                with open(yaml_file, 'r', encoding='latin-1') as f:
                     cable_data = yaml.safe_load(f)
                     if cable_data:
                         # Each file has one cable
