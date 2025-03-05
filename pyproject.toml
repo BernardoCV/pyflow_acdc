@@ -71,6 +71,7 @@ packages = ["pyflow_acdc"]
 [tool.setuptools.package-data]
 "pyflow_acdc" = [
     "folium_images/*.png",
-    "Cable_database/*.yaml"
+    "Cable_database/*.yaml",
+    "example_grids/*.py"
 ]
 
