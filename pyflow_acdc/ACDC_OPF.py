@@ -103,7 +103,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False, TS=F
                 
     """
     """
-    model_res,t_modelsolve = OPF_solve(model,grid)
+    model_res,solver_stats = OPF_solve(model,grid)
     
     t1 = time.time()
     # pr = cProfile.Profile()
@@ -124,10 +124,10 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False, TS=F
     grid.OPF_run=True  
     timing_info = {
     "create": t_modelcreate,
-    "solve": t_modelsolve,
+    "solve": solver_stats['time'],
     "export": t_modelexport,
     }
-    return model, model_res , timing_info
+    return model, model_res , timing_info, solver_stats
 
 
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
@@ -328,6 +328,12 @@ def OPF_solve(model,grid,solver_options=None):
     
     results = opt.solve(model)
     
+    solver_stats = {
+        'iterations': results.solver.iterations,
+        'best_objective': results.problem.lower_bound,
+        'time': results.solver.time,
+        'termination_condition': str(results.solver.termination_condition)
+    }
     
     if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
         # Set the logging level to INFO
@@ -336,10 +342,8 @@ def OPF_solve(model,grid,solver_options=None):
         # Now call log_infeasible_constraints
         log_infeasible_constraints(model)
     
-    
-    elapsed_time=results.solver.time
         
-    return  results, elapsed_time
+    return  results, solver_stats
 
 def OPF_updateParam(model,grid):
  

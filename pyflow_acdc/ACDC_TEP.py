@@ -424,7 +424,7 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
     t2 = time.time()  
     t_modelcreate = t2-t1
     
-    model_results,t_modelsolve= OPF_solve(model,grid)
+    model_results,solver_stats = OPF_solve(model,grid)
     
     t1 = time.time()
     TEP_res = ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering)   
@@ -437,11 +437,11 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
     
     timing_info = {
     "create": t_modelcreate,
-    "solve": t_modelsolve,
+    "solve": solver_stats['time'],
     "export": t_modelexport,
     }
     
-    return model, model_results ,TEP_res, timing_info
+    return model, model_results ,TEP_res, timing_info, solver_stats
 
 def TEP_subObj(submodel):
     # Define the social cost submodel function that can access the submodel's attributes
