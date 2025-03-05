@@ -304,10 +304,15 @@ def OPF_solve(model,grid):
     
     if grid.MixedBinCont:
            # opt = pyo.SolverFactory("mindtpy")
-           # results = opt.solve(model,mip_solver='gurobi',nlp_solver='ipopt')
+           # results = opt.solve(model,mip_solver='glpk',nlp_solver='ipopt')
            print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
     
     opt = pyo.SolverFactory("ipopt")
+
+    opt.options['max_iter']       = 10000  # Maximum number of iterations
+    opt.options['tol']            = 1e-8   # Convergence tolerance
+    opt.options['acceptable_tol'] = 1e-6   # Acceptable convergence tolerance
+    opt.options['print_level']    = 5      # Output verbosity (0-12)
     
     results = opt.solve(model)
     

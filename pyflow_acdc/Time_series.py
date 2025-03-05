@@ -64,7 +64,46 @@ def Time_series_PF(grid):
         print("Sequential")
         grid.TS_ACDC_PF(grid)
 
-
+def combine_TS(ts_list, rep_year=False):
+    """Combines multiple time series while maintaining the order of the input list.
+    
+    Args:
+        ts_list: List of pandas DataFrames to combine, each with index 1-8760
+        rep_year: If True, averages data hour by hour across years
+        
+    Returns:
+        DataFrame containing combined or averaged time series data
+    """
+    # Concatenate DataFrames in order
+    # save first 2 rows 
+    first_two_rows = [df.iloc[:2] for df in ts_list]
+    # just save 1 data frame
+    first_two_rows = first_two_rows[0]
+    # ignore first two rows
+    ts_list = [df.iloc[2:] for df in ts_list] 
+    # reset index
+    ts_list = [df.reset_index(drop=True) for df in ts_list]
+    combined_df = pd.concat(ts_list, axis=0, ignore_index=True)
+    combined_df = pd.concat([first_two_rows, combined_df], axis=0, ignore_index=True)
+    if rep_year:
+        # Standardize all dataframes to 8760 hours
+        processed_dfs = []
+        for df in ts_list:
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')  # 'coerce' will convert invalid values to NaN
+            if len(df) > 8760:
+                # remove 29th feb
+                df = df.drop(df.index[1416:1440])
+                df = df.reset_index(drop=True)
+            elif len(df) < 8760:
+                df = df.reindex(range(8760), method='ffill')
+            processed_dfs.append(df)
+            
+        # Calculate element-wise average across all dataframes
+        new_df = pd.concat(processed_dfs).groupby(level=0).mean()
+        return new_df, combined_df
+    
+    return combined_df
 
 def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
     typ = ts.type

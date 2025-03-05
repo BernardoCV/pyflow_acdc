@@ -227,27 +227,43 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
     return line
 
 def change_line_AC_to_expandable(grid, line_name):
+    l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
-            l  = line_to_process
+            l = line_to_process
             break
-    if l is not None:    
-            grid.lines_AC.remove(l)
-            l.remove()
-            line_vars=l.get_relevant_attributes()
-            expandable_line = Exp_Line_AC(**line_vars)
-            grid.lines_AC_exp.append(expandable_line)
-            grid.Update_Graph_AC()
             
+    if l is not None:    
+        grid.lines_AC.remove(l)
+        l.remove()
+        line_vars = {
+            'fromNode': l.fromNode,
+            'toNode': l.toNode,
+            'Resistance': l.R,
+            'Reactance': l.X,
+            'Conductance': l.G,
+            'Susceptance': l.B,
+            'MVA_rating': l.MVA_rating,
+            'Length_km': l.Length_km,
+            'm': l.m,
+            'shift': l.shift,
+            'N_cables': l.N_cables,
+            'name': l.name,
+            'geometry': l.geometry,
+            'S_base': l.S_base,
+            'Cable_type': l.Cable_type
+        }
+        expandable_line = Exp_Line_AC(**line_vars)
+        grid.lines_AC_exp.append(expandable_line)
+        grid.Update_Graph_AC()
 
-    # Reassign line numbers to ensure continuity in grid.lines_AC
+    # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
         line.lineNumber = i 
     grid.create_Ybus_AC()
     for i, line in enumerate(grid.lines_AC_exp):
         line.lineNumber = i 
-    s=1
-        
+
 def change_line_AC_to_tap_transformer(grid, line_name):
     l = None
     for line_to_process in grid.lines_AC:
@@ -257,7 +273,23 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     if l is not None:    
             grid.lines_AC.remove(l)
             l.remove()
-            line_vars=l.get_relevant_attributes()
+            line_vars=line_vars = {
+            'fromNode': l.fromNode,
+            'toNode': l.toNode,
+            'Resistance': l.R,
+            'Reactance': l.X,
+            'Conductance': l.G,
+            'Susceptance': l.B,
+            'MVA_rating': l.MVA_rating,
+            'Length_km': l.Length_km,
+            'm': l.m,
+            'shift': l.shift,
+            'N_cables': l.N_cables,
+            'name': l.name,
+            'geometry': l.geometry,
+            'S_base': l.S_base,
+            'Cable_type': l.Cable_type
+        }
             trafo = TF_Line_AC(**line_vars)
             grid.lines_AC_tf.append(trafo)
     else:

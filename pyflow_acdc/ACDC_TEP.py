@@ -241,7 +241,7 @@ def Translate_pd_TEP(grid):
 
     return Price_Zone_info
 
-def TEP_expansion_model(grid,export=None,costmodel='Linear',n_clusters=None,cluster_algorithm='Kmeans',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02):
+def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None):
     
     from .Time_series import  modify_parameters
     from .Time_series_clustering import cluster_TS
@@ -249,14 +249,32 @@ def TEP_expansion_model(grid,export=None,costmodel='Linear',n_clusters=None,clus
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
     clustering = False
-    if n_clusters is not None:
-        n_clusters,_,_ = cluster_TS(grid,n_clusters,cluster_algorithm)
+    if clustering_options is not None:
+        """
+        clustering_options = {
+            'n_clusters': 1,
+            'time_series': [],
+            'central_market': [],
+            'thresholds': [cv_threshold,correlation_threshold],
+            'print_details': True/False,
+            'corrolation_decisions': [correlation_cleaning = True/False,method = '1/2/3',scale_groups = True/False],
+            'cluster_algorithm': 'Kmeans/Ward/DBSCAN/OPTICS/Kmedoids/Spectral/HDBSCAN/PAM_Hierarchical'
+        }
+        """
+        n        = clustering_options['n_clusters'] 
+        time_series = clustering_options['time_series'] if 'time_series' in clustering_options else []
+        central_market = clustering_options['central_market'] if 'central_market' in clustering_options else []
+        thresholds = clustering_options['thresholds'] if 'thresholds' in clustering_options else [0,0.8]
+        print_details = clustering_options['print_details'] if 'print_details' in clustering_options else False
+        corrolation_decisions = clustering_options['corrolation_decisions'] if 'corrolation_decisions' in clustering_options else [False,'1',False]
+        algo = clustering_options['cluster_algorithm'] if 'cluster_algorithm' in clustering_options else 'Kmeans'
+       
+        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[1] ,correlation_threshold=thresholds[2],print_details=print_details,corrolation_decisions=corrolation_decisions)
+                
         clustering = True
     else:
         n_clusters = len(grid.Time_series[0].data)
-        if n_clusters > 24: #limit to be revised 
-            print(f"Warning: The number of clusters ({n_clusters}) exceeds 24. This may affect performance.")
-    
+        
     
     index = ["A", "B", "D", "E"]
     data = {

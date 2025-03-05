@@ -20,7 +20,7 @@ This documentation is under active development if any questions arise please con
 
    installation
    usage
-
+   citing
 
 .. toctree::
    :maxdepth: 2

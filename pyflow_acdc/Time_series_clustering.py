@@ -1,13 +1,16 @@
 from sklearn.cluster import KMeans, DBSCAN, OPTICS, AgglomerativeClustering, SpectralClustering, HDBSCAN
-from sklearn.metrics import silhouette_score, davies_bouldin_score, pairwise_distances
+from sklearn.metrics import pairwise_distances
 from sklearn.preprocessing import StandardScaler
 from sklearn_extra.cluster import KMedoids
+from sklearn.metrics import davies_bouldin_score
+import os
+if 'MPLBACKEND' not in os.environ:
+    os.environ['MPLBACKEND'] = 'Agg'
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import time as time
 from pathlib import Path
-from scipy.spatial.distance import cdist
 from sklearn.decomposition import PCA
 
 
@@ -317,6 +320,72 @@ def identify_correlations(grid,time_series=[], correlation_threshold=0,cv_thresh
         'groups': groups
     }
 
+def plot_time_series(data,labels,var_name,n_clusters,save_path,format,identifier,algo):
+    # Convert 8.25 cm to inches and maintain ratio
+    width_cm = 8.25
+    ratio = 6/10
+    width_inches = width_cm / 2.54
+    height_inches = width_inches * ratio
+    if len(data) > 10000:
+        width_inches = width_inches * 2
+    # Set publication-quality plotting parameters
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.rcParams.update({
+        'figure.figsize': (width_inches, height_inches),
+        'font.family': 'serif',
+        'font.size': 8,
+        'axes.labelsize': 8,
+        'axes.titlesize': 8,
+        'xtick.labelsize': 7,
+        'ytick.labelsize': 7,
+        'legend.fontsize': 7,
+        'lines.markersize': 4,
+        'lines.linewidth': 1,
+        'grid.alpha': 0.3
+    })
+
+    
+    # Create figure and apply formatting
+    fig, ax = plt.subplots()
+    max_colors = 8  # Set2 colormap has 8 distinct colors
+    colors = plt.cm.Set2(np.linspace(0, 1, max_colors))
+    markers = ['+', 'x', '*', '^', 'v', '<', '>', 's']  # Backup markers when colors repeat
+    
+    # Plot clusters with consistent styling
+    for i in range(n_clusters):
+        mask = labels == i
+        time_points = np.arange(len(data))[mask]
+        values = data.loc[mask, var_name]
+        
+        # If we've exceeded the number of colors, start cycling markers
+        current_marker = '+' if i < max_colors else markers[((i - max_colors) % len(markers))]
+        
+        ax.scatter(time_points, values, 
+                    marker=current_marker,
+                    color=colors[i % max_colors],
+                    alpha=.8, 
+                    s=16)
+    
+    # Format axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.tick_params(direction='out', length=3, width=0.8)
+    
+    ax.set_xlabel('Time')
+    ax.set_ylabel(f'Value (standardized) of {var_name}')
+    ax.set_title(f'Time Series Clustering\n{algo}, {n_clusters} clusters')
+    
+    plt.tight_layout()
+    
+    # Save plot with consistent settings
+    plt.savefig(f'{save_path}/timeseries_clustering_{algo}_{n_clusters}_{identifier}.{format}', 
+                dpi=300,
+                bbox_inches='tight',
+                pad_inches=0.1)
+    plt.close()
+
+
 def plot_correlation_matrix(corr_matrix, save_path=None):
     """
     Plot correlation matrix as a heatmap.
@@ -361,24 +430,25 @@ def cluster_TS(grid, n_clusters, time_series=[],central_market=[], algorithm='Km
     [data_scaled,scaler, data],_ = identify_correlations(grid,time_series=time_series, correlation_threshold=correlation_threshold,cv_threshold=cv_threshold,central_market=central_market,print_details=print_details,corrolation_decisions=corrolation_decisions)
   
     if algorithm == 'kmeans':
-        clusters, returns, labels = cluster_Kmeans(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        clusters, returns, data_info = cluster_Kmeans(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'ward':
-        clusters, returns, labels = cluster_Ward(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        clusters, returns, data_info = cluster_Ward(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'kmedoids':
-        clusters, returns, labels = cluster_Kmedoids(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        clusters, returns, data_info = cluster_Kmedoids(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'pam_hierarchical':
-        clusters, returns, labels = cluster_PAM_Hierarchical(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        clusters, returns, data_info = cluster_PAM_Hierarchical(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'spectral':
-        clusters, returns, labels = cluster_Spectral(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        clusters, returns, data_info = cluster_Spectral(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'dbscan':
-        n_clusters, clusters, returns, labels = cluster_DBSCAN(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        n_clusters, clusters, returns, data_info = cluster_DBSCAN(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'optics':
-        n_clusters, clusters, returns, labels = cluster_OPTICS(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)    
+        n_clusters, clusters, returns, data_info = cluster_OPTICS(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)    
     elif algorithm == 'hdbscan':
-        n_clusters, clusters, returns, labels = cluster_HDBSCAN(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
+        n_clusters, clusters, returns, data_info = cluster_HDBSCAN(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     
-
-    return n_clusters, clusters, returns, labels
+    data_scaled, labels = data_info
+    data_info = [data, data_scaled, labels]
+    return n_clusters, clusters, returns, data_info
 
 def _process_clusters(grid, data, cluster_centers):
     """
@@ -534,6 +604,8 @@ def cluster_Kmeans(grid, n_clusters, data, scaling_data=None, print_details=Fals
 
     data['Cluster'] = labels
     processed_results = _process_clusters(grid, data, cluster_centers)
+
+
     return processed_results, [CoV, kmeans.inertia_, kmeans.n_iter_], [data_scaled, labels]
 
 def cluster_Ward(grid, n_clusters, data, scaling_data=None, print_details=False):
@@ -660,49 +732,7 @@ def cluster_PAM_Hierarchical(grid, n_clusters, data, scaling_data=None, print_de
     processed_results = _process_clusters(grid, data, cluster_centers)
     return processed_results, CoV, [data_scaled, labels]
 
-def dunn_index(X, labels):
-    """
-    Compute the Dunn Index for clustering results.
 
-    Parameters:
-        X (array-like): Data points (n_samples, n_features).
-        labels (array-like): Cluster labels for each data point.
-
-    Returns:
-        float: Dunn Index value (higher is better).
-    """
-    unique_labels = np.unique(labels)
-    num_clusters = len(unique_labels)
-
-    if num_clusters < 2:
-        return 0  # Dunn Index is undefined for a single cluster
-
-    # Compute intra-cluster distances (max within-cluster distance)
-    intra_dists = []
-    for label in unique_labels:
-        cluster_points = X[labels == label]
-        if len(cluster_points) > 1:
-            intra_dists.append(np.max(pairwise_distances(cluster_points)))
-        else:
-            intra_dists.append(0)  # Single-point cluster
-
-    max_intra_dist = np.max(intra_dists) if intra_dists else 0
-
-    # Compute inter-cluster distances (min distance between different clusters)
-    inter_dists = []
-    for i in range(num_clusters):
-        for j in range(i + 1, num_clusters):
-            cluster_i = X[labels == unique_labels[i]]
-            cluster_j = X[labels == unique_labels[j]]
-            dist_matrix = cdist(cluster_i, cluster_j)  # Compute distances between clusters
-            inter_dists.append(np.min(dist_matrix))
-
-    min_inter_dist = np.min(inter_dists) if inter_dists else 0
-
-    if max_intra_dist == 0:
-        return 0
-    
-    return min_inter_dist / max_intra_dist
 
 def print_clustering_results(algorithm, n_clusters, specific_info):
     """Helper function to print clustering results in a standardized format."""
@@ -737,9 +767,9 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
         'time_taken': [],
         'Coefficient of Variation': [],
         'inertia': [],
-        'silhouette_score': [],
-        'dunn_index': [],
-        'davies_bouldin': []
+        'davies_bouldin_combined': [],
+        'davies_bouldin_value': [],
+        'davies_bouldin_seasonal': []
     }
     
     for algo in algorithms:
@@ -750,8 +780,8 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
             start_time = time.time()
             try:
                 
-                _,_,CoV,info = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=ts_options[0],algorithm=algo, cv_threshold=ts_options[1] ,correlation_threshold=ts_options[2],print_details=print_details,corrolation_decisions=corrolation_decisions)
-                data_scaled,labels = info
+                n_clusters,_,CoV,data_info = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=ts_options[0],algorithm=algo, cv_threshold=ts_options[1] ,correlation_threshold=ts_options[2],print_details=print_details,corrolation_decisions=corrolation_decisions)
+                data,data_scaled,labels = data_info
                 if algo == 'kmeans':
                     CoV, inertia, n_iter_ = CoV
                 elif algo == 'kmedoids':
@@ -761,94 +791,35 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
                 time_taken = time.time() - start_time
 
                 if labels is not None and len(np.unique(labels)) > 1:
-                    sil_score = silhouette_score(data_scaled,labels)
-                    dunn_idx = dunn_index(data_scaled,labels)
-                    db_score = davies_bouldin_score(data_scaled,labels)
-                    
+                    metrics = evaluate_clustering(data_scaled, labels)
+                    db_score        = metrics['davies_bouldin_combined']
+                    value_db_score  = metrics['davies_bouldin_value']
+                    season_db_score = metrics['davies_bouldin_seasonal']
+
                     if plotting:
-                        # Convert 8.25 cm to inches and maintain ratio
-                        width_cm = 8.25
-                        ratio = 6/10
-                        width_inches = width_cm / 2.54
-                        height_inches = width_inches * ratio
-
-                        # Set publication-quality plotting parameters
-                        plt.style.use('seaborn-v0_8-whitegrid')
-                        plt.rcParams.update({
-                            'figure.figsize': (width_inches, height_inches),
-                            'font.family': 'serif',
-                            'font.size': 8,
-                            'axes.labelsize': 8,
-                            'axes.titlesize': 8,
-                            'xtick.labelsize': 7,
-                            'ytick.labelsize': 7,
-                            'legend.fontsize': 7,
-                            'lines.markersize': 4,
-                            'lines.linewidth': 1,
-                            'grid.alpha': 0.3
-                        })
-
-                        # Calculate CoV using data_scaled
                         if plotting_options[0] is None:
                             covs = np.std(data_scaled, axis=0) / np.mean(np.abs(data_scaled), axis=0)
                             highest_cov_idx = np.argmax(covs)
-                            var_name = data_scaled.columns[highest_cov_idx]
+                            var_name = data.columns[highest_cov_idx]
+
                             print(f"Plotting time series with highest CoV: {var_name} (CoV = {covs.iloc[highest_cov_idx]:.3f})")
                         else:
                             var_name = plotting_options[0]
-                            highest_cov_idx = data_scaled.columns.get_loc(var_name)
+                            highest_cov_idx = data.columns.get_loc(var_name)
                             print(f"Plotting specified time series: {var_name}")
-                        
-                        # Create figure and apply formatting
-                        fig, ax = plt.subplots()
-                        max_colors = 8  # Set2 colormap has 8 distinct colors
-                        colors = plt.cm.Set2(np.linspace(0, 1, max_colors))
-                        markers = ['+', 'x', '*', '^', 'v', '<', '>', 's']  # Backup markers when colors repeat
-                        
-                        # Plot clusters with consistent styling
-                        for i in range(n):
-                            mask = labels == i
-                            time_points = np.arange(len(data_scaled))[mask]
-                            values = data_scaled.iloc[mask, highest_cov_idx]
-                            
-                            # If we've exceeded the number of colors, start cycling markers
-                            current_marker = '+' if i < max_colors else markers[((i - max_colors) % len(markers))]
-                            
-                            ax.scatter(time_points, values, 
-                                     marker=current_marker,
-                                     color=colors[i % max_colors],
-                                     alpha=.8, 
-                                     s=16)
-                        
-                        # Format axes
-                        ax.spines['top'].set_visible(False)
-                        ax.spines['right'].set_visible(False)
-                        ax.grid(True, linestyle='--', alpha=0.3)
-                        ax.tick_params(direction='out', length=3, width=0.8)
-                        
-                        ax.set_xlabel('Time')
-                        ax.set_ylabel(f'Value (standardized) of {var_name}')
-                        ax.set_title(f'Time Series Clustering\n{algo}, {n} clusters')
-                        
-                        plt.tight_layout()
-                        
-                        # Save plot with consistent settings
-                        plt.savefig(f'{save_path}/timeseries_clustering_{algo}_{n}_{identifier}.{plotting_options[1]}', 
-                                  dpi=300,
-                                  bbox_inches='tight',
-                                  pad_inches=0.1)
-                        plt.close()
+
+                        plot_time_series(data,labels,var_name,n_clusters,save_path,plotting_options[1],identifier,algo)    
                 else:
-                    sil_score = dunn_idx = db_score = 0
+                    sil_score = temporal_cohesion = 0
 
                 results['algorithm'].append(algo)
                 results['n_clusters'].append(n)
                 results['time_taken'].append(time_taken)
                 results['Coefficient of Variation'].append(CoV)
                 results['inertia'].append(inertia)
-                results['silhouette_score'].append(sil_score)
-                results['dunn_index'].append(dunn_idx)
-                results['davies_bouldin'].append(db_score)
+                results['davies_bouldin_combined'].append(db_score)
+                results['davies_bouldin_value'].append(value_db_score)
+                results['davies_bouldin_seasonal'].append(season_db_score)
                 
                 print(f"    Time: {time_taken:.2f}s")
                 
@@ -860,7 +831,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
     Path(save_path).mkdir(parents=True, exist_ok=True)
     
     # Updated summary to use correct columns
-    summary_df = df_results[['algorithm', 'n_clusters', 'time_taken', 'Coefficient of Variation','inertia','silhouette_score','dunn_index','davies_bouldin']]
+    summary_df = df_results[['algorithm', 'n_clusters', 'time_taken', 'Coefficient of Variation','inertia','davies_bouldin_combined','davies_bouldin_value','davies_bouldin_seasonal']]
     summary_df.to_csv(f'{save_path}/clustering_summary_{identifier}.csv', index=False)
  
     
@@ -922,15 +893,15 @@ def plot_clustering_results(df=None, results_path='clustering_results', format='
     
     # Create plots with consistent styling
     metrics = [
-        ('time_taken', 'Time (seconds)'),
-        ('Coefficient of Variation', 'Coefficient of Variation'),
-        ('inertia', 'Inertia'),
-        ('silhouette_score', 'Silhouette Score'),
-        ('dunn_index', 'Dunn Index'),
-        ('davies_bouldin', 'Davies-Bouldin Index')
+        ('time_taken', 'Time (seconds)',10),
+        ('Coefficient of Variation', 'Coefficient of Variation',2),
+        ('inertia', 'Inertia',100000),
+        ('davies_bouldin_combined', 'Davies-Bouldin Index',2.5),
+        ('davies_bouldin_value',    'Davies-Bouldin Index',2.5),
+        ('davies_bouldin_seasonal', 'Davies-Bouldin Index',2.5)
     ]
     
-    for metric, ylabel in metrics:
+    for metric, ylabel,ymax in metrics:
         fig, ax = plt.subplots()
         
         for idx, algo in enumerate(algorithms):
@@ -944,7 +915,8 @@ def plot_clustering_results(df=None, results_path='clustering_results', format='
         
         ax.set_xlabel('Number of Clusters')
         ax.set_ylabel(ylabel)
-        
+        ax.set_ylim(0,ymax)
+
         # Adjust legend
         ax.legend(bbox_to_anchor=(0.5, 1.15),
                  loc='upper center',
@@ -975,9 +947,9 @@ def Time_series_cluster_relationship(grid, ts1_name=None, ts2_name=None,price_zo
     Plot two time series with their cluster assignments in different colors.
     """
     # Get clusters
-    n_clusters, clusters, returns, labels = cluster_TS(
+    n_clusters, clusters, returns, data_info = cluster_TS(
         grid, number_of_clusters,time_series=take_into_account_time_series, algorithm=algorithm,print_details=False)
-    data_scaled,labels = labels
+    data,data_scaled,labels = data_info
 
     if ts1_name is not None:    
         ts1 = grid.Time_series[grid.Time_series_dic[ts1_name]].data
@@ -1360,6 +1332,89 @@ def find_medoid(cluster_data):
     distances = pairwise_distances(cluster_data, metric='manhattan')
     medoid_idx = distances.sum(axis=1).argmin()
     return cluster_data.index[medoid_idx]
+
+
+
+def evaluate_clustering(data_scaled, labels):
+    """
+    Evaluate time series clustering using standard DB index plus temporal and seasonal components.
+    """
+    def temporal_seasonal_scores(X, labels):
+        """Calculate seasonal component using DB-style calculation"""
+        unique_labels = np.unique(labels)
+        n_clusters = len(unique_labels)
+
+        # Calculate cluster centers for seasonal patterns
+        seasonal_centers = []
+        
+        for label in unique_labels:
+            cluster_points = X[labels == label]
+            
+            # Seasonal pattern
+            if cluster_points.shape[0] > 168:  # At least one week
+                weekly = cluster_points.shape[0] // 168 * 168
+                reshaped = cluster_points[:weekly].reshape(-1, 168, X.shape[1])
+                seasonal_pattern = np.mean(reshaped, axis=0)
+                seasonal_centers.append(np.mean(seasonal_pattern, axis=0))
+            else:
+                seasonal_centers.append(np.mean(cluster_points, axis=0))
+
+        seasonal_centers = np.array(seasonal_centers)
+
+        # Calculate DB scores
+        season_scores = []
+        
+        for i in range(n_clusters):
+            cluster_i = X[labels == unique_labels[i]]
+            
+            if len(cluster_i) <= 1:
+                continue
+                
+            # Calculate within-cluster scatter
+            season_scatter_i = np.std(cluster_i)
+            max_season_ratio = 0
+            
+            for j in range(n_clusters):
+                if i != j:
+                    cluster_j = X[labels == unique_labels[j]]
+                    if len(cluster_j) <= 1:
+                        continue
+                        
+                    # Calculate between-cluster separation
+                    season_sep = np.linalg.norm(seasonal_centers[i] - seasonal_centers[j])
+                    season_scatter_j = np.std(cluster_j)
+                    
+                    if season_sep > 0:
+                        season_ratio = (season_scatter_i + season_scatter_j) / season_sep
+                        max_season_ratio = max(max_season_ratio, season_ratio)
+            
+            if max_season_ratio > 0:
+                season_scores.append(max_season_ratio)
+
+        # Return zeros for temporal and the seasonal score
+        return np.mean(season_scores) if season_scores else 0
+
+    # Convert DataFrame to numpy array if needed
+    if isinstance(data_scaled, pd.DataFrame):
+        data_scaled_array = data_scaled.values
+    else:
+        data_scaled_array = np.array(data_scaled)
+    
+    # Get standard DB score from sklearn
+    standard_db = davies_bouldin_score(data_scaled_array, labels)
+    
+    # Get temporal and seasonal components
+    seasonal_db = temporal_seasonal_scores(data_scaled_array, labels)
+    
+    # Combine scores (equal weights)
+    combined_db = (standard_db + seasonal_db) / 2
+
+    return {
+        'davies_bouldin_combined': combined_db, 
+        'davies_bouldin_value': standard_db,
+        'davies_bouldin_seasonal': seasonal_db
+    }
+
 
 
 
