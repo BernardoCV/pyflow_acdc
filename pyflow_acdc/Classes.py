@@ -1184,7 +1184,7 @@ class Line_AC:
         """Load cable database from YAML files if not already loaded."""
         if cls._cable_database is None:
             # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent.parent
+            module_dir = Path(__file__).parent
             cable_dir = module_dir / 'Cable_database'
             
             data_dict = {}
@@ -1468,7 +1468,7 @@ class Line_DC:
         """Load cable database from YAML files if not already loaded."""
         if cls._cable_database is None:
             # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent.parent
+            module_dir = Path(__file__).parent
             cable_dir = module_dir / 'Cable_database'
             
             data_dict = {}
