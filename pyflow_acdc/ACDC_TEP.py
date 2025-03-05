@@ -269,7 +269,7 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
         corrolation_decisions = clustering_options['corrolation_decisions'] if 'corrolation_decisions' in clustering_options else [False,'1',False]
         algo = clustering_options['cluster_algorithm'] if 'cluster_algorithm' in clustering_options else 'Kmeans'
        
-        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[1] ,correlation_threshold=thresholds[2],print_details=print_details,corrolation_decisions=corrolation_decisions)
+        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[0] ,correlation_threshold=thresholds[1],print_details=print_details,corrolation_decisions=corrolation_decisions)
                 
         clustering = True
     else:

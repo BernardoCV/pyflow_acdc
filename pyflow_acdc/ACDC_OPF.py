@@ -300,19 +300,31 @@ def fx_conv(model,grid):
     model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
 
 
-def OPF_solve(model,grid):
+def OPF_solve(model,grid,solver_options=None):
     
     if grid.MixedBinCont:
            # opt = pyo.SolverFactory("mindtpy")
            # results = opt.solve(model,mip_solver='glpk',nlp_solver='ipopt')
            print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
     
-    opt = pyo.SolverFactory("ipopt")
+    if solver_options is None:
+        solver = 'ipopt' 
+        tol = 1e-8
+        max_iter = 3000
+        print_level = 12
+        acceptable_tol = 1e-6
+    else:
+        solver   = solver_options['solver'] if 'solver' in solver_options else 'ipopt'
+        tol      = solver_options['tol'] if 'tol' in solver_options else 1e-8
+        max_iter = solver_options['max_iter'] if 'max_iter' in solver_options else 3000
+        print_level = solver_options['print_level'] if 'print_level' in solver_options else 12
+        acceptable_tol = solver_options['acceptable_tol'] if 'acceptable_tol' in solver_options else 1e-6
 
-    opt.options['max_iter']       = 10000  # Maximum number of iterations
-    opt.options['tol']            = 1e-8   # Convergence tolerance
-    opt.options['acceptable_tol'] = 1e-6   # Acceptable convergence tolerance
-    opt.options['print_level']    = 5      # Output verbosity (0-12)
+    opt = pyo.SolverFactory(solver)
+    opt.options['max_iter']       = max_iter  # Maximum number of iterations
+    opt.options['tol']            = tol   # Convergence tolerance
+    opt.options['acceptable_tol'] = acceptable_tol   # Acceptable convergence tolerance
+    opt.options['print_level']    = print_level      # Output verbosity (0-12)
     
     results = opt.solve(model)
     
