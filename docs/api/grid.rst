@@ -1,5 +1,5 @@
 Grid Creation
-============
+==============    
 
 This module provides functions for creating and manipulating power system grids.
 
@@ -18,6 +18,7 @@ Creating a Grid
 
 Create Grid From Data
 ---------------------
+A more detailed description of the function can be found in the :doc:`csv_import` page.
 
 .. py:function:: Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
 
@@ -35,19 +36,19 @@ Create Grid From Data
         - Base power in MVA
       * - ``AC_node_data``
         - DataFrame
-        - AC node pandas or geopandas 
+        - AC node pandas, geopandas or csv string
       * - ``AC_line_data``
         - DataFrame
-        - AC line pandas or geopandas 
+        - AC line pandas, geopandas or csv string
       * - ``DC_node_data``
         - DataFrame
-        - DC node pandas or geopandas 
+        - DC node pandas, geopandas or csv string
       * - ``DC_line_data``
         - DataFrame
-        - DC line pandas or geopandas 
+        - DC line pandas, geopandas or csv string
       * - ``Converter_data``
         - DataFrame
-        - Converter pandas or geopandas 
+        - Converter pandas, geopandas or csv string
       * - ``data_in``
         - str
         - Input data format ('pu' or 'Ohm' if not assumed in Real values)
@@ -99,19 +100,19 @@ Extend Grid From Data
         - Existing grid to extend
       * - ``AC_node_data``
         - DataFrame
-        - AC node specifications to add
+        - AC node pandas, geopandas or csv string
       * - ``AC_line_data``
         - DataFrame
-        - AC line specifications to add
+        - AC line pandas, geopandas or csv string
       * - ``DC_node_data``
         - DataFrame
-        - DC node specifications to add
+        - DC node pandas, geopandas or csv string
       * - ``DC_line_data``
         - DataFrame
-        - DC line specifications to add
+        - DC line pandas, geopandas or csv string
       * - ``Converter_data``
         - DataFrame
-        - Converter specifications to add
+        - Converter pandas, geopandas or csv string
       * - ``data_in``
         - str
         - Input data format ('Real' or 'pu')

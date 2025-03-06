@@ -3,7 +3,6 @@ from scipy.io import loadmat
 import pandas as pd
 import numpy as np
 import copy
-import pandas as pd
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
 
@@ -36,6 +35,17 @@ def reset_all_class():
     
 def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real'):
     
+    if isinstance(AC_node_data, str):
+        AC_node_data = pd.read_csv(AC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(AC_line_data, str):
+        AC_line_data = pd.read_csv(AC_line_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(DC_node_data, str):
+        DC_node_data = pd.read_csv(DC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(DC_line_data, str):
+        DC_line_data = pd.read_csv(DC_line_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(Converter_data, str):
+        Converter_data = pd.read_csv(Converter_data, delimiter=",", quotechar="'", encoding="utf-8")
+
     reset_all_class()
     
     AC_nodes = process_AC_node(S_base, data_in, AC_node_data) if AC_node_data is not None else None
@@ -62,6 +72,18 @@ def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_
 
 def Extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real'):
     
+
+    if isinstance(AC_node_data, str):
+        AC_node_data = pd.read_csv(AC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(AC_line_data, str):
+        AC_line_data = pd.read_csv(AC_line_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(DC_node_data, str):
+        DC_node_data = pd.read_csv(DC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(DC_line_data, str):
+        DC_line_data = pd.read_csv(DC_line_data, delimiter=",", quotechar="'", encoding="utf-8")
+    if isinstance(Converter_data, str):
+        Converter_data = pd.read_csv(Converter_data, delimiter=",", quotechar="'", encoding="utf-8")
+        
     S_base= grid.S_base
     
     AC_nodes = process_AC_node(S_base, data_in, AC_node_data) if AC_node_data is not None else None
@@ -231,7 +253,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             Reactance    = AC_line_data.at[index, 'Reactance']    if 'Reactance'    in AC_line_data.columns else None
             Conductance  = AC_line_data.at[index, 'Conductance']  if 'Conductance'  in AC_line_data.columns else 0
             Susceptance  = AC_line_data.at[index, 'Susceptance']  if 'Susceptance'  in AC_line_data.columns else 0
-            MVA_rating   = AC_line_data.at[index, 'MVA_rating']   if 'MVA_rating'   in AC_line_data.columns else S_base*1.05
+            MVA_rating   = AC_line_data.at[index, 'MVA_rating']   if 'MVA_rating'   in AC_line_data.columns else 99999
             km           = AC_line_data.at[index, 'Length_km']    if 'Length_km'    in AC_line_data.columns else 1
             kV_base      = toNode.kV_base 
             m            = AC_line_data.at[index, 'm']            if 'm'            in AC_line_data.columns else 1
@@ -243,8 +265,8 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             
             Z_base = kV_base**2/S_base
             
-            Resistance = Resistance / Z_base if Resistance else 0.00001
-            Reactance  = Reactance  / Z_base if Reactance  else 0.00001
+            Resistance = Resistance / Z_base if Resistance else 0.0001
+            Reactance  = Reactance  / Z_base if Reactance  else 0.0001
             Conductance *= Z_base
             Susceptance *= Z_base
             
@@ -273,7 +295,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             L_mH = AC_line_data.at[index, 'L_mH_km']       
             C_uF = AC_line_data.at[index, 'C_uF_km']       if 'C_uF_km'    in AC_line_data.columns else 0
             G_uS = AC_line_data.at[index, 'G_uS_km']       if 'G_uS_km'    in AC_line_data.columns else 0
-            A_rating = AC_line_data.at[index, 'A_rating']
+            A_rating = AC_line_data.at[index, 'A_rating']   if 'A_rating'   in AC_line_data.columns else 9999
             # kV_base = AC_line_data.at[index, 'kV_base']
             kV_base= toNode.kV_base 
             km = AC_line_data.at[index, 'Length_km']
@@ -308,7 +330,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
             Voltage_0     = DC_node_data.at[index, 'Voltage_0']     if 'Voltage_0'     in DC_node_data.columns else 1.01
             Power_Gained  = DC_node_data.at[index, 'Power_Gained']  if 'Power_Gained'  in DC_node_data.columns else 0
-            Power_load    = DC_node_data.at[index, 'Power_load']    if 'Power_load'    in DC_node_data.columns else 0
+            Power_load    = DC_node_data.at[index, 'Power_Load']    if 'Power_Load'    in DC_node_data.columns else 0
             kV_base       = DC_node_data.at[index, 'kV_base']  
             Umin          = DC_node_data.at[index, 'Umin']          if 'Umin'          in DC_node_data.columns else 0.95
             Umax          = DC_node_data.at[index, 'Umax']          if 'Umax'          in DC_node_data.columns else 1.05
@@ -335,7 +357,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
             
             Voltage_0     = DC_node_data.at[index, 'Voltage_0']     if 'Power_Gained'  in DC_node_data.columns else 1.01
             Power_Gained  = DC_node_data.at[index, 'Power_Gained']  if 'Power_Gained'  in DC_node_data.columns else 0
-            Power_load    = DC_node_data.at[index, 'Power_load']    if 'Power_load'    in DC_node_data.columns else 0
+            Power_load    = DC_node_data.at[index, 'Power_Load']    if 'Power_Load'    in DC_node_data.columns else 0
             kV_base       = DC_node_data.at[index, 'kV_base']  
             Umin          = DC_node_data.at[index, 'Umin']          if 'Umin'          in DC_node_data.columns else 0.95
             Umax          = DC_node_data.at[index, 'Umax']          if 'Umax'          in DC_node_data.columns else 1.05
@@ -373,8 +395,8 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
                 toNode   = grid.nodes_DC[grid.nodes_dict_DC[DC_line_data.at[index, 'toNode']]]  
             
             
-            Resistance    = DC_line_data.at[index, 'Resistance']
-            MW_rating     = DC_line_data.at[index, 'MW_rating']      if 'MW_rating'     in DC_line_data.columns else S_base*1.05
+            Resistance    = DC_line_data.at[index, 'Resistance']    if 'Resistance'  in DC_line_data.columns else 0.0001
+            MW_rating     = DC_line_data.at[index, 'MW_rating']      if 'MW_rating'     in DC_line_data.columns else 99999
             kV_base       = toNode.kV_base 
             pol           = DC_line_data.at[index, 'Mono_Bi_polar']  if 'Mono_Bi_polar' in DC_line_data.columns else 'm'
             km            = DC_line_data.at[index, 'Length_km']        if 'Length_km' in DC_line_data.columns else 1
@@ -405,12 +427,12 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             
             
             
-            MW_rating     = DC_line_data.at[index, 'MW_rating']      if 'MW_rating'     in DC_line_data.columns else S_base*1.05
+            MW_rating     = DC_line_data.at[index, 'MW_rating']      if 'MW_rating'     in DC_line_data.columns else 99999
             kV_base       = toNode.kV_base 
             pol           = DC_line_data.at[index, 'Mono_Bi_polar']  if 'Mono_Bi_polar' in DC_line_data.columns else 'm'
             km            = DC_line_data.at[index, 'Length_km']        if 'Length_km' in DC_line_data.columns else 1
-            Resistance    = DC_line_data.at[index, 'Resistance']    if 'Resistance'  in DC_line_data.columns else 0.0095*km
             N_cables      = DC_line_data.at[index, 'N_cables']   if 'N_cables' in DC_line_data.columns else 1
+            Resistance    = DC_line_data.at[index, 'R_Ohm_km']    if 'R_Ohm_km'  in DC_line_data.columns else 0.0095*km/N_cables
             
             
             Z_base = kV_base**2/S_base
@@ -438,8 +460,8 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
                 fromNode = grid.nodes_DC[grid.nodes_dict_DC[DC_line_data.at[index, 'fromNode']]] 
                 toNode   = grid.nodes_DC[grid.nodes_dict_DC[DC_line_data.at[index, 'toNode']]]  
             
-            R = DC_line_data.at[index, 'R_Ohm_km']
-            A_rating = DC_line_data.at[index, 'A_rating']
+            R = DC_line_data.at[index, 'R_Ohm_km']  if 'R_Ohm_km' in DC_line_data.columns else 0.0095
+            A_rating = DC_line_data.at[index, 'A_rating']  if 'A_rating' in DC_line_data.columns else 9999
             kV_base = toNode.kV_base 
             pol  = DC_line_data.at[index, 'Mono_Bi_polar']  if 'Mono_Bi_polar' in DC_line_data.columns else 'm'
             km = DC_line_data.at[index, 'Length_km']        if 'Length_km' in DC_line_data.columns else 1
@@ -492,7 +514,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             Filter          = Converter_data.at[index, 'Filter']         if 'Filter'         in Converter_data.columns else 0
             Droop           = Converter_data.at[index, 'Droop']          if 'Droop'          in Converter_data.columns else 0
             kV_base         = Converter_data.at[index, 'AC_kV_base']     if 'AC_kV_base'     in Converter_data.columns else AC_node.kV_base
-            MVA_max         = Converter_data.at[index, 'MVA_rating']     if 'MVA_rating'     in Converter_data.columns else 9999
+            MVA_max         = Converter_data.at[index, 'MVA_rating']     if 'MVA_rating'     in Converter_data.columns else 99999
             Ucmin           = Converter_data.at[index, 'Ucmin']          if 'Ucmin'          in Converter_data.columns else 0.85
             Ucmax           = Converter_data.at[index, 'Ucmax']          if 'Ucmax'          in Converter_data.columns else 1.2
             n               = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
@@ -529,7 +551,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             Filter           = Converter_data.at[index, 'Filter_uF']     if 'Filter_uF'      in Converter_data.columns else 0
             Droop            = Converter_data.at[index, 'Droop']         if 'Droop'          in Converter_data.columns else 0
             kV_base          = Converter_data.at[index, 'AC_kV_base']    if 'AC_kV_base'     in Converter_data.columns else AC_node.kV_base
-            MVA_rating       = Converter_data.at[index, 'MVA_rating']    if 'MVA_rating'     in Converter_data.columns else 9999
+            MVA_rating       = Converter_data.at[index, 'MVA_rating']    if 'MVA_rating'     in Converter_data.columns else 99999
             Ucmin           = Converter_data.at[index, 'Ucmin']          if 'Ucmin'          in Converter_data.columns else 0.85
             Ucmax           = Converter_data.at[index, 'Ucmax']          if 'Ucmax'          in Converter_data.columns else 1.2
             n               = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
