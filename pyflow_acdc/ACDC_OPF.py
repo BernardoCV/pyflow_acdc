@@ -306,7 +306,7 @@ def OPF_solve(model,grid,solver_options=None):
            # opt = pyo.SolverFactory("mindtpy")
            # results = opt.solve(model,mip_solver='glpk',nlp_solver='ipopt')
            print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
-    
+    """
     if solver_options is None:
         solver = 'ipopt' 
         tol = 1e-8
@@ -320,18 +320,20 @@ def OPF_solve(model,grid,solver_options=None):
         print_level = solver_options['print_level'] if 'print_level' in solver_options else 12
         acceptable_tol = solver_options['acceptable_tol'] if 'acceptable_tol' in solver_options else 1e-6
 
-    opt = pyo.SolverFactory(solver)
+    
     opt.options['max_iter']       = max_iter  # Maximum number of iterations
     opt.options['tol']            = tol   # Convergence tolerance
     opt.options['acceptable_tol'] = acceptable_tol   # Acceptable convergence tolerance
     opt.options['print_level']    = print_level      # Output verbosity (0-12)
-    
+    """
+    opt = pyo.SolverFactory('ipopt')
     results = opt.solve(model)
-    
+    print(results.solver.message)  # Shows solver-specific messages
+
     solver_stats = {
-        'iterations': results.solver.iterations,
-        'best_objective': results.problem.lower_bound,
-        'time': results.solver.time,
+        'iterations': getattr(results.solver, 'iterations', None),  # May not exist in IPOPT
+        'best_objective': getattr(results.problem, 'upper_bound', None),  # IPOPT provides upper_bound
+        'time': getattr(results.solver, 'time', None),  # May not be available
         'termination_condition': str(results.solver.termination_condition)
     }
     

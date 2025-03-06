@@ -1,40 +1,17 @@
-Creating a grid from CSV files
-==============================
+CSV files for importing data
+============================
+
+In this page the column names for importing data from CSV files are described. It is important to note that column names are case sensitive. The CSV can then be used for the following functions:
 
 .. py:function:: Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
-     Creates a new grid from pandas DataFrames containing component data.
+   :noindex:
 
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
+   Creates a new grid from pandas/geopandas DataFrames or csv file strings containing component data.
 
-      * - Parameter
-        - Type
-        - Description
-      * - ``S_base``
-        - float
-        - Base power in MVA
-      * - ``AC_node_data``
-        - DataFrame
-        - AC node pandas, geopandas or csv string
-      * - ``AC_line_data``
-        - DataFrame
-        - AC line pandas, geopandas or csv string
-      * - ``DC_node_data``
-        - DataFrame
-        - DC node pandas, geopandas or csv string
-      * - ``DC_line_data``
-        - DataFrame
-        - DC line pandas, geopandas or csv string
-      * - ``Converter_data``
-        - DataFrame
-        - Converter pandas, geopandas or csv string
-      * - ``data_in``
-        - str
-        - Input data format ('pu', 'Ohm', or 'Real')
-      * - Returns
-        - grid, res
-        - Grid and Results objects
+.. py:function:: Extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
+   :noindex:
+
+   Extends an existing grid with new components from pandas/geopandas DataFrames or csv file strings.
 
 Required CSV Files
 -------------------
@@ -831,7 +808,7 @@ AC Line Data (MATACDC_AC_line_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
-    
+
     Line_id, fromNode, toNode, Resistance, Reactance, Conductance, Susceptance, MVA_rating, kV_base
     1      , 1       , 2     , 0.02     , 0.06     , 0         , 0.06      , 150      , 345
     2      , 1       , 3     , 0.08     , 0.24     , 0         , 0.05      , 100      , 345  
@@ -867,9 +844,9 @@ Converter Data (MATACDC_Converter_data.csv)
 .. code-block:: text
 
     Conv_id, AC_type, DC_type, AC_node, DC_node, P_AC  , Q_AC , P_DC, T_R   , T_X  , PR_R  , PR_X   , Filter, Droop, AC_kV_base, MVA_rating, Ucmin, Ucmax
-    1      , PQ     , PAC    , 2      , 1      , -0.6  , -0.4 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 1.2       , 0.9  , 1.2
-    2      , PV     , Slack  , 3      , 2      , 0     , 0    , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 1.2       , 0.9  , 1.2
-    3      , PQ     , PAC    , 5      , 3      , 0.35  , 0.05 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 1.2       , 0.9  , 1.2
+    1      , PQ     , PAC    , 2      , 1      , -0.6  , -0.4 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
+    2      , PV     , Slack  , 3      , 2      , 0     , 0    , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
+    3      , PQ     , PAC    , 5      , 3      , 0.35  , 0.05 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
 
 Example Code
 ~~~~~~~~~~~~

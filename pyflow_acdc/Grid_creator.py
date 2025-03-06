@@ -6,7 +6,7 @@ import copy
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
 
-from .Results import*
+from .Results_class import*
 from .Classes import*
 from .Class_editor import Cable_parameters, Converter_parameters, add_gen
 
@@ -339,8 +339,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
             
             geometry      = DC_node_data.at[index, 'geometry']        if 'geometry'    in DC_node_data.columns else None
                 
-            DC_nodes[var_name] = Node_DC(
-                node_type, Voltage_0, Power_Gained, Power_load,kV_base , name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
+            DC_nodes[var_name] = Node_DC(node_type,kV_base, Voltage_0, Power_Gained, Power_load, name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -369,7 +368,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
             
             geometry      = DC_node_data.at[index, 'geometry']        if 'geometry'    in DC_node_data.columns else None
             
-            DC_nodes[var_name] = Node_DC(node_type, Voltage_0, Power_Gained, Power_load, kV_base ,name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
+            DC_nodes[var_name] = Node_DC(node_type,kV_base, Voltage_0, Power_Gained, Power_load, name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
             
             if geometry is not None:
                 if isinstance(geometry, str): 

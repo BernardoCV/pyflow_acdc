@@ -6,6 +6,7 @@ Provides grid simulation and power flow analysis functionality.
 from pathlib import Path
 import importlib.util
 
+from .Results_class import *
 from .Class_editor import *
 from .Grid_creator import *
 from .Classes import *
@@ -49,7 +50,8 @@ except ImportError:
     
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
-
+    # Results
+    'Results',
     # Grid
     'Grid', 
     'Node_AC',

@@ -5,6 +5,8 @@ If you use PyFlow ACDC in your work, please cite the following paper:
 
 For the general framework:
 
+B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt, "An optimal power flow tool for AC/DC systems, applied to the analysis of the North Sea Grid for offshore wind integration," in IEEE Transactions on Power Systems, doi: 10.1109/TPWRS.2025.3533889.
+
 .. code-block:: bibtex
     
     @ARTICLE{bcv2025opf,
@@ -21,7 +23,10 @@ For the general framework:
 
 For the market-based OPF:
 
+
+
 .. code-block:: bibtex
+
     @ARTICLE{bcv2025market,
     author={Valerio, Bernardo Castro and Lacerda, Vinicius A. and Cheah-Mane, Marc and Gebraad, Pieter and Gomis-Bellmunt, Oriol},
     title={Optimizing Offshore Wind Integration through Multi-Terminal DC Grids: A Market-Based OPF Framework for the North Sea Interconnectors}, 

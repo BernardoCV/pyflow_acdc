@@ -11,7 +11,7 @@ import yaml
 from shapely.wkt import loads
 
 from .Classes import*
-from .Results import*
+from .Results_class import*
 
 from pathlib import Path    
     
@@ -114,6 +114,8 @@ def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
 
     if L_mH == 0:
         MVA_rating = N_cables*A_rating*kV_base/(1000)
+        N_cables = 1
+        #IN DC N cables is always 1 as the varible is used directly in the formulation
     else:
         MVA_rating = N_cables*A_rating*kV_base*np.sqrt(3)/(1000)
 
@@ -170,8 +172,8 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
     
     return node
 
-def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None,Umin=0.95, Umax=1.05,x_coord=None,y_coord=None,geometry=None):
-    node = Node_DC(node_type, Voltage_0, Power_Gained, Power_load,kV_base , name,Umin, Umax,x_coord,y_coord)
+def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None,Umin=0.95, Umax=1.05,x_coord=None,y_coord=None,geometry=None):  
+    node = Node_DC(node_type, kV_base, Voltage_0, Power_Gained, Power_load, name,Umin, Umax,x_coord,y_coord)
     grid.nodes_DC.append(node)
     if geometry is not None:
        if isinstance(geometry, str): 
@@ -301,7 +303,18 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     grid.create_Ybus_AC()
     s=1    
 
-def add_line_DC(grid, fromNode, toNode, Resistance_pu=0.001, MW_rating=9999,Length_km=1, polarity='m', name=None,geometry=None,Cable_type:str ='Custom'):
+def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu'):
+    kV_base=toNode.kV_base
+    if data_in == 'Ohm':
+        Z_base = kV_base**2/grid.S_base
+        
+        Resistance_pu = r / Z_base if r!=0 else 0.00001
+
+    elif data_in== 'Real': 
+       [Resistance_pu, _, _, _, MW_rating] = Cable_parameters(grid.S_base, R_Ohm_km, 0, 0, 0, 0, kV_base, Length_km,N_cables=1)
+    else:
+        Resistance_pu = r if r!=0 else 0.00001
+      
     if isinstance(polarity, int):
         if polarity == 1:
             polarity = 'm'

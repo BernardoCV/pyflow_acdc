@@ -70,7 +70,15 @@ class Grid:
         self.lines_AC_tf  = []
         
         self.Converters_ACDC = Converters if Converters else []
-        
+        for conv in self.Converters_ACDC:
+            if not hasattr(conv, 'basekA'):
+                conv.basekA  = self.S_base/(np.sqrt(3)*conv.AC_kV_base)
+                conv.a_conv = conv.a_conv_og/self.S_base
+                conv.b_conv = conv.b_conv_og*conv.basekA/self.S_base
+                conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
+                conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
+                conv.c_rect = conv.c_rect_og*conv.basekA**2/self.S_base
+
         self.lines_DC = []
         if lines_DC:
             for line in lines_DC:
@@ -1067,7 +1075,7 @@ class Node_DC:
     def name(self):
         return self._name
 
-    def __init__(self, node_type: str, Voltage_0: float, Power_Gained: float, Power_load: float,kV_base:float, name=None, Umin=0.95, Umax=1.05,x_coord=None,y_coord=None):
+    def __init__(self, node_type: str,kV_base:float, Voltage_0: float=1, Power_Gained: float=0, Power_load: float=0, name=None, Umin=0.95, Umax=1.05,x_coord=None,y_coord=None):
        
         self.nodeNumber = Node_DC.nodeNumber
         Node_DC.nodeNumber += 1
@@ -1697,7 +1705,7 @@ class AC_DC_converter:
         
             
             
-    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC, P_AC: float, Q_AC: float, P_DC: float, Transformer_resistance: float, Transformer_reactance: float, Phase_Reactor_R: float, Phase_Reactor_X: float, Filter: float, Droop: float, kV_base: float, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2, name=None):
+    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
         AC_DC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
