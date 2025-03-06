@@ -820,56 +820,55 @@ AC Node Data (MATACDC_AC_node_data.csv)
 
 .. code-block:: text
 
-    Node_id,type,Voltage_0,theta_0,Power_Gained,Reactive_Gained,Power_load,Reactive_load,kV_base
-    1,Slack,1.06,0,0,0,0,0,345
-    2,PV,1,0.1,0.4,0,0.2,0.1,345
-    3,PQ,1,0.1,0,0,0.45,0.15,345
-    4,PQ,1,0.1,0,0,0.4,0.05,345
-    5,PQ,1,0.1,0,0,0.6,0.1,345
+    Node_id, type  , Voltage_0, theta_0, Power_Gained, Reactive_Gained, Power_load, Reactive_load, kV_base
+    1     , Slack , 1.06     , 0      , 0           , 0              , 0         , 0            , 345
+    2     , PV    , 1        , 0.1    , 0.4         , 0              , 0.2       , 0.1          , 345  
+    3     , PQ    , 1        , 0.1    , 0           , 0              , 0.45      , 0.15         , 345
+    4     , PQ    , 1        , 0.1    , 0           , 0              , 0.4       , 0.05         , 345
+    5     , PQ    , 1        , 0.1    , 0           , 0              , 0.6       , 0.1          , 345
 
 AC Line Data (MATACDC_AC_line_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
-
-    Line_id,fromNode,toNode,Resistance,Reactance,Conductance,Susceptance,MVA_rating,kV_base
-    1,1,2,0.02,0.06,0,0.06,150,345
-    2,1,3,0.08,0.24,0,0.05,100,345
-    3,2,3,0.06,0.18,0,0.04,100,345
-    4,2,4,0.06,0.18,0,0.04,100,345
-    5,2,5,0.04,0.12,0,0.03,100,345
-    6,3,4,0.01,0.03,0,0.02,100,345
-    7,4,5,0.08,0.24,0,0.05,100,345
+    Line_id, fromNode, toNode, Resistance, Reactance, Conductance, Susceptance, MVA_rating, kV_base
+    1      , 1       , 2     , 0.02     , 0.06     , 0         , 0.06      , 150      , 345
+    2      , 1       , 3     , 0.08     , 0.24     , 0         , 0.05      , 100      , 345  
+    3      , 2       , 3     , 0.06     , 0.18     , 0         , 0.04      , 100      , 345
+    4      , 2       , 4     , 0.06     , 0.18     , 0         , 0.04      , 100      , 345
+    5      , 2       , 5     , 0.04     , 0.12     , 0         , 0.03      , 100      , 345
+    6      , 3       , 4     , 0.01     , 0.03     , 0         , 0.02      , 100      , 345
+    7      , 4       , 5     , 0.08     , 0.24     , 0         , 0.05      , 100      , 345
 
 DC Node Data (MATACDC_DC_node_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
-    Node_id,type,Voltage_0,Power_Gained,Power_load,kV_base
-    1,P,1,0,0,345
-    2,Slack,1,0,0,345
-    3,P,1,0,0,345
+    Node_id,type ,Voltage_0,Power_Gained,Power_load,kV_base
+       1   , P   ,     1   ,     0      ,     0    , 345
+       2   ,Slack,     1   ,     0      ,     0    , 345
+       3   , P   ,     1   ,     0      ,     0    , 345
 
 DC Line Data (MATACDC_DC_line_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
-    Line_id,fromNode,toNode,Resistance,MW_rating,kV_base,Mono_Bi_polar
-    1,1,2,0.052,100,345,sm
-    2,2,3,0.052,100,345,sm
-    3,1,3,0.073,100,345,sm
+    Line_id, fromNode, toNode, Resistance, MW_rating, kV_base, Mono_Bi_polar
+    1      , 1      , 2    , 0.052    , 100     , 345    , sm
+    2      , 2      , 3    , 0.052    , 100     , 345    , sm
+    3      , 1      , 3    , 0.073    , 100     , 345    , sm
 
 Converter Data (MATACDC_Converter_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
-    Conv_id,AC_type,DC_type,AC_node,DC_node,P_AC,Q_AC,P_DC,T_R,T_X,PR_R,PR_X,Filter,Droop,AC_kV_base,MVA_rating,Ucmin,Ucmax
-    1,PQ,PAC,2,1,-0.6,-0.4,0,0.0015,0.121,0.0001,0.16428,0.0887,0,345,1.2,0.9,1.2
-    2,PV,Slack,3,2,0,0,0,0.0015,0.121,0.0001,0.16428,0.0887,0,345,1.2,0.9,1.2
-    3,PQ,PAC,5,3,0.35,0.05,0,0.0015,0.121,0.0001,0.16428,0.0887,0,345,1.2,0.9,1.2
+    Conv_id, AC_type, DC_type, AC_node, DC_node, P_AC  , Q_AC , P_DC, T_R   , T_X  , PR_R  , PR_X   , Filter, Droop, AC_kV_base, MVA_rating, Ucmin, Ucmax
+    1      , PQ     , PAC    , 2      , 1      , -0.6  , -0.4 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 1.2       , 0.9  , 1.2
+    2      , PV     , Slack  , 3      , 2      , 0     , 0    , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 1.2       , 0.9  , 1.2
+    3      , PQ     , PAC    , 5      , 3      , 0.35  , 0.05 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 1.2       , 0.9  , 1.2
 
 Example Code
 ~~~~~~~~~~~~
