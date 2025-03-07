@@ -217,10 +217,10 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
                 fromNode = grid.nodes_AC[grid.nodes_dict_AC[AC_line_data.at[index, 'fromNode']]] 
                 toNode   = grid.nodes_AC[grid.nodes_dict_AC[AC_line_data.at[index, 'toNode']]]  
 
-            Resistance   = AC_line_data.at[index, 'Resistance']   if 'Resistance'  in AC_line_data.columns else  0.00001
-            Reactance    = AC_line_data.at[index, 'Reactance']    if 'Reactance'  in AC_line_data.columns else   0.00001
-            Conductance  = AC_line_data.at[index, 'Conductance']  if 'Conductance'  in AC_line_data.columns else 0
-            Susceptance  = AC_line_data.at[index, 'Susceptance']  if 'Susceptance'  in AC_line_data.columns else 0
+            Resistance   = AC_line_data.at[index, 'r']   if 'r'  in AC_line_data.columns else  0.00001
+            Reactance    = AC_line_data.at[index, 'x']    if 'x'  in AC_line_data.columns else   0.00001
+            Conductance  = AC_line_data.at[index, 'g']  if 'g'  in AC_line_data.columns else 0
+            Susceptance  = AC_line_data.at[index, 'b']  if 'b'  in AC_line_data.columns else 0
             MVA_rating   = AC_line_data.at[index, 'MVA_rating']   if 'MVA_rating'   in AC_line_data.columns else S_base*1.05
             km           = AC_line_data.at[index, 'Length_km']    if 'Length_km'    in AC_line_data.columns else 1
             kV_base      = toNode.kV_base 
@@ -249,10 +249,10 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
                 fromNode = grid.nodes_AC[grid.nodes_dict_AC[AC_line_data.at[index, 'fromNode']]] 
                 toNode   = grid.nodes_AC[grid.nodes_dict_AC[AC_line_data.at[index, 'toNode']]]  
 
-            Resistance   = AC_line_data.at[index, 'Resistance']   if 'Resistance'   in AC_line_data.columns else None
-            Reactance    = AC_line_data.at[index, 'Reactance']    if 'Reactance'    in AC_line_data.columns else None
-            Conductance  = AC_line_data.at[index, 'Conductance']  if 'Conductance'  in AC_line_data.columns else 0
-            Susceptance  = AC_line_data.at[index, 'Susceptance']  if 'Susceptance'  in AC_line_data.columns else 0
+            Resistance   = AC_line_data.at[index, 'R']   if 'R'   in AC_line_data.columns else None
+            Reactance    = AC_line_data.at[index, 'X']   if 'X'   in AC_line_data.columns else None
+            Conductance  = AC_line_data.at[index, 'G']   if 'G'   in AC_line_data.columns else 0
+            Susceptance  = AC_line_data.at[index, 'B']   if 'B'   in AC_line_data.columns else 0
             MVA_rating   = AC_line_data.at[index, 'MVA_rating']   if 'MVA_rating'   in AC_line_data.columns else 99999
             km           = AC_line_data.at[index, 'Length_km']    if 'Length_km'    in AC_line_data.columns else 1
             kV_base      = toNode.kV_base 
@@ -298,7 +298,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             A_rating = AC_line_data.at[index, 'A_rating']   if 'A_rating'   in AC_line_data.columns else 9999
             # kV_base = AC_line_data.at[index, 'kV_base']
             kV_base= toNode.kV_base 
-            km = AC_line_data.at[index, 'Length_km']
+            km = AC_line_data.at[index, 'Length_km']      if 'Length_km'   in AC_line_data.columns else 1
             N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
             m    = AC_line_data.at[index, 'm']             if 'm'            in AC_line_data.columns else 1
             shift= AC_line_data.at[index, 'shift']         if 'shift'        in AC_line_data.columns else 0
@@ -394,7 +394,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
                 toNode   = grid.nodes_DC[grid.nodes_dict_DC[DC_line_data.at[index, 'toNode']]]  
             
             
-            Resistance    = DC_line_data.at[index, 'Resistance']    if 'Resistance'  in DC_line_data.columns else 0.0001
+            Resistance    = DC_line_data.at[index, 'r']    if 'r'  in DC_line_data.columns else 0.0001
             MW_rating     = DC_line_data.at[index, 'MW_rating']      if 'MW_rating'     in DC_line_data.columns else 99999
             kV_base       = toNode.kV_base 
             pol           = DC_line_data.at[index, 'Mono_Bi_polar']  if 'Mono_Bi_polar' in DC_line_data.columns else 'm'
@@ -429,9 +429,9 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             MW_rating     = DC_line_data.at[index, 'MW_rating']      if 'MW_rating'     in DC_line_data.columns else 99999
             kV_base       = toNode.kV_base 
             pol           = DC_line_data.at[index, 'Mono_Bi_polar']  if 'Mono_Bi_polar' in DC_line_data.columns else 'm'
-            km            = DC_line_data.at[index, 'Length_km']        if 'Length_km' in DC_line_data.columns else 1
-            N_cables      = DC_line_data.at[index, 'N_cables']   if 'N_cables' in DC_line_data.columns else 1
-            Resistance    = DC_line_data.at[index, 'R_Ohm_km']    if 'R_Ohm_km'  in DC_line_data.columns else 0.0095*km/N_cables
+            km            = DC_line_data.at[index, 'Length_km']      if 'Length_km' in DC_line_data.columns else 1
+            N_cables      = DC_line_data.at[index, 'N_cables']       if 'N_cables' in DC_line_data.columns else 1
+            Resistance    = DC_line_data.at[index, 'R']              if 'R'  in DC_line_data.columns else 0.0095*km
             
             
             Z_base = kV_base**2/S_base
@@ -506,11 +506,11 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             P_AC            = Converter_data.at[index, 'P_AC']           if 'P_AC'           in Converter_data.columns else 0
             Q_AC            = Converter_data.at[index, 'Q_AC']           if 'Q_AC'           in Converter_data.columns else 0
             P_DC            = Converter_data.at[index, 'P_DC']           if 'P_DC'           in Converter_data.columns else 0
-            Transformer_R   = Converter_data.at[index, 'T_R']            if 'T_R'            in Converter_data.columns else 0
-            Transformer_X   = Converter_data.at[index, 'T_X']            if 'T_X'            in Converter_data.columns else 0
-            Phase_Reactor_R = Converter_data.at[index, 'PR_R']           if 'PR_R'           in Converter_data.columns else 0
-            Phase_Reactor_X = Converter_data.at[index, 'PR_X']           if 'PR_X'           in Converter_data.columns else 0   
-            Filter          = Converter_data.at[index, 'Filter']         if 'Filter'         in Converter_data.columns else 0
+            T_R_pu          = Converter_data.at[index, 'T_r']            if 'T_r'            in Converter_data.columns else 0
+            T_X_pu          = Converter_data.at[index, 'T_x']            if 'T_x'            in Converter_data.columns else 0
+            PR_R_pu         = Converter_data.at[index, 'PR_r']           if 'PR_r'           in Converter_data.columns else 0
+            PR_X_pu         = Converter_data.at[index, 'PR_x']           if 'PR_x'           in Converter_data.columns else 0   
+            Filter_pu       = Converter_data.at[index, 'Filter_b']         if 'Filter_b'         in Converter_data.columns else 0
             Droop           = Converter_data.at[index, 'Droop']          if 'Droop'          in Converter_data.columns else 0
             kV_base         = Converter_data.at[index, 'AC_kV_base']     if 'AC_kV_base'     in Converter_data.columns else AC_node.kV_base
             MVA_max         = Converter_data.at[index, 'MVA_rating']     if 'MVA_rating'     in Converter_data.columns else 99999
@@ -521,11 +521,60 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             
             geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
                      
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax, name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax, name=str(var_name))
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
                 Converters[var_name].geometry = geometry    
+    elif data_in == 'Ohm':
+        Converter_data = Converter_data.set_index('Conv_id')
+        "Convertor data sorting"
+        Converters = {}
+        for index, row in Converter_data.iterrows():
+            var_name        = index
+            if AC_nodes is not None and DC_nodes is not None:
+                AC_node         = AC_nodes[Converter_data.at[index, 'AC_node']]         
+                DC_node         = DC_nodes[Converter_data.at[index, 'DC_node']] 
+            else:
+                AC_node     = grid.nodes_DC[grid.nodes_dict_AC[Converter_data.at[index, 'AC_node']]] 
+                DC_node     = grid.nodes_DC[grid.nodes_dict_DC[Converter_data.at[index, 'DC_node']]]  
+            AC_type         = Converter_data.at[index, 'AC_type']        if 'AC_type'        in Converter_data.columns else AC_node.type
+            DC_type         = Converter_data.at[index, 'DC_type']        if 'DC_type'        in Converter_data.columns else DC_node.type
+            P_AC            = Converter_data.at[index, 'P_MW_AC']           if 'P_MW_AC'           in Converter_data.columns else 0
+            Q_AC            = Converter_data.at[index, 'Q_MVA_AC']           if 'Q_MVA_AC'           in Converter_data.columns else 0
+            P_DC            = Converter_data.at[index, 'P_MW_DC']           if 'P_MW_DC'           in Converter_data.columns else 0
+            Transformer_R   = Converter_data.at[index, 'T_R']            if 'T_R'            in Converter_data.columns else 0
+            Transformer_X   = Converter_data.at[index, 'T_X']            if 'T_X'            in Converter_data.columns else 0
+            Phase_Reactor_R = Converter_data.at[index, 'PR_R']           if 'PR_R'           in Converter_data.columns else 0
+            Phase_Reactor_X = Converter_data.at[index, 'PR_X']           if 'PR_X'           in Converter_data.columns else 0   
+            Filter          = Converter_data.at[index, 'Filter_B']         if 'Filter_B'         in Converter_data.columns else 0
+            Droop           = Converter_data.at[index, 'Droop']          if 'Droop'          in Converter_data.columns else 0
+            kV_base         = Converter_data.at[index, 'AC_kV_base']     if 'AC_kV_base'     in Converter_data.columns else AC_node.kV_base
+            MVA_max         = Converter_data.at[index, 'MVA_rating']     if 'MVA_rating'     in Converter_data.columns else 99999
+            Ucmin           = Converter_data.at[index, 'Ucmin']          if 'Ucmin'          in Converter_data.columns else 0.85
+            Ucmax           = Converter_data.at[index, 'Ucmax']          if 'Ucmax'          in Converter_data.columns else 1.2
+            n               = Converter_data.at[index, 'Nconverter']     if 'Nconverter'     in Converter_data.columns else 1
+            pol             = Converter_data.at[index, 'pol']            if 'pol'            in Converter_data.columns else 1
+            
+            geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
+
+            P_AC = P_AC/S_base
+            Q_AC = Q_AC/S_base
+            P_DC = P_DC/S_base
+
+
+            Z_base = kV_base**2/S_base
+            T_R_pu = Transformer_R/Z_base
+            T_X_pu = Transformer_X/Z_base
+            PR_R_pu = Phase_Reactor_R/Z_base
+            PR_X_pu = Phase_Reactor_X/Z_base
+            Filter_pu = Filter*Z_base
+
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax, name=str(var_name))
+            if geometry is not None:
+                if isinstance(geometry, str): 
+                     geometry = loads(geometry)  
+                Converters[var_name].geometry = geometry
     else:
         Converter_data = Converter_data.set_index('Conv_id')
         "Convertor data sorting"
@@ -541,7 +590,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             AC_type         = Converter_data.at[index, 'AC_type']        if 'AC_type'        in Converter_data.columns else AC_node.type
             DC_type         = Converter_data.at[index, 'DC_type']        if 'DC_type'        in Converter_data.columns else DC_node.type
             P_AC             = Converter_data.at[index, 'P_MW_AC']       if 'P_MW_AC'        in Converter_data.columns else 0
-            Q_AC             = Converter_data.at[index, 'Q_AC']          if 'Q_AC'           in Converter_data.columns else 0
+            Q_AC             = Converter_data.at[index, 'Q_MVA_AC']          if 'Q_MVA_AC'           in Converter_data.columns else 0
             P_DC             = Converter_data.at[index, 'P_MW_DC']       if 'P_MW_DC'        in Converter_data.columns else 0
             Transformer_R    = Converter_data.at[index, 'T_R_Ohm']       if 'T_R_Ohm'        in Converter_data.columns else 0
             Transformer_X    = Converter_data.at[index, 'T_X_mH']        if 'T_X_mH'         in Converter_data.columns else 0
@@ -563,6 +612,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 
             MVA_max = MVA_rating
             P_AC = P_AC/S_base
+            Q_AC = Q_AC/S_base
             P_DC = P_DC/S_base
             
            

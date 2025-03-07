@@ -1,0 +1,6 @@
+Node_id,type,Voltage_0,theta_0,Power_Gained,Reactive_Gained,Power_load,Reactive_load,kV_base
+1,Slack,1.06,0,0,0,0,0,345
+2,PV,1,0.1,40,0,20,10,345
+3,PQ,1,0.1,0,0,45,15,345
+4,PQ,1,0.1,0,0,40,5,345
+5,PQ,1,0.1,0,0,60,10,345

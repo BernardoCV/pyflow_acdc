@@ -94,9 +94,9 @@ def Converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Fi
     PR_X_H = PR_X_mH/1000
     T_X_H = T_X_mH/1000
 
-    B = f*F*np.pi
-    T_X = f*T_X_H*np.pi
-    PR_X = f*PR_X_H*np.pi
+    B    = 2*f*F*np.pi
+    T_X  = 2*f*T_X_H*np.pi
+    PR_X = 2*f*PR_X_H*np.pi
 
     T_R_pu = T_R_Ohm/Z_base
     T_X_pu = T_X/Z_base
@@ -113,8 +113,8 @@ def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
     Y_base = 1/Z_base
 
     if L_mH == 0:
-        MVA_rating = N_cables*A_rating*kV_base/(1000)
         N_cables = 1
+        MVA_rating = N_cables*A_rating*kV_base/(1000)
         #IN DC N cables is always 1 as the varible is used directly in the formulation
     else:
         MVA_rating = N_cables*A_rating*kV_base*np.sqrt(3)/(1000)

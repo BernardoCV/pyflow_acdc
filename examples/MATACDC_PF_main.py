@@ -12,21 +12,22 @@ import pyflow_acdc as pyf
 start_time = time.time()
 S_base=100 #MVA
 
+ext='Real'
 
-AC_node_data   = pd.read_csv('Stagg5MATACDC/MATACDC_AC_node_data.csv')
-DC_node_data   = pd.read_csv('Stagg5MATACDC/MATACDC_DC_node_data.csv')
-AC_line_data   = pd.read_csv('Stagg5MATACDC/MATACDC_AC_line_data.csv')
-DC_line_data   = pd.read_csv('Stagg5MATACDC/MATACDC_DC_line_data.csv')
-Converter_data = pd.read_csv('Stagg5MATACDC/MATACDC_Converter_data.csv')
+AC_node_data   = pd.read_csv(f'Stagg5MATACDC/MATACDC_AC_node_data_{ext}.csv')
+DC_node_data   = pd.read_csv(f'Stagg5MATACDC/MATACDC_DC_node_data_{ext}.csv')
+AC_line_data   = pd.read_csv(f'Stagg5MATACDC/MATACDC_AC_line_data_{ext}.csv')
+DC_line_data   = pd.read_csv(f'Stagg5MATACDC/MATACDC_DC_line_data_{ext}.csv')
+Converter_data = pd.read_csv(f'Stagg5MATACDC/MATACDC_Converter_data_{ext}.csv')
 
 
 
-[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data,DC_node_data, DC_line_data, Converter_data,data_in = 'pu')
-
-"""
-Sequential algorithm 
+[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data,DC_node_data, DC_line_data, Converter_data,data_in = ext)
 
 """
+# Sequential algorithm 
+
+# """
 
 pyf.ACDC_sequential(grid,QLimit=False)
 

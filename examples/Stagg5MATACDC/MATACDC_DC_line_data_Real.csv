@@ -1,0 +1,4 @@
+﻿Line_id,fromNode,toNode,R_Ohm_km,A_rating,kV_base,Mono_Bi_polar
+1,1,2,61.89,290,345,sm
+2,2,3,61.89,290,345,sm
+3,1,3,86.89,290,345,sm
