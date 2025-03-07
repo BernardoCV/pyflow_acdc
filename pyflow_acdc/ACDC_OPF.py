@@ -8,7 +8,7 @@ import pyomo.environ as pyo
 
 import time
 from concurrent.futures import ThreadPoolExecutor
-
+import re
 
 from  .ACDC_OPF_model import *
 
@@ -300,7 +300,7 @@ def fx_conv(model,grid):
     model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
 
 
-def OPF_solve(model,grid,solver_options=None):
+def OPF_solve(model,grid,solver_options=[]):
     
     if grid.MixedBinCont:
            # opt = pyo.SolverFactory("mindtpy")
@@ -326,12 +326,33 @@ def OPF_solve(model,grid,solver_options=None):
     opt.options['acceptable_tol'] = acceptable_tol   # Acceptable convergence tolerance
     opt.options['print_level']    = print_level      # Output verbosity (0-12)
     """
-    opt = pyo.SolverFactory('ipopt')
-    results = opt.solve(model)
-    print(results.solver.message)  # Shows solver-specific messages
+
+    #solver = solver_options['solver'] if 'solver' in solver_options else 'ipopt'
+    #tee = solver_options['tee'] if 'tee' in solver_options else True
+    #keepfiles = tee
+
+    solver = 'ipopt'
+    logging = solver_options['logging'] if 'logging' in solver_options else True
+    
+
+    opt = pyo.SolverFactory(solver)
+    opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
+    if logging:
+        results = opt.solve(model, logfile="ipopt_output.log")
+        
+        with open("ipopt_output.log", "r") as f:
+            log_content = f.read()
+            print("Log content:", log_content)  # Debug print
+
+        # Print the regex match attempt
+        match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
+        num_iterations = int(match.group(1)) if match else None
+    else:
+        results = opt.solve(model)
+        num_iterations = None
 
     solver_stats = {
-        'iterations': getattr(results.solver, 'iterations', None),  # May not exist in IPOPT
+        'iterations': num_iterations,  # May not exist in IPOPT
         'best_objective': getattr(results.problem, 'upper_bound', None),  # IPOPT provides upper_bound
         'time': getattr(results.solver, 'time', None),  # May not be available
         'termination_condition': str(results.solver.termination_condition)

@@ -355,15 +355,13 @@ Example Code
         data_in='pu'  # Data is in per unit
     )
 
-
 .. raw:: html
 
    </details>
-
    <details>
    <summary><b>Data in Ohms</b></summary>
 
-Data in Ohms affects AC and DC brach components, where the user specify the absolute reissitance. It is assumed that the user has taken into account lenght, parallel branches and so on. And the resistance, reactance, conductnace and susceptance are given for the whole branch.
+Data in Ohms affects AC and DC branch components, where the user specifies the absolute resistance. It is assumed that the user has taken into account length, parallel branches and so on. And the resistance, reactance, conductance and susceptance are given for the whole branch.
 
 .. list-table:: AC Nodes
    :widths: 20 20 20
@@ -612,7 +610,7 @@ Data in Ohms affects AC and DC brach components, where the user specify the abso
 
 Here are example CSV files from a 5-bus test system using the data in Ohm values:
 
-AC Node Data (AC_node_data_Ohm.csv)
+AC Node Data (AC_node_data_Ohm.csv) 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
@@ -698,11 +696,9 @@ Example Code
         data_in='Ohm'  # Data is in Ohm values
     )
 
-
 .. raw:: html
 
    </details>
-
    <details>
    <summary><b>Data in Real values</b></summary>
 
@@ -1041,14 +1037,9 @@ Example Code
         data_in='Real'  # Data is in Real values
     )
 
-
 .. raw:: html
 
    </details>
-
-
-
-
 
 References
 ----------
