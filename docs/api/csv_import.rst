@@ -790,9 +790,9 @@ Data in Ohms affects AC and DC brach components, where the user specify the abso
 Example Files
 --------------
 
-Here are example CSV files from a 5-bus test system:
+Here are example CSV files from a 5-bus test system using the data in per unit [1]_:
 
-AC Node Data (MATACDC_AC_node_data.csv)
+AC Node Data (AC_node_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
@@ -804,7 +804,7 @@ AC Node Data (MATACDC_AC_node_data.csv)
     4     , PQ    , 1        , 0.1    , 0           , 0              , 0.4       , 0.05         , 345
     5     , PQ    , 1        , 0.1    , 0           , 0              , 0.6       , 0.1          , 345
 
-AC Line Data (MATACDC_AC_line_data.csv)
+AC Line Data (AC_line_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
@@ -818,7 +818,7 @@ AC Line Data (MATACDC_AC_line_data.csv)
     6      , 3       , 4     , 0.01     , 0.03     , 0         , 0.02      , 100      , 345
     7      , 4       , 5     , 0.08     , 0.24     , 0         , 0.05      , 100      , 345
 
-DC Node Data (MATACDC_DC_node_data.csv)
+DC Node Data (DC_node_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
@@ -828,7 +828,7 @@ DC Node Data (MATACDC_DC_node_data.csv)
        2   ,Slack,     1   ,     0      ,     0    , 345
        3   , P   ,     1   ,     0      ,     0    , 345
 
-DC Line Data (MATACDC_DC_line_data.csv)
+DC Line Data (DC_line_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
@@ -838,7 +838,7 @@ DC Line Data (MATACDC_DC_line_data.csv)
     2      , 2      , 3    , 0.052    , 100     , 345    , sm
     3      , 1      , 3    , 0.073    , 100     , 345    , sm
 
-Converter Data (MATACDC_Converter_data.csv)
+Converter Data (Converter_data.csv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
@@ -857,11 +857,11 @@ Example Code
     import pyflow_acdc as pyf
 
     # Read CSV files
-    ac_nodes = pd.read_csv('MATACDC_AC_node_data.csv')
-    ac_lines = pd.read_csv('MATACDC_AC_line_data.csv')
-    dc_nodes = pd.read_csv('MATACDC_DC_node_data.csv')
-    dc_lines = pd.read_csv('MATACDC_DC_line_data.csv')
-    converters = pd.read_csv('MATACDC_Converter_data.csv')
+    ac_nodes = pd.read_csv('AC_node_data.csv')
+    ac_lines = pd.read_csv('AC_line_data.csv')
+    dc_nodes = pd.read_csv('DC_node_data.csv')
+    dc_lines = pd.read_csv('DC_line_data.csv')
+    converters = pd.read_csv('Converter_data.csv')
 
     # Create grid
     grid, results = pyf.Create_grid_from_data(
@@ -873,6 +873,14 @@ Example Code
         Converter_data=converters,
         data_in='pu'  # Data is in per unit
     )
+
+
+
+References
+----------
+
+.. [1] J. Beerten and R. Belmans, "MatACDC - an open source software tool for steady-state analysis and operation of HVDC grids," 11th IET International Conference on AC and DC Power Transmission, Birmingham, 2015, pp. 1-9, doi: 10.1049/cp.2015.0061. keywords: {Steady-state analysis;HVDC grids;AC/DC systems;power flow modelling},
+
 
 
 
