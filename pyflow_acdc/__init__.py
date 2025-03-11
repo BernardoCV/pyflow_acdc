@@ -155,6 +155,7 @@ __all__ = [
     'price_zone_data_pd',
     'price_zone_coef_data',
     'plot_curves',
+    'clean_entsoe_data',
 
     'run_dash',
 ]

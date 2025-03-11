@@ -763,8 +763,7 @@ Key Attributes:
 
 
 
-References
-----------
+**References**
 
 .. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
        "An optimal power flow tool for AC/DC systems, applied to the analysis of the

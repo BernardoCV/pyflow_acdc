@@ -852,7 +852,8 @@ def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
 
 def results_TS_OPF(grid,excel_file_path,grid_names=None,stats=None,times=None):
     
-    
+    if not excel_file_path.endswith('.xlsx'):
+        excel_file_path = f'{excel_file_path}.xlsx'
   
     if grid_names is not None:
         grid.time_series_results['grid_loading'] =grid.time_series_results['grid_loading'].rename(columns=grid_names)

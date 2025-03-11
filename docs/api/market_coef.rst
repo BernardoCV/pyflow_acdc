@@ -1,17 +1,15 @@
 Market Coefficients Module
-=========================
+===========================
 
-This page has been pre-filled with the functions that are available in the Market_Coeff module by AI, please check the code for more details.
-
-This module provides functions for analyzing market data and generating cost coefficients for price zones.
+This module provides functions for analyzing supply and demand market data to prepare values for the price zone coefficients based on EPEX Spot data format. As well as cleaning data downloaded from ENTSO-E for load and generation trends.
 
 functions are found in pyflow_acdc.Market_Coeff
 
 Price Zone Coefficient Analysis
------------------------------
+-------------------------------
 
-price_zone_coef_data
-^^^^^^^^^^^^^^^^^^
+Obtain price zone coefficients
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:function:: price_zone_coef_data(df, start, end, increase_eq_price=50)
 
@@ -47,60 +45,58 @@ price_zone_coef_data
         - 50
         - €/MWh
 
-   Returns dictionary containing:
+   Returns a list of dictionaries containing:
 
-   - Supply/demand curves
-   - Market equilibrium points
-   - Cost coefficients
-   - Timing information
+   - ``Date`` - Date of the data
+   - ``Hour`` - Hour of the data
+   - ``Sell`` - Supply curve data
+   - ``Purchase`` - Demand curve data
+   - ``Integrated_sets`` - Benefit of consumption and cost of generation from integral of supply and demand curves
+   - ``Dem_data_points`` - Number of demand data points
+   - ``Gen_data_points`` - Number of supply data points
+   - ``max_gen`` - Maximum supply value
+   - ``min_demand`` - Minimum demand value
+   - ``Market_price`` - Market clearing price
+   - ``Volume_eq`` - Market clearing volume
+   - ``poly`` - Dictionary containing polynomial coefficients
+   - ``prediction_BC`` - Predicted benefit of consumption
+   - ``prediction_CG`` - Predicted cost of generation
+   - ``Volume_0`` - Volume where first positive price is supplied
 
-Cost Generation Curves
---------------------
+   And timing information with the following keys:
 
-cost_generation_curve
+   - ``load data`` - Time taken to load data
+   - ``avg process`` - Average time taken to process data
+   - ``tot process`` - Total time taken to process data
+
+Export data to csv
 ^^^^^^^^^^^^^^^^^^
 
-.. py:function:: cost_generation_curve(data, hour, increase_eq_price)
+.. py:function:: price_zone_data_pd(data,save_csv=None)
 
-   Calculates cost and benefit curves for a specific hour.
+   Converts market data to pandas DataFrame and saves it to a csv file.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 10
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
         - Default
-        - Units
       * - ``data``
         - dict
         - Market data
         - Required
-        - -
-      * - ``hour``
-        - int
-        - Hour to analyze
-        - Required
-        - hour
-      * - ``increase_eq_price``
-        - float
-        - Price increase
-        - Required
-        - €/MWh
-
-   Calculates:
-
-   - Cost of generation curve
-   - Benefit of consumption curve
-   - Market equilibrium point
-   - Operating limits (Pmin, Pmax)
+      * - ``save_csv``
+        - str
+        - Save csv file
+        - None
 
 Visualization
------------
+^^^^^^^^^^^^^^
 
-plot_curves
-^^^^^^^^^
+Generates plots of market curves.
 
 .. py:function:: plot_curves(data, hour, name=None)
 
@@ -142,28 +138,66 @@ plot_curves
 
    .. code-block:: python
 
-       pyf.plot_curves(market_data, hour=12, name='market_curves')
+       pyf.plot_curves(market_data, hour=12, name='Belgium')
 
-Coefficient Calculation
---------------------
+ENTSO-E Data Cleaning
+---------------------
 
-calculate_cost_of_generation
-^^^^^^^^^^^^^^^^^^^^^^^^^
+For the use of entsoe data cleaning, the data has to be structured as follows:
 
-.. py:function:: calculate_cost_of_generation(supply_df, min_volume, eq_volume, max_volume, max_price, supply_interp, eq_price)
+.. code-block:: text
 
-   Calculates generation cost coefficients.
+    path
+    |-- key0
+    |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_0-1}12312300-{year_0}12312300.csv
+    |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_0-1}12312300-{year_0}12312300.csv
+    |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_1-1}12312300-{year_1}12312300.csv
+    |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_1-1}12312300-{year_1}12312300.csv
+    |   |-- ...
+    |-- key1
+    |   |-- ...
+    |-- ...  
 
-   Returns quadratic cost function coefficients (a, b, c) where:
-   
-   Cost = a*P² + b*P + c
+This is the name of the files when downloaded from ENTSO-E transparency platform.
 
-   - a: Quadratic coefficient (€/MW²h)
-   - b: Linear coefficient (€/MWh)
-   - c: Constant term (€/h)
 
-   Also returns:
+.. py:function:: clean_entsoe_data(key_list, year_list, production_types=[], output_excel=None,path=None):
+    
+   Process generation and load data for multiple areas/years and save to Excel.
 
-   - Volume ranges
-   - Interpolation functions
-   - Operating limits
+   .. list-table::
+      :widths: 20 10 30 30
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+      * - ``key_list``
+        - list
+        - List of keys
+        - Required
+      * - ``year_list``
+        - list  
+        - List of years
+        - Required
+      * - ``production_types``
+        - list
+        - Reduced list of production types
+        - All
+      * - ``output_excel``
+        - str
+        - Output excel file
+        - output_data.xlsx
+      * - ``path``
+        - str
+        - Path to save the excel file
+        - Current working directory
+
+   **Returns**
+
+   Excel file containing the following sheets:
+
+   * ``Maximum values`` - Contains maximum values for each column
+   * ``year_0`` - Contains normalized data for the first year
+   * ``year_n`` - Contains normalized data for subsequent years

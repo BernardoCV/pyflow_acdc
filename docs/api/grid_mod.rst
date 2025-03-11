@@ -9,7 +9,7 @@ Add Grid Components
 -------------------
 
 Add AC Node
-^^^^^^^^^^^^
+^^^^^^^^^^^^	
 
 .. py:function:: add_AC_node(grid, kV_base, node_type='PQ', Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1, Gs=0, Bs=0, x_coord=None, y_coord=None, geometry=None)
 
@@ -888,7 +888,7 @@ Line Modifications
 ------------------
 
 Change Line to Expandable
-^^^^^^^^^^^^^^^^^^^^^^^^    
+^^^^^^^^^^^^^^^^^^^^^^^^^    
 
 .. py:function:: change_line_AC_to_expandable(grid, line_name)
 

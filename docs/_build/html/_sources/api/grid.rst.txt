@@ -57,7 +57,7 @@ A more detailed description of the function can be found in the :doc:`csv_import
         - Grid and Results objects
 
    **Example**
-
+   
    .. code-block:: python
 
        grid, results = pyf.Create_grid_from_data(100, ac_nodes_df, ac_lines_df)
