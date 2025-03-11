@@ -48,12 +48,12 @@ def pglib_opf_case5_pjm():
     nodes_AC = pd.DataFrame(nodes_AC_data)
 
     lines_AC_data = [
-        {'fromNode': '1.0', 'toNode': '2.0', 'Resistance': 0.00281, 'Reactance': 0.0281, 'Conductance': 0, 'Susceptance': 0.00712, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '1'},
-        {'fromNode': '1.0', 'toNode': '4.0', 'Resistance': 0.00304, 'Reactance': 0.0304, 'Conductance': 0, 'Susceptance': 0.00658, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '2'},
-        {'fromNode': '1.0', 'toNode': '5.0', 'Resistance': 0.00064, 'Reactance': 0.0064, 'Conductance': 0, 'Susceptance': 0.03126, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '3'},
-        {'fromNode': '2.0', 'toNode': '3.0', 'Resistance': 0.00108, 'Reactance': 0.0108, 'Conductance': 0, 'Susceptance': 0.01852, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '4'},
-        {'fromNode': '3.0', 'toNode': '4.0', 'Resistance': 0.00297, 'Reactance': 0.0297, 'Conductance': 0, 'Susceptance': 0.00674, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '5'},
-        {'fromNode': '4.0', 'toNode': '5.0', 'Resistance': 0.00297, 'Reactance': 0.0297, 'Conductance': 0, 'Susceptance': 0.00674, 'MVA_rating': 240.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '6'}
+        {'fromNode': '1.0', 'toNode': '2.0', 'r': 0.00281, 'x': 0.0281, 'g': 0, 'b': 0.00712, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '1'},
+        {'fromNode': '1.0', 'toNode': '4.0', 'r': 0.00304, 'x': 0.0304, 'g': 0, 'b': 0.00658, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '2'},
+        {'fromNode': '1.0', 'toNode': '5.0', 'r': 0.00064, 'x': 0.0064, 'g': 0, 'b': 0.03126, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '3'},
+        {'fromNode': '2.0', 'toNode': '3.0', 'r': 0.00108, 'x': 0.0108, 'g': 0, 'b': 0.01852, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '4'},
+        {'fromNode': '3.0', 'toNode': '4.0', 'r': 0.00297, 'x': 0.0297, 'g': 0, 'b': 0.00674, 'MVA_rating': 426.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '5'},
+        {'fromNode': '4.0', 'toNode': '5.0', 'r': 0.00297, 'x': 0.0297, 'g': 0, 'b': 0.00674, 'MVA_rating': 240.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '6'}
     ]
     lines_AC = pd.DataFrame(lines_AC_data)
 

@@ -141,7 +141,7 @@ Examples of running an optimal power flow...
 
     [grid,res]=pyf.case39_acdc()
 
-    model,results,timing_info,solver_stats = pyf.OPF_ACDC(grid,ObjRule={'obj':{'w':1}})
+    model, timing_info, [model_res,solver_stats] = pyf.OPF_ACDC(grid,ObjRule={'obj':{'w':1}})
 
     res.All()
     print ('------')

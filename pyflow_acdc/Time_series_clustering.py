@@ -155,7 +155,7 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
 
     return data_scaled, scaler, data
 
-def identify_correlations(grid,time_series=[], correlation_threshold=0,cv_threshold=0,central_market=[],print_details=False,corrolation_decisions=[]):
+def  identify_correlations(grid,time_series=[], correlation_threshold=0,cv_threshold=0,central_market=[],print_details=False,corrolation_decisions=[]):
     """
     Identify highly correlated time series variables.
     
@@ -237,15 +237,17 @@ def identify_correlations(grid,time_series=[], correlation_threshold=0,cv_thresh
         columns_to_drop = []
 
         if clean_groups:    
-            if method == '1':
-                print("\nUsing highest variance method:")
+            if method == '1' or method == 1:
+                
                 for group in groups:
                     group_list = list(group)
                     group_variances = data[group_list].var()
                     max_var_col = group_variances.idxmax()
-                    print(f"\nGroup: {group_list}")
-                    print(f"Variances: {group_variances}")
-                    print(f"Keeping: {max_var_col} (variance: {group_variances[max_var_col]:.2f})")
+                    if print_details:
+                        print("\nUsing highest variance method:")
+                        print(f"\nGroup: {group_list}")
+                        print(f"Variances: {group_variances}")
+                        print(f"Keeping: {max_var_col} (variance: {group_variances[max_var_col]:.2f})")
                     
                     if scale_groups:
                         scaling_factor = np.sqrt(len(group_list))
@@ -254,38 +256,41 @@ def identify_correlations(grid,time_series=[], correlation_threshold=0,cv_thresh
                     
                     columns_to_drop.extend([col for col in group_list if col != max_var_col])
             
-            elif method == '2':
-                print("\nUsing PCA with new components:")
+            elif method == '2' or method == 2:
+                
                 for group in groups:
                     group_list = list(group)
                     group_data = data_scaled[group_list]
                     
-                    print(f"\nGroup: {group_list}")
                     # Apply PCA
                     pca = PCA(n_components=1)
                     pc1 = pca.fit_transform(group_data)
                     
                     # Create new column name
                     new_col = f"PC1_{'_'.join(group_list)}"
-                    print(f"Creating new component: {new_col}")
-                    print(f"Explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
+                    if print_details:
+                        print("\nUsing PCA with new components:")
+                        print(f"\nGroup: {group_list}")
+                        print(f"Creating new component: {new_col}")
+                        print(f"Explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
                     
                     # Scale PC if requested
                     if scale_groups:
                         scaling_factor = np.sqrt(len(group_list))
-                        print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
+                        if print_details:
+                            print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
                         pc1 *= scaling_factor
                     
                     data_scaled[new_col] = pc1.ravel()
                     columns_to_drop.extend(group_list)
             
-            elif method == '3':
-                print("\nUsing PCA representative method:")
+            elif method == '3' or method == 3:
+                
                 for group in groups:
                     group_list = list(group)
                     group_data = data_scaled[group_list]
                     
-                    print(f"\nGroup: {group_list}")
+                    
                     # Apply PCA
                     pca = PCA(n_components=1)
                     pc1 = pca.fit_transform(group_data)
@@ -295,9 +300,12 @@ def identify_correlations(grid,time_series=[], correlation_threshold=0,cv_thresh
                     max_cor_idx = np.argmax(np.abs(correlations))
                     max_cor_col = group_list[max_cor_idx]
                     
-                    print(f"PC1 explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
-                    print(f"Correlations with PC1: {dict(zip(group_list, correlations))}")
-                    print(f"Keeping: {max_cor_col} (correlation: {correlations[max_cor_idx]:.2f})")
+                    if print_details:
+                        print("\nUsing PCA representative method:")
+                        print(f"\nGroup: {group_list}")
+                        print(f"PC1 explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
+                        print(f"Correlations with PC1: {dict(zip(group_list, correlations))}")
+                        print(f"Keeping: {max_cor_col} (correlation: {correlations[max_cor_idx]:.2f})")
                     
                     if scale_groups:
                         scaling_factor = np.sqrt(len(group_list))

@@ -394,7 +394,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
     def formula_Min_Ext_Gen():
         if ObjRule['Ext_Gen']['w']==0:
             return 0
-        return sum((model.PGi_opt[node]**2 + (model.QGi_opt[node]**2)) for node in model.nodes_AC)
+        return sum((model.PGi_opt[node]*grid.S_base) for node in model.nodes_AC)
 
     def formula_Energy_cost():
         if ObjRule['Energy_cost']['w']==0:

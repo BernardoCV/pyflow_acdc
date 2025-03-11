@@ -32,9 +32,9 @@ This documentation is under active development if any questions arise please con
    api/grid_mod
    api/pf
    api/opf
-   api/plotting
    api/ts
    api/ts_clustering
+   api/plotting
    api/market_coef
    api/export_files
 
