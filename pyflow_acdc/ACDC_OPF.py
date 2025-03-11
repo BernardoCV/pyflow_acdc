@@ -332,22 +332,22 @@ def OPF_solve(model,grid,solver_options=[]):
     #keepfiles = tee
 
     solver = 'ipopt'
-    # logging = solver_options['logging'] if 'logging' in solver_options else True
+    #logging = solver_options['logging'] if 'logging' in solver_options else True
     
 
     opt = pyo.SolverFactory(solver)
-    # opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
-    # if logging:
-    #     results = opt.solve(model, logfile="ipopt_output.log")
+    #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
+    #if logging:
+    #    results = opt.solve(model, logfile="ipopt_output.log")
         
-    #     with open("ipopt_output.log", "r") as f:
-    #         log_content = f.read()
-    #         print("Log content:", log_content)  # Debug print
+    #    with open("ipopt_output.log", "r") as f:
+    #        log_content = f.read()
+    #        print("Log content:", log_content)  # Debug print
 
-    #     # Print the regex match attempt
-    #     match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
-    #     num_iterations = int(match.group(1)) if match else None
-    # else:
+    # Print the regex match attempt
+    #match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
+    #num_iterations = int(match.group(1)) if match else None
+
     results = opt.solve(model)
     num_iterations = None
 
