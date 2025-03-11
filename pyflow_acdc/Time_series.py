@@ -538,6 +538,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
        'AC_losses': {'w': 0},
        'DC_losses': {'w': 0},
        'Converter_Losses': {'w': 0},
+       'General_Losses': {'w': 0},  
        'PZ_cost_of_generation': {'w': 0},
        'Renewable_profit': {'w': 0},
        'Gen_set_dev': {'w': 0}

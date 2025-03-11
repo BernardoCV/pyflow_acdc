@@ -508,7 +508,7 @@ def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,M
              found=True
              break
     if not found:
-        print('Node {node_name} does not exist')
+        print(f'Node {node_name} does not exist')
         sys.exit()
     gen.price_zone_link=price_zone_link
     if price_zone_link:
