@@ -810,7 +810,7 @@ def OPF_conv_results(model,grid):
         S_AC = np.sqrt(opt_res_P_conv_AC[name]**2 + opt_res_Q_conv_AC[name]**2)
         P_DC = opt_res_P_conv_DC[name]
         
-        opt_res_Loading_conv[name]=max(S_AC, np.abs(P_DC)) * grid.S_base / conv.MVA_max
+        opt_res_Loading_conv[name]=max(S_AC, np.abs(P_DC)) * grid.S_base / (conv.MVA_max*conv.NumConvP)
        
     with ThreadPoolExecutor() as executor:
         executor.map(process_converter, grid.Converters_ACDC)

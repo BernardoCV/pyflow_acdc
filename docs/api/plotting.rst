@@ -7,11 +7,93 @@ This module provides functions for visualizing grid components and results.
 
 functions are found in pyflow_acdc.Graph_and_plot
 
+Time Series Results
+-------------------
+
+This function is used to plot the time series results of the grid.
+
+.. py:function:: plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_format='svg')
+
+   Creates plots for time series results. The possible plotting choices are:
+
+   - 'Power Generation by price zone'
+   - 'Power Generation by generator'
+   - 'Curtailment'
+   - 'Market Prices'
+   - 'AC line loading'
+   - 'DC line loading'
+   - 'AC/DC Converters'
+   - 'Power Generation by generator area chart'
+   - 'Power Generation by price zone area chart'
+
+
+   .. list-table::
+      :widths: 20 10 50 10
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+      * - ``grid``
+        - Grid
+        - Grid with results
+        - Required
+      * - ``start``
+        - str
+        - Start date
+        - None
+      * - ``end``
+        - str
+        - End date
+        - None
+      * - ``plotting_choices``
+        - list
+        - Results types to plot
+        - None
+      * - ``show``    
+        - bool
+        - Whether to show the plot in browser
+        - True
+      * - ``path``  
+        - str
+        - Path to save the plot
+        - Current working directory
+      * - ``save_format``
+        - str
+        - Format to save the plot
+        - 'svg'
+
+   **Example**
+
+   .. code-block:: python
+
+       import pyflow_acdc as pyf
+       [grid,results] = pyf.NS_MTDC()
+
+       start = 5750
+       end = 6000
+       obj = {'Energy_cost': 1}
+
+       market_prices_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
+       TS_MK = pd.read_csv(market_prices_url)
+       pyf.add_TimeSeries(grid,TS_MK)
+
+       wind_load_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
+       TS_wl = pd.read_csv(wind_load_url)
+       pyf.add_TimeSeries(grid,TS_wl)
+
+       times=pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)  
+
+       grid.plot_TS_res(grid,start,end)
+
+
+
 Network Graph Visualization
--------------------------
+---------------------------
 
 plot_Graph
-^^^^^^^^^
+^^^^^^^^^^
 
 .. py:function:: plot_Graph(Grid, image_path=None, dec=3, text='inPu', grid_names=None, base_node_size=10, G=None)
 
@@ -63,121 +145,7 @@ plot_Graph
 
        grid.plot_Graph(text='abs')
 
-Map Visualization
----------------
 
-plot_folium
-^^^^^^^^^^
-
-.. py:function:: plot_folium(grid, text='inPu', name='grid_map', tiles="CartoDB Positron", polygon=None, ant_path='None', clustering=True, coloring=None)
-
-   Creates an interactive map visualization using Folium.
-
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``grid``
-        - Grid
-        - Grid to visualize
-        - Required
-        - -
-      * - ``text``
-        - str
-        - Hover text format ('inPu' or 'abs')
-        - 'inPu'
-        - -
-      * - ``name``
-        - str
-        - Output file name
-        - 'grid_map'
-        - -
-      * - ``tiles``
-        - str
-        - Map style
-        - "CartoDB Positron"
-        - -
-      * - ``ant_path``
-        - str
-        - Animated paths
-        - 'None'
-        - -
-      * - ``clustering``
-        - bool
-        - Enable marker clustering
-        - True
-        - -
-
-   **Features**:
-
-   - Interactive map with zoom/pan
-   - Voltage level filtering
-   - Component type layers:
-     - MVAC Lines (<110kV)
-     - HVAC Lines (<300kV)
-     - HVAC Lines (<500kV)
-     - HVDC Lines
-     - Converters
-     - Transformers
-   - Marker clustering for generators/loads
-   - Hover information for components
-   - Optional animated power flows
-
-   **Example**
-
-   .. code-block:: python
-
-       grid.plot_folium(name='my_map', text='inPu')
-
-Time Series Results
------------------
-
-plot_TS_res
-^^^^^^^^^^
-
-.. py:function:: plot_TS_res(grid, results_to_plot=None)
-
-   Creates plots for time series results.
-
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``grid``
-        - Grid
-        - Grid with results
-        - Required
-        - -
-      * - ``results_to_plot``
-        - list
-        - Results types to plot
-        - None
-        - -
-
-   **Available Result Types**:
-
-   - Line loadings
-   - Node voltages
-   - Power flows
-   - Generator dispatch
-   - Load profiles
-   - Converter flows
-
-   **Example**
-
-   .. code-block:: python
-
-       grid.plot_TS_res(['line_loading', 'voltages'])
 
 Neighbor Graph
 ------------
