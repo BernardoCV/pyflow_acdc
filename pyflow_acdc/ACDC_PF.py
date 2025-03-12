@@ -85,18 +85,20 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
         for conv in grid.Converters_ACDC:
             if conv.type== 'PAC':
                 PGi_ren = sum(rs.PGi_ren*rs.gamma for rs in conv.Node_AC.connected_RenSource)
+                QGi_ren = sum(rs.QGi_ren for rs in conv.Node_AC.connected_RenSource)
                 PGi_opt = sum(gen.PGen for gen in conv.Node_AC.connected_gen)
                 QGi_opt = sum(gen.QGen for gen in conv.Node_AC.connected_gen)
                 if conv.Node_AC.stand_alone == True:
                     conv.P_AC = -(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
-                    conv.Q_AC = -(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
+                    conv.Q_AC = -(conv.Node_AC.QGi+QGi_opt+QGi_ren-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                 else:
                     if conv.AC_type == 'Slack':
                         conv.P_AC = conv.Node_AC.P_INJ-(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
-                        conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
+                        conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt+QGi_ren-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                     if conv.AC_type == 'PV':
                         conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                 flow_conv_P_AC(grid,conv)
+                s=1
 
         if QLimit == True:
             for conv in grid.Converters_ACDC:
@@ -120,7 +122,8 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
 
             if conv.AC_type == 'PV':
                 QGi_opt = sum(gen.QGen for gen in conv.Node_AC.connected_gen)
-                conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi+QGi_opt-AC_node.QLi+AC_node.Q_s_fx)
+                QGi_ren = sum(rs.QGi_ren for rs in conv.Node_AC.connected_RenSource)
+                conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi+QGi_opt+QGi_ren-AC_node.QLi+AC_node.Q_s_fx)
             conv.U_s = AC_node.V
             conv.th_s = AC_node.theta
             flow_conv(grid,conv)
@@ -318,9 +321,9 @@ def Jacobian_AC(grid, Voltages, Angles,P,Q):
     V = Voltages
     th = Angles
     
-    slack_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'Slack'])
-    pv_indices    = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'PV'])
-    pq_indices    = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'PQ'])
+    slack_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'Slack'], dtype=int)
+    pv_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'PV'], dtype=int)
+    pq_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == 'PQ'], dtype=int)
     non_slack_indices = np.sort(np.concatenate((pv_indices, pq_indices)))
 
     
@@ -527,8 +530,6 @@ def flow_conv_P_AC(grid, conv):
 
     Is = np.conj(Ss_cart/Us_cart)
 
-    
-
     if Zf != 0:
         Uf_cart = Us_cart+Ztf*Is
         Ic_cart = Us_cart/Zf+Is*(Zf+Ztf)/Zf
@@ -537,7 +538,7 @@ def flow_conv_P_AC(grid, conv):
     else:
         Uf_cart = 0 + 1j*0
         Ic_cart = Is
-        Uc_cart = Us_cart+Ztf*Ic_cart
+        Uc_cart = Us_cart+(Ztf+Zc)*Ic_cart
         
         # else:
         #     [Uc, th_c] = [Us, th_s]
@@ -650,7 +651,7 @@ def Jacobian_conv(grid, conv, Qcf, Qsf, Pcf, Psf, U_f, U_c, Pc, Qc, Ps, Qs):
 
     return J_conv
 
-def flow_conv(grid, conv, tol_lim=1e-14, maxIter=20):
+def flow_conv(grid, conv, tol_lim=1e-10, maxIter=20):
 
     if conv.Bf == 0:
         flow_conv_no_filter(grid,conv, tol_lim, maxIter)

@@ -1,5 +1,7 @@
-System Modelling
-=================
+.. _modelling:
+
+System Modelling 
+================
 
 This page presents the modelling of the different components of the grid.
 
@@ -7,6 +9,8 @@ The Classes are found in pyflow_acdc.Classes
 
 AC System Modelling
 -------------------
+
+.. _AC_node_modelling:
 
 AC node modelling
 ^^^^^^^^^^^^^^^^^
@@ -113,7 +117,8 @@ Example Usage:
         
 
 
-   
+.. _AC_branch_modelling:
+
 AC branch modelling
 ^^^^^^^^^^^^^^^^^^^
 
@@ -232,6 +237,10 @@ Example Usage:
 
         line_2 = pyf.Line_AC(node1, node2, S_base=100, Length_km=100, Cable_type='NREL_XLPE_630mm_66kV')
 
+
+
+.. _DC_node_modelling:
+
 DC System Modelling
 ------------------- 
 
@@ -310,6 +319,8 @@ Example Usage:
         node = pyf.Node_DC('P', 1, 0,0,525,name='Bus1')
 
 
+.. _DC_line_modelling:
+
 DC line modelling
 ^^^^^^^^^^^^^^^^^
 
@@ -377,6 +388,8 @@ Key Attributes:
      - Base power of the line in MVA
 
 
+
+.. _ACDC_converter_modelling:
 
 ACDC Converter Modelling
 ------------------------
@@ -612,6 +625,8 @@ Key Attributes:
 
 
 
+.. _Generator_modelling:
+
 Generator Modelling
 --------------------
 
@@ -724,6 +739,10 @@ Key Attributes:
          :align: center
      - 
 
+
+
+.. _Price_zone_modelling:
+
 Price Zone Modelling
 ---------------------
 
@@ -744,8 +763,7 @@ Key Attributes:
 
 
 
-References
-----------
+**References**
 
 .. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
        "An optimal power flow tool for AC/DC systems, applied to the analysis of the

@@ -24,18 +24,32 @@ This documentation is under active development if any questions arise please con
 
 .. toctree::
    :maxdepth: 2
-   :caption: API Reference:
+   :caption: Grid Management:
 
    api/modelling
    api/grid
    api/csv_import
    api/grid_mod
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Power Flow Analysis:
+
    api/pf
    api/opf
-   api/plotting
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Time Series & Analysis:
+
    api/ts
-   api/ts_clustering
    api/market_coef
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Visualization & Export:
+
+   api/plotting
    api/export_files
 
 Quick Start

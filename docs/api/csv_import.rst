@@ -13,6 +13,15 @@ In this page the column names for importing data from CSV files are described. I
 
    Extends an existing grid with new components from pandas/geopandas DataFrames or csv file strings.
 
+
+.. figure:: ../images/Stagg5MATACDC.svg
+   :alt: Case 5 Stagg
+   :align: center
+
+   Case 5 Stagg Grid
+
+The examples below are based on the Case 5 Stagg Grid in MATACDC [1]_.
+
 Required CSV Files
 -------------------
 
@@ -271,10 +280,9 @@ Select your data input format:
      - None
 
 
-Here are example CSV files from a 5-bus test system using the data in per unit [1]_:
+Here are example CSV files from a 5-bus test system in per unit:
 
-AC Node Data (AC_node_data.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**AC Node Data (AC_node_data.csv)**
 
 .. code-block:: text
 
@@ -285,8 +293,7 @@ AC Node Data (AC_node_data.csv)
     4     , PQ    , 1        , 0.1    , 0           , 0              , 0.4       , 0.05         , 345
     5     , PQ    , 1        , 0.1    , 0           , 0              , 0.6       , 0.1          , 345
 
-AC Line Data (AC_line_data.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**AC Line Data (AC_line_data.csv)**
 
 .. code-block:: text
 
@@ -299,8 +306,7 @@ AC Line Data (AC_line_data.csv)
     6      , 3       , 4     , 0.01, 0.03 , 0, 0.02, 100      , 345
     7      , 4       , 5     , 0.08, 0.24 , 0, 0.05, 100      , 345
 
-DC Node Data (DC_node_data.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**DC Node Data (DC_node_data.csv)**
 
 .. code-block:: text
 
@@ -309,8 +315,7 @@ DC Node Data (DC_node_data.csv)
        2   ,Slack,     1   ,     0      ,     0    , 345
        3   , P   ,     1   ,     0      ,     0    , 345
 
-DC Line Data (DC_line_data.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**DC Line Data (DC_line_data.csv)**
 
 .. code-block:: text
 
@@ -319,8 +324,7 @@ DC Line Data (DC_line_data.csv)
     2      , 2       , 3     , 0.052, 100     , 345    , sm
     3      , 1       , 3     , 0.073, 100     , 345    , sm
 
-Converter Data (Converter_data.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Converter Data (Converter_data.csv)**
 
 .. code-block:: text
 
@@ -329,8 +333,7 @@ Converter Data (Converter_data.csv)
     2      , PV     , Slack  , 3      , 2      , 0     , 0    , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
     3      , PQ     , PAC    , 5      , 3      , 0.35  , 0.05 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
 
-Example Code
-~~~~~~~~~~~~
+**Example Code**
 
 .. code-block:: python
 
@@ -362,6 +365,8 @@ Example Code
    <summary><b>Data in Ohms</b></summary>
 
 Data in Ohms affects AC and DC branch components, where the user specifies the absolute resistance. It is assumed that the user has taken into account length, parallel branches and so on. And the resistance, reactance, conductance and susceptance are given for the whole branch.
+
+**AC Node Data (AC_node_data_Ohm.csv)**
 
 .. list-table:: AC Nodes
    :widths: 20 20 20
@@ -420,6 +425,8 @@ Data in Ohms affects AC and DC branch components, where the user specifies the a
      - None
 
 
+**AC Line Data (AC_line_data_Ohm.csv)**
+
 .. list-table:: AC Branch
    :widths: 20 20 20
    :header-rows: 1
@@ -464,6 +471,8 @@ Data in Ohms affects AC and DC branch components, where the user specifies the a
      - geometry
      - None
             
+**DC Node Data (DC_node_data_Ohm.csv)**
+
 .. list-table:: DC Nodes
    :widths: 20 20 20
    :header-rows: 1
@@ -505,6 +514,8 @@ Data in Ohms affects AC and DC branch components, where the user specifies the a
      - geometry
      - None
 
+**DC Line Data (DC_line_data_Ohm.csv)**
+
 .. list-table:: DC Branch
    :widths: 20 20 20
    :header-rows: 1
@@ -536,6 +547,8 @@ Data in Ohms affects AC and DC branch components, where the user specifies the a
    * - Geometry
      - geometry
      - None
+
+**Converter Data (Converter_data_Ohm.csv)**
 
 .. list-table:: Converter
    :widths: 20 20 20
@@ -608,10 +621,11 @@ Data in Ohms affects AC and DC branch components, where the user specifies the a
      - geometry
      - None
 
+**Example CSV Files**
+
 Here are example CSV files from a 5-bus test system using the data in Ohm values:
 
-AC Node Data (AC_node_data_Ohm.csv) 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**AC Node Data (AC_node_data_Ohm.csv)**
 
 .. code-block:: text
 
@@ -623,8 +637,7 @@ AC Node Data (AC_node_data_Ohm.csv)
     5,PQ,1,0.1,0,0,60,10,345
 
 
-AC Line Data (AC_line_data_Ohm.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**AC Line Data (AC_line_data_Ohm.csv)**
 
 .. code-block:: text
 
@@ -638,8 +651,7 @@ AC Line Data (AC_line_data_Ohm.csv)
     7,4,5,95.220,285.660,0,0.0000420,100,345
 
 
-DC Node Data (DC_node_data_Ohm.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**DC Node Data (DC_node_data_Ohm.csv)**
 
 .. code-block:: text
 
@@ -649,8 +661,7 @@ DC Node Data (DC_node_data_Ohm.csv)
     3,P,1,0,0,345
 
 
-DC Line Data (DC_line_data_Ohm.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**DC Line Data (DC_line_data_Ohm.csv)**
 
 .. code-block:: text
 
@@ -660,8 +671,7 @@ DC Line Data (DC_line_data_Ohm.csv)
     3,1,3,86.89,100,345,sm
 
 
-Converter Data (Converter_data_Ohm.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Converter Data (Converter_data_Ohm.csv)**
 
 .. code-block:: text
 
@@ -670,8 +680,7 @@ Converter Data (Converter_data_Ohm.csv)
     2,PV,Slack,3,2,0,0,0,1.785,144.02,0.119,195.534,7.45E-05,0,345,120,0.9,1.2
     3,PQ,PAC,5,3,35,5,0,1.785,144.02,0.119,195.534,7.45E-05,0,345,120,0.9,1.2
 
-Example Code
-~~~~~~~~~~~~
+**Example Code**
 
 .. code-block:: python
 
@@ -954,8 +963,7 @@ Example Code
 
 Here are example CSV files from a 5-bus test system using the data in Real values:
 
-AC Node Data (AC_node_data_Real.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**AC Node Data (AC_node_data_Real.csv)**
 
 .. code-block:: text
 
@@ -966,8 +974,7 @@ AC Node Data (AC_node_data_Real.csv)
     4,PQ,1,0.1,0,0,40,5,345
     5,PQ,1,0.1,0,0,60,10,345
 
-AC Line Data (AC_line_data_Real.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**AC Line Data (AC_line_data_Real.csv)**
 
 .. code-block:: text
 
@@ -980,8 +987,7 @@ AC Line Data (AC_line_data_Real.csv)
     6,3,4,11.9,113.6684604,0,0.053476061,167.3479041,345
     7,4,5,95.22,909.2840209,0,0.133690152,167.3479041,345
 
-DC Node Data (DC_node_data_Real.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**DC Node Data (DC_node_data_Real.csv)**
 
 .. code-block:: text
 
@@ -991,8 +997,7 @@ DC Node Data (DC_node_data_Real.csv)
     3,P,1,0,0,345
 
 
-DC Line Data (DC_line_data_Real.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**DC Line Data (DC_line_data_Real.csv)**
 
 .. code-block:: text
 
@@ -1001,8 +1006,7 @@ DC Line Data (DC_line_data_Real.csv)
     2,2,3,61.89,290,345,sm
     3,1,3,86.89,290,345,sm
 
-Converter Data (Converter_data_Real.csv)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Converter Data (Converter_data_Real.csv)**
 
 .. code-block:: text
 
@@ -1011,8 +1015,7 @@ Converter Data (Converter_data_Real.csv)
     2,PV,Slack,3,2,0,0,0,1.785,458.4298981,0.119,622.4040529,0.237140865,0,345,120,0.9,1.2
     3,PQ,PAC,5,3,35,5,0,1.785,458.4298981,0.119,622.4040529,0.237140865,0,345,120,0.9,1.2
 
-Example Code
-~~~~~~~~~~~~
+**Example Code**
 
 .. code-block:: python
 
@@ -1041,8 +1044,8 @@ Example Code
 
    </details>
 
-References
-----------
+**References**
+
 
 .. [1] J. Beerten and R. Belmans, "MatACDC - an open source software tool for steady-state analysis and operation of HVDC grids," 11th IET International Conference on AC and DC Power Transmission, Birmingham, 2015, pp. 1-9, doi: 10.1049/cp.2015.0061. keywords: {Steady-state analysis;HVDC grids;AC/DC systems;power flow modelling},
 

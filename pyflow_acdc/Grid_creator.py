@@ -14,10 +14,10 @@ __all__ = [ # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
     'Extend_grid_from_data',
-    'reset_all_class'
+    'initialize_pyflowacdc'
 ]
 
-def reset_all_class():
+def initialize_pyflowacdc():
     Node_AC.reset_class()
     Node_DC.reset_class()
     Line_AC.reset_class()
@@ -46,7 +46,7 @@ def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_
     if isinstance(Converter_data, str):
         Converter_data = pd.read_csv(Converter_data, delimiter=",", quotechar="'", encoding="utf-8")
 
-    reset_all_class()
+    initialize_pyflowacdc()
     
     AC_nodes = process_AC_node(S_base, data_in, AC_node_data) if AC_node_data is not None else None
     AC_nodes_list = list(AC_nodes.values()) if AC_nodes is not None else []
@@ -641,6 +641,9 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 def Create_grid_from_mat(matfile):
     if not matfile.endswith('.mat'):
         matfile = matfile + '.mat'
+    
+    initialize_pyflowacdc()
+
     data = loadmat(matfile)
 
     bus_columns = ['bus_i', 'type', 'Pd', 'Qd', 'Gs', 'Bs', 'area', 'Vm', 'Va', 'baseKV', 'zone', 'Vmax', 'Vmin']

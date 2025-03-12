@@ -47,6 +47,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False, TS=F
        'AC_losses': {'w': 0},
        'DC_losses': {'w': 0},
        'Converter_Losses': {'w': 0},
+       'General_Losses': {'w': 0},
        'PZ_cost_of_generation': {'w': 0},
        'Renewable_profit': {'w': 0},
        'Gen_set_dev': {'w': 0}
@@ -127,7 +128,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False, TS=F
     "solve": solver_stats['time'],
     "export": t_modelexport,
     }
-    return model, model_res , timing_info, solver_stats
+    return model, timing_info, [model_res,solver_stats]
 
 
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
@@ -393,7 +394,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
     def formula_Min_Ext_Gen():
         if ObjRule['Ext_Gen']['w']==0:
             return 0
-        return sum((model.PGi_opt[node]**2 + (model.QGi_opt[node]**2)) for node in model.nodes_AC)
+        return sum((model.PGi_opt[node]*grid.S_base) for node in model.nodes_AC)
 
     def formula_Energy_cost():
         if ObjRule['Energy_cost']['w']==0:
@@ -420,7 +421,22 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
         if ObjRule['Converter_Losses']['w']==0:
             return 0
         return sum(model.P_conv_loss[conv]+model.P_AC_loss_conv[conv] for conv in model.conv)
-               
+
+    def formula_General_Losses():
+        if ObjRule['General_Losses']['w']==0:
+            return 0
+        load = 0
+        if grid.nodes_AC != []:
+            load = sum(model.P_known_AC[node] for node in model.nodes_AC)
+        if grid.nodes_DC != []:
+            load = sum(model.P_known_DC[node] for node in model.nodes_DC)
+        gen = 0
+        if grid.Generators != []:
+            gen = sum(model.PGi_gen[gen] for gen in model.gen_AC)
+        if grid.RenSources != []:
+            gen = sum(model.P_renSource[rs]*model.gamma[rs] for rs in model.ren_sources)
+        return gen - load
+    
     def formula_curtailment_red():
         if ObjRule['Curtailment_Red']['w']==0:
             return 0
@@ -471,6 +487,8 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
             entry['f'] = formula_DC_losses()
         elif key == 'Converter_Losses':
             entry['f'] = formula_Converter_Losses()
+        elif key == 'General_Losses':
+            entry['f'] = formula_General_Losses()
         elif key == 'Curtailment_Red':   
             entry ['f'] = formula_curtailment_red()
         elif key == 'PZ_cost_of_generation':

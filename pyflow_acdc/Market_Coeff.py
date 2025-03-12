@@ -14,14 +14,17 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
 from scipy.optimize import minimize
+import re 
 
 __all__ = [
     'price_zone_data_pd',
     'price_zone_coef_data',
-    'plot_curves'
+    'plot_curves',
+    'clean_entsoe_data'
     ]
 
 def price_zone_data_pd(data,save_csv=None):
+
     df= pd.DataFrame(columns=['time','a_BC', 'b_BC', 'c_BC','a_CG', 'b_CG', 'c_CG','price','volume','PGL_min','PGL_max']) 
     
     
@@ -43,7 +46,10 @@ def price_zone_data_pd(data,save_csv=None):
     
     df.set_index('time', inplace=True)
     if save_csv is not None:
-        df.to_csv(save_csv, index=True)
+        if save_csv.endswith('.csv'):
+            df.to_csv(save_csv, index=True)
+        else:
+            df.to_csv(f'{save_csv}.csv', index=True)
     return df   
   
 def is_leap_year(year):
@@ -51,7 +57,10 @@ def is_leap_year(year):
     return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
       
 def price_zone_coef_data(df,start,end,increase_eq_price=50):
-    
+
+    if isinstance(df, str):
+        df= pd.read_csv(df)
+
     first_date = pd.to_datetime(df.iloc[0]['Date'], format='%d/%m/%Y')
     year = first_date.year
     is_leap = is_leap_year(year)
@@ -62,9 +71,7 @@ def price_zone_coef_data(df,start,end,increase_eq_price=50):
         'Date': None,  # Placeholder for the date
         'Hour': i,
         'Sell': pd.DataFrame(columns=['volume', 'price']),
-        'Purchase': pd.DataFrame(columns=['volume', 'price']),
-        'Load': 0,
-        'Gen': 0
+        'Purchase': pd.DataFrame(columns=['volume', 'price'])
     }
     for i in range(1, total_hours + 1)
     ]
@@ -134,10 +141,6 @@ def price_zone_coef_data(df,start,end,increase_eq_price=50):
         data[i]['Date'] = data_storage['Dates'][i]
         data[i]['Sell'] = pd.DataFrame(data_storage['Sell'][i])
         data[i]['Purchase'] = pd.DataFrame(data_storage['Purchase'][i])
-    
-    
-    
-    
     
     t2= time.time()    
     t_loaddata = t2-t1    
@@ -219,13 +222,6 @@ def cost_generation_curve(data, hour,increase_eq_price):
     cumulative_benefit_values_all = cumulative_benefit_interp(volumes)
     
     net_benefit_all =  cumulative_benefit_values_all - cumulative_cost_values_all
-     
-    
-    
-    
-    
-    
-    
     
     
     chosen_entry['Integrated_sets'] = pd.DataFrame({
@@ -514,3 +510,202 @@ def plot_curves(data, hour, name=None):
     return fig
 
 
+### ENTSEO DATA
+
+
+def compute_hour_of_year(df,production_types=[], Area= None):
+    # Filter the dataframe based on the production type if provided
+    
+    mtu_substring='MTU'
+    
+    if production_types and isinstance(production_types, list):
+        # Handle non-empty list case
+        production_types = [pt.strip() for pt in production_types]
+        df = df[df["Production Type"].isin(production_types)].reset_index(drop=True)
+        num_prod = len(production_types)
+        if df.empty:
+           print("The DataFrame is empty after filtering. Check the production_types or the data.")
+           return df
+    elif production_types == 'Load':
+        num_prod = 1
+    else:    
+        # Handle empty list, None, or invalid input
+        production_types = list(df['Production Type'].unique())
+        num_prod = len(production_types)
+    # Find the column that contains 'MTU' in its name (case-insensitive match)
+    mtu_columns = [col for col in df.columns if mtu_substring in col.upper()]
+    
+    MW_cols = [col for col in df.columns if 'MW' in col.upper()]
+    for MW_col in MW_cols:
+        df[MW_col] = pd.to_numeric(df[MW_col], errors='coerce')
+    
+       
+    
+    if mtu_columns:
+        # Use the first column that contains 'MTU'
+        mtu_column = mtu_columns[0]
+        print(f"Found MTU column: {mtu_column}")
+        numeric_cols = df.select_dtypes(include='number').columns
+        sample_time = df[mtu_column].iloc[0]
+        
+        # Try to find a valid time range using regex
+        time_pattern = r"(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}) - (\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2})"
+        match = re.match(time_pattern, sample_time)
+        
+        if match:
+            # Extract start and end times from the MTU string
+            start_time = pd.to_datetime(match.group(1))
+            end_time = pd.to_datetime(match.group(2))
+            
+            # Compute the time difference in hours
+            time_diff = (end_time - start_time).total_seconds() / 3600  # In hours
+            
+            if time_diff == 1:  # 1-hour step
+                df['Hour of Year'] = (df.index//num_prod) + 1 
+            elif time_diff == 0.5:  # 30-minute step
+                df['Hour of Year'] = (df.index // 2*num_prod) + 1    
+            elif time_diff == 0.25:  # 15-minute step
+                df['Hour of Year'] = (df.index // 4*num_prod) + 1
+            else:
+                print(f"Unknown time step in {mtu_column}. Please check the MTU column.")
+                df['Hour of Year'] = df.index + 1
+            
+        else:
+            print(f"MTU column in {mtu_column} does not match expected time range format.")
+            df['Hour of Year'] = df.index + 1
+        
+        
+        
+        if isinstance(production_types, list):
+            # Pivot the data to have each production type as a separate column
+            df = df.pivot_table(index='Hour of Year', columns="Production Type", values=numeric_cols, aggfunc="mean")
+            
+            # Flatten the multi-level column index if necessary
+            df.columns = [f"{prod_type}" for col, prod_type in df.columns]
+            df = df.reset_index()
+        numeric_cols = df.select_dtypes(include='number').columns
+        # Check the time step by inspecting the time format in the first row
+        
+        
+    else:
+        print(f"No MTU-like column found in the dataframe.")
+        df['Hour of Year'] = df.index + 1
+    
+
+    df_hourly = df.groupby('Hour of Year')[numeric_cols].mean()
+    
+    all_hours = set(range(1, df['Hour of Year'].max() + 1))  # Create a set of all possible hours
+    existing_hours = set(df['Hour of Year'])  # Set of hours already in the dataframe
+    missing_hours = all_hours - existing_hours  # Set of missing hou
+    if missing_hours:
+        missing_df = pd.DataFrame({'Hour of Year': list(missing_hours)})
+        for col in df_hourly.columns:
+            if col != 'Hour of Year':  # Set all other columns to NaN
+                missing_df[col] = np.nan
+
+        # Step 3: Append the missing rows to the original dataframe
+        df_hourly = pd.concat([df_hourly, missing_df]).sort_values(by='Hour of Year').reset_index(drop=True)
+
+
+    df_hourly = df_hourly.set_index('Hour of Year')
+    if 'Hour of Year' in df_hourly.columns:
+        df_hourly = df_hourly.drop(columns=['Hour of Year'])
+    df_hourly = df_hourly.interpolate(method='linear', axis=0)
+    df_hourly = df_hourly.bfill(axis=0).ffill(axis=0)
+    
+    
+    max_values = df_hourly.max()
+    
+    # Create a dictionary with column names as keys and max values as values
+    max_dict = {col: max_values[col] for col in df_hourly.columns}
+    
+    # Step 2: Normalize each column by dividing by its max value
+    df_normalized = df_hourly.copy()  # Make a copy to avoid changing the original df
+    for col in df_hourly.columns:
+        df_normalized[col] = df_hourly[col] / max_dict[col]
+
+    if Area is not None:
+        df_normalized.columns = [f'{Area}_' + col for col in df_normalized.columns]
+    # Return the resulting DataFrame with hourly data
+    return df_normalized, max_dict
+
+
+
+
+def clean_entsoe_data(key_list, year_list, production_types=[], output_excel=None,path=None):
+    """Process generation and load data for multiple areas/years and save to Excel"""
+    combined_dict_all = {}
+    combined_df_all = {}
+
+    for year in year_list:
+        combined_dict_year = {}  
+        combined_df_year = pd.DataFrame()
+        for key in key_list:  
+                if path is None:
+                    name_GEN= f"{key}/AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year-1}12312300-{year}12312300"
+                    name_Load= f"{key}/GUI_TOTAL_LOAD_DAYAHEAD_{year-1}12312300-{year}12312300"
+                else:
+                    name_GEN= f"{path}/{key}/AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year-1}12312300-{year}12312300"
+                    name_Load= f"{path}/{key}/GUI_TOTAL_LOAD_DAYAHEAD_{year-1}12312300-{year}12312300"
+                # Read the data
+                df_GEN = pd.read_csv(f"{name_GEN}.csv")
+                df_Load = pd.read_csv(f"{name_Load}.csv")
+                
+                # Apply the function to df_GEN and df_Load
+                df_GEN_hourly , max_dict_gen = compute_hour_of_year(df_GEN, production_types, Area= key)
+                df_Load_hourly, max_dict_load = compute_hour_of_year(df_Load, Area= key)
+            
+                
+                # Combine the data from df_GEN_hourly and df_Load_hourly
+                combined_df = pd.merge(df_GEN_hourly, df_Load_hourly, on='Hour of Year', how='outer')
+                combined_dict = {**max_dict_gen, **max_dict_load}
+                
+                combined_dict_year[key]=combined_dict
+                if combined_df_year.empty:  # Check if it's the first iteration
+                    combined_df_year = combined_df  # Initialize with the first combined_df
+                else:
+                    combined_df_year = pd.merge(combined_df_year, combined_df, left_index=True, right_index=True, how='outer')
+            
+        combined_dict_all[year] = combined_dict_year
+        combined_df_all[year]   = combined_df_year
+
+    if output_excel is None:
+        output_excel= "output_data.xlsx"
+    else:
+        if not output_excel.endswith('.xlsx'):
+            output_excel= f"{output_excel}.xlsx"
+    if path is not None:
+        output_excel= f"{path}/{output_excel}"
+
+    with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:          
+        # Write combined_dict_all to a single sheet with separate tables for each year
+        sheet_name = "Maximum Values"
+        if sheet_name not in writer.sheets:
+            writer.book.create_sheet(sheet_name)
+        start_row = 0  # Initialize starting row for writing tables
+        for year, combined_dict in combined_dict_all.items():
+            # Convert the year's dictionary to a DataFrame
+            
+            year_df = pd.DataFrame()
+            
+            # Iterate over the areas dictionary to add each area's data as a column
+            for area, dicts in combined_dict.items():
+                area_df = pd.DataFrame.from_dict(dicts, orient='index', columns=[area])
+                if year_df.empty:
+                    year_df = area_df
+                else:
+                    year_df = pd.merge(year_df, area_df, left_index=True, right_index=True, how='outer')
+            
+            # Write a header for the year
+            header_df = pd.DataFrame([f"Table for Year {year}"], columns=[""])
+            header_df.to_excel(writer, sheet_name=sheet_name, startrow=start_row, index=False, header=False)
+            
+            start_row += 1
+            
+            # Write the DataFrame
+            year_df.to_excel(writer, sheet_name=sheet_name, startrow=start_row, index=True)
+            start_row += len(area_df) + 3  # Leave a blank row between tables
+
+        # Write each year's combined_df_all to a separate sheet
+        for idx, year in enumerate(combined_df_all.keys(), start=1):
+            combined_df_all[year].to_excel(writer, sheet_name=f"{year}", index=True)

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.3.1"
+version = "0.3.2"
 license = {file = "LICENSE.txt"}
 requires-python = ">= 3.9"
 
@@ -61,8 +61,7 @@ OPF = ["numpy <2.0.0",
 Dash = ["dash"]
 
 [project.urls]
-
-Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.3.1.tar.gz"
+Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.3.2.tar.gz"
 
 
 [tool.setuptools]

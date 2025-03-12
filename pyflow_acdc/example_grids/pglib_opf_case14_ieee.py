@@ -55,26 +55,26 @@ def pglib_opf_case14_ieee():
     nodes_AC = pd.DataFrame(nodes_AC_data)
 
     lines_AC_data = [
-        {'fromNode': '1.0', 'toNode': '2.0', 'Resistance': 0.01938, 'Reactance': 0.05917, 'Conductance': 0, 'Susceptance': 0.0528, 'MVA_rating': 472.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '1'},
-        {'fromNode': '1.0', 'toNode': '5.0', 'Resistance': 0.05403, 'Reactance': 0.22304, 'Conductance': 0, 'Susceptance': 0.0492, 'MVA_rating': 128.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '2'},
-        {'fromNode': '2.0', 'toNode': '3.0', 'Resistance': 0.04699, 'Reactance': 0.19797, 'Conductance': 0, 'Susceptance': 0.0438, 'MVA_rating': 145.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '3'},
-        {'fromNode': '2.0', 'toNode': '4.0', 'Resistance': 0.05811, 'Reactance': 0.17632, 'Conductance': 0, 'Susceptance': 0.034, 'MVA_rating': 158.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '4'},
-        {'fromNode': '2.0', 'toNode': '5.0', 'Resistance': 0.05695, 'Reactance': 0.17388, 'Conductance': 0, 'Susceptance': 0.0346, 'MVA_rating': 161.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '5'},
-        {'fromNode': '3.0', 'toNode': '4.0', 'Resistance': 0.06701, 'Reactance': 0.17103, 'Conductance': 0, 'Susceptance': 0.0128, 'MVA_rating': 160.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '6'},
-        {'fromNode': '4.0', 'toNode': '5.0', 'Resistance': 0.01335, 'Reactance': 0.04211, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 664.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '7'},
-        {'fromNode': '4.0', 'toNode': '7.0', 'Resistance': 0.0, 'Reactance': 0.20912, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 141.0, 'kV_base': 1.0, 'm': 0.978, 'shift': 0.0, 'Line_id': '8'},
-        {'fromNode': '4.0', 'toNode': '9.0', 'Resistance': 0.0, 'Reactance': 0.55618, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 53.0, 'kV_base': 1.0, 'm': 0.969, 'shift': 0.0, 'Line_id': '9'},
-        {'fromNode': '5.0', 'toNode': '6.0', 'Resistance': 0.0, 'Reactance': 0.25202, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 117.0, 'kV_base': 1.0, 'm': 0.932, 'shift': 0.0, 'Line_id': '10'},
-        {'fromNode': '6.0', 'toNode': '11.0', 'Resistance': 0.09498, 'Reactance': 0.1989, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 134.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '11'},
-        {'fromNode': '6.0', 'toNode': '12.0', 'Resistance': 0.12291, 'Reactance': 0.25581, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 104.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '12'},
-        {'fromNode': '6.0', 'toNode': '13.0', 'Resistance': 0.06615, 'Reactance': 0.13027, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 201.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '13'},
-        {'fromNode': '7.0', 'toNode': '8.0', 'Resistance': 0.0, 'Reactance': 0.17615, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 167.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '14'},
-        {'fromNode': '7.0', 'toNode': '9.0', 'Resistance': 0.0, 'Reactance': 0.11001, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 267.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '15'},
-        {'fromNode': '9.0', 'toNode': '10.0', 'Resistance': 0.03181, 'Reactance': 0.0845, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 325.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '16'},
-        {'fromNode': '9.0', 'toNode': '14.0', 'Resistance': 0.12711, 'Reactance': 0.27038, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 99.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '17'},
-        {'fromNode': '10.0', 'toNode': '11.0', 'Resistance': 0.08205, 'Reactance': 0.19207, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 141.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '18'},
-        {'fromNode': '12.0', 'toNode': '13.0', 'Resistance': 0.22092, 'Reactance': 0.19988, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 99.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '19'},
-        {'fromNode': '13.0', 'toNode': '14.0', 'Resistance': 0.17093, 'Reactance': 0.34802, 'Conductance': 0, 'Susceptance': 0.0, 'MVA_rating': 76.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '20'}
+        {'fromNode': '1.0', 'toNode': '2.0', 'r': 0.01938, 'x': 0.05917, 'g': 0, 'b': 0.0528, 'MVA_rating': 472.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '1'},
+        {'fromNode': '1.0', 'toNode': '5.0', 'r': 0.05403, 'x': 0.22304, 'g': 0, 'b': 0.0492, 'MVA_rating': 128.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '2'},
+        {'fromNode': '2.0', 'toNode': '3.0', 'r': 0.04699, 'x': 0.19797, 'g': 0, 'b': 0.0438, 'MVA_rating': 145.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '3'},
+        {'fromNode': '2.0', 'toNode': '4.0', 'r': 0.05811, 'x': 0.17632, 'g': 0, 'b': 0.034, 'MVA_rating': 158.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '4'},
+        {'fromNode': '2.0', 'toNode': '5.0', 'r': 0.05695, 'x': 0.17388, 'g': 0, 'b': 0.0346, 'MVA_rating': 161.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '5'},
+        {'fromNode': '3.0', 'toNode': '4.0', 'r': 0.06701, 'x': 0.17103, 'g': 0, 'b': 0.0128, 'MVA_rating': 160.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '6'},
+        {'fromNode': '4.0', 'toNode': '5.0', 'r': 0.01335, 'x': 0.04211, 'g': 0, 'b': 0.0, 'MVA_rating': 664.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '7'},
+        {'fromNode': '4.0', 'toNode': '7.0', 'r': 0.0, 'x': 0.20912, 'g': 0, 'b': 0.0, 'MVA_rating': 141.0, 'kV_base': 1.0, 'm': 0.978, 'shift': 0.0, 'Line_id': '8'},
+        {'fromNode': '4.0', 'toNode': '9.0', 'r': 0.0, 'x': 0.55618, 'g': 0, 'b': 0.0, 'MVA_rating': 53.0, 'kV_base': 1.0, 'm': 0.969, 'shift': 0.0, 'Line_id': '9'},
+        {'fromNode': '5.0', 'toNode': '6.0', 'r': 0.0, 'x': 0.25202, 'g': 0, 'b': 0.0, 'MVA_rating': 117.0, 'kV_base': 1.0, 'm': 0.932, 'shift': 0.0, 'Line_id': '10'},
+        {'fromNode': '6.0', 'toNode': '11.0', 'r': 0.09498, 'x': 0.1989, 'g': 0, 'b': 0.0, 'MVA_rating': 134.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '11'},
+        {'fromNode': '6.0', 'toNode': '12.0', 'r': 0.12291, 'x': 0.25581, 'g': 0, 'b': 0.0, 'MVA_rating': 104.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '12'},
+        {'fromNode': '6.0', 'toNode': '13.0', 'r': 0.06615, 'x': 0.13027, 'g': 0, 'b': 0.0, 'MVA_rating': 201.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '13'},
+        {'fromNode': '7.0', 'toNode': '8.0', 'r': 0.0, 'x': 0.17615, 'g': 0, 'b': 0.0, 'MVA_rating': 167.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '14'},
+        {'fromNode': '7.0', 'toNode': '9.0', 'r': 0.0, 'x': 0.11001, 'g': 0, 'b': 0.0, 'MVA_rating': 267.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '15'},
+        {'fromNode': '9.0', 'toNode': '10.0', 'r': 0.03181, 'x': 0.0845, 'g': 0, 'b': 0.0, 'MVA_rating': 325.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '16'},
+        {'fromNode': '9.0', 'toNode': '14.0', 'r': 0.12711, 'x': 0.27038, 'g': 0, 'b': 0.0, 'MVA_rating': 99.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '17'},
+        {'fromNode': '10.0', 'toNode': '11.0', 'r': 0.08205, 'x': 0.19207, 'g': 0, 'b': 0.0, 'MVA_rating': 141.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '18'},
+        {'fromNode': '12.0', 'toNode': '13.0', 'r': 0.22092, 'x': 0.19988, 'g': 0, 'b': 0.0, 'MVA_rating': 99.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '19'},
+        {'fromNode': '13.0', 'toNode': '14.0', 'r': 0.17093, 'x': 0.34802, 'g': 0, 'b': 0.0, 'MVA_rating': 76.0, 'kV_base': 1.0, 'm': 1, 'shift': 0, 'Line_id': '20'}
     ]
     lines_AC = pd.DataFrame(lines_AC_data)
 

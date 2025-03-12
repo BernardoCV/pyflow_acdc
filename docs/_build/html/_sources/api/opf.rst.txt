@@ -1,107 +1,176 @@
 Optimal Power Flow Module
 =========================
 
-This page has been pre-filled with the functions that are available in the OPF module by AI, please check the code for more details.
-
 This module provides functions for AC/DC hybrid optimal power flow analysis [1]_.
 
 functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_model
 
 AC/DC Hybrid Optimal Power Flow
-------------------------------
+-------------------------------
 
-.. py:function:: OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, TS=False)
+.. py:function::  OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, TS=False)
 
    Performs AC/DC hybrid optimal power flow calculation.
 
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
+  .. list-table::
+    :widths: 20 10 50 10
+    :header-rows: 1
 
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``grid``
-        - Grid
-        - Grid to optimize
-        - Required
-        - -
-      * - ``ObjRule``
-        - dict
-        - Objective function weights
-        - None
-        - -
-      * - ``PV_set``
-        - bool
-        - Enable PV setpoint optimization
-        - False
-        - -
-      * - ``OnlyGen``
-        - bool
-        - Only optimize generation
-        - True
-        - -
-      * - ``Price_Zones``
-        - bool
-        - Enable price zone constraints
-        - False
-        - -
-      * - ``TS``
-        - bool
-        - Time series optimization
-        - False
-        - -
-      * - Returns
-        - tuple
-        - (model, results, timing)
-        - -
-        - -
+    * - Parameter
+      - Type
+      - Description
+      - Default
+    * - ``grid``
+      - Grid
+      - Grid to optimize
+      - Required
+    * - ``ObjRule``
+      - dict
+      - Objective function weights
+      - None
+    * - ``PV_set``
+      - bool
+      - Enable PV setpoint optimization
+      - False
+    * - ``OnlyGen``
+      - bool
+      - Only generators are considered in the cost function
+      - True
+    * - ``Price_Zones``
+      - bool
+      - Enable price zone constraints
+      - False
+    * - ``TS``
+      - bool
+      - Time series optimization
+      - False
+  
+  **Example**
 
-   **Objective Function Weights**
+  .. code-block:: python
 
-   .. list-table::
-      :widths: 30 70
-      :header-rows: 1
+      model, timing, solver_data =pyf.OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, TS=False)
 
-      * - Weight
-        - Description
-      * - ``Ext_Gen``
-        - External generation cost
-      * - ``Energy_cost``
-        - Energy cost
-      * - ``Curtailment_Red``
-        - Renewable curtailment reduction
-      * - ``AC_losses``
-        - AC transmission losses
-      * - ``DC_losses``
-        - DC transmission losses
-      * - ``Converter_Losses``
-        - Converter losses
-      * - ``PZ_cost_of_generation``
-        - Price zone generation cost
-      * - ``Renewable_profit``
-        - Renewable generation profit
-      * - ``Gen_set_dev``
-        - Generator setpoint deviation
+.. _obj_functions:
+
+Objective Functions
+^^^^^^^^^^^^^^^^^^^^
+
+The user can define the objective by setting the weight of each sub objective. The objective function is defined as:
+
+.. function:: OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False)
+
+  This function creates a weighted sum of the different sub objectives.
+
+  .. math::
+    \min \frac{\sum_{i=1}^{O} \left( w_i \cdot f_i \right)}{\sum_{i=1}^{O} w_i}
+
+  where :math:`f_i` is the sub objective and :math:`w_i` is the weight.
+
+  The following table shows the pre-built objective functions as defined in [1]_ :
+
+
+  .. list-table::
+    :widths: 20 40 40
+    :header-rows: 1
+
+    * - Weight
+      - Description
+      - Formula
+    * - ``Ext_Gen``
+      - External generation minimization or maximum export
+      - :math:`\sum_{g=1}^{G} \cdot P_{g}`
+    * - ``Energy_cost``
+      - Energy cost
+      - :math:`\sum_{g=1}^{\mathcal{G}_{ac}} \left(P_{g}^2 \cdot \alpha_g + P_{g} \cdot \beta_g  \right)`
+    * - ``Curtailment_Red``
+      - Renewable curtailment reduction
+      - :math:`\sum_{rg=1}^{ \mathcal{RG}_{ac}}\left((1-\gamma_rg)P_{rg}\cdot \rho_{rg} \sigma_{rg}\right)`
+    * - ``AC_losses``
+      - AC transmission losses
+      - :math:`\sum_{j=1}^{\mathcal{B}_{ac}}  \left( P_{j,\text{from}} +P_{j,\text{to}} \right)`
+    * - ``DC_losses``
+      - DC transmission losses
+      - :math:`\sum_{e=1}^{\mathcal{B}_{dc}} \left( P_{e,\text{from}} +P_{e,\text{to}} \right)`
+    * - ``Converter_Losses``
+      - Converter losses
+      - :math:`\sum_{cn=1}^{\mathcal{C}_{n}} \left( P_{loss_{cn}} + |\left(P_{c_{cn}}-P_{s_{cn}}\right)| \right)`
+    * - ``General_Losses``
+      - Generation minus demand
+      - :math:`\left(\sum^{\mathcal{G}} P_{g}+\sum^{\mathcal{RG}} P_{rg}*\gamma_{rg}- \sum^{\mathcal{L}} P_{L} \right)`
+
+  The following table shows the pre-built objective functions as defined in [2]_:
+
+  .. list-table::
+    :widths: 20 40 40
+    :header-rows: 1
+
+    * - Weight
+      - Description
+      - Formula 
+    * - ``PZ_cost_of_generation``
+      - Price zone generation cost
+      - :math:`\sum^{\mathcal{M}}_m CG(P_N)_m`
+
+  The following table shows the pre-built objective functions in development:
+
+  .. list-table::
+    :widths: 20 40 40
+    :header-rows: 1
+
+    * - Weight
+      - Description
+      - Formula
+    * - ``Renewable_profit``
+      - Renewable generation profit
+      - :math:`- \left(\sum^{\mathcal{RG}} P_{rg}*\gamma_{rg} + \sum^{\mathcal{C}} \left(P_{loss,c} + P_{AC,loss,c}\right)\right)`
+    * - ``Gen_set_dev``
+      - Generator setpoint deviation
+      - :math:`\sum_{g=1}^{G}  \left(P_g -P_{g,set}\right)^2`
+      
+
+  **Example**
+
+  .. code-block:: python
+
+      weights_def = {
+      'Ext_Gen': {'w': 0},
+      'Energy_cost': {'w': 0},
+      'Curtailment_Red': {'w': 0},
+      'AC_losses': {'w': 0},
+      'DC_losses': {'w': 0},
+      'Converter_Losses': {'w': 0},
+      'PZ_cost_of_generation': {'w': 0},
+      'Renewable_profit': {'w': 0},
+      'Gen_set_dev': {'w': 0}
+      }
+      
+Solvers
+^^^^^^^
+
+The OPF module supports the following solvers:
+
+- IPOPT
+
+.. function::  OPF_solve(model,grid,solver_options=[])
+
+   Solves the OPF model using the specified solver.
+
+   :param model: The optimization model
+   :param grid: The grid to optimize
+   :param solver_options: Additional solver options
 
    **Example**
 
    .. code-block:: python
 
-       weights = {
-           'Energy_cost': 1.0,
-           'AC_losses': 0.1,
-           'DC_losses': 0.1
-       }
-       model, results, timing = pyf.OPF_ACDC(grid, ObjRule=weights)
+      results, solver_stats =pyf.OPF_solve(model,grid,solver_options=[])
 
 Model Components
----------------
+^^^^^^^^^^^^^^^^
 
-Variables
-^^^^^^^^^
+**Variables**
+
 
 The optimization model includes variables for:
 
@@ -113,47 +182,29 @@ The optimization model includes variables for:
 - Converter power flows
 - Price zone variables
 
-Constraints
-^^^^^^^^^^
+**Constraints**
+
 
 The model enforces constraints for:
 
-- AC power flow equations
-- DC power flow equations
-- Generator limits
-- Line thermal limits
-- Voltage limits
-- Converter operation limits
-- Price zone balancing
+- :ref:`AC power flow equations <AC_node_modelling>`
+- :ref:`DC power flow equations <DC_node_modelling>`
+- :ref:`Generator limits <Generator_modelling>`
+- :ref:`AC branch thermal limits <AC_branch_modelling>`
+- :ref:`DC branch thermal limits <DC_line_modelling>`
+- Voltage and angle limits
+- :ref:`Converter operation limits <ACDC_converter_modelling>`
+- :ref:`Price zone balancing <Price_zone_modelling>`
 
-Results Processing
------------------
+For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
 
-.. py:function:: obtain_results_TSOPF(model, grid, current_range, idx, Price_Zones)
-
-   Processes time series OPF results.
-
-   Returns dictionaries containing:
-
-   - Converter power flows (AC and DC side)
-   - Generator dispatch
-   - Line loadings
-   - Price zone results
-   - Renewable curtailment
-   - System losses
-
-   **Example**
-
-   .. code-block:: python
-
-       results = pyf.obtain_results_TSOPF(model, grid, 24, 0, Price_Zones=True)
-
-
-
-References
-----------
+**References**
 
 .. [1] B.C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
        "An optimal power flow tool for AC/DC systems, applied to the analysis of the
        North Sea Grid for offshore wind integration" in IEEE Transactions on Power
        Systems, doi: 10.1109/TPWRS.2023.3533889.
+
+.. [2] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
+       "Optimizing Offshore Wind Integration through Multi-Terminal DC Grids: A
+       Market-Based OPF Framework for the North Sea Interconnectors"

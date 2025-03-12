@@ -1,0 +1,16 @@
+/* Light mode background override */
+[data-theme="light"] {
+    --color-background-primary: #e8e8e8;  /* Main background */
+    --color-content-background: #bdb9b902;  /* Content area background (keeping transparent) */
+    --color-code-background: #f8f8f818;     /* Code block background */
+    --color-code-border: #e1e4e531;         /* Code block border */
+    --color-code-figure: #3a3939;            /* Darker image color */
+}
+
+/* Figure background styling */
+[data-theme="light"] figure {
+    background-color: #3a393969;  /* Slightly darker background for figures */
+    padding: 1rem;
+    border-radius: 4px;
+}
+

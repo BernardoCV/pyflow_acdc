@@ -49,7 +49,10 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # a list of builtin themes.
 #
 html_theme = 'furo'
-html_title = project 
+html_title = project
+
+# Custom CSS to override background color
+html_css_files = ['custom.css']
 # Remove or comment out the general html_logo setting
 # html_logo = '_static/logo.svg'
 
