@@ -77,7 +77,7 @@ For this module, you need to have the optional dependendency pyflow_acdc[mapping
 
    .. raw:: html
 
-      <iframe src="https://github.com/pyflow-acdc/pyflow_acdc/blob/bcv_dev/docs/images/North_Sea_MTDC.html" width="100%" height="500px" frameborder="0"></iframe>
+      <iframe src="/_static/North_Sea_MTDC.html" width="100%" height="500px" frameborder="0"></iframe>
 
    **Example with animated power flows**
 
@@ -93,4 +93,4 @@ For this module, you need to have the optional dependendency pyflow_acdc[mapping
 
    .. raw:: html
 
-      <iframe src="https://pyflow-acdc.readthedocs.io/en/latest/_static/North_Sea_MTDC_animated.html" width="100%" height="500px" frameborder="0"></iframe>
+      <iframe src="/_static/North_Sea_MTDC_animated.html" width="100%" height="500px" frameborder="0"></iframe>
