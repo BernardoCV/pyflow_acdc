@@ -57,7 +57,7 @@ A more detailed description of the function can be found in the :doc:`csv_import
         - Grid and Results objects
 
    **Example**
-   
+
    .. code-block:: python
 
        grid, results = pyf.Create_grid_from_data(100, ac_nodes_df, ac_lines_df)
@@ -129,15 +129,15 @@ Extend Grid From Data
 Reset All Classes
 -----------------
 
-.. py:function:: reset_all_class()
+.. py:function:: initialize_pyflowacdc()
 
-   Resets all component class counters.
+   Resets all component class counters. This function is neeed if you have installed pyflow_acdc directly from pip. Create_grid_from_data and Create_grid_from_mat automatically call this function so you dont need to.
 
    **Example**
 
    .. code-block:: python
 
-       reset_all_class()
+       pyf.initialize_pyflowacdc()
 
 Change Base Power
 -----------------   
