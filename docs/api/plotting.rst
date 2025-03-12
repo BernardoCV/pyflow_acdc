@@ -40,17 +40,17 @@ This function is used to plot the time series results of the grid.
         - Grid with results
         - Required
       * - ``start``
-        - str
-        - Start date
-        - None
+        - int
+        - Start timeframe
+        - Required
       * - ``end``
-        - str
-        - End date
-        - None
+        - int
+        - End timeframe
+        - Required
       * - ``plotting_choices``
         - list
         - Results types to plot
-        - None
+        - All
       * - ``show``    
         - bool
         - Whether to show the plot in browser
@@ -69,6 +69,8 @@ This function is used to plot the time series results of the grid.
    .. code-block:: python
 
        import pyflow_acdc as pyf
+       import pandas as pd
+
        [grid,results] = pyf.NS_MTDC()
 
        start = 5750
@@ -92,200 +94,148 @@ This function is used to plot the time series results of the grid.
 Network Graph Visualization
 ---------------------------
 
-plot_Graph
-^^^^^^^^^^
+Full grid visualization as a network graph
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: plot_Graph(Grid, image_path=None, dec=3, text='inPu', grid_names=None, base_node_size=10, G=None)
+.. py:function:: plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
 
    Creates an interactive network graph visualization using Plotly.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 10
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
         - Default
-        - Units
       * - ``Grid``
         - Grid
         - Grid to visualize
         - Required
-        - -
-      * - ``image_path``
-        - str
-        - Path to save image
-        - None
-        - -
-      * - ``dec``
-        - int
-        - Decimal places
-        - 3
-        - -
       * - ``text``
         - str
-        - Hover text format ('inPu' or 'abs')
+        - Hover text format ('data' or 'inPu' or 'abs')
         - 'inPu'
-        - -
-      * - ``grid_names``
-        - dict
-        - Custom node names
-        - None
-        - -
       * - ``base_node_size``
         - int
         - Base size for nodes
         - 10
-        - -
+      * - ``G``
+        - Graph
+        - Graph to visualize
+        - Full grid
 
    **Example**
 
    .. code-block:: python
 
-       grid.plot_Graph(text='abs')
+       import pyflow_acdc as pyf
+
+       grid,res = pyf.case24_3zones_acdc()
+
+       pyf.plot_Graph(grid)
+
+   .. figure:: ../images/case24acdc_full.svg
+      :alt: case24_3zones_acdc_graph
+      :width: 70%
+
+
 
 
 
 Neighbor Graph
-------------
+--------------
 
-plot_neighbour_graph
-^^^^^^^^^^^^^^^^^^
+This function is used to plot the neighbor graph of a node. You can either provide a node or a node name, one or the other must be provided.
 
-.. py:function:: plot_neighbour_graph(grid, node, depth=1)
+.. py:function:: plot_neighbour_graph(grid,node=None,node_name=None,base_node_size=10, proximity=1)
 
    Creates a graph visualization of a node's neighbors.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 10
       :header-rows: 1
 
       * - Parameter
         - Type
         - Description
         - Default
-        - Units
       * - ``grid``
         - Grid
         - Grid to analyze
         - Required
-        - -
       * - ``node``
         - Node
-        - Central node
-        - Required
-        - -
-      * - ``depth``
-        - int
-        - Neighbor depth
-        - 1
-        - -
-
-   **Example**
-
-   .. code-block:: python
-
-       grid.plot_neighbour_graph(node, depth=2)
-
-Interactive Dashboard
-------------------
-
-run_dash
-^^^^^^^
-
-.. py:function:: run_dash(grid)
-
-   Creates and runs an interactive Dash web application for visualizing time series results.
-
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``grid``
-        - Grid
-        - Grid with time series results
-        - Required
-        - -
-
-   **Features**:
-
-   - Interactive plot selection:
-     - Power Generation by price zone
-     - Power Generation by generator
-     - Power Generation by price zone (area chart)
-     - Power Generation by generator (area chart)
-     - Market Prices
-     - AC line loading
-     - DC line loading
-     - AC/DC Converters
-     - Curtailment
-   - Dynamic axis limits
-   - Component selection checklist
-   - Real-time plot updates
-
-   **Example**
-
-   .. code-block:: python
-
-       pyf.run_dash(grid)
-
-Dashboard Components
------------------
-
-plot_TS_res
-^^^^^^^^^^
-
-.. py:function:: plot_TS_res(grid, plotting_choice, selected_rows, x_limits=None, y_limits=None)
-
-   Creates plots for the Dash dashboard.
-
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``grid``
-        - Grid
-        - Grid with results
-        - Required
-        - -
-      * - ``plotting_choice``
+        - Node object
+        - None
+      * - ``node_name``
         - str
-        - Type of plot
-        - Required
-        - -
-      * - ``selected_rows``
-        - list
-        - Components to plot
-        - Required
-        - -
-      * - ``x_limits``
-        - tuple
-        - X-axis limits
+        - Node name
         - None
-        - -
-      * - ``y_limits``
-        - tuple
-        - Y-axis limits
-        - None
-        - -
+      * - ``base_node_size``
+        - int
+        - Base size for nodes
+        - 10
+      * - ``proximity``
+        - int
+        - Proximity
+        - 1
 
-   **Available Plot Types**:
+   **Example**
 
-   - Line plots
-   - Stacked area charts
-   - Time series data
-   - Loading percentages
-   - Price curves
+   .. code-block:: python
 
-   Returns a Plotly figure object for the dashboard.
+       import pyflow_acdc as pyf
+
+       grid,res = pyf.case24_3zones_acdc()
+
+       pyf.plot_neighbour_graph(grid,node_name='111.0')
+
+   .. figure:: ../images/case24acdc_neig.svg
+      :alt: case24_3zones_acdc neighbour graph of node 111.0
+      :width: 70%
+
+Saving the Network Graph
+------------------------
+
+For this function, you need to have the svgwrite library installed. You can install it using pip install svgwrite. ``geometry`` of objects is required.
+
+.. py:function:: save_network_svg(grid, name='grid_network', width=1000, height=800)
+
+   Saves the network graph as an SVG file.
+
+   .. list-table::
+      :widths: 20 10 50 10
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+      * - ``grid``
+        - Grid
+        - Grid to save
+        - Required
+      * - ``name``
+        - str
+        - Name of the file  
+        - 'grid_network'
+      * - ``width``
+        - int
+        - Width of the file
+        - 1000
+      * - ``height``
+        - int
+        - Height of the file
+        - 800
+
+   **Example**
+
+   .. code-block:: python 
+
+       grid.save_network_svg(grid)
+
+
+
+

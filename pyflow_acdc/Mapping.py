@@ -12,12 +12,12 @@ import webbrowser
 from .Graph_and_plot import update_hovertexts, create_subgraph_color_dict
 from .Classes import Node_AC
 
-def plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None):
+def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None):
     # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter" 
-        
+    if name is None:
+        name = grid.name
     update_hovertexts(grid, text) 
 
-  
     # Initialize the map, centred around the North Sea
     m = folium.Map(location=[56, 10], tiles=tiles,zoom_start=5)
     

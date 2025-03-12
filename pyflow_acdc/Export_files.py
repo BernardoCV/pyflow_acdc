@@ -388,6 +388,7 @@ def {file_name}():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    grid.name = '{file_name}'
     """
     
     if pz_code:

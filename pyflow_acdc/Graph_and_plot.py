@@ -478,7 +478,7 @@ def plot_neighbour_graph(grid,node=None,node_name=None,base_node_size=10, proxim
     plot_Graph(grid,base_node_size=base_node_size,G=Gn)
 
         
-def plot_Graph(Grid,image_path=None,dec=3,text='inPu',grid_names=None,base_node_size=10,G=None):
+def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
     
     if G is None:
         G = Grid.Graph_toPlot
@@ -643,31 +643,7 @@ def plot_Graph(Grid,image_path=None,dec=3,text='inPu',grid_names=None,base_node_
     
     # Create figure
     fig = go.Figure(data=edge_traces + node_traces + [mnode_trace], layout=layout)
-        
     
-    if image_path is not None:
-        # Load the image
-        with open(image_path, 'rb') as image_file:
-                encoded_image = base64.b64encode(image_file.read()).decode()
- 
-           # Add background image
-        fig.update_layout(
-        images=[
-            dict(
-                source=f'data:image/png;base64,{encoded_image}',
-                xref='paper', yref='paper',
-                x=0, y=1,
-                sizex=1, sizey=1,
-                sizing='stretch',
-                opacity=0.5,
-                layer='below'
-                    )
-                ]
-            )
-   
-
-       
-
     
     # Display plot
     pio.show(fig)

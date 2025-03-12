@@ -126,7 +126,28 @@ Optimal Power Flow Time Series
 
    .. code-block:: python
 
-       timing_info = pyf.TS_ACDC_OPF(grid, ObjRule={'Energy_cost': 1.0})
+       import pyflow_acdc as pyf
+       import pandas as pd
+
+       [grid,results] = pyf.NS_MTDC()
+
+       start = 5750
+       end = 6000
+       obj = {'Energy_cost': 1}
+
+       market_prices_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
+       TS_MK = pd.read_csv(market_prices_url)
+       pyf.add_TimeSeries(grid,TS_MK)
+
+       wind_load_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
+       TS_wl = pd.read_csv(wind_load_url)
+       pyf.add_TimeSeries(grid,TS_wl)
+
+       times=pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)  
+
+       res_dict = grid.time_series_results
+
+        
 
 Parallel Time Series OPF
 ^^^^^^^^^^^^^^^^^^^^^^^^
