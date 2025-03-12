@@ -75,9 +75,11 @@ For this module, you need to have the optional dependendency pyflow_acdc[mapping
 
        pyf.plot_folium(grid)
 
-   .. raw:: html
+   .. only:: html
 
-      <iframe src="/_static/North_Sea_MTDC.html" width="100%" height="500px" frameborder="0"></iframe>
+      .. raw:: html
+
+         <iframe src="/_static/North_Sea_MTDC.html" width="100%" height="500px" frameborder="0"></iframe>
 
    **Example with animated power flows**
 
@@ -91,6 +93,8 @@ For this module, you need to have the optional dependendency pyflow_acdc[mapping
 
        pyf.plot_folium(grid,ant_path='All')
 
-   .. raw:: html
+   .. only:: html
 
-      <iframe src="/_static/North_Sea_MTDC_animated.html" width="100%" height="500px" frameborder="0"></iframe>
+      .. raw:: html
+
+         <iframe src="/_static/North_Sea_MTDC_animated.html" width="100%" height="500px" frameborder="0"></iframe>
