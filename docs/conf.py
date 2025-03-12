@@ -72,6 +72,6 @@ html_theme_options = {
 html_static_path = ['_static']
 html_extra_path = ['_static']
 
-from sphinx.util import mimetypes
+import mimetypes
 mimetypes.add_type('text/html', '.html', True)
 
