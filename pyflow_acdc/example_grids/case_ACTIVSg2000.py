@@ -5273,7 +5273,8 @@ def case_ACTIVSg2000():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    
+    grid.name = 'case_ACTIVSg2000'
+
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
         node_name = nodes_AC.at[index, 'Node_id']

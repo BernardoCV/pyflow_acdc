@@ -1,6 +1,7 @@
 import networkx as nx
 import plotly.graph_objs as go
 import plotly.io as pio
+import matplotlib.pyplot as plt
 import logging
 import itertools
 import base64
@@ -477,7 +478,7 @@ def plot_neighbour_graph(grid,node=None,node_name=None,base_node_size=10, proxim
     plot_Graph(grid,base_node_size=base_node_size,G=Gn)
 
         
-def plot_Graph(Grid,image_path=None,dec=3,text='inPu',grid_names=None,base_node_size=10,G=None):
+def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
     
     if G is None:
         G = Grid.Graph_toPlot
@@ -642,158 +643,167 @@ def plot_Graph(Grid,image_path=None,dec=3,text='inPu',grid_names=None,base_node_
     
     # Create figure
     fig = go.Figure(data=edge_traces + node_traces + [mnode_trace], layout=layout)
-        
     
-    if image_path is not None:
-        # Load the image
-        with open(image_path, 'rb') as image_file:
-                encoded_image = base64.b64encode(image_file.read()).decode()
- 
-           # Add background image
-        fig.update_layout(
-        images=[
-            dict(
-                source=f'data:image/png;base64,{encoded_image}',
-                xref='paper', yref='paper',
-                x=0, y=1,
-                sizex=1, sizey=1,
-                sizing='stretch',
-                opacity=0.5,
-                layer='below'
-                    )
-                ]
-            )
-   
-
-       
-
     
     # Display plot
     pio.show(fig)
     s=1
     return fig
  
-def plot_TS_res(grid, start, end, plotting_choice=None, grid_names=None):
-    Plot = {
-        'Power Generation by price zone': False,
-        'Power Generation by generator': False,
-        'Curtailment': False,
-        'Market Prices': False,
-        'AC line loading': False,
-        'DC line loading': False,
-        'AC/DC Converters': False,
-        'Power Generation by generator area chart': False,
-        'Power Generation by price zone area chart': False,
-    }
-
-    # If plotting_choice is None, ask user to choose
-    if plotting_choice is None:
-        print("Please choose a plotting option:")
-        print("1: Power Generation by price zone")
-        print("2: Power Generation by generator")
-        print("3: Curtailment")
-        print("4: Market Prices")
-        print("5: AC line loading")
-        print("6: DC line loading")
-        print("7: AC/DC Converters")
-        print("8: Power Generation by generator area chart")
-        print("9: Power Generation by price zone area chart")
-        
-        choice = int(input("Enter a number between 1 and 9: "))
-        if choice == 1:
-            plotting_choice = 'Power Generation by price zone'
-        elif choice == 2:
-            plotting_choice = 'Power Generation by generator'
-        elif choice == 3:
-            plotting_choice = 'Curtailment'
-        elif choice == 4:
-            plotting_choice = 'Market Prices'
-        elif choice == 5:
-            plotting_choice = 'AC line loading'
-        elif choice == 6:
-            plotting_choice = 'DC line loading'
-        elif choice == 7:
-            plotting_choice = 'AC/DC Converters'
-        elif choice == 8:
-            plotting_choice = 'Power Generation by generator area chart'
-        elif choice == 9:
-            plotting_choice = 'Power Generation by price zone area chart'
-        else:
-            print("Invalid choice. Please choose a valid option.")
-            return
-
-    # Verify that the choice is valid
-    if plotting_choice not in Plot:
-        print(f"Invalid plotting option: {plotting_choice}")
-        return
-
-    pio.renderers.default = 'browser'
+def plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_format='svg'):
+    Plot = [
+        'Power Generation by price zone'    ,
+        'Power Generation by generator'    ,
+        'Curtailment'    ,
+        'Market Prices'    ,
+        'AC line loading'    ,
+        'DC line loading'    ,
+        'ACDC Converters'    ,
+        'Power Generation by generator area chart'    ,
+        'Power Generation by price zone area chart'    ,
+    ]
     
-    # Retrieve the time series data for curtailment
-    
-    if plotting_choice == 'Curtailment':
-        df = grid.time_series_results['curtailment'].iloc[start:end]*100
-    elif plotting_choice in ['Power Generation by generator','Power Generation by generator area chart']:
-        df = grid.time_series_results['real_power_opf'].iloc[start:end]*grid.S_base
-    elif plotting_choice in ['Power Generation by price zone','Power Generation by price zone area chart'] :
-        df = grid.time_series_results['real_power_by_zone'].iloc[start:end] * grid.S_base
-    elif plotting_choice == 'Market Prices':
-        df = grid.time_series_results['prices_by_zone'].iloc[start:end]
-    elif plotting_choice == 'AC line loading':
-        df = grid.time_series_results['ac_line_loading'].iloc[start:end]*100
-    elif plotting_choice == 'DC line loading':
-        df = grid.time_series_results['dc_line_loading'].iloc[start:end]*100
-    elif plotting_choice == 'AC/DC Converters':
-        df = grid.time_series_results['converter_loading'].iloc[start:end] * grid.S_base
+    if plotting_choices == []:
+        plotting_choices = Plot
+    for plotting_choice in plotting_choices:
+        # Verify that the choice is valid
+        if plotting_choice not in Plot:
+            print(f"Invalid plotting option: {plotting_choice}")
+            continue
 
         
-        
-        
-    columns = df.columns  # Correct way to get DataFrame columns
-    time = df.index  # Assuming the DataFrame index is time
-    
-    
-    layout = dict(
-        title=f"Time Series Plot: {plotting_choice}",  # Set title based on user choice
-        hovermode="x"
-    )
+        # Retrieve the time series data for curtailment
+        y_label = None
+        ylim = None
+        if plotting_choice == 'Curtailment':
+            df = grid.time_series_results['curtailment'].loc[start:end]*100
+            y_label = 'Curtailment (%)'
+            ylim = [0,110]
+        elif plotting_choice in ['Power Generation by generator','Power Generation by generator area chart']:
+            df = grid.time_series_results['real_power_opf'].loc[start:end]*grid.S_base
+            y_label = 'Power Generation (MW)'
+        elif plotting_choice in ['Power Generation by price zone','Power Generation by price zone area chart'] :
+            df = grid.time_series_results['real_power_by_zone'].loc[start:end] * grid.S_base
+            y_label = 'Power Generation (MW)'
+        elif plotting_choice == 'Market Prices':
+            df = grid.time_series_results['prices_by_zone'].loc[start:end]
+            df = df.loc[:, ~df.columns.str.startswith('o_')]
+            y_label = 'Market Prices (€/MWh)'
+        elif plotting_choice == 'AC line loading':
+            df = grid.time_series_results['ac_line_loading'].loc[start:end]*100
+            y_label = 'AC Line Loading (%)'
+            ylim = [0,110]
+        elif plotting_choice == 'DC line loading':
+            df = grid.time_series_results['dc_line_loading'].loc[start:end]*100
+            y_label = 'DC Line Loading (%)'
+            ylim = [0,110]
+        elif plotting_choice == 'ACDC Converters':
+            df = grid.time_series_results['converter_loading'].loc[start:end] * grid.S_base
+            y_label = 'ACDC Converters (MW)'
+            ylim = [0,110]
+        columns = df.columns  
+        time = df.index  # Assuming the DataFrame index is time
+       
+        if show:
+            # Show figure
+            pio.renderers.default = 'browser'
 
-    cumulative_sum = None
-    fig = go.Figure()
-    # Check if we need to stack the areas for specific plotting choices
-    stack_areas = plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']
-
-
-    # Adding traces to the subplots
-    for col in columns:
-        y_values = df[col]
-
-        if stack_areas:
-            # print(stack_areas)
-            # If stacking, add the current values to the cumulative sum
-            if cumulative_sum is None:
-                cumulative_sum = y_values.copy()  # Start cumulative sum with the first selected row
-                fig.add_trace(
-                    go.Scatter(x=time, y=y_values, name=col, hoverinfo='x+y+name', fill='tozeroy')
-                )
-            else:
-                y_values = cumulative_sum + y_values  # Stack current on top of cumulative sum
-                cumulative_sum = y_values  # Update cumulative sum
-                fig.add_trace(
-                    go.Scatter(x=time, y=y_values, name=col, hoverinfo='x+y+name', fill='tonexty')
-                )
-        else:
-            # Plot normally (no stacking)
-            fig.add_trace(
-                go.Scatter(x=time, y=y_values, name=col, hoverinfo='x+y+name')
+            layout = dict(
+                title=f"Time Series Plot: {plotting_choice}",  # Set title based on user choice
+                hovermode="x"
             )
 
-    # Update layout
-    fig.update_layout(layout)
-    
-    # Show figure
-    fig.show()
+            cumulative_sum = None
+            fig = go.Figure()
+            # Check if we need to stack the areas for specific plotting choices
+            stack_areas = plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']
 
+            # Adding traces to the subplots
+            for col in columns:
+                y_values = df[col]
+
+                if stack_areas:
+                    # print(stack_areas)
+                    # If stacking, add the current values to the cumulative sum
+                    if cumulative_sum is None:
+                        cumulative_sum = y_values.copy()  # Start cumulative sum with the first selected row
+                        fig.add_trace(
+                            go.Scatter(x=time, y=y_values, name=col, hoverinfo='x+y+name', fill='tozeroy')
+                        )
+                    else:
+                        y_values = cumulative_sum + y_values  # Stack current on top of cumulative sum
+                        cumulative_sum = y_values  # Update cumulative sum
+                        fig.add_trace(
+                            go.Scatter(x=time, y=y_values, name=col, hoverinfo='x+y+name', fill='tonexty')
+                        )
+                else:
+                    # Plot normally (no stacking)
+                    fig.add_trace(
+                        go.Scatter(x=time, y=y_values, name=col, hoverinfo='x+y+name')
+                    )
+            # Update layout
+            fig.update_layout(layout)
+            fig.show()
+
+        if format is not None:
+            
+            # Convert 8.25 cm to inches and maintain ratio
+            width_cm = 8.25
+            ratio = 6/10  # Original height/width ratio
+            width_inches = width_cm / 2.54
+            height_inches = width_inches * ratio
+            if len(df) > 10000:
+                width_inches = width_inches * 2
+            # Set publication-quality plotting parameters
+            plt.style.use('seaborn-v0_8-whitegrid')
+            plt.rcParams.update({
+                'figure.figsize': (width_inches, height_inches),
+                'font.family': 'serif',
+                'font.size': 8,
+                'axes.labelsize': 8,
+                'axes.titlesize': 8,
+                'xtick.labelsize': 7,
+                'ytick.labelsize': 7,
+                'legend.fontsize': 7,
+                'lines.markersize': 4,
+                'lines.linewidth': 1,
+                'grid.alpha': 0.3
+            })
+
+            fig_plt = plt.figure()
+            max_colors = 8  # Set2 colormap has 8 distinct colors
+            colors = plt.cm.Set2(np.linspace(0, 1, max_colors))
+            line_markers = ['-', '--', ':', '-.']  # Backup markers when colors repeat
+            i = 0
+
+            stack_areas = plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']
+            cumulative_sum  = 0*df[columns[0]]
+            for col in columns:
+                y_values = df[col]
+                current_line =  '-' if i < max_colors else line_markers[((i - max_colors) % len(line_markers))]
+                if stack_areas:
+                    y_values = cumulative_sum + y_values  # Stack current on top of cumulative sum
+                    cumulative_sum = y_values  # Update cumulative sum
+                    plt.plot(time, y_values, color=colors[i % max_colors], linestyle=current_line, label=col)
+                else:
+                    plt.plot(time, y_values, color=colors[i % max_colors], linestyle=current_line, label=col)
+                i += 1  
+
+            plt.title(plotting_choice)
+            plt.xlabel('Time')
+            if ylim is not None:
+                plt.ylim(ylim)
+            plt.ylabel(y_label)
+            if i < 12:
+                plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=4)
+            plt.tight_layout()
+            
+
+            if path is None:
+                plt.savefig(f"{plotting_choice}.{save_format}")
+            else:
+                plt.savefig(f"{path}/{plotting_choice}.{save_format}")
+        
 
 def create_subgraph_color_dict(G):
     

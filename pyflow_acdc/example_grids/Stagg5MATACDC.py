@@ -80,7 +80,7 @@ def Stagg5MATACDC():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    
+    grid.name = 'Stagg 5-bus System ACDC'
     
     
     # Return the grid

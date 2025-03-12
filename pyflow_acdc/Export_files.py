@@ -186,10 +186,10 @@ def create_dictionaries(grid):
                 data["lines_AC"].append({
                     "fromNode": line.fromNode.name,
                     "toNode": line.toNode.name,
-                    "Resistance": line.R,
-                    "Reactance": line.X,
-                    "Conductance": line.G,
-                    "Susceptance": line.B,
+                    "r": line.R,
+                    "x": line.X,
+                    "g": line.G,
+                    "b": line.B,
                     "MVA_rating": line.MVA_rating,
                     "kV_base": line.kV_base,
                     "m": line.m,
@@ -229,7 +229,7 @@ def create_dictionaries(grid):
                 data["lines_DC"].append({
                     "fromNode":   line.fromNode.name,
                     "toNode":     line.toNode.name,
-                    "Resistance": line.R,
+                    "r": line.R,
                     "MW_rating":  line.MW_rating,
                     "kV_base":    line.kV_base,
                     "Length_km":         line.Length_km,
@@ -388,6 +388,7 @@ def {file_name}():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    grid.name = '{file_name}'
     """
     
     if pz_code:

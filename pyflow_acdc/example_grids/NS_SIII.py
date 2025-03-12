@@ -296,7 +296,7 @@ def NS_SII():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-        
+    grid.name= 'North Sea Scenario III'    
     
     # Add Price Zones:
     pyf.add_price_zone(grid,'BE',97.27,import_pu_L=1,export_pu_G=1,a=0,b=97.27,c=0,import_expand_pu=0)

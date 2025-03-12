@@ -50,6 +50,8 @@ This documentation is under active development if any questions arise please con
    :caption: Visualization & Export:
 
    api/plotting
+   api/dash
+   api/folium
    api/export_files
 
 Quick Start

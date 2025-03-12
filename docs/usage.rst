@@ -1,7 +1,9 @@
 Usage Guide
 ===========
 
+This package was designed to facilitate the management of node and branch data in Excel, allowing users to easily convert the data into CSV format for seamless import into Python for calculations. For a detailed guide on this process, I highly recommend referring to :ref:`csv_import`.
 
+Alternatively, you can also construct your grid directly in Python. Below is the fundamental approach to creating a grid.
 
 Creating a Grid
 ---------------
@@ -131,6 +133,7 @@ Examples of running a power flow...
 Running an Optimal Power Flow
 -----------------------------
 To run this, you need to have the OPF optional installed. This includes the following packages:
+
 - pyomo
 - ipopt
 

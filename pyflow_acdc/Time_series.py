@@ -593,7 +593,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t2= time.time()  
         t_modelupdate = t2-t1
         
-        model_res,t_modelsolve = OPF_solve(model,grid)
+        results, solver_stats = OPF_solve(model,grid)
+        t_modelsolve = solver_stats['time']
         
         total_update_time+= t_modelupdate
         total_solve_time += t_modelsolve
