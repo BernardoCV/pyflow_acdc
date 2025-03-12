@@ -91,8 +91,3 @@ For this module, you need to have the optional dependendency pyflow_acdc[mapping
        pyf.OPF_ACDC(grid)
 
        pyf.plot_folium(grid,ant_path='All')
-
-   .. raw:: html
-
-      <iframe src="_static/North_Sea_MTDC_animated.txt" width="100%" height="600px"></iframe>
-
