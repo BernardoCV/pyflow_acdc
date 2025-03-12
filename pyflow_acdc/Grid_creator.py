@@ -641,6 +641,9 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 def Create_grid_from_mat(matfile):
     if not matfile.endswith('.mat'):
         matfile = matfile + '.mat'
+    
+    initialize_pyflowacdc()
+
     data = loadmat(matfile)
 
     bus_columns = ['bus_i', 'type', 'Pd', 'Qd', 'Gs', 'Bs', 'area', 'Vm', 'Va', 'baseKV', 'zone', 'Vmax', 'Vmin']
