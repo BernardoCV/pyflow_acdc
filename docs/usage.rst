@@ -18,6 +18,7 @@ This is the basic way to create a grid. This grid is the same as running MATACDC
 
     import pyflow_acdc as pyf
 
+    pyf.initialize_pyflowacdc()
 
     S_base = 100
 
@@ -74,6 +75,8 @@ Grids can also be built in the opposite order, creating the core grid first, the
 
     import pyflow_acdc as pyf
 
+    pyf.initialize_pyflowacdc()
+    
     grid = pyf.Grid(100)
     res = pyf.Results(grid)
 

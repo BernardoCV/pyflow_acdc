@@ -103,7 +103,7 @@ __all__ = [
     'cart2pol',
     'pol2cartz',
     'cartz2pol',
-    'reset_all_class',
+    'initialize_pyflowacdc',
     
     # Power Flow
     'AC_PowerFlow',
