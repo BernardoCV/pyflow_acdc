@@ -145,77 +145,294 @@ Time series data can be added to the grid by using the :py:func:`add_TimeSeries`
         - Time series type
       * - ``ignore``
         - str
-        - Pattern to ignore
+        - List of TS_types one might wish not to include
 
 Accepted types
 ^^^^^^^^^^^^^^
 
-   The time series update will depend on which type it can be associated to, this is why it is important to have different names for each object even if they are in different classes. The following types are accepted:
+The time series update will depend on which type it can be associated to, this is why it is important to have different names for each object even if they are in different classes. The following types are accepted:
 
-   .. list-table::
-      :widths: 10 50 20 30
-      :header-rows: 1
+.. list-table::
+  :widths: 10 50 20 30
+  :header-rows: 1
 
-      * - Type
-        - Description
-        - Object Associated
-        - Affected object variable
-      * - 'Load'
-        - Load time series
-        - :py:class:`Price_Zone`, :py:class:`Node_AC`, :py:class:`Node_DC`
-        - obj.PLi_factor
-      * - 'price'
-        - Price time series
-        - :py:class:`Price_Zone`, :py:class:`Node_AC`,  :py:class:`Node_DC`
-        - obj.price
-      * - 'WPP', 'OWPP', 'SF', 'REN'
-        - Per unit power available of base power
-        - :py:class:`Ren_source_zone`, :py:class:`Ren_Source`
-        - obj.PRGi_available
-   
-   The following parameters are only available for price zones [1]_.
-  
-   .. list-table::
-      :widths: 10 50 20 30
-      :header-rows: 1   
+  * - Type
+    - Description
+    - Object Associated
+    - Affected object variable
+  * - 'Load'
+    - Load time series
+    - :py:class:`Price_Zone`, :py:class:`Node_AC`, :py:class:`Node_DC`
+    - obj.PLi_factor
+  * - 'price'
+    - Price time series
+    - :py:class:`Price_Zone`, :py:class:`Node_AC`,  :py:class:`Node_DC`
+    - obj.price
+  * - 'WPP', 'OWPP', 'SF', 'REN'
+    - Per unit power available of base power
+    - :py:class:`Ren_source_zone`, :py:class:`Ren_Source`
+    - obj.PRGi_available
 
-      * - Type
-        - Description
-        - Object Associated
-        - Affected object variable
-      * - 'a_CG'
-        - Quadratic factor of cost of generation
-        - :py:class:`Price_Zone`
-        - obj.a_CG
-      * - 'b_CG'
-        - Linear factor of cost of generation
-        - :py:class:`Price_Zone`
-        - obj.b_CG
-      * - 'c_CG'
-        - Constant factor of cost of generation
-        - :py:class:`Price_Zone`
-        - obj.c_CG
-      * - 'PGL_min'
-        - Minimum value of P_N for the price zone
-        - :py:class:`Price_Zone`
-        - obj.PGL_min
-      * - 'PGL_max'
-        - Maximum value of P_N for the price zone
-        - :py:class:`Price_Zone`
-        - obj.PGL_max
+The following parameters are only available for price zones [1]_.
+
+.. list-table::
+  :widths: 10 50 20 30
+  :header-rows: 1   
+
+  * - Type
+    - Description
+    - Object Associated
+    - Affected object variable
+  * - 'a_CG'
+    - Quadratic factor of cost of generation
+    - :py:class:`Price_Zone`
+    - obj.a_CG
+  * - 'b_CG'
+    - Linear factor of cost of generation
+    - :py:class:`Price_Zone`
+    - obj.b_CG
+  * - 'c_CG'
+    - Constant factor of cost of generation
+    - :py:class:`Price_Zone`
+    - obj.c_CG
+  * - 'PGL_min'
+    - Minimum value of P_N for the price zone
+    - :py:class:`Price_Zone`
+    - obj.PGL_min
+  * - 'PGL_max'
+    - Maximum value of P_N for the price zone
+    - :py:class:`Price_Zone`
+    - obj.PGL_max
 
 Data format
 ^^^^^^^^^^^^
 
-   Data format depends on the selection of ``associated`` and ``TS_type``. The value in ``associated`` is the name of the object which it refers to, this can be a node, a renewable source, a price zone or a renewable source zone.
+Data format depends on the selection of ``associated`` and ``TS_type``. The value in ``associated`` is the name of the object which it refers to, this can be a node, a renewable source, a price zone or a renewable source zone.
 
-   
+For a dataset of length n, the CSV will follow this format: Position 0 is treated as the column name when imported into pandas. The first line should contain only headers and no data. Then there are cases where:
 
-   **Example**
+**associated  and TS_type assigned by user**
 
-   .. code-block:: python
+.. list-table::
+   :class: columns-2
+   :widths: 100 100
+  
+   * - .. list-table::
+         :widths: 10 10 
+         :header-rows: 1   
+         :align: left
 
-       pyf.add_TimeSeries(grid, load_data, TS_type="Load")
+         * - position
+           - value
+         * - 0
+           - time series name
+         * - 1
+           - start of the data
+         * - n
+           - end of the data
+
+     - .. list-table::
+         :widths: 10 10 10 10
+         :header-rows: 1   
+         :align: right
+
+         * - 0
+           - Load_n1
+           - Load_n2
+           - price_n1
+         * - 1
+           - 0.95
+           - 0.55
+           - 20
+         * - 2
+           - 0.75
+           - 0.95
+           - 30
+         * - 3
+           - 0.84
+           - 0.72
+           - 30
+
+.. code-block:: python
+
+    n1_load_data = pd.DataFrame({"Load_n1": [0.95, 0.75, 0.84]})
+    n2_load_data = pd.DataFrame({"Load_n2": [0.55, 0.95, 0.72]})
+    price_data   = pd.DataFrame({"price_n1": [20, 30, 40]})
+
+    pyf.add_TimeSeries(grid, n1_load_data,associated="node1", TS_type="Load")
+    pyf.add_TimeSeries(grid, n2_load_data,associated="node2", TS_type="Load")
+    pyf.add_TimeSeries(grid, price_data,associated="node1", TS_type="price")
+
+**only associated assigned by user**
+
+.. list-table::
+   :class: columns-2
+   :widths: 100 100
+  
+   * - .. list-table::
+         :widths: 10 10 
+         :header-rows: 1   
+
+         * - position
+           - value
+         * - 0
+           - time series name
+         * - 1
+           - TS_type
+         * - 2
+           - start of the data
+         * - n+1
+           - end of the data
+
+     - .. list-table::
+         :widths: 10 10 10 10
+         :header-rows: 1   
+         :align: right
+
+         * - 0
+           - Load_n1
+           - Load_n2
+           - price_n1
+         * - 1
+           - Load
+           - Load
+           - price
+         * - 2
+           - 0.95
+           - 0.55
+           - 20
+         * - 3
+           - 0.75
+           - 0.95
+           - 30
+         * - 4
+           - 0.84
+           - 0.72
+           - 40
+
+.. code-block:: python
+
+    n1_data = pd.DataFrame({"Load_n1": ['Load', 0.95, 0.75, 0.84],
+                            "price_n1": ['price', 20, 30, 40]})
+    n2_data = pd.DataFrame({"Load_n2": ['Load', 0.55, 0.95, 0.72]})
+    pyf.add_TimeSeries(grid, n1_data,associated="node1")
+    pyf.add_TimeSeries(grid, n2_data,associated="node2")
+
+**only TS_type assigned by user**
+
+.. list-table::
+   :class: columns-2
+   :widths: 100 100
+  
+   * - .. list-table::
+         :widths: 10 10 
+         :header-rows: 1   
+
+         * - position
+           - value
+         * - 0
+           - time series name
+         * - 1
+           - Object name
+         * - 2
+           - start of the data
+         * - n+1
+           - end of the data
+
+     - .. list-table::
+         :widths: 10 10 10 10
+         :header-rows: 1   
+         :align: right
+
+         * - 0
+           - Load_n1
+           - Load_n2
+           - price_n1
+         * - 1
+           - node1
+           - node2
+           - node1
+         * - 2
+           - 0.95
+           - 0.55
+           - 20
+         * - 3
+           - 0.75
+           - 0.95
+           - 30
+         * - 4
+           - 0.84
+           - 0.72
+           - 40
+
+.. code-block:: python
+
+    load_data  = pd.DataFrame({"Load_n1": ['node1', 0.95, 0.75, 0.84],
+                               "Load_n2": ['node2', 0.55, 0.95, 0.72]})
+    price_data = pd.DataFrame({"price_n1": ['node1', 20, 30, 40]})
+    pyf.add_TimeSeries(grid, load_data, TS_type="Load")    
+    pyf.add_TimeSeries(grid, price_data, TS_type="price")
+
+**associated = None and TS_type = None**
+
+.. list-table::
+   :class: columns-2
+   :widths: 100 100
+  
+   * - .. list-table::
+         :widths: 10 10 
+         :header-rows: 1   
+
+         * - position
+           - value
+         * - 0
+           - time series name
+         * - 1
+           - Object name
+         * - 2
+           - TS type
+         * - 3
+           - start of the data
+         * - n+2
+           - end of the data
+
+     - .. list-table::
+         :widths: 10 10 10 10
+         :header-rows: 1   
+         :align: right
+
+         * - 0
+           - Load_n1
+           - Load_n2
+           - price_n1
+         * - 1
+           - node1
+           - node2
+           - node1
+         * - 2
+           - Load
+           - Load
+           - price
+         * - 3
+           - 0.95
+           - 0.75
+           - 20
+         * - 4
+           - 0.75
+           - 0.84
+           - 30
+         * - 5
+           - 0.84
+           - 0.72
+           - 40
+
+.. code-block:: python
+
+    load_data = pd.DataFrame({"Load_n1": ['node1', 'Load', 0.95, 0.75, 0.84],
+                              "Load_n2": ['node2', 'Load', 0.55, 0.95, 0.72],
+                              "price_n1":['node1', 'price', 20, 30, 40]})
+    pyf.add_TimeSeries(grid, load_data)   
+
 
 **References**
 

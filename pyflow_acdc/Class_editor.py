@@ -665,7 +665,7 @@ def time_series_dict(grid, ts):
                 break  # Stop after assigning to the correct node
 
 
-def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,ignore=None):
+def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None):
     TS = Time_Series_data
     Time_series = {}
     # check if there are nan values in Time series and change to 0
@@ -676,27 +676,28 @@ def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,ignore=No
             element_name = associated
             element_type = TS_type
             data = TS.loc[0:, col].astype(float).to_numpy()  
-            name = f'{associated}_{TS_type}'
+            name = col
             
         
         elif associated is not None: 
             element_name = associated
-            element_type = col
-            data = TS.loc[0:, col].astype(float).to_numpy()  
-            name = f'{associated}_{col}'
+            element_type = TS.at[0, col]
+            data = TS.loc[1:, col].astype(float).to_numpy()  
+            name = col
         
         elif TS_type is not None:
-            element_name = col
+            element_name = TS.at[0, col]
             element_type = TS_type
-            data = TS.loc[0:, col].astype(float).to_numpy()   
-            name = f'{col}_{TS_type}'
+            data = TS.loc[1:, col].astype(float).to_numpy()   
+            name = col
         
         else: 
             element_name = TS.at[0, col]
             element_type = TS.at[1, col]
             data = TS.loc[2:, col].astype(float).to_numpy()   
             name = col
-        if ignore and ignore in name:
+            
+        if ignore and TS_type in ignore:
             continue
     
         
