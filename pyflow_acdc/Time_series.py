@@ -113,6 +113,8 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         grid.Price_Zones_dict = {pz.name: pz for pz in grid.Price_Zones}
     if not hasattr(grid, 'nodes_AC_dict'):
         grid.nodes_AC_dict = {node.name: node for node in grid.nodes_AC}
+    if not hasattr(grid, 'nodes_AC_dict'):
+        grid.nodes_DC_dict = {node.name: node for node in grid.nodes_DC}    
     if not hasattr(grid, 'RenSource_zones_dict'):
         grid.RenSource_zones_dict = {zone.name: zone for zone in grid.RenSource_zones}
     if not hasattr(grid, 'RenSources_dict'):
@@ -142,6 +144,10 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
             node.price = ts.data[idx]
+            
+        node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
+        if node_dc:
+            node_dc.price = ts.data[idx]    
     
     elif typ == 'Load':
         # Directly access price zone and nodes using dictionaries
@@ -152,6 +158,10 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
             node.PLi_factor = ts.data[idx]
+            
+        node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
+        if node_dc:
+            node_dc.PLi_factor = ts.data[idx]    
     
     elif typ in ['WPP', 'OWPP', 'SF', 'REN']:
         # Directly access RenSource_zones and RenSources using dictionaries
@@ -555,7 +565,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     
     PV_set=False
     if  weights_def['PZ_cost_of_generation']['w']!=0 :
-        Price_Zones=True
+        price_zone_restrictions=True
     if  weights_def['Curtailment_Red']['w']!=0 :
         grid.CurtCost=True
         
@@ -593,7 +603,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t2= time.time()  
         t_modelupdate = t2-t1
         
-        model_res,t_modelsolve = OPF_solve(model,grid)
+        results, solver_stats = OPF_solve(model,grid)
+        t_modelsolve = solver_stats['time']
         
         total_update_time+= t_modelupdate
         total_solve_time += t_modelsolve
@@ -852,7 +863,8 @@ def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
 
 def results_TS_OPF(grid,excel_file_path,grid_names=None,stats=None,times=None):
     
-    
+    if not excel_file_path.endswith('.xlsx'):
+        excel_file_path = f'{excel_file_path}.xlsx'
   
     if grid_names is not None:
         grid.time_series_results['grid_loading'] =grid.time_series_results['grid_loading'].rename(columns=grid_names)

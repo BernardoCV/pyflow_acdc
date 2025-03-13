@@ -129,15 +129,15 @@ Extend Grid From Data
 Reset All Classes
 -----------------
 
-.. py:function:: reset_all_class()
+.. py:function:: initialize_pyflowacdc()
 
-   Resets all component class counters.
+   Resets all component class counters. This function is neeed if you have installed pyflow_acdc directly from pip. Create_grid_from_data and Create_grid_from_mat automatically call this function so you dont need to.
 
    **Example**
 
    .. code-block:: python
 
-       reset_all_class()
+       pyf.initialize_pyflowacdc()
 
 Change Base Power
 -----------------   

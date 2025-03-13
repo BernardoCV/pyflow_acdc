@@ -395,7 +395,9 @@ def add_MTDC_price_zone(Grid, name,  linked_price_zones=None,pricing_strategy='a
 
 
 def add_offshore_price_zone(Grid,main_price_zone,name):
-    
+    if isinstance(main_price_zone, str):
+        main_price_zone = next((M for M in Grid.Price_Zones if main_price_zone == M.name), None)
+
     oprice_zone = OffshorePrice_Zone(name=name, price=main_price_zone.price, main_price_zone=main_price_zone)
     Grid.Price_Zones.append(oprice_zone)
     
@@ -575,7 +577,7 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
         elif Offshore:
             rensource.Offshore=True
             # Create an offshore price_zone by appending 'o' to the main price_zone's name
-            oprice_zone_name = f'o{price_zone}'
+            oprice_zone_name = f'o_{price_zone}'
 
             # Find the main price_zone
             main_price_zone = next((M for M in Grid.Price_Zones if price_zone == M.name), None)
@@ -752,13 +754,13 @@ def assign_RenToZone(Grid,ren_source_name,new_zone_name):
  
 "Assigning components to zones"
     
-def assign_nodeToPrice_Zone(Grid,node_name,ACDC, new_price_zone_name):
+def assign_nodeToPrice_Zone(Grid,node_name, new_price_zone_name,ACDC='AC'):
         """ Assign node to a new price_zone and remove it from its previous price_zone """
         new_price_zone = None
         old_price_zone = None
         node_to_reassign = None
         
-        nodes_attr = 'nodes_AC' if ACDC == 'AC' else 'nodes_DC'
+        nodes_attr = 'nodes_DC' if ACDC == 'DC' else 'nodes_AC'
         
         # Find the new price_zone
         for price_zone in Grid.Price_Zones:

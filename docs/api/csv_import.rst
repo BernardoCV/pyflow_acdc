@@ -1,3 +1,5 @@
+.. _csv_import:
+
 CSV files for importing data
 ============================
 
@@ -1044,8 +1046,8 @@ Here are example CSV files from a 5-bus test system using the data in Real value
 
    </details>
 
-References
-----------
+**References**
+
 
 .. [1] J. Beerten and R. Belmans, "MatACDC - an open source software tool for steady-state analysis and operation of HVDC grids," 11th IET International Conference on AC and DC Power Transmission, Birmingham, 2015, pp. 1-9, doi: 10.1049/cp.2015.0061. keywords: {Steady-state analysis;HVDC grids;AC/DC systems;power flow modelling},
 

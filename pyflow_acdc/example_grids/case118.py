@@ -352,14 +352,14 @@ def case118():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    
+    grid.name = 'case118'
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
         node_name = nodes_AC.at[index, 'Node_id']
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     pyf.add_gen(grid, '1.0', '1', price_zone_link=False, lf=40.0, qf=0.01, MWmax=100.0, MWmin=0.0, MVArmax=15.0, MVArmin=-5.0, PsetMW=0.0, QsetMVA=0.0)

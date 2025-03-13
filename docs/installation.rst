@@ -16,16 +16,13 @@ Requirements
     * pyyaml
 
 * Optional dependencies:
-    * Clustering:
-     * scikit-learn-extra
-     * scikit-learn
     * Mapping:
-     * folium
+        * folium
     * Optimal power flow:  
-     * pyomo
-     * ipopt
+        * pyomo
+        * ipopt
     * Dash:
-     * dash
+        * dash
 
 
 Install from PyPI
@@ -68,22 +65,24 @@ Making Changes
     To merge your changes into the main branch please contact the repository owner.
 
 Additional Dependencies
----------------------
+------------------------
+
 For Mapping functionality
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 Install the following packages::
 
     pip install folium
 
 For OPF functionality
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 Install the following packages::
 
+    pip install numpy <2.0.0
     pip install pyomo
     pip install ipopt
 
 For Dash Interface
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
 Install the following packages::
 
     pip install dash

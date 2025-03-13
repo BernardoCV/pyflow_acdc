@@ -76,6 +76,8 @@ pip install folium
 
 For OPF you will need to install the following packages:
 ```bash
+
+pip install numpy <2.0.0
 pip install pyomo
 pip install ipopt
 

@@ -1351,21 +1351,21 @@ def pglib_opf_case588_sdet_acdc():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    
+    grid.name = 'IEEE 588-bus System ACDC'
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
         node_name = nodes_AC.at[index, 'Node_id']
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     for index, row in nodes_DC.iterrows():
         node_name = nodes_DC.at[index, 'Node_id']
         price_zone = nodes_DC.at[index, 'PZ']
         ACDC = 'DC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     pyf.add_gen(grid, '4.0', '2', price_zone_link=False, lf=40.064589, qf=0.0, MWmax=281.74, MWmin=172.18, MVArmax=279.47, MVArmin=-349.34, PsetMW=226.96, QsetMVA=-34.935)

@@ -1,5 +1,5 @@
 Time Series Module
-=================
+==================
 
 This module provides functions for time series analysis of power flows and optimal power flow.
 
@@ -14,7 +14,7 @@ Sequential AC/DC Time Series Power Flow
    Performs sequential AC/DC power flow for time series data.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 10 
       :header-rows: 1
 
       * - Parameter
@@ -39,14 +39,15 @@ Sequential AC/DC Time Series Power Flow
         - False
 
    **Returns**
-   Results are stored in grid.time_series_results containing:
 
-   - PF_results: Node voltages and power flows
-   - line_loading: Line loading percentages
-   - ac_line_loading: AC line loading percentages
-   - dc_line_loading: DC line loading percentages
-   - converter_loading: Converter loading percentages
-   - grid_loading: Overall grid loading
+   Results are stored in ``grid.time_series_results`` dictionary with the following keys:
+
+   - ``PF_results``: Node voltages and power flows
+   - ``line_loading``: Line loading percentages
+   - ``ac_line_loading``: AC line loading percentages
+   - ``dc_line_loading``: DC line loading percentages
+   - ``converter_loading``: Converter loading percentages
+   - ``grid_loading``: Overall grid loading
 
    **Example**
 
@@ -97,46 +98,66 @@ Optimal Power Flow Time Series
         - bool
         - Print step in the terminal
         - False
+
    **Returns**
-   Results are stored in grid.time_series_results containing:
 
-   - converter_p_dc: Converter power in DC side
-   - converter_q_ac: Converter power in AC side
-   - converter_p_ac: Converter power in AC side
-   - converter_loading: Converter loading percentages
-   - real_load_opf: Real load
-   - real_power_opf: Real power
-   - reactive_power_opf: Reactive power
-   - curtailment: Curtailment
-   - line_loading: Line loading percentages
-   - grid_loading: Loading by unsyncrhonized grids.
-   - prices_by_zone: Prices by price zone
-   - prices_by_zone_total: Total prices by price zone
-   - ac_line_loading: AC line loading percentages
-   - dc_line_loading: DC line loading percentages
-   - real_load_opf: Real load per node
-   - real_load_by_zone: Real load per price zone
-   - real_power_by_zone: Real power per price zone
-   - reactive_power_opf: Reactive power per generator
-   - real_power_opf: Real power per generator
+   Results are stored in ``grid.time_series_results`` dictionary with the following keys:
 
-  It also returns a dictionary with the timing information.
+   * ``converter_p_dc`` - Converter power in DC side
+   * ``converter_q_ac`` - Converter power in AC side
+   * ``converter_p_ac`` - Converter power in AC side
+   * ``converter_loading`` - Converter loading percentages
+   * ``real_load_opf`` - Real load per node
+   * ``real_power_opf`` - Real power per generator
+   * ``reactive_power_opf`` - Reactive power per generator
+   * ``curtailment`` - Curtailment values
+   * ``line_loading`` - Line loading percentages
+   * ``grid_loading`` - Loading by unsynchronized grids
+   * ``prices_by_zone`` - Prices by price zone
+   * ``prices_by_zone_total`` - Total prices by price zone
+   * ``ac_line_loading`` - AC line loading percentages
+   * ``dc_line_loading`` - DC line loading percentages
+   * ``real_load_by_zone`` - Real load per price zone
+   * ``real_power_by_zone`` - Real power per price zone
+
+   It also returns a dictionary with the timing information.
 
    **Example**
 
    .. code-block:: python
 
-       timing_info = pyf.TS_ACDC_OPF(grid, ObjRule={'Energy_cost': 1.0})
+       import pyflow_acdc as pyf
+       import pandas as pd
+
+       [grid,results] = pyf.NS_MTDC()
+
+       start = 5750
+       end = 6000
+       obj = {'Energy_cost': 1}
+
+       market_prices_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
+       TS_MK = pd.read_csv(market_prices_url)
+       pyf.add_TimeSeries(grid,TS_MK)
+
+       wind_load_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
+       TS_wl = pd.read_csv(wind_load_url)
+       pyf.add_TimeSeries(grid,TS_wl)
+
+       times=pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)  
+
+       res_dict = grid.time_series_results
+
+        
 
 Parallel Time Series OPF
-^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:function:: TS_ACDC_OPF_parallel(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
 
    Performs parallel time series optimal power flow analysis. Creates parallel sub-models to speed up the calculation.
 
    **Returns**
-   Retults are saved in grid.time_series_results and the average elapsed time is returned.
+   Results are saved in ``grid.time_series_results`` and the average elapsed time is returned.
 
    **Example**
 
@@ -163,7 +184,6 @@ Statistical Analysis
         - Grid
         - Grid with results
         - Required
-        - -
       * - ``curtail``
         - float
         - Curtailment percentile
@@ -217,34 +237,33 @@ Results Export
         - dict
         - Computation times
         - None
-        - -
 
    Exports sheets for:
 
-   - Timing information
-   - All line loadings (AC/DC)
-   - AC line loadings
-   - DC line loadings
-   - Grid loadings
-   - Converter DC power
-   - Converter AC power
-   - Converter AC reactive power
-   - Real load per node
-   - Real power per generator
-   - Reactive power per generator
-   - Curtailment
-   - Converter loading
-   - Real load by zone
-   - Real power by zone
-   - Reactive power by zone
-   - Prices by zone
-   - Statistics
+   - ``Time`` - Timing information
+   - ``All line loadings (AC/DC)`` - All line loadings (AC/DC)
+   - ``AC line loadings`` - AC line loading percentages
+   - ``DC line loadings`` - DC line loading percentages
+   - ``Grid loadings`` - Grid loading percentages
+   - ``Converter DC power`` - Converter power in DC side
+   - ``Converter AC power`` - Converter power in AC side
+   - ``Converter AC reactive power`` - Converter reactive power in AC side
+   - ``Real load per node`` - Real load per node
+   - ``Real power per generator`` - Real power per generator
+   - ``Reactive power per generator`` - Reactive power per generator
+   - ``Curtailment`` - Curtailment
+   - ``Converter loading`` - Converter loading percentages
+   - ``Real load by zone`` - Real load by zone
+   - ``Real power by zone`` - Real power by zone
+   - ``Reactive power by zone`` - Reactive power by zone
+   - ``Prices by zone`` - Prices by zone
+   - ``Statistics`` - Statistics
 
    **Example**
 
    .. code-block:: python
 
-       pyf.results_TS_OPF(grid, "results.xlsx", stats=stats_df)
+       pyf.results_TS_OPF(grid, "results", stats=stats_df)
 
 References
 ----------

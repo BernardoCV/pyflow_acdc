@@ -5273,14 +5273,15 @@ def case_ACTIVSg2000():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    
+    grid.name = 'case_ACTIVSg2000'
+
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
         node_name = nodes_AC.at[index, 'Node_id']
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     pyf.add_gen(grid, '1004.0', '1', price_zone_link=False, lf=0.0, qf=0.0, MWmax=158.25, MWmin=158.25, MVArmax=44.94, MVArmin=-30.380000000000003, PsetMW=158.25, QsetMVA=-30.380000000000003)

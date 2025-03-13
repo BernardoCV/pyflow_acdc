@@ -217,21 +217,22 @@ def case24_3zones_acdc():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    
+    grid.name = 'case24_3zones_acdc'
+
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
         node_name = nodes_AC.at[index, 'Node_id']
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     for index, row in nodes_DC.iterrows():
         node_name = nodes_DC.at[index, 'Node_id']
         price_zone = nodes_DC.at[index, 'PZ']
         ACDC = 'DC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     pyf.add_gen(grid, '101.0', '1', price_zone_link=False, lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)

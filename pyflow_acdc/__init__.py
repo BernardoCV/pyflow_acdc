@@ -103,7 +103,7 @@ __all__ = [
     'cart2pol',
     'pol2cartz',
     'cartz2pol',
-    'reset_all_class',
+    'initialize_pyflowacdc',
     
     # Power Flow
     'AC_PowerFlow',
@@ -155,6 +155,7 @@ __all__ = [
     'price_zone_data_pd',
     'price_zone_coef_data',
     'plot_curves',
+    'clean_entsoe_data',
 
     'run_dash',
 ]

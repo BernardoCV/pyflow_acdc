@@ -49,7 +49,11 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # a list of builtin themes.
 #
 html_theme = 'furo'
-html_title = project 
+html_title = project
+
+# Custom CSS to override background color
+html_css_files = ['custom.css']
+
 # Remove or comment out the general html_logo setting
 # html_logo = '_static/logo.svg'
 
@@ -66,4 +70,5 @@ html_theme_options = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_extra_path = ['_static']
 

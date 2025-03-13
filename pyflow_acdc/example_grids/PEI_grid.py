@@ -368,6 +368,7 @@ def PEI_grid():
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    grid.name = 'Princess Elizabeth Island'
     
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
@@ -375,14 +376,14 @@ def PEI_grid():
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     for index, row in nodes_DC.iterrows():
         node_name = nodes_DC.at[index, 'Node_id']
         price_zone = nodes_DC.at[index, 'PZ']
         ACDC = 'DC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     

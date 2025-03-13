@@ -121,10 +121,8 @@ class Grid:
         self.TEP_n_years = 25
         self.TEP_discount_rate =0.02
         
+        self.name = 'Grid'
         
-      
- 
-
         if self.nodes_AC:
             self.Update_Graph_AC()
             self.Update_PQ_AC()

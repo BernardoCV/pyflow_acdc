@@ -78,11 +78,11 @@ The user can define the objective by setting the weight of each sub objective. T
       - Description
       - Formula
     * - ``Ext_Gen``
-      - External generation cost
+      - External generation minimization or maximum export
       - :math:`\sum_{g=1}^{G} \cdot P_{g}`
     * - ``Energy_cost``
       - Energy cost
-      - :math:`\sum_{g=1}^{\mathcal{G}_{ac}} \left( P_{g}^2 \cdot \alpha_g + P_{g} \cdot \beta_g  \right)`
+      - :math:`\sum_{g=1}^{\mathcal{G}_{ac}} \left(P_{g}^2 \cdot \alpha_g + P_{g} \cdot \beta_g  \right)`
     * - ``Curtailment_Red``
       - Renewable curtailment reduction
       - :math:`\sum_{rg=1}^{ \mathcal{RG}_{ac}}\left((1-\gamma_rg)P_{rg}\cdot \rho_{rg} \sigma_{rg}\right)`
@@ -198,8 +198,7 @@ The model enforces constraints for:
 
 For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
 
-References
-----------
+**References**
 
 .. [1] B.C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
        "An optimal power flow tool for AC/DC systems, applied to the analysis of the

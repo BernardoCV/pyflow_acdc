@@ -9,7 +9,7 @@ Add Grid Components
 -------------------
 
 Add AC Node
-^^^^^^^^^^^^
+^^^^^^^^^^^^	
 
 .. py:function:: add_AC_node(grid, kV_base, node_type='PQ', Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1, Gs=0, Bs=0, x_coord=None, y_coord=None, geometry=None)
 
@@ -749,6 +749,9 @@ Add Renewable Source
 
        source = pyf.add_RenSource(grid, "bus1", 100, ren_type="Wind")
 
+
+.. _price_zones:
+
 Add Price Zone
 ^^^^^^^^^^^^^^	
 
@@ -788,38 +791,9 @@ Add Price Zone
 
        zone = pyf.add_price_zone(grid, "Zone1", price=50)
 
-Add Renewable Source Zone
-^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_RenSource_zone(grid, name)
+.. _price_zone_assignments:
 
-   Adds a renewable source zone to the grid.
-
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-      * - ``grid``
-        - Grid
-        - Grid to modify
-      * - ``name``
-        - str
-        - Zone name
-      * - Returns
-        - Ren_source_zone
-        - Created renewable zone
-
-   **Example**
-
-   .. code-block:: python
-
-       zone = pyf.add_RenSource_zone(grid, "WindZone1")
-
-Zone Assignments
-----------------
 
 Assign Node to Price Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^^	
@@ -854,41 +828,12 @@ Assign Node to Price Zone
 
        pyf.assign_nodeToPrice_Zone(grid, "bus1", "AC", "Zone1")
 
-Assign Renewable to Zone
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. py:function:: assign_RenToZone(grid, ren_source_name, new_zone_name)
-
-   Assigns a renewable source to a zone.
-
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-      * - ``grid``
-        - Grid
-        - Grid containing source
-      * - ``ren_source_name``
-        - str
-        - Name of renewable source
-      * - ``new_zone_name``
-        - str
-        - Name of target zone
-
-   **Example**
-
-   .. code-block:: python
-
-       pyf.assign_RenToZone(grid, "wind1", "WindZone1")
 
 Line Modifications
 ------------------
 
 Change Line to Expandable
-^^^^^^^^^^^^^^^^^^^^^^^^    
+^^^^^^^^^^^^^^^^^^^^^^^^^    
 
 .. py:function:: change_line_AC_to_expandable(grid, line_name)
 
@@ -941,41 +886,3 @@ Change Line to Transformer
 
        pyf.change_line_AC_to_tap_transformer(grid, "line1")
 
-Time Series
------------
-
-Add Time Series
-^^^^^^^^^^^^^^^
-
-.. py:function:: add_TimeSeries(grid, Time_Series_data, associated=None, TS_type=None, ignore=None)
-
-   Adds time series data to grid components.
-
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-      * - ``grid``
-        - Grid
-        - Grid to modify
-      * - ``Time_Series_data``
-        - DataFrame
-        - Time series data
-      * - ``associated``
-        - str
-        - Component name
-      * - ``TS_type``
-        - str
-        - Time series type
-      * - ``ignore``
-        - str
-        - Pattern to ignore
-
-   **Example**
-
-   .. code-block:: python
-
-       pyf.add_TimeSeries(grid, load_data, TS_type="Load")
