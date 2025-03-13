@@ -26,7 +26,7 @@ API Documentation
 ^^^^^^^^^^^^^^^^^^
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Grid Management:
 
    api/modelling
@@ -35,14 +35,14 @@ API Documentation
    api/grid_mod
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Power Flow Analysis:
 
    api/pf
    api/opf
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3  
    :caption: Time Series & Analysis:
 
    api/ts_mod

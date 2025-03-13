@@ -12,7 +12,7 @@ Time Series Results
 
 This function is used to plot the time series results of the grid.
 
-.. py:function:: plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_format='svg')
+.. py:function:: plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_format=None)
 
    Creates plots for time series results. The possible plotting choices are:
 
@@ -61,8 +61,8 @@ This function is used to plot the time series results of the grid.
         - Current working directory
       * - ``save_format``
         - str
-        - Format to save the plot
-        - 'svg'
+        - Format to save the plot, if None, the plot are not saved
+        - None
 
    **Example**
 

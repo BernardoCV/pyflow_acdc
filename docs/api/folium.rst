@@ -1,8 +1,12 @@
 Mapping
 =======
 
+
+
 For this module, you need to have the optional dependendency pyflow_acdc[mapping] installed.
 
+Interactive map
+---------------
 
 .. py:function:: plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None)
    

@@ -17,7 +17,8 @@ Creating a Grid
     grid = pyf.Grid()
 
 Create Grid From Data
----------------------
+^^^^^^^^^^^^^^^^^^^^^	
+
 A more detailed description of the function can be found in the :doc:`csv_import` page.
 
 .. py:function:: Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
@@ -63,7 +64,7 @@ A more detailed description of the function can be found in the :doc:`csv_import
        grid, results = pyf.Create_grid_from_data(100, ac_nodes_df, ac_lines_df)
 
 Create Grid From Matpower
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:function:: Create_grid_from_mat(matfile)
 
@@ -82,7 +83,7 @@ Create Grid From Matpower
        grid, results = pyf.Create_grid_from_mat("case9.mat")
 
 Extend Grid From Data  
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 .. py:function:: Extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
 
@@ -127,7 +128,7 @@ Extend Grid From Data
        pyf.Extend_grid_from_data(grid, new_ac_nodes_df)
 
 Reset All Classes
------------------
+^^^^^^^^^^^^^^^^^
 
 .. py:function:: initialize_pyflowacdc()
 
@@ -140,7 +141,7 @@ Reset All Classes
        pyf.initialize_pyflowacdc()
 
 Change Base Power
------------------   
+^^^^^^^^^^^^^^^^^   
 
 under development
 
@@ -172,7 +173,7 @@ under development
        pyf.change_S_base(grid, 100)
 
 Create Sub Grid
-----------------
+^^^^^^^^^^^^^^^^
 
 .. py:function:: create_sub_grid(grid, Area=None, Area_name=None, polygon_coords=None)
 

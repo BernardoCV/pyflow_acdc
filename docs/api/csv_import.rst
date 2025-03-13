@@ -29,6 +29,9 @@ Required CSV Files
 
 Select your data input format:
 
+Data in per unit (pu)
+^^^^^^^^^^^^^^^^^^^^^^
+
 .. raw:: html
 
    <details>
@@ -363,6 +366,12 @@ Here are example CSV files from a 5-bus test system in per unit:
 .. raw:: html
 
    </details>
+
+Data in Ohms
+^^^^^^^^^^^^^^  
+
+.. raw:: html
+  
    <details>
    <summary><b>Data in Ohms</b></summary>
 
@@ -710,6 +719,13 @@ Here are example CSV files from a 5-bus test system using the data in Ohm values
 .. raw:: html
 
    </details>
+
+
+Data in Real values
+^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html 
+
    <details>
    <summary><b>Data in Real values</b></summary>
 

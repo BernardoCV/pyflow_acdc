@@ -697,9 +697,6 @@ def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None):
             data = TS.loc[2:, col].astype(float).to_numpy()   
             name = col
             
-        if ignore and TS_type in ignore:
-            continue
-    
         
         Time_serie = TimeSeries(element_type, element_name, data,name)                  
         Grid.Time_series.append(Time_serie)

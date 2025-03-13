@@ -109,18 +109,17 @@ Price zones function also like renewable sources zone when dealing with time ser
 
 
 
-Add Time Series
----------------
+Time Series data
+----------------
 
+Add Time Series
+^^^^^^^^^^^^^^^
 
 Time series data can be added to the grid by using the :py:func:`add_TimeSeries` function. This function allows to add time series data to a specific component. Time series data is imported from csv files.
 
 
 
-
-
-
-.. py:function:: add_TimeSeries(grid, Time_Series_data, associated=None, TS_type=None, ignore=None)
+.. py:function:: add_TimeSeries(grid, Time_Series_data, associated=None, TS_type=None)
 
    Adds time series data to grid components.
 
@@ -143,9 +142,7 @@ Time series data can be added to the grid by using the :py:func:`add_TimeSeries`
       * - ``TS_type``
         - str
         - Time series type
-      * - ``ignore``
-        - str
-        - List of TS_types one might wish not to include
+      
 
 Accepted types
 ^^^^^^^^^^^^^^

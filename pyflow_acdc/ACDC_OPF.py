@@ -39,7 +39,7 @@ def pack_variables(*args):
            
             
 
-def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False, TS=False):
+def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     weights_def = {
        'Ext_Gen': {'w': 0},
        'Energy_cost': {'w': 0},

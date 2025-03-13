@@ -8,48 +8,114 @@ functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_model
 AC/DC Hybrid Optimal Power Flow
 -------------------------------
 
-.. py:function::  OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, TS=False)
+Running the OPF
+^^^^^^^^^^^^^^^^
+
+This function runs the AC/DC hybrid optimal power flow calculation. It creates the :ref:`model <model_creation>`, chooses an :ref:`objective function <obj_functions>`, and :ref:`solves <model_solving>` the model.
+
+.. py:function::  OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
 
    Performs AC/DC hybrid optimal power flow calculation.
 
-  .. list-table::
-    :widths: 20 10 50 10
-    :header-rows: 1
+   .. list-table::
+      :widths: 20 10 50 10
+      :header-rows: 1
 
-    * - Parameter
-      - Type
-      - Description
-      - Default
-    * - ``grid``
-      - Grid
-      - Grid to optimize
-      - Required
-    * - ``ObjRule``
-      - dict
-      - Objective function weights
-      - None
-    * - ``PV_set``
-      - bool
-      - Enable PV setpoint optimization
-      - False
-    * - ``OnlyGen``
-      - bool
-      - Only generators are considered in the cost function
-      - True
-    * - ``Price_Zones``
-      - bool
-      - Enable price zone constraints
-      - False
-    * - ``TS``
-      - bool
-      - Time series optimization
-      - False
+      * - Parameter
+        - Type
+        - Description
+        - Default
+      * - ``grid``
+        - Grid
+        - Grid to optimize
+        - Required
+      * - ``ObjRule``
+        - dict
+        - Objective function weights
+        - None
+      * - ``PV_set``
+        - bool
+        - Sets PV and Slack voltage as fixed variables
+        - False
+      * - ``OnlyGen``
+        - bool
+        - Only generators are considered in the cost function
+        - True
+      * - ``Price_Zones``
+        - bool
+        - Enable price zone constraints
+        - False
   
-  **Example**
+   **Example**
 
-  .. code-block:: python
+   .. code-block:: python
 
-      model, timing, solver_data =pyf.OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, TS=False)
+      model, timing, solver_data =pyf.OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+
+.. _model_creation:
+
+Creating the OPF model
+^^^^^^^^^^^^^^^^^^^^^^
+
+
+.. function:: OPF_createModel_ACDC(model,grid,PV_set,Price_Zones)
+
+   Creates the OPF model.
+
+   .. list-table::
+      :widths: 20 10 50 
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+      * - ``model``
+        - Model
+        - Model to create
+      * - ``grid``
+        - Grid
+        - Grid to optimize    
+      * - ``PV_set``
+        - bool
+        - Sets PV and Slack voltage as fixed variables
+      * - ``Price_Zones``
+        - bool
+        - Enable price zone constraints
+
+   **Variables**
+
+
+   The optimization model includes variables for:
+
+   - AC node voltages and angles
+   - DC node voltages 
+   - Generator active/reactive power
+   - Renewable generation and curtailment
+   - Line flows
+   - Converter power flows
+   - Price zone variables
+
+   **Constraints**
+
+
+   The model enforces constraints for:
+
+   - :ref:`AC power flow equations <AC_node_modelling>`
+   - :ref:`DC power flow equations <DC_node_modelling>`
+   - :ref:`Generator limits <Generator_modelling>`
+   - :ref:`AC branch thermal limits <AC_branch_modelling>`
+   - :ref:`DC branch thermal limits <DC_line_modelling>`
+   - Voltage and angle limits
+   - :ref:`Converter operation limits <ACDC_converter_modelling>`
+   - :ref:`Price zone balancing <Price_zone_modelling>`
+
+   For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
+
+   **Example**
+
+   .. code-block:: python
+
+      model = pyf.OPF_createModel_ACDC(model,grid,PV_set,Price_Zones)
 
 .. _obj_functions:
 
@@ -145,6 +211,8 @@ The user can define the objective by setting the weight of each sub objective. T
       'Gen_set_dev': {'w': 0}
       }
       
+.. _model_solving:
+
 Solvers
 ^^^^^^^
 
@@ -166,37 +234,6 @@ The OPF module supports the following solvers:
 
       results, solver_stats =pyf.OPF_solve(model,grid,solver_options=[])
 
-Model Components
-^^^^^^^^^^^^^^^^
-
-**Variables**
-
-
-The optimization model includes variables for:
-
-- AC node voltages and angles
-- DC node voltages 
-- Generator active/reactive power
-- Renewable generation and curtailment
-- Line flows
-- Converter power flows
-- Price zone variables
-
-**Constraints**
-
-
-The model enforces constraints for:
-
-- :ref:`AC power flow equations <AC_node_modelling>`
-- :ref:`DC power flow equations <DC_node_modelling>`
-- :ref:`Generator limits <Generator_modelling>`
-- :ref:`AC branch thermal limits <AC_branch_modelling>`
-- :ref:`DC branch thermal limits <DC_line_modelling>`
-- Voltage and angle limits
-- :ref:`Converter operation limits <ACDC_converter_modelling>`
-- :ref:`Price zone balancing <Price_zone_modelling>`
-
-For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
 
 **References**
 

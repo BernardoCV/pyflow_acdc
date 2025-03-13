@@ -9,6 +9,9 @@ functions are found in pyflow_acdc.Time_series
 Sequential AC/DC Time Series Power Flow
 ---------------------------------------
 
+Cross-sectional time series
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. py:function:: TS_ACDC_PF(grid, start=1, end=99999, print_step=False)
 
    Performs sequential AC/DC power flow for time series data.
@@ -58,6 +61,8 @@ Sequential AC/DC Time Series Power Flow
 Optimal Power Flow Time Series
 ------------------------------
 
+Cross-sectional time series
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. py:function:: TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=False,expand=False,print_step=False)
     
    Performs time series optimal power flow analysis.
@@ -149,8 +154,8 @@ Optimal Power Flow Time Series
 
         
 
-Parallel Time Series OPF
-^^^^^^^^^^^^^^^^^^^^^^^^
+Parallel cross-sectional time series
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:function:: TS_ACDC_OPF_parallel(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
 
@@ -165,8 +170,12 @@ Parallel Time Series OPF
 
        average_elapsed_time=pyf.TS_ACDC_OPF_parallel(grid)
 
+
+Data handling
+-------------
+
 Statistical Analysis
---------------------
+^^^^^^^^^^^^^^^^^^^^
 
 .. py:function:: Time_series_statistics(grid, curtail=0.99, over_loading=0.9)
 
@@ -203,7 +212,7 @@ Statistical Analysis
    - Percentiles
 
 Results Export
---------------
+^^^^^^^^^^^^^^
 
 .. py:function:: results_TS_OPF(grid, excel_file_path, grid_names=None, stats=None, times=None)
 
