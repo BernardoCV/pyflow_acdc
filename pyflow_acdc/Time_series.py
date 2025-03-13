@@ -113,7 +113,7 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         grid.Price_Zones_dict = {pz.name: pz for pz in grid.Price_Zones}
     if not hasattr(grid, 'nodes_AC_dict'):
         grid.nodes_AC_dict = {node.name: node for node in grid.nodes_AC}
-    if not hasattr(grid, 'nodes_AC_dict'):
+    if not hasattr(grid, 'nodes_DC_dict'):
         grid.nodes_DC_dict = {node.name: node for node in grid.nodes_DC}    
     if not hasattr(grid, 'RenSource_zones_dict'):
         grid.RenSource_zones_dict = {zone.name: zone for zone in grid.RenSource_zones}
