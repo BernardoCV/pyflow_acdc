@@ -16,16 +16,13 @@ Requirements
     * pyyaml
 
 * Optional dependencies:
-    * Clustering:
-     * scikit-learn-extra
-     * scikit-learn
     * Mapping:
-     * folium
+        * folium
     * Optimal power flow:  
-     * pyomo
-     * ipopt
+        * pyomo
+        * ipopt
     * Dash:
-     * dash
+        * dash
 
 
 Install from PyPI

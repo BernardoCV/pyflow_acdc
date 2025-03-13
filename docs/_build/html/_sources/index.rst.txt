@@ -16,11 +16,14 @@ This documentation is under active development if any questions arise please con
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Introduction:
 
    installation
    usage
    citing
+
+API Documentation
+^^^^^^^^^^^^^^^^^^
 
 .. toctree::
    :maxdepth: 2

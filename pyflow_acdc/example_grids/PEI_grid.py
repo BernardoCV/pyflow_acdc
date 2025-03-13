@@ -376,14 +376,14 @@ def PEI_grid():
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     for index, row in nodes_DC.iterrows():
         node_name = nodes_DC.at[index, 'Node_id']
         price_zone = nodes_DC.at[index, 'PZ']
         ACDC = 'DC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     

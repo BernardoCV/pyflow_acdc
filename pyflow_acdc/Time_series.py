@@ -555,7 +555,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     
     PV_set=False
     if  weights_def['PZ_cost_of_generation']['w']!=0 :
-        Price_Zones=True
+        price_zone_restrictions=True
     if  weights_def['Curtailment_Red']['w']!=0 :
         grid.CurtCost=True
         
