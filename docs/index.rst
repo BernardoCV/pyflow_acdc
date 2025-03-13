@@ -45,6 +45,7 @@ API Documentation
    :maxdepth: 2
    :caption: Time Series & Analysis:
 
+   api/ts_mod
    api/ts
    api/market_coef
 

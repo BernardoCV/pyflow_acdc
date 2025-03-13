@@ -113,6 +113,8 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         grid.Price_Zones_dict = {pz.name: pz for pz in grid.Price_Zones}
     if not hasattr(grid, 'nodes_AC_dict'):
         grid.nodes_AC_dict = {node.name: node for node in grid.nodes_AC}
+    if not hasattr(grid, 'nodes_AC_dict'):
+        grid.nodes_DC_dict = {node.name: node for node in grid.nodes_DC}    
     if not hasattr(grid, 'RenSource_zones_dict'):
         grid.RenSource_zones_dict = {zone.name: zone for zone in grid.RenSource_zones}
     if not hasattr(grid, 'RenSources_dict'):
@@ -142,6 +144,10 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
             node.price = ts.data[idx]
+            
+        node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
+        if node_dc:
+            node_dc.price = ts.data[idx]    
     
     elif typ == 'Load':
         # Directly access price zone and nodes using dictionaries
@@ -152,6 +158,10 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
             node.PLi_factor = ts.data[idx]
+            
+        node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
+        if node_dc:
+            node_dc.PLi_factor = ts.data[idx]    
     
     elif typ in ['WPP', 'OWPP', 'SF', 'REN']:
         # Directly access RenSource_zones and RenSources using dictionaries
