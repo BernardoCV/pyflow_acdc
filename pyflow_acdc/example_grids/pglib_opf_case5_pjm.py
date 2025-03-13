@@ -74,7 +74,7 @@ def pglib_opf_case5_pjm():
         price_zone = nodes_AC.at[index, 'PZ']
         ACDC = 'AC'
         if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, ACDC, price_zone)
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
     pyf.add_gen(grid, '1.0', '1', price_zone_link=False, lf=14, qf=0, MWmax=40.0, MWmin=0.0, MVArmax=30.0, MVArmin=-30.0, PsetMW=20.0, QsetMVA=0.0)
