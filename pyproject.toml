@@ -61,8 +61,8 @@ OPF = ["numpy <2.0.0",
 Dash = ["dash"]
 
 [project.urls]
-Repository = "https://github.com/BernardoCV/pyflow_acdc/archive/refs/tags/v0.3.2.tar.gz"
-
+Repository     = "https://github.com/BernardoCV/pyflow_acdc"
+Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
 [tool.setuptools]
 packages = ["pyflow_acdc"]
