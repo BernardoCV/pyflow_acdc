@@ -278,7 +278,7 @@ Running the Sequential AC/DC Power Flow
    Performs sequential AC/DC power flow calculation.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 10 
       :header-rows: 1
 
       * - Parameter

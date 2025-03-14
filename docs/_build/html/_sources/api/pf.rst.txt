@@ -259,7 +259,7 @@ Sequential AC/DC power flow is a method that solves the AC and DC power flows se
 2. Converter power flow: Solves the converter power flow equations.
 3. DC power flow: Solves the DC power flow equations for the DC grid.
 
-The sequential solver will compare the :math:`P_{s}` of converters until convergence is reached.
+The sequential solver will compare the :math:`P_{conv}` of converters in the AC grid until convergence is reached.
 
 
 
@@ -278,7 +278,7 @@ Running the Sequential AC/DC Power Flow
    Performs sequential AC/DC power flow calculation.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 10 
       :header-rows: 1
 
       * - Parameter

@@ -1,6 +1,7 @@
 /* Light mode background override */
 [data-theme="light"] {
     --color-background-primary: #e8e8e8;  /* Main background */
+    --color-background-secondary: #d0d0d0;  /* Secondary background */
     --color-content-background: #bdb9b902;  /* Content area background (keeping transparent) */
     --color-code-background: #f8f8f818;     /* Code block background */
     --color-code-border: #e1e4e531;         /* Code block border */
