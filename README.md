@@ -95,7 +95,7 @@ Online documentation can be found at:
 
 https://pyflow-acdc.readthedocs.io/
 
-This is being built but not yet completed, any questions please contact the repository owner.
+To build the latest documentation of a branch, build it locally.
 
 To build the documentation:
 ```bash
