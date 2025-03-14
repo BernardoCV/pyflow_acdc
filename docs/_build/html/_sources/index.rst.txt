@@ -64,7 +64,7 @@ API Documentation
    api/market_coef
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Visualization & Export:
 
    api/plotting

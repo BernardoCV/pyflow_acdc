@@ -1,4 +1,5 @@
 import networkx as nx
+import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 import matplotlib.pyplot as plt
@@ -13,9 +14,10 @@ from .Classes import Node_AC
 
 
 __all__ = ['plot_Graph',
-    'plot_neighbour_graph',
-    'plot_TS_res',
-    'save_network_svg']
+           'Time_series_prob',
+           'plot_neighbour_graph',
+           'plot_TS_res',
+           'save_network_svg']
 
 def update_ACnode_hovertext(node,S_base,text):
     # print(f"Updating hover text for node: {node.name}")
@@ -745,8 +747,7 @@ def plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_f
             fig.update_layout(layout)
             fig.show()
 
-        if format is not None:
-            
+        if save_format is not None:
             # Convert 8.25 cm to inches and maintain ratio
             width_cm = 8.25
             ratio = 6/10  # Original height/width ratio
@@ -754,56 +755,159 @@ def plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_f
             height_inches = width_inches * ratio
             if len(df) > 10000:
                 width_inches = width_inches * 2
+            
             # Set publication-quality plotting parameters
             plt.style.use('seaborn-v0_8-whitegrid')
             plt.rcParams.update({
                 'figure.figsize': (width_inches, height_inches),
-                'font.family': 'serif',
+                'font.family': 'sans-serif',
                 'font.size': 8,
                 'axes.labelsize': 8,
                 'axes.titlesize': 8,
                 'xtick.labelsize': 7,
                 'ytick.labelsize': 7,
-                'legend.fontsize': 7,
+                'legend.fontsize': 6,
                 'lines.markersize': 4,
                 'lines.linewidth': 1,
                 'grid.alpha': 0.3
             })
 
-            fig_plt = plt.figure()
-            max_colors = 8  # Set2 colormap has 8 distinct colors
+            # Create figure with proper spacing for legend
+            plt.figure(figsize=(width_inches, height_inches))
+            
+            # Adjust the plot area to make room for the legend
+            plt.subplots_adjust(right=0.85)  # Make room for legend on the right
+
+            max_colors = 8
             colors = plt.cm.Set2(np.linspace(0, 1, max_colors))
-            line_markers = ['-', '--', ':', '-.']  # Backup markers when colors repeat
+            line_markers = ['-', '--', ':', '-.']
             i = 0
 
             stack_areas = plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']
-            cumulative_sum  = 0*df[columns[0]]
+            cumulative_sum = 0*df[columns[0]]
             for col in columns:
                 y_values = df[col]
-                current_line =  '-' if i < max_colors else line_markers[((i - max_colors) % len(line_markers))]
+                current_line = '-' if i < max_colors else line_markers[((i - max_colors) % len(line_markers))]
                 if stack_areas:
-                    y_values = cumulative_sum + y_values  # Stack current on top of cumulative sum
-                    cumulative_sum = y_values  # Update cumulative sum
+                    y_values = cumulative_sum + y_values
+                    cumulative_sum = y_values
                     plt.plot(time, y_values, color=colors[i % max_colors], linestyle=current_line, label=col)
                 else:
                     plt.plot(time, y_values, color=colors[i % max_colors], linestyle=current_line, label=col)
-                i += 1  
+                i += 1
 
             plt.title(plotting_choice)
             plt.xlabel('Time')
+            plt.xlim(time[0], time[-1])
             if ylim is not None:
                 plt.ylim(ylim)
             plt.ylabel(y_label)
-            if i < 12:
-                plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=4)
-            plt.tight_layout()
-            
 
+            # Adjust legend position based on number of items
+            if i < 14:
+                plt.legend(loc='center left', bbox_to_anchor=(1.02, 0.5),
+                          frameon=False,
+                          ncol=1)
+            
+            # Make x-axis labels horizontal
+            plt.xticks(rotation=0)
+            
+            # Ensure everything fits
+            plt.tight_layout()
+
+            # Save with extra width to accommodate legend
             if path is None:
-                plt.savefig(f"{plotting_choice}.{save_format}")
+                plt.savefig(f"{plotting_choice}.{save_format}", 
+                            bbox_inches='tight',  # Always use tight to include legend
+                            dpi=300)
             else:
-                plt.savefig(f"{path}/{plotting_choice}.{save_format}")
+                plt.savefig(f"{path}/{plotting_choice}.{save_format}", 
+                            bbox_inches='tight',
+                            dpi=300)
+            
+            plt.close()
         
+
+def Time_series_prob(grid, element_name, save_format=None, path=None):
+        
+        a = grid.Time_series
+        
+        df_gen = grid.time_series_results['real_power_opf']
+        df_prices = grid.time_series_results['prices_by_zone']
+        df_AC_line_res = grid.time_series_results['ac_line_loading']
+        df_DC_line_res = grid.time_series_results['dc_line_loading']
+        df_conv_res = grid.time_series_results['converter_loading']
+  
+        merged_df = pd.concat([df_gen, df_prices, df_AC_line_res, df_DC_line_res, df_conv_res], axis=1)
+
+
+        width_cm = 8  # Doubled for side-by-side plots
+        ratio = 6/10
+        width_inches = width_cm / 2.54
+        height_inches = width_inches * ratio
+
+        plt.style.use('seaborn-v0_8-whitegrid')
+        plt.rcParams.update({
+            'figure.figsize': (width_inches, height_inches),
+            'font.family': 'sans-serif',
+            'font.size': 8,
+            'axes.labelsize': 8,
+            'axes.titlesize': 8,
+            'xtick.labelsize': 7,
+            'ytick.labelsize': 7,
+            'legend.fontsize': 6,
+            'lines.markersize': 4,
+            'lines.linewidth': 1,
+            'grid.alpha': 0.3
+        })
+
+        found = False
+        for ts in a:
+             if ts.name == element_name:
+                    data = ts.data
+                    found = True
+                    break
+        if not found:
+            for col in merged_df.columns:
+                if col == element_name:
+                    data = merged_df[col]
+                    break
+
+        fig, ax1 = plt.subplots()
+                    
+        # Plot histogram on primary y-axis
+        ax1.hist(data, bins=100, density=True, alpha=0.5, color='b', label='PDF')
+        ax1.set_xlabel(element_name)
+        ax1.set_ylabel('Probability Density', color='b')
+        ax1.tick_params(axis='y', labelcolor='b')
+        
+        # Create secondary y-axis and plot CDF
+        ax2 = ax1.twinx()
+        sorted_data = np.sort(data)
+        cumulative_prob = np.linspace(0, 1, len(sorted_data))
+        ax2.plot(sorted_data, cumulative_prob, color='r', label='CDF')
+        ax2.set_ylabel('Cumulative Probability', color='r')
+        ax2.tick_params(axis='y', labelcolor='r')
+        
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout()
+        
+        # Save before showing
+        if save_format:
+            if path is None:
+                plt.savefig(f"{element_name}_distribution.{save_format}", 
+                        bbox_inches='tight',
+                        dpi=300)
+            else:
+                plt.savefig(f"{path}/{element_name}_distribution.{save_format}", 
+                        bbox_inches='tight',
+                        dpi=300)
+        
+        plt.show()
+        plt.close()
+        return    
+
+
 
 def create_subgraph_color_dict(G):
     

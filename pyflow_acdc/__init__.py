@@ -147,6 +147,7 @@ __all__ = [
     # Visualization
     
     'plot_Graph',
+    'Time_series_prob',
     'plot_neighbour_graph',
     'plot_TS_res',
     'save_network_svg',

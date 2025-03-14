@@ -385,28 +385,3 @@ Other Results
       |    Efficiency    |      95.0%      |        |
       +------------------+-----------------+--------+
 
-Time series probability
------------------------
-
-
-.. py:method:: Time_series_prob(element_name)
-
-   :param element_name: Name of element to analyze
-
-   Displays probability distribution plots for time series data of specified element.
-
-.. py:method:: Time_series_plots(start=1, end=9999, All=False)
-
-   :param start: Start time index (default: 1)
-   :param end: End time index (default: 9999) 
-   :param All: Whether to show all plots (default: False)
-
-   Displays time series plots for:
-   
-   - Renewable generation
-   - Load
-   - Prices (if variable pricing enabled)
-   - Power generation
-   - Reactive power
-   - DC converter power
-   - Line loading (if All=True)
