@@ -1,5 +1,5 @@
 Plotting Module
-==============
+===============
 
 This page has been pre-filled with the functions that are available in the Plotting module by AI, please check the code for more details.
 
@@ -234,8 +234,14 @@ For this function, you need to have the svgwrite library installed. You can inst
 
    .. code-block:: python 
 
+       import pyflow_acdc as pyf
+
+       grid,res = pyf.NS_MTDC()
+
        grid.save_network_svg(grid)
 
-
+   .. figure:: ../images/grid_network.svg
+      :alt: grid_network
+      :width: 70%
 
 

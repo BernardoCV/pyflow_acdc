@@ -572,7 +572,7 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
             
             MTDC_price_zone.add_linked_price_zone(main_price_zone)
             main_price_zone.ImportExpand += base / Grid.S_base
-            assign_nodeToPrice_Zone(Grid, node_name,ACDC, MTDC)
+            assign_nodeToPrice_Zone(Grid, node_name,MTDC, ACDC)
             # Additional logic for MTDC can be placed here
         elif Offshore:
             rensource.Offshore=True
@@ -591,14 +591,14 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
                     oprice_zone= add_offshore_price_zone(Grid,main_price_zone,oprice_zone_name)
 
                 # Assign the node to the offshore price_zone
-                assign_nodeToPrice_Zone(Grid, node_name,ACDC, oprice_zone_name)
+                assign_nodeToPrice_Zone(Grid, node_name,oprice_zone_name,ACDC)
                 # Link the offshore price_zone to the main price_zone
                 main_price_zone.link_price_zone(oprice_zone)
                 # Expand the import capacity in the main price_zone
                 main_price_zone.ImportExpand += base / Grid.S_base
         else:
             # Assign the node to the main price_zone
-            assign_nodeToPrice_Zone(Grid, node_name,ACDC, price_zone)
+            assign_nodeToPrice_Zone(Grid, node_name, price_zone,ACDC)
 
 
 

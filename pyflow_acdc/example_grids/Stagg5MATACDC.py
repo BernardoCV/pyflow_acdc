@@ -46,13 +46,13 @@ def Stagg5MATACDC():
     nodes_AC = pd.DataFrame(nodes_AC_data)
 
     lines_AC_data = [
-        {'fromNode': '1', 'toNode': '2', 'Resistance': 0.02, 'Reactance': 0.06, 'Conductance': 0, 'Susceptance': 0.06, 'MVA_rating': 150, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '1'},
-        {'fromNode': '1', 'toNode': '3', 'Resistance': 0.08, 'Reactance': 0.24, 'Conductance': 0, 'Susceptance': 0.05, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '2'},
-        {'fromNode': '2', 'toNode': '3', 'Resistance': 0.06, 'Reactance': 0.18, 'Conductance': 0, 'Susceptance': 0.04, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '3'},
-        {'fromNode': '2', 'toNode': '4', 'Resistance': 0.06, 'Reactance': 0.18, 'Conductance': 0, 'Susceptance': 0.04, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '4'},
-        {'fromNode': '2', 'toNode': '5', 'Resistance': 0.04, 'Reactance': 0.12, 'Conductance': 0, 'Susceptance': 0.03, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '5'},
-        {'fromNode': '3', 'toNode': '4', 'Resistance': 0.01, 'Reactance': 0.03, 'Conductance': 0, 'Susceptance': 0.02, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '6'},
-        {'fromNode': '4', 'toNode': '5', 'Resistance': 0.08, 'Reactance': 0.24, 'Conductance': 0, 'Susceptance': 0.05, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '7'}
+        {'fromNode': '1', 'toNode': '2', 'r': 0.02, 'x': 0.06, 'g': 0, 'b': 0.06, 'MVA_rating': 150, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '1'},
+        {'fromNode': '1', 'toNode': '3', 'r': 0.08, 'x': 0.24, 'g': 0, 'b': 0.05, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '2'},
+        {'fromNode': '2', 'toNode': '3', 'r': 0.06, 'x': 0.18, 'g': 0, 'b': 0.04, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '3'},
+        {'fromNode': '2', 'toNode': '4', 'r': 0.06, 'x': 0.18, 'g': 0, 'b': 0.04, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '4'},
+        {'fromNode': '2', 'toNode': '5', 'r': 0.04, 'x': 0.12, 'g': 0, 'b': 0.03, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '5'},
+        {'fromNode': '3', 'toNode': '4', 'r': 0.01, 'x': 0.03, 'g': 0, 'b': 0.02, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '6'},
+        {'fromNode': '4', 'toNode': '5', 'r': 0.08, 'x': 0.24, 'g': 0, 'b': 0.05, 'MVA_rating': 100, 'kV_base': 345, 'm': 1, 'shift': 0, 'Line_id': '7'}
     ]
     lines_AC = pd.DataFrame(lines_AC_data)
 
@@ -64,16 +64,16 @@ def Stagg5MATACDC():
     nodes_DC = pd.DataFrame(nodes_DC_data)
 
     lines_DC_data = [
-        {'fromNode': '1', 'toNode': '2', 'Resistance': 0.052, 'MW_rating': 100, 'kV_base': 345, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '1'},
-        {'fromNode': '2', 'toNode': '3', 'Resistance': 0.052, 'MW_rating': 100, 'kV_base': 345, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '2'},
-        {'fromNode': '1', 'toNode': '3', 'Resistance': 0.073, 'MW_rating': 100, 'kV_base': 345, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '3'}
+        {'fromNode': '1', 'toNode': '2', 'r': 0.052, 'MW_rating': 100, 'kV_base': 345, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Line_id': '1'},
+        {'fromNode': '2', 'toNode': '3', 'r': 0.052, 'MW_rating': 100, 'kV_base': 345, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Line_id': '2'},
+        {'fromNode': '1', 'toNode': '3', 'r': 0.073, 'MW_rating': 100, 'kV_base': 345, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Line_id': '3'}
     ]
     lines_DC = pd.DataFrame(lines_DC_data)
 
     Converters_ACDC_data = [
-        {'AC_type': 'PQ', 'DC_type': 'PAC', 'AC_node': '2', 'DC_node': '1', 'P_AC': -0.6, 'Q_AC': -0.4, 'P_DC': 0, 'T_R': 0.0015, 'T_X': 0.121, 'PR_R': 0.0001, 'PR_X': 0.16428, 'Filter': 0.0887, 'Droop': 0, 'AC_kV_base': 345, 'MVA_rating': 120.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2},
-        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': '3', 'DC_node': '2', 'P_AC': 0.0, 'Q_AC': 0.0, 'P_DC': 0, 'T_R': 0.0015, 'T_X': 0.121, 'PR_R': 0.0001, 'PR_X': 0.16428, 'Filter': 0.0887, 'Droop': 0, 'AC_kV_base': 345, 'MVA_rating': 120.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '2', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2},
-        {'AC_type': 'PQ', 'DC_type': 'PAC', 'AC_node': '5', 'DC_node': '3', 'P_AC': 0.35, 'Q_AC': 0.05, 'P_DC': 0, 'T_R': 0.0015, 'T_X': 0.121, 'PR_R': 0.0001, 'PR_X': 0.16428, 'Filter': 0.0887, 'Droop': 0, 'AC_kV_base': 345, 'MVA_rating': 120.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '3', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2}
+        {'AC_type': 'PQ', 'DC_type': 'PAC', 'AC_node': '2', 'DC_node': '1', 'P_AC': -0.6, 'Q_AC': -0.4, 'P_DC': 0, 'T_r': 0.0015, 'T_x': 0.121, 'PR_r': 0.0001, 'PR_x': 0.16428, 'Filter_b': 0.0887, 'Droop': 0, 'AC_kV_base': 345, 'MVA_rating': 120.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2},
+        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': '3', 'DC_node': '2', 'P_AC': 0.0, 'Q_AC': 0.0, 'P_DC': 0, 'T_r': 0.0015, 'T_x': 0.121, 'PR_r': 0.0001, 'PR_x': 0.16428, 'Filter_b': 0.0887, 'Droop': 0, 'AC_kV_base': 345, 'MVA_rating': 120.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '2', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2},
+        {'AC_type': 'PQ', 'DC_type': 'PAC', 'AC_node': '5', 'DC_node': '3', 'P_AC': 0.35, 'Q_AC': 0.05, 'P_DC': 0, 'T_r': 0.0015, 'T_x': 0.121, 'PR_r': 0.0001, 'PR_x': 0.16428, 'Filter_b': 0.0887, 'Droop': 0, 'AC_kV_base': 345, 'MVA_rating': 120.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '3', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2}
     ]
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 

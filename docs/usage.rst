@@ -30,13 +30,13 @@ This is the basic way to create a grid. This grid is the same as running MATACDC
     AC_node_4 = pyf.Node_AC(node_type='PQ', Voltage_0=1, theta_0=0.1, kV_base=345,Power_load=0.4,Reactive_load=0.05)
     AC_node_5 = pyf.Node_AC(node_type='PQ', Voltage_0=1, theta_0=0.1, kV_base=345,Power_load=0.6,Reactive_load=0.1)
 
-    AC_line_1 = pyf.Line_AC(AC_node_1, AC_node_2,Resistance=0.02,Reactance=0.06,Susceptance=0.06,MVA_rating=150)
-    AC_line_2 = pyf.Line_AC(AC_node_1, AC_node_3,Resistance=0.08,Reactance=0.24,Susceptance=0.05,MVA_rating=100)
-    AC_line_3 = pyf.Line_AC(AC_node_2, AC_node_3,Resistance=0.06,Reactance=0.18,Susceptance=0.04,MVA_rating=100)
-    AC_line_4 = pyf.Line_AC(AC_node_2, AC_node_4,Resistance=0.06,Reactance=0.18,Susceptance=0.04,MVA_rating=100)
-    AC_line_5 = pyf.Line_AC(AC_node_2, AC_node_5,Resistance=0.04,Reactance=0.12,Susceptance=0.03,MVA_rating=100)
-    AC_line_6 = pyf.Line_AC(AC_node_3, AC_node_4,Resistance=0.01,Reactance=0.03,Susceptance=0.02,MVA_rating=100)   
-    AC_line_7 = pyf.Line_AC(AC_node_4, AC_node_5,Resistance=0.08,Reactance=0.24,Susceptance=0.05,MVA_rating=100)
+    AC_line_1 = pyf.Line_AC(AC_node_1, AC_node_2,r=0.02,x=0.06,b=0.06,MVA_rating=150)
+    AC_line_2 = pyf.Line_AC(AC_node_1, AC_node_3,r=0.08,x=0.24,b=0.05,MVA_rating=100)
+    AC_line_3 = pyf.Line_AC(AC_node_2, AC_node_3,r=0.06,x=0.18,b=0.04,MVA_rating=100)
+    AC_line_4 = pyf.Line_AC(AC_node_2, AC_node_4,r=0.06,x=0.18,b=0.04,MVA_rating=100)
+    AC_line_5 = pyf.Line_AC(AC_node_2, AC_node_5,r=0.04,x=0.12,b=0.03,MVA_rating=100)
+    AC_line_6 = pyf.Line_AC(AC_node_3, AC_node_4,r=0.01,x=0.03,b=0.02,MVA_rating=100)   
+    AC_line_7 = pyf.Line_AC(AC_node_4, AC_node_5,r=0.08,x=0.24,b=0.05,MVA_rating=100)
 
 
 
@@ -44,9 +44,9 @@ This is the basic way to create a grid. This grid is the same as running MATACDC
     DC_node_2 = pyf.Node_DC(node_type='Slack', Voltage_0=1,kV_base=345)
     DC_node_3 = pyf.Node_DC(node_type='P', Voltage_0=1,kV_base=345)
 
-    DC_line_1 = pyf.Line_DC(DC_node_1, DC_node_2,Resistance=0.052,MW_rating=100,polarity='sm')
-    DC_line_2 = pyf.Line_DC(DC_node_2, DC_node_3,Resistance=0.052,MW_rating=100,polarity='sm')
-    DC_line_3 = pyf.Line_DC(DC_node_1, DC_node_3,Resistance=0.073,MW_rating=100,polarity='sm')
+    DC_line_1 = pyf.Line_DC(DC_node_1, DC_node_2,r=0.052,MW_rating=100,polarity='sm')
+    DC_line_2 = pyf.Line_DC(DC_node_2, DC_node_3,r=0.052,MW_rating=100,polarity='sm')
+    DC_line_3 = pyf.Line_DC(DC_node_1, DC_node_3,r=0.073,MW_rating=100,polarity='sm')
 
     Converter_1 = pyf.AC_DC_converter('PQ', 'PAC'  , AC_node_2, DC_node_1, P_AC=-0.6, Q_AC=-0.4, P_DC=0, Transformer_resistance=0.0015, Transformer_reactance=0.121, Phase_Reactor_R=0.0001, Phase_Reactor_X=0.16428, Filter=0.0887, Droop=0, kV_base=345, MVA_max=120)
     Converter_2 = pyf.AC_DC_converter('PV', 'Slack', AC_node_3, DC_node_2, Transformer_resistance=0.0015, Transformer_reactance=0.121, Phase_Reactor_R=0.0001, Phase_Reactor_X=0.16428, Filter=0.0887, Droop=0, kV_base=345, MVA_max=120)

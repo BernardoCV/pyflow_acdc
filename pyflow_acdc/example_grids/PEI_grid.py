@@ -360,8 +360,8 @@ def PEI_grid():
     lines_DC = pd.DataFrame(lines_DC_data)
 
     Converters_ACDC_data = [
-        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': 'PE_Island', 'DC_node': 'PEI_DC', 'P_AC': -15.23256842600699, 'Q_AC': -30.50016621804582, 'P_DC': 14.0, 'T_R': 0.0, 'T_X': 0.0, 'PR_R': 0.0, 'PR_X': 0.0, 'Filter': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '0', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.500677 51.528584, 2.502952 51.528717)'},
-        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': 'BE_ON', 'DC_node': 'ON_DC', 'P_AC': 12.834001291959405, 'Q_AC': 21.10058400394354, 'P_DC': -13.812961565331412, 'T_R': 0.0, 'T_X': 0.0, 'PR_R': 0.0, 'PR_X': 0.0, 'Filter': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.770443 51.125775, 2.771301 51.126938)'}
+        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': 'PE_Island', 'DC_node': 'PEI_DC', 'P_AC': -15.23256842600699, 'Q_AC': -30.50016621804582, 'P_DC': 14.0, 'T_r': 0.0, 'T_x': 0.0, 'PR_r': 0.0, 'PR_x': 0.0, 'Filter_b': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '0', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.500677 51.528584, 2.502952 51.528717)'},
+        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': 'BE_ON', 'DC_node': 'ON_DC', 'P_AC': 12.834001291959405, 'Q_AC': 21.10058400394354, 'P_DC': -13.812961565331412, 'T_r': 0.0, 'T_x': 0.0, 'PR_r': 0.0, 'PR_x': 0.0, 'Filter_b': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.770443 51.125775, 2.771301 51.126938)'}
     ]
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 

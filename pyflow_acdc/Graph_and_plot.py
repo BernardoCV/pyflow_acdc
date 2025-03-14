@@ -650,7 +650,7 @@ def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
     s=1
     return fig
  
-def plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_format='svg'):
+def plot_TS_res(grid, start, end, plotting_choices=[],show=True,path=None,save_format=None):
     Plot = [
         'Power Generation by price zone'    ,
         'Power Generation by generator'    ,

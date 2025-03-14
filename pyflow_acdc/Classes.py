@@ -1151,13 +1151,13 @@ class Line_AC:
         The starting node of the line
     toNode : Node_AC
         The ending node of the line
-    Resistance : float
+    r : float
         Resistance of the line in pu
-    Reactance : float
+    x : float
         Reactance of the line in pu
-    Conductance : float
+    g : float
         Conductance of the line in pu
-    Susceptance : float
+    b : float
         Susceptance of the line in pu
     MVA_rating : float
         MVA rating of the line
@@ -1249,7 +1249,7 @@ class Line_AC:
         R,X,G,B,MVA_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, Length_km,N_cables)
         return R, X, G, B, MVA_rating
     
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC,Resistance: float= 0.001, Reactance: float=0.001, Conductance: float=0.001, Susceptance: float=0, MVA_rating: float=9999,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,S_base:float=100,Cable_type:str ='Custom'):
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC,r: float= 0.001, x: float=0.001, g: float=0, b: float=0, MVA_rating: float=9999,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,S_base:float=100,Cable_type:str ='Custom'):
         self.lineNumber = Line_AC.lineNumber
         Line_AC.lineNumber += 1
         
@@ -1262,10 +1262,10 @@ class Line_AC:
         self.toNode = toNode
         self.kV_base = toNode.kV_base
 
-        self.R = Resistance
-        self.X = Reactance
-        self.G = Conductance
-        self.B = Susceptance
+        self.R = r
+        self.X = x
+        self.G = g
+        self.B = b
         self.MVA_rating = MVA_rating
         
         self.m =m
@@ -1391,17 +1391,17 @@ class TF_Line_AC:
     def name(self):
         return self._name
 
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC, Resistance: float, Reactance: float, Conductance: float, Susceptance: float, MVA_rating: float, kV_base: float,m:float=1, shift:float=0, name=None):
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC,  r: float, x: float, g: float, b: float, MVA_rating: float, kV_base: float,m:float=1, shift:float=0, name=None):
         self.trafNumber = TF_Line_AC.trafNumber
         TF_Line_AC.trafNumber += 1
 
         self.fromNode = fromNode
         self.toNode = toNode
         self.direction = 'from'
-        self.R = Resistance
-        self.X = Reactance
-        self.G = Conductance
-        self.B = Susceptance
+        self.R = r
+        self.X = x
+        self.G = g
+        self.B = b
         self.Z = self.R + self.X * 1j
         self.Y = self.G + self.B * 1j
         self.kV_base = kV_base
@@ -1450,7 +1450,7 @@ class Line_DC:
         The starting node of the line
     toNode : Node_DC
         The ending node of the line
-    Resistance : float
+    r : float
         Resistance of the line in pu    
     MW_rating : float
         MVA rating of the line
@@ -1526,10 +1526,10 @@ class Line_DC:
         A_rating = cable_data['A_rating']
         km = Length_km
 
-        R, _, _, _, MW_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,1)
-        return R, MW_rating
+        r, _, _, _, MW_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,1)
+        return r, MW_rating
     
-    def __init__(self, fromNode: Node_DC, toNode: Node_DC, Resistance: float=0.001, MW_rating: float=9999,km:float=1, polarity='m', name=None,N_cables=1,Cable_type:str='Custom',S_base:float=100):
+    def __init__(self, fromNode: Node_DC, toNode: Node_DC, r: float=0.001, MW_rating: float=9999,km:float=1, polarity='m', name=None,N_cables=1,Cable_type:str='Custom',S_base:float=100):
         self.lineNumber = Line_DC.lineNumber
         Line_DC.lineNumber += 1
 
@@ -1552,7 +1552,7 @@ class Line_DC:
         self.np_line_max = N_cables
         self.np_line_opf=False
 
-        self.R = Resistance
+        self.R = r
         self.MW_rating = MW_rating
         self.Length_km=km
 

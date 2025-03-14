@@ -59,9 +59,11 @@ html_css_files = ['custom.css']
 
 # Theme options
 html_theme_options = {
+    "light_css_variables": {},
+    "dark_css_variables": {},
     "sidebar_hide_name": True,
-    "light_logo": "logo.svg",    # Logo for light mode
-    "dark_logo": "logo_dark.svg", # Logo for dark mode
+    "light_logo": "logo.svg",
+    "dark_logo": "logo_dark.svg",
     "navigation_with_keys": True,
     "announcement": "This documentation is under active development.",
 }

@@ -136,11 +136,14 @@ class Results:
         # Define the table headers
         table.field_names = ["Grid", "Power Loss (MW)","Load %"]
         generation=0 
-
+        grid_loads = 0
         if self.Grid.nodes_AC is not None:
             for node in self.Grid.nodes_AC:
-                generation+=(node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)+sum(gen.PGen for gen in node.connected_gen))*self.Grid.S_base
-                        
+                if node.type == 'Slack':
+                    generation += (node.P_INJ+node.PLi)*self.Grid.S_base
+                else:
+                    generation+=(node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)+sum(gen.PGen for gen in node.connected_gen))*self.Grid.S_base
+                grid_loads += node.PLi*self.Grid.S_base
 
             self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
             for line in self.Grid.lines_AC:
@@ -172,6 +175,8 @@ class Results:
         if self.Grid.nodes_DC is not None:
             for node in self.Grid.nodes_DC:
                 generation+= (node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource))*self.Grid.S_base
+                grid_loads += node.PLi*self.Grid.S_base
+
 
             self.lossP_DC = np.zeros(self.Grid.Num_Grids_DC)
 
@@ -208,7 +213,7 @@ class Results:
             table.add_row(['AC DC Converters', np.round(P_loss_ACDC, decimals=self.dec),""])
 
 
-        eff = (generation-tot)/generation*100
+        eff = grid_loads/generation*100
         
         table.add_row(["Total loss", np.round(tot, decimals=self.dec),""])
         table.add_row(["     ", "",""])
@@ -250,7 +255,7 @@ class Results:
 
         for line in self.Grid.lines_DC:
             node = line.fromNode
-            G = self.Grid.Graph_node_to_Grid_index_DC[node]
+            G = self.Grid.Graph_node_to_Grid_index_DC[node.nodeNumber]
 
             Ploss = np.real(line.loss)*self.Grid.S_base
 

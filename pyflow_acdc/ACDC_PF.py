@@ -651,7 +651,7 @@ def Jacobian_conv(grid, conv, Qcf, Qsf, Pcf, Psf, U_f, U_c, Pc, Qc, Ps, Qs):
 
     return J_conv
 
-def flow_conv(grid, conv, tol_lim=1e-10, maxIter=20):
+def flow_conv(grid, conv, tol_lim=1e-12, maxIter=20):
 
     if conv.Bf == 0:
         flow_conv_no_filter(grid,conv, tol_lim, maxIter)

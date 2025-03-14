@@ -176,7 +176,7 @@ def create_dictionaries(grid):
                     "x_coord": node.x_coord,
                     "y_coord": node.y_coord,
                     "PZ" :node.PZ,
-                    "geometry": node.geometry.wkt 
+                    "geometry": node.geometry.wkt if node.geometry is not None else None
                 })
 
     # AC Lines
@@ -195,7 +195,7 @@ def create_dictionaries(grid):
                     "m": line.m,
                     "shift": line.shift,
                     "Line_id": line.name,
-                    "geometry": line.geometry.wkt
+                    "geometry": line.geometry.wkt if line.geometry is not None else None
                 })
 
     # DC Nodes
@@ -214,7 +214,7 @@ def create_dictionaries(grid):
                     "x_coord":     node.x_coord,
                     "y_coord":     node.y_coord,
                     "PZ" :node.PZ,
-                    "geometry": node.geometry.wkt
+                    "geometry": node.geometry.wkt if node.geometry is not None else None
                 })
 
     # DC Lines
@@ -235,7 +235,7 @@ def create_dictionaries(grid):
                     "Length_km":         line.Length_km,
                     "Mono_Bi_polar":   pol,
                     "Line_id":       line.name,     
-                    "geometry": line.geometry.wkt
+                    "geometry": line.geometry.wkt if line.geometry is not None else None
                 })
 
     # Converters
@@ -250,10 +250,10 @@ def create_dictionaries(grid):
                     "P_AC":    conv.P_AC,
                     "Q_AC":    conv.Q_AC,
                     "P_DC":    conv.P_DC,
-                    "T_R": conv.R_t *conv.cn_pol,
-                    "T_X":  conv.X_t *conv.cn_pol,
-                    "PR_R":        conv.PR_R*conv.cn_pol,
-                    "PR_X":        conv.PR_X*conv.cn_pol,
+                    "T_r": conv.R_t *conv.cn_pol,
+                    "T_x":  conv.X_t *conv.cn_pol,
+                    "PR_r":        conv.PR_R*conv.cn_pol,
+                    "PR_x":        conv.PR_X*conv.cn_pol,
                     "Filter":                 conv.Bf  /conv.cn_pol,
                     "Droop":    conv.Droop_rate,
                     "AC_kV_base":  conv.AC_kV_base,
@@ -267,7 +267,7 @@ def create_dictionaries(grid):
                     "losscinv":   conv.c_inver_og*conv.cn_pol,
                     "Ucmin": conv.Ucmin,
                     "Ucmax": conv.Ucmax,
-                    "geometry": conv.geometry.wkt 
+                    "geometry": conv.geometry.wkt if conv.geometry is not None else None        
                 })
     
     # Step 1: Define sets for the MTDC price_zones and linked price_zones
