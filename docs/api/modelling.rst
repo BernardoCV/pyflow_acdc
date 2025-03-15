@@ -179,16 +179,16 @@ Key Attributes:
    * - ``toNode``
      - :class:`Node_AC`
      - The ending node of the line
-   * - ``Resistance``
+   * - ``r``
      - (float)
      - Resistance of the line in pu
-   * - ``Reactance``
+   * - ``x``
      - (float)
      - Reactance of the line in pu
-   * - ``Conductance``
+   * - ``g``
      - (float)
      - Conductance of the line in pu
-   * - ``Susceptance``
+   * - ``b``
      - (float)
      - Susceptance of the line in pu
    * - ``MVA_rating``
@@ -231,7 +231,7 @@ Example Usage:
         node2 = pyf.Node_AC('Slack', 1, 0,66,name='Bus2')
 
         # In pu
-        line_1 = pyf.Line_AC(node1, node2, Resistance=0.01, Reactance=0.1, Conductance=0, Susceptance=0, MVA_rating=100, N_cables=1, name='Line1')
+        line_1 = pyf.Line_AC(node1, node2, r=0.01, x=0.1, g=0, b=0, MVA_rating=100, N_cables=1, name='Line1')
     
         # Or by cable type in database
 
@@ -348,6 +348,22 @@ DC line modelling
         -P_{e, rating} \leq& P_{to/from} \leq P_{e,rating} \qquad \forall e \in \mathcal{B}_{dc}
     \end{align}
 
+Example Usage:
+    .. code-block:: python
+
+        import pyflow_acdc as pyf
+        # Create an AC node
+        node1 = pyf.Node_DC('Slack', 1, 0,0,525,name='Bus1')
+        node2 = pyf.Node_DC('P', 1, 0,0,525,name='Bus2')
+
+        # In pu
+        line_1 = pyf.Line_DC(node1, node2, r=0.01, MW_rating=100, N_cables=1, name='Line1')
+    
+        # Or by cable type in database
+
+        line_2 = pyf.Line_DC(node1, node2, S_base=100, Length_km=100, Cable_type='NREL_HVDC_2000mm_320kV')
+
+
 
 
 Key Attributes:
@@ -365,7 +381,7 @@ Key Attributes:
    * - ``toNode``
      - Node_DC
      - The ending node of the line
-   * - ``Resistance``
+   * - ``r``
      - float
      - Resistance of the line in pu
    * - ``MW_rating``
