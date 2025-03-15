@@ -348,22 +348,6 @@ DC line modelling
         -P_{e, rating} \leq& P_{to/from} \leq P_{e,rating} \qquad \forall e \in \mathcal{B}_{dc}
     \end{align}
 
-Example Usage:
-    .. code-block:: python
-
-        import pyflow_acdc as pyf
-        # Create an AC node
-        node1 = pyf.Node_DC('Slack', 1, 0,0,525,name='Bus1')
-        node2 = pyf.Node_DC('P', 1, 0,0,525,name='Bus2')
-
-        # In pu
-        line_1 = pyf.Line_DC(node1, node2, r=0.01, MW_rating=100, N_cables=1, name='Line1')
-    
-        # Or by cable type in database
-
-        line_2 = pyf.Line_DC(node1, node2, S_base=100, Length_km=100, Cable_type='NREL_HVDC_2000mm_320kV')
-
-
 
 
 Key Attributes:
@@ -402,6 +386,22 @@ Key Attributes:
    * - ``S_base``
      - float
      - Base power of the line in MVA
+
+Example Usage:
+    .. code-block:: python
+
+        import pyflow_acdc as pyf
+        # Create an AC node
+        node1 = pyf.Node_DC('Slack', 1, 0,0,525,name='Bus1')
+        node2 = pyf.Node_DC('P', 1, 0,0,525,name='Bus2')
+
+        # In pu
+        line_1 = pyf.Line_DC(node1, node2, r=0.01, MW_rating=100, N_cables=1, name='Line1')
+    
+        # Or by cable type in database
+
+        line_2 = pyf.Line_DC(node1, node2, S_base=100, Length_km=100, Cable_type='NREL_HVDC_2000mm_320kV')
+
 
 
 
