@@ -662,6 +662,12 @@ Generator Modelling
         P_{g}^2+Q_{g}^2 \leq   S_{g,rating}^{2} & \qquad \forall g \in \mathcal{G}_{ac}  
     \end{align}
 
+.. figure:: ../images/Gen_limits.svg
+   :width: 250
+   :alt: Generator limits
+   :align: center
+
+   Generator limits
 
 Class Reference: :class:`pyflow_acdc.Classes.Gen_AC`
 
