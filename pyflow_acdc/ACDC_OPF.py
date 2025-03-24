@@ -76,7 +76,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    model= OPF_createModel_ACDC(model,grid,PV_set,Price_Zones)
+    OPF_createModel_ACDC(model,grid,PV_set,Price_Zones)
     # pr.disable()
     
     # s = StringIO()
@@ -475,7 +475,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
         if ObjRule['Gen_set_dev']['w']==0:
             return 0
         return sum((model.PGi_gen[gen.genNumber]-gen.Pset)**2 for gen in grid.Generators)
-   
+    s=1
     for key, entry in ObjRule.items():
         if key == 'Ext_Gen':
             entry['f'] = formula_Min_Ext_Gen()

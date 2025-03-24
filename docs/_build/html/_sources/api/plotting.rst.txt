@@ -164,8 +164,6 @@ This function is used to plot the probability of the time series parameters or r
       TS_wl = pd.read_csv(wind_load_url)
       pyf.add_TimeSeries(grid,TS_wl)
 
-
-
       pyf.Time_series_prob(grid,'OWPP_BE',save_format='svg')
       pyf.Time_series_prob(grid,'BE_price',save_format='svg')
       pyf.Time_series_prob(grid,'L_BE',save_format='svg')

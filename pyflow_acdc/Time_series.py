@@ -576,7 +576,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     
     t1 = time.time()
-    model= OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)
+    OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)
     t2 = time.time()  
     t_modelcreate = t2-t1
     

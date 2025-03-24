@@ -22,7 +22,7 @@ AC node modelling
 
    AC node equivalent circuit with voltage source and impedance
 
-The active and reactive power injections at the AC node are given by [1]:
+The active and reactive power injections at the AC node are given by [1]_:
 
 .. math::
     :label: eq:PnodeAC

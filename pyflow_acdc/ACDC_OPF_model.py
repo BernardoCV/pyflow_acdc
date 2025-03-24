@@ -38,9 +38,41 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     
     if OnlyAC:
         [AC_info,Price_Zone_info]=Translate_pyf_OPF(grid,OnlyAC,Price_Zones=Price_Zones)
+        DC_info = None
+        Conv_info = None
     else:
         [AC_info,DC_info,Conv_info,Price_Zone_info]=Translate_pyf_OPF(grid,OnlyAC,Price_Zones=Price_Zones)
    
+    AC_variables(model,grid,AC_info,PV_set)
+
+    if not OnlyAC:
+        DC_variables(model,grid,DC_info)
+        Converter_variables(model,grid,Conv_info)
+
+    if TEP:
+        TEP_variables(model,grid,AC_info,DC_info,Conv_info)
+    else:
+        TEP_parameters(model,grid,AC_info,DC_info,Conv_info)
+
+    if Price_Zones:
+        price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info)
+        price_zone_constraints(model,grid,Price_Zone_info)
+    else:
+        price_zone_parameters(model,grid,AC_info,DC_info)
+
+    AC_constraints(model,grid,AC_info)
+
+    if not OnlyAC:
+        DC_constraints(model,grid)
+        Converter_constraints(model,grid,Conv_info)
+
+    
+
+    
+    s=1
+def AC_variables(model,grid,AC_info,PV_set):
+    
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
 
     AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
     lf,qf,P_renSource = gen_info
@@ -48,30 +80,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_exp,lista_lineas_AC_tf,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
-    
-    if not OnlyAC:
-        DC_Lists,DC_nodes_info,DC_lines_info = DC_info
-        
-        lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
-        u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
-        P_lineDC_limit,NP_lineDC    = DC_lines_info
-        
-            
-        Conv_Lists, Conv_Volt = Conv_info
-        
-        lista_conv,NumConvP_i = Conv_Lists
-        u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
-        
-    
-    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
-    lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
-    price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
-    """
-    MODEL INITIATION
-    """
 
-
-    
     "Model Sets"
     model.nodes_AC   = pyo.Set(initialize=lista_nodos_AC)
     model.lines_AC   = pyo.Set(initialize=lista_lineas_AC)
@@ -88,48 +97,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     
     model.AC_slacks  = pyo.Set(initialize=AC_slack)
     model.AC_PVs     = pyo.Set(initialize=AC_PV)
-    if not OnlyAC:
-        model.nodes_DC   = pyo.Set(initialize=lista_nodos_DC)
-        model.lines_DC   = pyo.Set(initialize=lista_lineas_DC)
-        model.DC_slacks  = pyo.Set(initialize=DC_slack)
-    
-        model.conv       = pyo.Set(initialize=lista_conv)
-     
-    """Variables and limits
-    """
-    "Price_Zone Variables"
-    def Price_Zone_P_bounds(model, price_zone):
-        nM = grid.Price_Zones[price_zone]
-        return (nM.PGL_min,nM.PGL_max)
-    
-    def lf_bounds(model, ngen):
-        gen = grid.Generators[ngen]
-        if gen.price_zone_link:
-            return (None,None)
-        else:
-            return (lf[ngen],lf[ngen])
-    
-    if  Price_Zones:
-        model.M = pyo.Set(initialize=lista_M)
-        model.PN = pyo.Var(model.M,bounds=Price_Zone_P_bounds,initialize=0)
-        model.PGL_min= pyo.Param(model.M,initialize=PGL_min,mutable=True)
-        model.PGL_max= pyo.Param(model.M,initialize=PGL_max,mutable=True)
-        # model.PN_load = pyo.Var(model.M)
-        model.price = pyo.Var(model.nodes_AC,initialize=price)
-        model.price_dc = pyo.Var(model.nodes_DC,initialize=price_dc)
-        
-        model.lf = pyo.Var (model.gen_AC,bounds=lf_bounds,  initialize=lf)
-        model.price_zone_price = pyo.Var(model.M,initialize=0)
-        model.price_zone_a = pyo.Param(model.M,initialize=price_zone_as,mutable=True)
-        model.price_zone_b = pyo.Param(model.M,initialize=price_zone_bs,mutable=True)
-        model.SocialCost = pyo.Var(model.M,initialize=0)
-        
-    else:
-        model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
-        model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)
-        if not OnlyAC:
-            model.price_dc  = pyo.Param(model.nodes_DC, initialize=price_dc,mutable=True)
-    
+            
     "AC Variables"
     #AC nodes variables
     model.V_AC       = pyo.Var(model.nodes_AC, bounds=lambda model, node: (u_min_ac[node], u_max_ac[node]), initialize=V_ini_AC)
@@ -297,6 +265,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     model.QAC_to       = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
     model.QAC_from     = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
     model.PAC_line_loss= pyo.Var(model.lines_AC, initialize=0)
+
     if TEP_AC:
         model.exp_PAC_to       = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
         model.exp_PAC_from     = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
@@ -312,265 +281,11 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
                   
         model.tf_PAC_line_loss= pyo.Var(model.lines_AC_tf, initialize=0)
     
-    "DC variables"
-    #DC nodes variables
-    def DC_V_slack_rule(model, node):
-        return model.V_DC[node] == V_ini_DC[node]
-    def Pbounds_lines(model, line):
-        return (-P_lineDC_limit[line], P_lineDC_limit[line])
-    def P_conv_DC_node_bounds(model,node): #This limits the varable of those DC nodes that do not have a converter connected 
-         if node in DC_nodes_connected_conv:
-             return (None,None)
-         else:
-             return (0,0)
-    def Pren_bounds_DC(model, node):
-        nDC = grid.nodes_DC[node]
-        if nDC.connected_RenSource == []:
-            return (0,0)
-        else:
-            return (None,None)
+def AC_constraints(model,grid,AC_info):
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
+    S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
 
-
-    if not OnlyAC:
-        model.V_DC = pyo.Var(model.nodes_DC, bounds=lambda model, node: (u_min_dc[node], u_max_dc[node]), initialize=V_ini_DC)
-        model.P_known_DC = pyo.Param(model.nodes_DC, initialize=P_known_DC,mutable=True)
-        model.PGi_ren_DC = pyo.Var(model.nodes_DC, bounds=Pren_bounds_DC,initialize=0)
-
-        model.DC_V_slack_constraint = pyo.Constraint(model.DC_slacks, rule=DC_V_slack_rule)
-        
-        #DC Lines variables
-        
-    
-        model.PDC_to       = pyo.Var(model.lines_DC,bounds=Pbounds_lines ,  initialize=0)
-        model.PDC_from     = pyo.Var(model.lines_DC,bounds=Pbounds_lines , initialize=0)
-        model.PDC_line_loss= pyo.Var(model.lines_DC,bounds=Pbounds_lines , initialize=0)
-        
-        
-        model.P_conv_DC = pyo.Var(model.nodes_DC, bounds=P_conv_DC_node_bounds,initialize=0)
-   
-       
-    
-    "Converter Variables"
-    def conv_opt_bounds(model, node):
-        nAC = grid.nodes_AC[node]
-        if not nAC.connected_conv:
-            return (0,0)
-        else:
-            return (None,None)
-        
-    if not OnlyAC:
-        model.Uc   = pyo.Var(model.conv, bounds=lambda model, conv: (u_c_min[conv], u_c_max[conv]), initialize=1) 
-        model.Uf   = pyo.Var(model.conv, bounds=lambda model, conv: (u_c_min[conv], u_c_max[conv]), initialize=1) 
-        model.th_c   = pyo.Var(model.conv, bounds=(-1.6, 1.6), initialize=0) 
-        model.th_f   = pyo.Var(model.conv, bounds=(-1.6, 1.6), initialize=0) 
-        model.P_AC_loss_conv= pyo.Var(model.conv,within=pyo.NonNegativeReals)
-        
-           
-        model.P_conv_loss = pyo.Var(model.conv, initialize=0)
-
-        model.P_conv_AC = pyo.Var(model.nodes_AC,bounds=conv_opt_bounds, initialize=0)
-        model.Q_conv_AC = pyo.Var(model.nodes_AC,bounds=conv_opt_bounds, initialize=0)
-        
-        model.P_conv_s_AC  = pyo.Var(model.conv, initialize=0)   
-        model.Q_conv_s_AC = pyo.Var(model.conv, initialize=0)
-    
-        model.P_conv_c_AC  = pyo.Var(model.conv, initialize=0.0001)   
-        model.Q_conv_c_AC = pyo.Var(model.conv, initialize=0.0001)
-        
-        model.P_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)   
-        model.Q_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)
-    
-   
-    
-    "TEP variables"
-    
-    if not TEP: #No TEP and var  are set as parameters
-        if TEP_AC:    
-            model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)    
-        if not OnlyAC:
-            model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC)
-            model.NumConvP = pyo.Param(model.conv,initialize=NumConvP_i)
-    
-    else:
-        if TEP_AC:
-            def NPline_bounds_AC(model, line):
-                element=grid.lines_AC_exp[line]
-                if element.np_line_opf==False:
-                    return (NP_lineAC[line], NP_lineAC[line])
-                else:
-                    return (NP_lineAC[line], None)
-            
-            model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC)
-        
- 
-        if not OnlyAC:
-            def NPline_bounds(model, line):
-                element=grid.lines_DC[line]
-                if element.np_line_opf==False:
-                    return (NP_lineDC[line], NP_lineDC[line])
-                else:
-                    return (NP_lineDC[line], None)
-            
-            model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC)
-            
-            def NPconv_bounds(model, conv):
-                element=grid.Converters_ACDC[conv]
-                if element.NUmConvP_opf==False:
-                    return (NumConvP_i[conv], NumConvP_i[conv])
-                else:
-                    return (NumConvP_i[conv], None)
-            
-            model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
-    
-    
-    """EQUALITY CONSTRAINTS
-    """
-    "Price Zone equality constraints"
-    
-    def price_zone_price_formula(model,price_zone):
-        from .Classes import Price_Zone
-        if type(grid.Price_Zones[price_zone]) is Price_Zone:
-            return model.price_zone_price[price_zone]==2*model.price_zone_a[price_zone]*model.PN[price_zone]*grid.S_base+model.price_zone_b[price_zone]
-        else :
-            return pyo.Constraint.Skip
-    
-    def node_price_set_AC(model,node):
-        try: 
-            price_zone=node2price_zone['AC'][node]
-            return model.price_zone_price[price_zone]== model.price[node] 
-        except:
-            return model.price[node]==0
-    def node_price_set_DC(model,node):
-        try: 
-            price_zone=node2price_zone['DC'][node]
-            return model.price_zone_price[price_zone]== model.price_dc[node] 
-        except:
-            return model.price_dc[node]==0
-    
-    
-    def P_price_zone(model,price_zone):
-        Pm_AC=sum(model.P_known_AC[node]   + model.PGi_ren[node] + model.PGi_opt[node] for node in price_zone2node['AC'][price_zone])
-        Pm_DC=sum(model.P_known_DC[node_DC]+ model.PGi_ren_DC[node_DC] for node_DC in price_zone2node['DC'][price_zone])
-        
-        return model.PN[price_zone] ==Pm_AC+Pm_DC
-
-    def PZ_cost_of_generation(model,price_zone):
-        from .Classes import Price_Zone
-        if type(grid.Price_Zones[price_zone]) is Price_Zone:
-            return model.SocialCost[price_zone]== model.price_zone_a[price_zone]*(model.PN[price_zone]*grid.S_base)**2+model.price_zone_b[price_zone]*(model.PN[price_zone]*grid.S_base)
-        else:
-            return model.SocialCost[price_zone]==0
-        
-    def Price_link(model,price_zone):
-        from .Classes import Price_Zone
-        if type(grid.Price_Zones[price_zone]) is Price_Zone:
-            linked_price_zone=grid.Price_Zones[price_zone].linked_price_zone
-            if linked_price_zone is not None:   
-                return model.price_zone_price[price_zone] == model.price_zone_price[linked_price_zone.price_zone_num]
-            else: 
-                return pyo.Constraint.Skip
-        else:
-            return pyo.Constraint.Skip
-    
-    # def MTDC_price_link(model,price_zone):
-    #     from PyFlow_ACDC import MTDCPrice_Zone
-    #     if isinstance(grid.Price_Zones[price_zone], MTDCPrice_Zone): 
-    #          pricing_strategy = grid.Price_Zones[price_zone].pricing_strategy
-    #          linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[price_zone].linked_price_zones]
-    #          if pricing_strategy == 'min':
-    #             return model.price_zone_price[price_zone] <= min(model.price_zone_price[mkt] for mkt in linked_price_zones)  # Set upper limit to the minimum of linked price_zones
-    
-    #          elif pricing_strategy == 'max':
-    #             return model.price_zone_price[price_zone] >= max(model.price_zone_price[mkt] for mkt in linked_price_zones)  # Set lower limit to the maximum of linked price_zones
-    
-    #          elif pricing_strategy == 'avg':
-    #             return model.price_zone_price[price_zone] == sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
-
-    #          else:
-    #             raise ValueError(f"Unsupported pricing strategy: {pricing_strategy}")
-    #             return pyo.Constraint.Skip
-    #     else:
-    #         return pyo.Constraint.Skip
-            
-    if Price_Zones:
-        grid.OPF_Price_Zones_constraints_used=True
-        model.price_zone_gen_link = pyo.ConstraintList()
-        for node in grid.nodes_AC:  # Loop through all nodes
-            nAC = node.nodeNumber
-            for g in node.connected_gen:  # Loop through all generators in the node
-                if g.price_zone_link:
-                    model.price_zone_gen_link.add(model.price[nAC] == model.lf[g.genNumber])
-        
-            
-            
-        model.price_zone_price_constraint = pyo.Constraint(model.M,rule=price_zone_price_formula)
-        model.price_zone_price_link_ = pyo.Constraint(model.M,rule=Price_link)
-        
-        model.price_zone_MTDC_link = pyo.ConstraintList()
-        
-        from .Classes import MTDCPrice_Zone
-        # Step 1: Define sets for the MTDC price_zones and linked price_zones
-        model.MTDCPrice_Zones = pyo.Set(initialize=[m for m in model.M if isinstance(grid.Price_Zones[m], MTDCPrice_Zone)])
-        
-        for mtdc_price_zone in model.MTDCPrice_Zones:
-            linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[mtdc_price_zone].linked_price_zones]
-            
-            if not linked_price_zones:
-                break
-            # Define a set of linked price_zones for each MTDC price_zone
-            # model.LinkedPrice_Zones = pyo.Set(initialize=linked_price_zones)
-        
-            pricing_strategy = grid.Price_Zones[mtdc_price_zone].pricing_strategy
-        
-            if pricing_strategy == 'min':
-                grid.MixedBinCont=True
-                # Step 1: Create distinct binary variables for each MTDC price_zone and its linked price_zones
-                model.y_min = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=1)
-    
-                # Step 2: Ensure MTDC price_zone price is less than or equal to all linked price_zone prices
-                for mkt in linked_price_zones:
-                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] <= model.price_zone_price[mkt])
-    
-                # Step 3: Ensure that the MTDC price_zone price is equal to one of the linked price_zone prices
-                model.price_zone_MTDC_link.add(sum(model.y_min[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
-    
-                # Step 4: Link the binary variable to the actual price_zone prices
-                for mkt in linked_price_zones:
-                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_min[mkt, mtdc_price_zone])
-
-            elif pricing_strategy == 'max':
-                grid.MixedBinCont=True
-                # Step 2: Create binary variables indexed by both the linked price_zones and the MTDC price_zone
-                model.y_max = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=0)
-        
-                # Step 3: Ensure MTDC price_zone price is greater than or equal to all linked price_zone prices
-                for mkt in linked_price_zones:
-                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] >= model.price_zone_price[mkt])
-        
-                # Step 4: Ensure that the MTDC price_zone price is equal to one of the linked price_zone prices
-                model.price_zone_MTDC_link.add(sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
-        
-                # Step 5: Link the binary variable to the actual price_zone prices
-                for mkt in linked_price_zones:
-                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_max[mkt, mtdc_price_zone]/sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones))
-        
-            elif pricing_strategy == 'avg':
-                # MTDC price_zone price equals the average of linked price_zone prices
-                avg_expr = sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
-                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == avg_expr)
-        
-            else:
-                raise ValueError(f"Unsupported pricing strategy: {pricing_strategy}")
-                    
-                    
-        
-        model.price_constraint_AC = pyo.Constraint(model.nodes_AC,rule=node_price_set_AC)
-        model.price_constraint_DC = pyo.Constraint(model.nodes_DC,rule=node_price_set_DC)
-        
-        model.PN_constraint = pyo.Constraint(model.M,rule=P_price_zone)
-        # model.PNL_constraint = pyo.Constraint(model.M,rule=P_price_zone_load)
-        model.CG_constraint = pyo.Constraint(model.M,rule=PZ_cost_of_generation)
-        
     "AC equality constraints"
     # AC node constraints
     def P_AC_node_rule(model, node):
@@ -635,6 +350,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
    
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
     model.Gen_QREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_QREN_rule) 
+    
     
     def toPexp_rule(model,node):
        nAC = grid.nodes_AC[node]
@@ -942,7 +658,113 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
         model.tf_Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_tf, rule=Q_from_AC_line_tf)
         model.tf_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_tf, rule=P_loss_AC_rule_tf)
     
+    "AC inequality constraints"
+    #AC gen inequality
+    def S_gen_AC_limit_rule(model,ngen):
+        gen = grid.Generators[ngen]
+        if gen.Max_S is None:
+            return pyo.Constraint.Skip
+        else:    
+            return model.PGi_gen[ngen]**2+model.QGi_gen[ngen]**2 <= gen.Max_S**2 
+    
+    model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
+    #AC Ren sources inequality
+    
+    def S_renS_AC_limit_rule(model,rs):
+        ren_source= grid.RenSources[rs]
+        if ren_source.Max_S is None or ren_source.connected =='DC':
+            return pyo.Constraint.Skip
+        else:    
+            return (model.P_renSource[rs]*model.gamma[rs])**2+model.Q_renSource[rs]**2 <= ren_source.Max_S**2 
+    
+    model.S_renS_AC_limit_constraint   = pyo.Constraint(model.ren_sources, rule=S_renS_AC_limit_rule)
+    
+    #AC lines inequality
+    def S_to_AC_limit_rule(model,line):
         
+        return model.PAC_to[line]**2+model.QAC_to[line]**2 <= S_lineAC_limit[line]**2
+    def S_from_AC_limit_rule(model,line):
+        
+        return model.PAC_from[line]**2+model.QAC_from[line]**2 <= S_lineAC_limit[line]**2
+    
+    
+    model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
+    model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
+    
+    def S_to_AC_limit_rule_exp(model,line):
+        
+        return model.exp_PAC_to[line]**2+model.exp_QAC_to[line]**2 <= S_lineACexp_limit[line]**2
+    def S_from_AC_limit_rule_exp(model,line):
+        
+        return model.exp_PAC_from[line]**2+model.exp_QAC_from[line]**2 <= S_lineACexp_limit[line]**2
+    
+    if TEP_AC:
+        model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
+        model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
+    
+    def S_to_AC_limit_rule_tf(model,line):
+        
+        return model.tf_PAC_to[line]**2+model.tf_QAC_to[line]**2 <= S_lineACtf_limit[line]**2
+    def S_from_AC_limit_rule_tf(model,line):
+        
+        return model.tf_PAC_from[line]**2+model.tf_QAC_from[line]**2 <= S_lineACtf_limit[line]**2
+    
+    if TAP_tf:
+        model.tf_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_tf, rule=S_to_AC_limit_rule_tf)
+        model.tf_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_tf, rule=S_from_AC_limit_rule_tf)
+    
+    s=1
+        
+
+def DC_variables(model,grid,DC_info):
+    DC_Lists,DC_nodes_info,DC_lines_info = DC_info
+        
+    lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
+    u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
+    P_lineDC_limit,NP_lineDC    = DC_lines_info
+
+    "Model Sets"
+    model.nodes_DC   = pyo.Set(initialize=lista_nodos_DC)
+    model.lines_DC   = pyo.Set(initialize=lista_lineas_DC)
+    model.DC_slacks  = pyo.Set(initialize=DC_slack)
+
+    "DC variables"
+    #DC nodes variables
+    def DC_V_slack_rule(model, node):
+        return model.V_DC[node] == V_ini_DC[node]
+    def Pbounds_lines(model, line):
+        return (-P_lineDC_limit[line], P_lineDC_limit[line])
+    
+    def P_conv_DC_node_bounds(model,node): #This limits the varable of those DC nodes that do not have a converter connected 
+         if node in DC_nodes_connected_conv:
+             return (None,None)
+         else:
+             return (0,0)
+         
+    def Pren_bounds_DC(model, node):
+        nDC = grid.nodes_DC[node]
+        if nDC.connected_RenSource == []:
+            return (0,0)
+        else:
+            return (None,None)
+
+    model.V_DC = pyo.Var(model.nodes_DC, bounds=lambda model, node: (u_min_dc[node], u_max_dc[node]), initialize=V_ini_DC)
+    model.P_known_DC = pyo.Param(model.nodes_DC, initialize=P_known_DC,mutable=True)
+    model.PGi_ren_DC = pyo.Var(model.nodes_DC, bounds=Pren_bounds_DC,initialize=0)
+
+    model.DC_V_slack_constraint = pyo.Constraint(model.DC_slacks, rule=DC_V_slack_rule)
+    
+    #DC Lines variables
+    
+
+    model.PDC_to       = pyo.Var(model.lines_DC,bounds=Pbounds_lines ,  initialize=0)
+    model.PDC_from     = pyo.Var(model.lines_DC,bounds=Pbounds_lines , initialize=0)
+    model.PDC_line_loss= pyo.Var(model.lines_DC,bounds=Pbounds_lines , initialize=0)
+    
+    
+    model.P_conv_DC = pyo.Var(model.nodes_DC, bounds=P_conv_DC_node_bounds,initialize=0)
+   
+def DC_constraints(model,grid):
 
     "DC equality constraints"
     #DC node constraints
@@ -952,7 +774,6 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
        P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber] for rs in nDC.connected_RenSource)                  
        return  model.PGi_ren_DC[node] ==   P_gen
    
-    
     
     def P_DC_node_rule(model, node):
         i = node
@@ -973,9 +794,8 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     # def P_DC_noconv_rule(model, node):
     #     return model.P_conv_DC[node] == 0
     
-    if not OnlyAC:
-        model.Gen_PREN_constraint_DC =pyo.Constraint(model.nodes_DC, rule=Gen_PREN_rule_DC)
-        model.P_DC_node_constraint = pyo.Constraint(model.nodes_DC, rule=P_DC_node_rule)
+    model.Gen_PREN_constraint_DC =pyo.Constraint(model.nodes_DC, rule=Gen_PREN_rule_DC)
+    model.P_DC_node_constraint = pyo.Constraint(model.nodes_DC, rule=P_DC_node_rule)
     
     #DC lines equality constraints
     
@@ -1005,11 +825,59 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
         
         return model.PDC_line_loss[line]==(model.PDC_from[line]+ model.PDC_to[line])
     
-    if not OnlyAC:
-        model.Pfrom_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_from_DC_line)
-        model.Pto_DC_line_constraint     = pyo.Constraint(model.lines_DC, rule=P_to_DC_line)
-        model.Ploss_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_loss_DC_line_rule)    
+    model.Pfrom_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_from_DC_line)
+    model.Pto_DC_line_constraint     = pyo.Constraint(model.lines_DC, rule=P_to_DC_line)
+    model.Ploss_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_loss_DC_line_rule)    
         
+    "DC inequality constraints"
+    
+    #they set in the variables themselves
+       
+
+def Converter_variables(model,grid,Conv_info):
+    
+    Conv_Lists, Conv_Volt = Conv_info
+        
+    lista_conv,NumConvP_i = Conv_Lists
+    u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
+
+
+    "Model Sets"
+    model.conv       = pyo.Set(initialize=lista_conv)
+
+    "Converter Variables"
+    def conv_opt_bounds(model, node):
+        nAC = grid.nodes_AC[node]
+        if not nAC.connected_conv:
+            return (0,0)
+        else:
+            return (None,None)
+        
+    model.Uc   = pyo.Var(model.conv, bounds=lambda model, conv: (u_c_min[conv], u_c_max[conv]), initialize=1) 
+    model.Uf   = pyo.Var(model.conv, bounds=lambda model, conv: (u_c_min[conv], u_c_max[conv]), initialize=1) 
+    model.th_c   = pyo.Var(model.conv, bounds=(-1.6, 1.6), initialize=0) 
+    model.th_f   = pyo.Var(model.conv, bounds=(-1.6, 1.6), initialize=0) 
+    model.P_AC_loss_conv= pyo.Var(model.conv,within=pyo.NonNegativeReals)
+    
+        
+    model.P_conv_loss = pyo.Var(model.conv, initialize=0)
+
+    model.P_conv_AC = pyo.Var(model.nodes_AC,bounds=conv_opt_bounds, initialize=0)
+    model.Q_conv_AC = pyo.Var(model.nodes_AC,bounds=conv_opt_bounds, initialize=0)
+    
+    model.P_conv_s_AC  = pyo.Var(model.conv, initialize=0)   
+    model.Q_conv_s_AC = pyo.Var(model.conv, initialize=0)
+
+    model.P_conv_c_AC  = pyo.Var(model.conv, initialize=0.0001)   
+    model.Q_conv_c_AC = pyo.Var(model.conv, initialize=0.0001)
+    
+    model.P_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)   
+    model.Q_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)
+    
+def Converter_constraints(model,grid,Conv_info):
+    Conv_Lists, Conv_Volt = Conv_info
+  
+    u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
     
     "Converter equality Constraints"
     
@@ -1203,8 +1071,6 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
         
 
            F1 = Pcf-Psf
-         
-           
             
        return F1==0
 
@@ -1242,13 +1108,13 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
            
             
        return F2==0
-    if not OnlyAC:
-        model.Conv_Ps_constraint = pyo.Constraint(model.conv,rule=Conv_Ps_rule)
-        model.Conv_Qs_constraint = pyo.Constraint(model.conv,rule=Conv_Qs_rule)
-        model.Conv_Pc_constraint = pyo.Constraint(model.conv,rule=Conv_Pc_rule)
-        model.Conv_Qc_constraint = pyo.Constraint(model.conv,rule=Conv_Qc_rule)
-        model.Conv_F1_constraint = pyo.Constraint(model.conv,rule=Conv_F1_rule)
-        model.Conv_F2_constraint = pyo.Constraint(model.conv,rule=Conv_F2_rule)
+
+    model.Conv_Ps_constraint = pyo.Constraint(model.conv,rule=Conv_Ps_rule)
+    model.Conv_Qs_constraint = pyo.Constraint(model.conv,rule=Conv_Qs_rule)
+    model.Conv_Pc_constraint = pyo.Constraint(model.conv,rule=Conv_Pc_rule)
+    model.Conv_Qc_constraint = pyo.Constraint(model.conv,rule=Conv_Qc_rule)
+    model.Conv_F1_constraint = pyo.Constraint(model.conv,rule=Conv_F1_rule)
+    model.Conv_F2_constraint = pyo.Constraint(model.conv,rule=Conv_F2_rule)
     
     # Adds all converters in the AC nodes they are connected to
     def Conv_PAC_rule(model,node):
@@ -1296,94 +1162,13 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
         
         return model.P_conv_loss[conv] == P_loss
 
-    if not OnlyAC:
-        model.Conv_DC_constraint = pyo.Constraint(model.conv, rule=Conv_DC_rule)
-        model.Conv_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Conv_PAC_rule)
-        model.Conv_QAC_constraint = pyo.Constraint(model.nodes_AC, rule=Conv_Q_rule)
-        model.Conv_loss_constraint = pyo.Constraint(model.conv, rule=Conv_loss_rule)
+
+    model.Conv_DC_constraint = pyo.Constraint(model.conv, rule=Conv_DC_rule)
+    model.Conv_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Conv_PAC_rule)
+    model.Conv_QAC_constraint = pyo.Constraint(model.nodes_AC, rule=Conv_Q_rule)
+    model.Conv_loss_constraint = pyo.Constraint(model.conv, rule=Conv_loss_rule)
    
-    
-    """
-    INEQUALITY CONSTRAINTS
-    """
-    "Price_Zone inequality constraints"
-    
-    def import_rule(model,price_zone):
-        return model.PN[price_zone] >= model.PGL_min[price_zone]
-    def export_rule(model,price_zone):
-        return model.PN[price_zone] <= model.PGL_max[price_zone]
-    
-    
-    if Price_Zones:
-        model.import_constraint = pyo.Constraint(model.M,rule=import_rule)
-        model.export_constraint = pyo.Constraint(model.M,rule=export_rule)
-    
-    "AC inequality constraints"
-    #AC gen inequality
-    def S_gen_AC_limit_rule(model,ngen):
-        gen = grid.Generators[ngen]
-        if gen.Max_S is None:
-            return pyo.Constraint.Skip
-        else:    
-            return model.PGi_gen[ngen]**2+model.QGi_gen[ngen]**2 <= gen.Max_S**2 
-    
-    model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
-    #AC Ren sources inequality
-    
-    def S_renS_AC_limit_rule(model,rs):
-        ren_source= grid.RenSources[rs]
-        if ren_source.Max_S is None or ren_source.connected =='DC':
-            return pyo.Constraint.Skip
-        else:    
-            return (model.P_renSource[rs]*model.gamma[rs])**2+model.Q_renSource[rs]**2 <= ren_source.Max_S**2 
-    
-    model.S_renS_AC_limit_constraint   = pyo.Constraint(model.ren_sources, rule=S_renS_AC_limit_rule)
-    
-    
-   
-    
-    #AC lines inequality
-    def S_to_AC_limit_rule(model,line):
-        
-        return model.PAC_to[line]**2+model.QAC_to[line]**2 <= S_lineAC_limit[line]**2
-    def S_from_AC_limit_rule(model,line):
-        
-        return model.PAC_from[line]**2+model.QAC_from[line]**2 <= S_lineAC_limit[line]**2
-    
-    
-    model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
-    model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
-    
-    def S_to_AC_limit_rule_exp(model,line):
-        
-        return model.exp_PAC_to[line]**2+model.exp_QAC_to[line]**2 <= S_lineACexp_limit[line]**2
-    def S_from_AC_limit_rule_exp(model,line):
-        
-        return model.exp_PAC_from[line]**2+model.exp_QAC_from[line]**2 <= S_lineACexp_limit[line]**2
-    
-    if TEP_AC:
-        model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
-        model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
-    
-    def S_to_AC_limit_rule_tf(model,line):
-        
-        return model.tf_PAC_to[line]**2+model.tf_QAC_to[line]**2 <= S_lineACtf_limit[line]**2
-    def S_from_AC_limit_rule_tf(model,line):
-        
-        return model.tf_PAC_from[line]**2+model.tf_QAC_from[line]**2 <= S_lineACtf_limit[line]**2
-    
-    if TAP_tf:
-        model.tf_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_tf, rule=S_to_AC_limit_rule_tf)
-        model.tf_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_tf, rule=S_from_AC_limit_rule_tf)
-    
-    
-    
-    
-    
-    "DC inequality constraints"
-    
-    #they set in the variables themselves
-    
+
     "Converters inequality constraints"
     
     def Conv_ACc_Limit_rule(model, conv):
@@ -1404,19 +1189,299 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     def Conv_AC_loss2(model,conv):
         return  model.P_AC_loss_conv[conv] >= model.P_conv_s_AC[conv]-model.P_conv_c_AC[conv]
     
+
+    model.Conv_ACc_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_ACc_Limit_rule)
+    model.Conv_ACs_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_ACs_Limit_rule)
+    model.Conv_DC_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_DC_Limit_rule)
+    model.Conv_AC_loss_constraint1= pyo.Constraint(model.conv,rule=Conv_AC_loss1)
+    model.Conv_AC_loss_constraint2= pyo.Constraint(model.conv,rule=Conv_AC_loss2)
     
+    
+
+def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info):
+
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
+    lf,qf,P_renSource = gen_info
+    u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
+
+    DC_Lists,DC_nodes_info,DC_lines_info = DC_info
+    u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
+
+    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
+    lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
+    price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
+
+    "Price Zone Sets"
+    model.M = pyo.Set(initialize=lista_M)
+
+
+    "Price_Zone Variables"
+    def Price_Zone_P_bounds(model, price_zone):
+        nM = grid.Price_Zones[price_zone]
+        return (nM.PGL_min,nM.PGL_max)
+    
+    def lf_bounds(model, ngen):
+        gen = grid.Generators[ngen]
+        if gen.price_zone_link:
+            return (None,None)
+        else:
+            return (lf[ngen],lf[ngen])
+    
+    model.PN = pyo.Var(model.M,bounds=Price_Zone_P_bounds,initialize=0)
+    model.PGL_min= pyo.Param(model.M,initialize=PGL_min,mutable=True)
+    model.PGL_max= pyo.Param(model.M,initialize=PGL_max,mutable=True)
+    # model.PN_load = pyo.Var(model.M)
+    model.price = pyo.Var(model.nodes_AC,initialize=price)
+    model.price_dc = pyo.Var(model.nodes_DC,initialize=price_dc)
+    
+    model.lf = pyo.Var (model.gen_AC,bounds=lf_bounds,  initialize=lf)
+    model.price_zone_price = pyo.Var(model.M,initialize=0)
+    model.price_zone_a = pyo.Param(model.M,initialize=price_zone_as,mutable=True)
+    model.price_zone_b = pyo.Param(model.M,initialize=price_zone_bs,mutable=True)
+    model.SocialCost = pyo.Var(model.M,initialize=0)
+
+
+def price_zone_constraints(model,grid,Price_Zone_info):
+
+    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
+    lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
+    price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
+
+    "Price Zone equality constraints"
+    
+    def price_zone_price_formula(model,price_zone):
+        from .Classes import Price_Zone
+        if type(grid.Price_Zones[price_zone]) is Price_Zone:
+            return model.price_zone_price[price_zone]==2*model.price_zone_a[price_zone]*model.PN[price_zone]*grid.S_base+model.price_zone_b[price_zone]
+        else :
+            return pyo.Constraint.Skip
+    
+    def node_price_set_AC(model,node):
+        try: 
+            price_zone=node2price_zone['AC'][node]
+            return model.price_zone_price[price_zone]== model.price[node] 
+        except:
+            return model.price[node]==0
+    def node_price_set_DC(model,node):
+        try: 
+            price_zone=node2price_zone['DC'][node]
+            return model.price_zone_price[price_zone]== model.price_dc[node] 
+        except:
+            return model.price_dc[node]==0
+    
+    
+    def P_price_zone(model,price_zone):
+        Pm_AC=sum(model.P_known_AC[node]   + model.PGi_ren[node] + model.PGi_opt[node] for node in price_zone2node['AC'][price_zone])
+        Pm_DC=sum(model.P_known_DC[node_DC]+ model.PGi_ren_DC[node_DC] for node_DC in price_zone2node['DC'][price_zone])
+        
+        return model.PN[price_zone] ==Pm_AC+Pm_DC
+
+    def PZ_cost_of_generation(model,price_zone):
+        from .Classes import Price_Zone
+        if type(grid.Price_Zones[price_zone]) is Price_Zone:
+            return model.SocialCost[price_zone]== model.price_zone_a[price_zone]*(model.PN[price_zone]*grid.S_base)**2+model.price_zone_b[price_zone]*(model.PN[price_zone]*grid.S_base)
+        else:
+            return model.SocialCost[price_zone]==0
+        
+    def Price_link(model,price_zone):
+        from .Classes import Price_Zone
+        if type(grid.Price_Zones[price_zone]) is Price_Zone:
+            linked_price_zone=grid.Price_Zones[price_zone].linked_price_zone
+            if linked_price_zone is not None:   
+                return model.price_zone_price[price_zone] == model.price_zone_price[linked_price_zone.price_zone_num]
+            else: 
+                return pyo.Constraint.Skip
+        else:
+            return pyo.Constraint.Skip
+    
+    # def MTDC_price_link(model,price_zone):
+    #     from PyFlow_ACDC import MTDCPrice_Zone
+    #     if isinstance(grid.Price_Zones[price_zone], MTDCPrice_Zone): 
+    #          pricing_strategy = grid.Price_Zones[price_zone].pricing_strategy
+    #          linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[price_zone].linked_price_zones]
+    #          if pricing_strategy == 'min':
+    #             return model.price_zone_price[price_zone] <= min(model.price_zone_price[mkt] for mkt in linked_price_zones)  # Set upper limit to the minimum of linked price_zones
+    
+    #          elif pricing_strategy == 'max':
+    #             return model.price_zone_price[price_zone] >= max(model.price_zone_price[mkt] for mkt in linked_price_zones)  # Set lower limit to the maximum of linked price_zones
+    
+    #          elif pricing_strategy == 'avg':
+    #             return model.price_zone_price[price_zone] == sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
+
+    #          else:
+    #             raise ValueError(f"Unsupported pricing strategy: {pricing_strategy}")
+    #             return pyo.Constraint.Skip
+    #     else:
+    #         return pyo.Constraint.Skip
+        
+    grid.OPF_Price_Zones_constraints_used=True
+    model.price_zone_gen_link = pyo.ConstraintList()
+    for node in grid.nodes_AC:  # Loop through all nodes
+        nAC = node.nodeNumber
+        for g in node.connected_gen:  # Loop through all generators in the node
+            if g.price_zone_link:
+                model.price_zone_gen_link.add(model.price[nAC] == model.lf[g.genNumber])
+    
+        
+        
+    model.price_zone_price_constraint = pyo.Constraint(model.M,rule=price_zone_price_formula)
+    model.price_zone_price_link_ = pyo.Constraint(model.M,rule=Price_link)
+    
+    model.price_zone_MTDC_link = pyo.ConstraintList()
+    
+    from .Classes import MTDCPrice_Zone
+    # Step 1: Define sets for the MTDC price_zones and linked price_zones
+    model.MTDCPrice_Zones = pyo.Set(initialize=[m for m in model.M if isinstance(grid.Price_Zones[m], MTDCPrice_Zone)])
+    
+    for mtdc_price_zone in model.MTDCPrice_Zones:
+        linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[mtdc_price_zone].linked_price_zones]
+        
+        if not linked_price_zones:
+            break
+        # Define a set of linked price_zones for each MTDC price_zone
+        # model.LinkedPrice_Zones = pyo.Set(initialize=linked_price_zones)
+    
+        pricing_strategy = grid.Price_Zones[mtdc_price_zone].pricing_strategy
+    
+        if pricing_strategy == 'min':
+            grid.MixedBinCont=True
+            # Step 1: Create distinct binary variables for each MTDC price_zone and its linked price_zones
+            model.y_min = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=1)
+
+            # Step 2: Ensure MTDC price_zone price is less than or equal to all linked price_zone prices
+            for mkt in linked_price_zones:
+                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] <= model.price_zone_price[mkt])
+
+            # Step 3: Ensure that the MTDC price_zone price is equal to one of the linked price_zone prices
+            model.price_zone_MTDC_link.add(sum(model.y_min[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
+
+            # Step 4: Link the binary variable to the actual price_zone prices
+            for mkt in linked_price_zones:
+                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_min[mkt, mtdc_price_zone])
+
+        elif pricing_strategy == 'max':
+            grid.MixedBinCont=True
+            # Step 2: Create binary variables indexed by both the linked price_zones and the MTDC price_zone
+            model.y_max = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=0)
+    
+            # Step 3: Ensure MTDC price_zone price is greater than or equal to all linked price_zone prices
+            for mkt in linked_price_zones:
+                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] >= model.price_zone_price[mkt])
+    
+            # Step 4: Ensure that the MTDC price_zone price is equal to one of the linked price_zone prices
+            model.price_zone_MTDC_link.add(sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
+    
+            # Step 5: Link the binary variable to the actual price_zone prices
+            for mkt in linked_price_zones:
+                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_max[mkt, mtdc_price_zone]/sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones))
+    
+        elif pricing_strategy == 'avg':
+            # MTDC price_zone price equals the average of linked price_zone prices
+            avg_expr = sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
+            model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == avg_expr)
+    
+        else:
+            raise ValueError(f"Unsupported pricing strategy: {pricing_strategy}")
+                
+                
+    
+    model.price_constraint_AC = pyo.Constraint(model.nodes_AC,rule=node_price_set_AC)
+    model.price_constraint_DC = pyo.Constraint(model.nodes_DC,rule=node_price_set_DC)
+    
+    model.PN_constraint = pyo.Constraint(model.M,rule=P_price_zone)
+    # model.PNL_constraint = pyo.Constraint(model.M,rule=P_price_zone_load)
+    model.CG_constraint = pyo.Constraint(model.M,rule=PZ_cost_of_generation)
+        
+    "Price_Zone inequality constraints"
+    
+    def import_rule(model,price_zone):
+        return model.PN[price_zone] >= model.PGL_min[price_zone]
+    def export_rule(model,price_zone):
+        return model.PN[price_zone] <= model.PGL_max[price_zone]
+    
+    model.import_constraint = pyo.Constraint(model.M,rule=import_rule)
+    model.export_constraint = pyo.Constraint(model.M,rule=export_rule)    
+
+def price_zone_parameters(model,grid,AC_info,DC_info):
+
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
+    lf,qf,P_renSource = gen_info
+    u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
+
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    "Price Zone Parameters"
+    model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
+    model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)
+    if not OnlyAC:
+        DC_Lists,DC_nodes_info,DC_lines_info = DC_info
+        u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
+
+        model.price_dc  = pyo.Param(model.nodes_DC, initialize=price_dc,mutable=True)
+
+def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
+
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
+    S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
+   
+
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    if TEP_AC:    
+        model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)    
+    if not OnlyAC:
+        DC_Lists,DC_nodes_info,DC_lines_info = DC_info
+        P_lineDC_limit,NP_lineDC    = DC_lines_info
+
+        Conv_Lists, Conv_Volt = Conv_info
+        lista_conv,NumConvP_i = Conv_Lists
+
+        model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC)
+        model.NumConvP = pyo.Param(model.conv,initialize=NumConvP_i)
+
+
+def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
+
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
+    S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
+
+
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    "TEP variables"
+    
+    if TEP_AC:
+        def NPline_bounds_AC(model, line):
+            element=grid.lines_AC_exp[line]
+            if element.np_line_opf==False:
+                return (NP_lineAC[line], NP_lineAC[line])
+            else:
+                return (NP_lineAC[line], None)
+        
+        model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC)
     
     if not OnlyAC:
-        model.Conv_ACc_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_ACc_Limit_rule)
-        model.Conv_ACs_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_ACs_Limit_rule)
-        model.Conv_DC_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_DC_Limit_rule)
-        model.Conv_AC_loss_constraint1= pyo.Constraint(model.conv,rule=Conv_AC_loss1)
-        model.Conv_AC_loss_constraint2= pyo.Constraint(model.conv,rule=Conv_AC_loss2)
-    
-    
-    
-    return model
+        DC_Lists,DC_nodes_info,DC_lines_info = DC_info
+        P_lineDC_limit,NP_lineDC    = DC_lines_info
 
+        Conv_Lists, Conv_Volt = Conv_info
+        lista_conv,NumConvP_i = Conv_Lists
+
+        def NPline_bounds(model, line):
+            element=grid.lines_DC[line]
+            if element.np_line_opf==False:
+                return (NP_lineDC[line], NP_lineDC[line])
+            else:
+                return (NP_lineDC[line], None)
+        
+        model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC)
+        
+        def NPconv_bounds(model, conv):
+            element=grid.Converters_ACDC[conv]
+            if element.NUmConvP_opf==False:
+                return (NumConvP_i[conv], NumConvP_i[conv])
+            else:
+                return (NumConvP_i[conv], None)
+        
+        model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
+    
 
 
 
