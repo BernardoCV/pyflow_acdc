@@ -1,4 +1,3 @@
-
 from scipy.io import loadmat
 import pandas as pd
 import numpy as np
@@ -766,9 +765,11 @@ def Create_grid_from_mat(matfile):
             Bs = AC_node_data.at[index, 'Bs']/S_base
           
             kV_base         = AC_node_data.at[index, 'baseKV']
-            Voltage_0       = AC_node_data.at[index, 'Vm']
+            
             theta_0         = np.radians(AC_node_data.at[index, 'Va'])     
             
+            
+            Voltage_0 = Gen_data.loc[Gen_data['bus'] == index, 'Vg'].iloc[0] if Gen_data is not None and (Gen_data['bus'] == index).any() else 1.01
             
             Power_Gained = (Gen_data[Gen_data['bus'] == index]['Pg'].values[0] / S_base 
                 if Gen_data is not None and not Gen_data[Gen_data['bus'] == index].empty 
@@ -937,7 +938,7 @@ def Create_grid_from_mat(matfile):
 
 
     G = Grid(S_base, AC_nodes_list, AC_lines_list, nodes_DC=DC_nodes_list,
-             lines_DC=DC_lines_list, Converters=Convertor_list, conv_DC=None)
+             lines_DC=DC_lines_list, Converters=Convertor_list)
     res = Results(G, decimals=3)
     
     if Gen_data is not None:        

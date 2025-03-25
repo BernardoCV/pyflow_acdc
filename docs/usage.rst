@@ -210,6 +210,7 @@ Available test cases:
 For Power Flow:
 - pyf.Stagg5MATACDC()
 - pyf.PEI_grid()
+- pyf.pglib_opf_case24_ieee_rts()
 
 For Optimal Power Flow:
 
