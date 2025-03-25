@@ -487,7 +487,7 @@ def AC_constraints(model,grid,AC_info):
     
     def P_to_AC_line_exp(model,line):   
        
-        l = grid.lines_AC[line]
+        l = grid.lines_AC_exp[line]
         f = l.fromNode.nodeNumber
         t = l.toNode.nodeNumber
         Vf=model.V_AC[f]
@@ -504,7 +504,7 @@ def AC_constraints(model,grid,AC_info):
         return model.exp_PAC_to[line] == Pto
     
     def P_from_AC_line_exp(model,line):       
-       l = grid.lines_AC[line]
+       l = grid.lines_AC_exp[line]
        f = l.fromNode.nodeNumber
        t = l.toNode.nodeNumber
        Vf=model.V_AC[f]
@@ -520,7 +520,7 @@ def AC_constraints(model,grid,AC_info):
        return model.exp_PAC_from[line] == Pfrom
     
     def Q_to_AC_line_exp(model,line):   
-        l = grid.lines_AC[line]
+        l = grid.lines_AC_exp[line]
         f = l.fromNode.nodeNumber
         t = l.toNode.nodeNumber
         Vf=model.V_AC[f]
@@ -539,7 +539,7 @@ def AC_constraints(model,grid,AC_info):
         return model.exp_QAC_to[line] == Qto
     
     def Q_from_AC_line_exp(model,line):       
-       l = grid.lines_AC[line]
+       l = grid.lines_AC_exp[line]
        f = l.fromNode.nodeNumber
        t = l.toNode.nodeNumber
        Vf=model.V_AC[f]
@@ -558,7 +558,7 @@ def AC_constraints(model,grid,AC_info):
        return model.exp_QAC_from[line] == Qfrom
     
     def P_loss_AC_rule_exp(model,line):
-        return model.exp_PAC_line_loss[line]== model.exp_PAC_to[line]+model.PAC_from[line]
+        return model.exp_PAC_line_loss[line]== model.exp_PAC_to[line]+model.exp_PAC_from[line]
     
     
     if TEP_AC:
@@ -568,6 +568,7 @@ def AC_constraints(model,grid,AC_info):
         model.exp_Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=Q_from_AC_line_exp)
         model.exp_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_exp, rule=P_loss_AC_rule_exp)
     
+    s=1
     def P_to_AC_line_tf(model,trafo):   
         tf = grid.lines_AC_tf[trafo]
         f = tf.fromNode.nodeNumber
@@ -1199,13 +1200,15 @@ def Converter_constraints(model,grid,Conv_info):
     
 
 def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info):
-
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    
     AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
     lf,qf,P_renSource = gen_info
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
-
-    DC_Lists,DC_nodes_info,DC_lines_info = DC_info
-    u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
+    
+    if not OnlyAC:
+        DC_Lists,DC_nodes_info,DC_lines_info = DC_info
+        u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
 
     Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
     lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
@@ -1432,10 +1435,10 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
         P_lineDC_limit,NP_lineDC    = DC_lines_info
 
         Conv_Lists, Conv_Volt = Conv_info
-        lista_conv,NumConvP_i = Conv_Lists
+        lista_conv,NumConvP = Conv_Lists
 
         model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC)
-        model.NumConvP = pyo.Param(model.conv,initialize=NumConvP_i)
+        model.NumConvP = pyo.Param(model.conv,initialize=NumConvP)
 
 
 def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
@@ -1445,6 +1448,14 @@ def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
 
 
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    from .ACDC_TEP import get_TEP_variables
+
+    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
+
+    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
+    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
+
     "TEP variables"
     
     if TEP_AC:
@@ -1453,43 +1464,38 @@ def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
             if element.np_line_opf==False:
                 return (NP_lineAC[line], NP_lineAC[line])
             else:
-                return (NP_lineAC[line], None)
+                return (NP_lineAC[line], NP_lineAC_max[line])
         
-        model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC)
-    
-    if not OnlyAC:
-        DC_Lists,DC_nodes_info,DC_lines_info = DC_info
-        P_lineDC_limit,NP_lineDC    = DC_lines_info
+        model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
+        model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
 
-        Conv_Lists, Conv_Volt = Conv_info
-        lista_conv,NumConvP_i = Conv_Lists
+    if not OnlyAC:
+        
 
         def NPline_bounds(model, line):
             element=grid.lines_DC[line]
             if element.np_line_opf==False:
                 return (NP_lineDC[line], NP_lineDC[line])
             else:
-                return (NP_lineDC[line], None)
+                return (NP_lineDC[line], NP_lineDC_max[line])
         
-        model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC)
-        
+        model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC_i)
+        model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
         def NPconv_bounds(model, conv):
             element=grid.Converters_ACDC[conv]
             if element.NUmConvP_opf==False:
-                return (NumConvP_i[conv], NumConvP_i[conv])
+                return (NumConvP[conv], NumConvP[conv])
             else:
-                return (NumConvP_i[conv], None)
+                return (NumConvP[conv], NumConvP_max[conv])
         
         model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
+        model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
+
+
+
+def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     
-
-
-
-def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
-    if grid.nn_DC!=0:
-        OnlyAC=False
-    else:
-        OnlyAC=True
     grid.V_AC = np.zeros(grid.nn_AC)
     grid.Theta_V_AC = np.zeros(grid.nn_AC)
     
@@ -1585,6 +1591,43 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
 
         with ThreadPoolExecutor() as executor:
             executor.map(process_price_zone, grid.Price_Zones)
+    if TEP_AC:
+        lines_AC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}
+        lines_AC_TEP_fromP = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_from.items()}
+        lines_AC_TEP_toP = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_to.items()}
+        lines_AC_TEP_fromQ = {k: np.float64(pyo.value(v)) for k, v in model.exp_QAC_from.items()}
+        lines_AC_TEP_toQ = {k: np.float64(pyo.value(v)) for k, v in model.exp_QAC_to.items()}
+        lines_AC_TEP_P_loss = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_line_loss.items()}
+
+        def process_line_AC_TEP(line):
+            l = line.lineNumber
+            line.np_line = lines_AC_TEP[l]
+            line.P_loss = lines_AC_TEP_P_loss[l]*lines_AC_TEP[l]
+            line.fromS = (lines_AC_TEP_fromP[l] + 1j*lines_AC_TEP_fromQ[l])*lines_AC_TEP[l]
+            line.toS = (lines_AC_TEP_toP[l] + 1j*lines_AC_TEP_toQ[l])*lines_AC_TEP[l]
+            line.loss = line.fromS + line.toS
+
+        with ThreadPoolExecutor() as executor:
+            executor.map(process_line_AC_TEP, grid.lines_AC_exp)
+
+    if TAP_tf:
+        tf_PAC_to_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_PAC_to.items()}
+        tf_PAC_from_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_PAC_from.items()}
+        tf_QAC_to_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_QAC_to.items()}
+        tf_QAC_from_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_QAC_from.items()}
+        tf_m_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_m.items()}
+        tf_loss_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_PAC_line_loss.items()}
+        
+        def process_line_AC_tf(tf):
+            tfN = tf.trafNumber
+            tf.P_loss = tf_loss_values[tfN]
+            tf.fromS = tf_PAC_from_values[tfN] + 1j*tf_QAC_from_values[tfN]
+            tf.toS = tf_PAC_to_values[tfN] + 1j*tf_QAC_to_values[tfN]
+            tf.m = tf_m_values[tfN]
+            tf.loss = tf.fromS + tf.toS
+
+        with ThreadPoolExecutor() as executor:
+            executor.map(process_line_AC_tf, grid.lines_AC_tf)
 
     grid.Line_AC_calc()    
     
@@ -1606,7 +1649,17 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
 
     with ThreadPoolExecutor() as executor:
         executor.map(process_node_DC, grid.nodes_DC)
-    
+
+    if TEP:
+        lines_DC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}
+
+        def process_line_DC_TEP(line):
+            l = line.lineNumber
+            line.np_line = lines_DC_TEP[l]
+
+        with ThreadPoolExecutor() as executor:
+            executor.map(process_line_DC_TEP, grid.lines_DC)
+
     # converters
 
     P_conv_DC_conv_values= {k: np.float64(pyo.value(v)) for k, v in model.P_conv_DC.items()}
@@ -1617,11 +1670,13 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
     P_conv_loss_values   = {k: np.float64(pyo.value(v)) for k, v in model.P_conv_loss.items()}
     Uc_values            = {k: np.float64(pyo.value(v)) for k, v in model.Uc.items()}
     Uf_values            = {k: np.float64(pyo.value(v)) for k, v in model.Uf.items()}
-    
+    nconv_TEP            = {k: np.float64(pyo.value(v)) for k, v in model.NumConvP.items()}
     
     # Parallelize converter processing
     def process_converter(conv):
         nconv = conv.ConvNumber
+        if TEP:
+            conv.NumConvP = nconv_TEP[nconv]
         conv.P_DC      = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] * conv.NumConvP
         conv.P_AC      = P_conv_s_AC_values[nconv] * conv.NumConvP
         conv.Q_AC      = Q_conv_s_AC_values[nconv] * conv.NumConvP
@@ -1640,6 +1695,7 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones):
     with ThreadPoolExecutor() as executor:
         executor.map(process_converter, grid.Converters_ACDC)
         
+    
     
     grid.Line_DC_calc()
 

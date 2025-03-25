@@ -39,7 +39,7 @@ def pack_variables(*args):
            
             
 
-def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
+def obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones):
     weights_def = {
        'Ext_Gen': {'w': 0},
        'Energy_cost': {'w': 0},
@@ -65,7 +65,11 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
         Price_Zones=True
     if  weights_def['Curtailment_Red']['w']!=0 :
         grid.CurtCost=True
-        
+
+    return weights_def, Price_Zones
+def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
+    
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones)
         
     model = pyo.ConcreteModel()
     model.name="AC/DC hybrid OPF"
@@ -122,7 +126,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     # print(s.getvalue())
     t2 = time.time()  
     t_modelexport = t2-t1
-    t_modelexport = t2-t1
+   
        
     grid.OPF_run=True  
     timing_info = {
@@ -136,30 +140,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
     from .Time_series import update_grid_data,modify_parameters
     
-    weights_def = {
-       'Ext_Gen': {'w': 0},
-       'Energy_cost': {'w': 0},
-       'Curtailment_Red': {'w': 0},
-       'AC_losses': {'w': 0},
-       'DC_losses': {'w': 0},
-       'Converter_Losses': {'w': 0},
-       'PZ_cost_of_generation': {'w': 0},
-       'Renewable_profit': {'w': 0},
-       'Gen_set_dev': {'w': 0}
-    }
-
-    # If user provides specific weights, merge them with the default
-    if ObjRule is not None:
-       for key in ObjRule:
-           if key in weights_def:
-               weights_def[key]['w'] = ObjRule[key]
-
-    if OnlyGen == False:
-        grid.OnlyGen=False
-    if  weights_def['PZ_cost_of_generation']['w']!=0 :
-        Price_Zones=True
-    if  weights_def['Curtailment_Red']['w']!=0 :
-        grid.CurtCost=True
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones)
         
         
     model = pyo.ConcreteModel()
@@ -649,7 +630,7 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     P_lineDC_limit, NP_lineDC = {}, {}
 
     AC_nodes_connected_conv, DC_nodes_connected_conv = [], []
-    S_limit_conv, NumConvP_i, P_conv_loss = {}, {}, {}
+    S_limit_conv, NumConvP, P_conv_loss = {}, {}, {}
     DC_slack = []
 
     
@@ -672,7 +653,7 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
         DC_nodes_connected_conv.append(conv.Node_DC.nodeNumber)
         P_conv_limit[conv.Node_DC.nodeNumber] = conv.MVA_max / grid.S_base
         S_limit_conv[conv.ConvNumber] = conv.MVA_max / grid.S_base
-        NumConvP_i[conv.ConvNumber] = conv.NumConvP
+        NumConvP[conv.ConvNumber] = conv.NumConvP
         u_c_min[conv.ConvNumber] = conv.Ucmin
         u_c_max[conv.ConvNumber] = conv.Ucmax
         P_conv_loss[conv.ConvNumber] = conv.P_loss
@@ -684,7 +665,7 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     DC_lines_info = pack_variables(P_lineDC_limit, NP_lineDC)
     DC_info = pack_variables(DC_Lists, DC_nodes_info, DC_lines_info)
    
-    Conv_Lists = pack_variables(lista_conv, NumConvP_i)
+    Conv_Lists = pack_variables(lista_conv, NumConvP)
     Conv_Volt = pack_variables(u_c_min, u_c_max, S_limit_conv, P_conv_limit) 
     Conv_info = pack_variables(Conv_Lists, Conv_Volt)
     

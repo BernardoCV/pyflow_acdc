@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF
-from .ACDC_OPF import OPF_solve,OPF_obj
+from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC
 
 
 __all__ = [
@@ -244,11 +244,11 @@ def Translate_pd_TEP(grid):
 
 def get_TEP_variables(grid):
     
-    NumConvP_i,NumConvP_max={},{}
+    NumConvP,NumConvP_i,NumConvP_max={},{},{}
     S_limit_conv={}
     P_lineDC_limit ={}
-    NP_lineDC_i,NP_lineDC_max ={},{}
-    NP_lineAC_i,NP_lineAC_max = {},{}
+    NP_lineDC,NP_lineDC_i,NP_lineDC_max ={},{},{}
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max = {},{},{}
     Line_length ={}
     
     
@@ -256,72 +256,101 @@ def get_TEP_variables(grid):
     conv_phi={}
     
     for l in grid.lines_AC_exp:
-        NP_lineAC_i[l.lineNumber]     = l.np_line+1 if l.np_line+1<=l.np_line_max else l.np_line_max
+        NP_lineAC[l.lineNumber]     = l.np_line
+        NP_lineAC_i[l.lineNumber]   = (
+            l.np_line if not l.np_line_opf 
+            else min(l.np_line + 1, l.np_line_max)
+        )
         NP_lineAC_max[l.lineNumber]   = l.np_line_max
         
     for conv in grid.Converters_ACDC:
-        NumConvP_i [conv.ConvNumber]  = conv.NumConvP+1 if conv.NumConvP+1<=conv.NumConvP_max else conv.NumConvP_max
+        NumConvP [conv.ConvNumber]  = conv.NumConvP 
+        NumConvP_i[conv.ConvNumber] = (
+            conv.NumConvP if not conv.NUmConvP_opf 
+            else min(conv.NumConvP + 1, conv.NumConvP_max)
+        )
         NumConvP_max[conv.ConvNumber] = conv.NumConvP_max
         S_limit_conv[conv.ConvNumber] = conv.MVA_max/grid.S_base
     for l in grid.lines_DC:
         P_lineDC_limit[l.lineNumber]  = l.MW_rating/grid.S_base
-        NP_lineDC_i[l.lineNumber]     = l.np_line+1 if l.np_line+1<=l.np_line_max else l.np_line_max
+        NP_lineDC[l.lineNumber]     = l.np_line 
+        NP_lineDC_i[l.lineNumber]   = (
+            l.np_line if not l.np_line_opf 
+            else min(l.np_line + 1, l.np_line_max)
+        )
         NP_lineDC_max[l.lineNumber]   = l.np_line_max
         Line_length[l.lineNumber]     = l.Length_km
         
     
     
-    conv_var=pack_variables(NumConvP_i,NumConvP_max,S_limit_conv,conv_phi)
-    DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi)
-    AC_line_var=pack_variables(NP_lineAC_i,NP_lineAC_max,Line_length,line_phi)
+    conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi)
+    DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi)
+    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi)
 
 
     return conv_var,DC_line_var,AC_line_var
 
-def transmission_expansion(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,ObjRule=None):
+def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=None):
 
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
-    weights_def = {
-       'Ext_Gen': {'w': 0},
-       'Energy_cost': {'w': 0},
-       'Curtailment_Red': {'w': 0},
-       'AC_losses': {'w': 0},
-       'DC_losses': {'w': 0},
-       'Converter_Losses': {'w': 0},
-       'PZ_cost_of_generation': {'w': 0},
-       'Renewable_profit': {'w': 0},
-       'Gen_set_dev': {'w': 0}
-    }
-
-    # If user provides specific weights, merge them with the default
-    if ObjRule is not None:
-       for key in ObjRule:
-           if key in weights_def:
-               weights_def[key]['w'] = ObjRule[key]
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
 
-def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None,ObjRule=None):
-    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
-    weights_def = {
-       'Ext_Gen': {'w': 0},
-       'Energy_cost': {'w': 0},
-       'Curtailment_Red': {'w': 0},
-       'AC_losses': {'w': 0},
-       'DC_losses': {'w': 0},
-       'Converter_Losses': {'w': 0},
-       'PZ_cost_of_generation': {'w': 0},
-       'Renewable_profit': {'w': 0},
-       'Gen_set_dev': {'w': 0}
+    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
+
+    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
+    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
+    
+    lista_lineas_DC = list(range(0, grid.nl_DC))
+    lista_conv = list(range(0, grid.nconv))
+    lista_AC   = list(range(0,grid.nle_AC))
+
+    t1 = time.time()
+    model = pyo.ConcreteModel()
+    model.name        ="TEP MTDC AC/DC hybrid OPF"
+
+    OPF_createModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+
+    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_OPF = OPF_obj(model,grid,weights_def,True,OnlyAC)
+    
+    present_value =   (1 - (1 + discount_rate) ** -n_years) / discount_rate
+    if NPV:
+        obj_OPF *=present_value
+    
+
+    total_cost = obj_TEP + obj_OPF
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+
+    t2 = time.time()  
+    t_modelcreate = t2-t1
+    
+    model_results,solver_stats = OPF_solve(model,grid)
+
+    t1 = time.time()
+    ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
+    t2 = time.time() 
+
+    t_modelexport = t2-t1
+
+    grid.OPF_run=True  
+    grid.TEP_run=True
+    
+    timing_info = {
+    "create": t_modelcreate,
+    "solve": solver_stats['time'],
+    "export": t_modelexport,
     }
+    return model, model_results , timing_info, solver_stats
 
-    # If user provides specific weights, merge them with the default
-    if ObjRule is not None:
-       for key in ObjRule:
-           if key in weights_def:
-               weights_def[key]['w'] = ObjRule[key]
 
+def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None,ObjRule=None):
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
 
     from .Time_series import  modify_parameters
     from .Time_series_clustering import cluster_TS
@@ -357,9 +386,9 @@ def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=Fa
         
     conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
 
-    NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
-    P_lineDC_limit,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
-    NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
+    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
+    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
     
     lista_lineas_DC = list(range(0, grid.nl_DC))
     lista_conv = list(range(0, grid.nconv))
@@ -377,8 +406,7 @@ def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=Fa
     model.lines_AC_exp= pyo.Set(initialize=lista_AC)
     
     w={}
-    coeff={}
-    
+
     base_model = pyo.ConcreteModel()
     OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
     
@@ -411,30 +439,28 @@ def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=Fa
     def NPline_bounds_AC(model, line):
         element=grid.lines_AC_exp[line]
         if element.np_line_opf:
-            return (NP_lineAC_i[line]-1, NP_lineAC_max[line])
+            return (NP_lineAC[line], NP_lineAC_max[line])
         else:
-            return (NP_lineAC_i[line]-1, NP_lineAC_i[line]-1)
+            return (NP_lineAC[line], NP_lineAC[line])
     
     model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
     
-    s=1
-    
-    
+
     def NPline_bounds(model, line):
         element=grid.lines_DC[line]
         if element.np_line_opf:
-            return (NP_lineDC_i[line]-1, NP_lineDC_max[line])
+            return (NP_lineDC[line], NP_lineDC_max[line])
         else:
-            return (NP_lineDC_i[line]-1, NP_lineDC_i[line]-1)
+            return (NP_lineDC[line], NP_lineDC[line])
     
     model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC_i)
     
     def NPconv_bounds(model, conv):
         element=grid.Converters_ACDC[conv]
         if element.NUmConvP_opf:
-            return (NumConvP_i[conv]-1, NumConvP_max[conv])
+            return (NumConvP[conv], NumConvP_max[conv])
         else:
-            return (NumConvP_i[conv]-1, NumConvP_i[conv]-1)
+            return (NumConvP[conv], NumConvP[conv])
     
     model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
     
@@ -444,7 +470,6 @@ def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=Fa
             return model.NumLinesACP[line] ==model.submodel[t].NumLinesACP[line]
         else:
             return pyo.Constraint.Skip
-    
     
     def NP_line_link(model,line,t):
         element=grid.lines_DC[line]
@@ -476,11 +501,11 @@ def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=Fa
     model_results,solver_stats = OPF_solve(model,grid)
     
     t1 = time.time()
-    TEP_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering)   
+    TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering)   
     t2 = time.time()  
     t_modelexport = t2-t1
         
-    # TEP_res ={}
+    # TEP_TS_res ={}
     grid.OPF_run=True  
     grid.TEP_run=True
     
@@ -490,7 +515,7 @@ def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=Fa
     "export": t_modelexport,
     }
     
-    return model, model_results ,TEP_res, timing_info, solver_stats
+    return model, model_results ,TEP_TS_res, timing_info, solver_stats
 
 def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
     OnlyGen=True
@@ -509,9 +534,9 @@ def TEP_obj(model,grid,NPV):
             line = grid.lines_AC_exp[l]
             if line.np_line_opf: 
                if NPV:
-                   AC_Inv_lines+=model.NumLinesACP[l]*line.MVA_rating*line.Length_km*line.phi*line.life_time
+                   AC_Inv_lines+=(model.NumLinesACP[l]-model.NumLinesACP_base[l])*line.base_cost
                else: 
-                   AC_Inv_lines+=model.NumLinesACP[l]*line.MVA_rating*line.Length_km*line.phi  
+                   AC_Inv_lines+=(model.NumLinesACP[l]-model.NumLinesACP_base[l])*line.base_cost/line.life_time_hours
     
         return AC_Inv_lines
     def Cables_investments():
@@ -520,9 +545,9 @@ def TEP_obj(model,grid,NPV):
            line= grid.lines_DC[l]
            if line.np_line_opf: 
              if NPV:
-                 Inv_lines+=model.NumLinesDCP[l]*line.MW_rating*line.Length_km*line.phi*line.life_time
+                 Inv_lines+=(model.NumLinesDCP[l]-model.NumLinesDCP_base[l])*line.base_cost
              else:
-                 Inv_lines+=(model.NumLinesDCP[l]*line.MW_rating)*line.Length_km*line.phi
+                 Inv_lines+=(model.NumLinesDCP[l]-model.NumLinesDCP_base[l])*line.base_cost/line.life_time_hours
         return Inv_lines
             
     def Converter_investments():
@@ -531,9 +556,9 @@ def TEP_obj(model,grid,NPV):
             conv= grid.Converters_ACDC[cn]
             if conv.NUmConvP_opf:
                if NPV: 
-                 Inv_conv+=model.NumConvP[cn]*conv.MVA_max*conv.phi*conv.life_time
+                 Inv_conv+=(model.NumConvP[cn]-model.NumConvP_base[cn])*conv.base_cost
                else:
-                 Inv_conv+=model.NumConvP[cn]*conv.MVA_max*conv.phi
+                 Inv_conv+=(model.NumConvP[cn]-model.NumConvP_base[cn])*conv.base_cost/conv.life_time_hours
         return Inv_conv
     
     if TEP_AC: 
@@ -890,21 +915,21 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering):
     
     
     # Pack all variables into the final result
-    TEP_res = pack_variables(clustering,n_clusters,
+    TEP_TS_res = pack_variables(clustering,n_clusters,
         flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price
     )
-    grid.TEP_res=TEP_res
+    grid.TEP_TS_res=TEP_TS_res
     
       
     grid.Line_AC_calc()
     grid.Line_DC_calc()
     
-    return TEP_res
+    return TEP_TS_res
 
-def export_TEP_results_to_excel(grid,export):
+def export_TEP_TS_results_to_excel(grid,export):
     [clustering,n_clusters,flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
-        flipped_data_conv, flipped_data_price] = grid.TEP_res
+        flipped_data_conv, flipped_data_price] = grid.TEP_TS_res
            # Define the column names for the DataFrame
     columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]","Unit cost [€/MVA]","Life time [years]", "phi [€/MVA-h]"]
     

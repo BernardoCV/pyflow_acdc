@@ -498,14 +498,16 @@ class Grid:
         for i, Grid in enumerate(self.Grids_AC):
             for node in Grid:
                 self.Graph_node_to_Grid_index_AC[node.nodeNumber] = i
-                for line in self.lines_AC:
+                for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_tf:
                     if line.fromNode == node or line.toNode == node:
                         self.Graph_line_to_Grid_index_AC[line] = i
+        
 
-        for line in self.lines_AC:
+        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_tf:
             g=self.Graph_line_to_Grid_index_AC[line]
             self.rating_grid_AC[g]+=line.MVA_rating
             self.Graph_number_lines_AC[g]+=1
+            
         "Slack identification"
         self.num_slackAC = np.zeros(self.Num_Grids_AC)
 
@@ -985,8 +987,8 @@ class Node_AC:
         self.used = False
         self.stand_alone = True
         
-       
-
+        self.P_INJ=Voltage_0
+            
         self.price = 0.0
         self.Num_conv_connected=0
         self.connected_conv=set()

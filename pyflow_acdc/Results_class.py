@@ -52,12 +52,15 @@ class Results:
         if self.Grid.OPF_run :
             self.Ext_gen()
             if any(node.RenSource for node in self.Grid.nodes_AC):
-            
                 self.Ext_WPP()
-            self.Price_Zone()    
+            if self.Grid.Price_Zones != []: 
+                self.Price_Zone()    
         if self.Grid.TEP_run:
+            self.AC_exp_lines_power()
             self.TEP_N()
-            self.TEP_ts_res()
+            if self.Grid.TEP_res is not None:
+                self.TEP_TS_norm()
+                self.TEP_ts_res()
         print('------')
 
     def All_AC(self):
@@ -137,23 +140,33 @@ class Results:
         table.field_names = ["Grid", "Power Loss (MW)","Load %"]
         generation=0 
         grid_loads = 0
+        
+        
         if self.Grid.nodes_AC is not None:
+            if self.Grid.OPF_run:
+                P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                        +sum(gen.PGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+                Q_AC = np.vstack([node.QGi+sum(gen.QGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+            else:
+                P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                        +sum(gen.Pset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+                Q_AC = np.vstack([node.QGi+sum(gen.Qset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+            
             for node in self.Grid.nodes_AC:
-                if node.type == 'Slack':
-                    generation += (node.P_INJ+node.PLi)*self.Grid.S_base
+                if not self.Grid.OPF_run and node.type == 'Slack':
+                      PGi = node.P_INJ-(node.P_s)+node.PLi
                 else:
-                    generation+=(node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)+sum(gen.PGen for gen in node.connected_gen))*self.Grid.S_base
+                      PGi = P_AC[node.nodeNumber].item()
+                generation += PGi*self.Grid.S_base      
                 grid_loads += node.PLi*self.Grid.S_base
 
             self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
+            
             for line in self.Grid.lines_AC:
                 node = line.fromNode
                 G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                 Ploss = np.real(line.loss)*self.Grid.S_base
-               
-                     
-                i = line.fromNode.nodeNumber
-                j = line.toNode.nodeNumber
+            
                 Sfrom = abs(line.fromS)*self.Grid.S_base
                 Sto   = abs(line.toS)*self.Grid.S_base
 
@@ -162,7 +175,23 @@ class Results:
                 self.Grid.load_grid_AC[G] += load
                 
                 self.lossP_AC[G] += Ploss
-                
+
+            
+            for line in self.Grid.lines_AC_exp:
+                if line.np_line>0.001:
+                    node = line.fromNode
+                    G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
+                    Ploss = np.real(line.loss)*self.Grid.S_base
+                    
+                    Sfrom = abs(line.fromS)*self.Grid.S_base
+                    Sto   = abs(line.toS)*self.Grid.S_base
+    
+                    load = max(Sfrom, Sto)
+                    
+                    self.Grid.load_grid_AC[G] += load
+                    
+                    self.lossP_AC[G] += Ploss
+                    
             tot = 0
             for g in range(self.Grid.Num_Grids_AC):
                 if self.Grid.rating_grid_AC[g]!=0:
@@ -204,7 +233,7 @@ class Results:
                 table.add_row([f'DC Grid {g+1}', np.round(self.lossP_DC[g], decimals=self.dec),np.round(gload, decimals=self.dec)])
                 tot += self.lossP_DC[g]
 
-        if self.Grid.Converters_ACDC is not None:
+        if self.Grid.Converters_ACDC != []:
             P_loss_ACDC = 0
             for conv in self.Grid.Converters_ACDC:
                 P_loss_ACDC += (conv.P_loss_tf+conv.P_loss)*self.Grid.S_base
@@ -218,6 +247,7 @@ class Results:
         table.add_row(["Total loss", np.round(tot, decimals=self.dec),""])
         table.add_row(["     ", "",""])
         table.add_row(["Generation", np.round(generation, decimals=self.dec),""])
+        table.add_row(["Load", np.round(grid_loads, decimals=self.dec),""])
         table.add_row(["Efficiency", f'{np.round(eff, decimals=0)}%',""])
         print('--------------')
         print('Power loss')
@@ -365,11 +395,11 @@ class Results:
                             
                             if not self.Grid.OPF_run:
                                 if node.type == 'Slack':
-                                    PGi = node.P_INJ+node.PLi
-                                    QGi = node.Q_INJ+node.QLi
+                                    PGi = node.P_INJ-(node.P_s)+node.PLi
+                                    QGi = node.Q_INJ-(node.Q_s+node.Q_s_fx)+node.QLi
 
                                 if node.type == 'PV':
-                                    node.QGi = node.Q_INJ - (node.Q_s+node.Q_s_fx)+node.QLi
+                                    node.QGi = node.Q_INJ-(node.Q_s+node.Q_s_fx)+node.QLi
 
                             table.add_row([node.name, 
                                            np.round(PGi*self.Grid.S_base, 
@@ -439,12 +469,12 @@ class Results:
                             QGi = Q_AC[node.nodeNumber].item()
                             if not self.Grid.OPF_run:
                                 if node.type == 'Slack':
-                                    PGi = node.P_INJ+node.PLi
-                                    QGi = node.Q_INJ+node.QLi
+                                    PGi = node.P_INJ-(node.P_s)+node.PLi
+                                    QGi = node.Q_INJ-(node.Q_s+node.Q_s_fx)+node.QLi
 
                                 if node.type == 'PV':
-                                    node.QGi = node.Q_INJ - (node.Q_s+node.Q_s_fx)+node.QLi
-
+                                    node.QGi = node.Q_INJ-(node.Q_s+node.Q_s_fx)+node.QLi
+                                    
                             table.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(
                                 node.QLi*self.Grid.S_base, decimals=self.dec), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
                             table_all.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(
@@ -586,6 +616,47 @@ class Results:
 
             with open(csv_filename, 'w', newline='') as csvfile:
                 csvfile.write(csv_data)
+
+    def AC_exp_lines_power(self):
+
+        print('--------------')
+        print('Results AC Expansion Lines power')
+        
+
+        tablep = pt()
+        tablep.field_names = ["Line", "From bus", "To bus",
+                                "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)", "Power loss (MW)", "Q loss (MVAR)"]
+        for g in range(self.Grid.Num_Grids_AC):
+            print(f'Grid AC {g+1}')
+            for line in self.Grid.lines_AC_exp:
+               if line.np_line>0.001:  
+                    if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
+                        i = line.fromNode.nodeNumber
+                        j = line.toNode.nodeNumber
+                        
+                        p_from = np.real(line.fromS)*self.Grid.S_base
+                        Q_from = np.imag(line.fromS)*self.Grid.S_base
+    
+                        p_to = np.real(line.toS)*self.Grid.S_base
+                        Q_to = np.imag(line.toS)*self.Grid.S_base
+    
+                        Ploss = np.real(line.loss)*self.Grid.S_base
+                        Qloss = np.imag(line.loss)*self.Grid.S_base
+    
+                        tablep.add_row([
+                            line.name, 
+                            line.fromNode.name, 
+                            line.toNode.name, 
+                            np.round(p_from, decimals=self.dec), 
+                            np.round(Q_from, decimals=self.dec), 
+                            np.round(p_to, decimals=self.dec), 
+                            np.round(Q_to, decimals=self.dec), 
+                            np.round(Ploss, decimals=self.dec), 
+                            np.round(Qloss, decimals=self.dec)
+                        ])
+                     
+            if len(tablep.rows) > 0:  # Check if the table is not None and has at least one row
+                print(tablep)
 
     def AC_lines_power(self, Grid=None):
         
@@ -850,7 +921,7 @@ class Results:
         
         
     
-    def TEP_N(self,p=True):
+    def TEP_N(self):
         
         table = pt()
         table.field_names = ["Element","Type" ,"Initial", "Optimized N","Maximum","Optimized Power Rating [MW]","Expansion Cost [M€]"]
@@ -901,7 +972,38 @@ class Results:
         print('--------------')
         print('Transmission Expansion Problem')
         print(table)
+
+       
+     
+    def TEP_TS_norm(self):
+
+        tot = 0
+        tot_n = 0
+
+        for l in self.Grid.lines_AC_exp:
+            if l.np_line_opf:
+                
+                opt=l.np_line
+                cost=((opt)*l.MVA_rating*l.Length_km*l.phi)*l.life_time*8760/(10**6)
+                tot+=cost
+                tot_n+=((opt)*l.MVA_rating*l.Length_km*l.phi)/1000
+
+        for l in self.Grid.lines_DC:
+            if l.np_line_opf:
+                opt=l.np_line
+                cost=((opt)*l.MW_rating*l.Length_km*l.phi)*l.life_time*8760/(10**6)
+                tot+=cost
+                tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
+                
         
+        for cn in self.Grid.Converters_ACDC:
+            if cn.NUmConvP_opf:
+                opt=cn.NumConvP
+                cost=((opt)*cn.MVA_max*cn.phi)*cn.life_time*8760/(10**6)
+                tot+=cost
+                tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
+        
+
         curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
         weight = SC.loc['Weight']
         table=pt()
