@@ -584,8 +584,9 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     for var_obj in model.component_objects(pyo.Var, active=True):
         initial_values[var_obj.name] = {index: var_obj[index].value for index in var_obj}
 
-    [obj_rule,model]= OPF_obj(model,grid,weights_def,OnlyGen=True)
-    
+    obj_rule= OPF_obj(model,grid,weights_def,OnlyGen=True)
+    model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
+
     while idx < max_time:
         for ts in grid.Time_series:
             update_grid_data(grid,ts, idx,price_zone_restrictions)

@@ -13,16 +13,17 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF
-from .ACDC_OPF import OPF_solve
+from .ACDC_OPF import OPF_solve,OPF_obj
 
 
 __all__ = [
-    'TEP_expansion_model',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
     'update_attributes',
     'Expand_element',
-    'Translate_pd_TEP'
+    'Translate_pd_TEP',
+    'transmission_expansion',
+    'transmission_expansion_TS'
 ]
 
 def pack_variables(*args):
@@ -241,8 +242,87 @@ def Translate_pd_TEP(grid):
 
     return Price_Zone_info
 
-def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None):
+def get_TEP_variables(grid):
     
+    NumConvP_i,NumConvP_max={},{}
+    S_limit_conv={}
+    P_lineDC_limit ={}
+    NP_lineDC_i,NP_lineDC_max ={},{}
+    NP_lineAC_i,NP_lineAC_max = {},{}
+    Line_length ={}
+    
+    
+    line_phi={}
+    conv_phi={}
+    
+    for l in grid.lines_AC_exp:
+        NP_lineAC_i[l.lineNumber]     = l.np_line+1 if l.np_line+1<=l.np_line_max else l.np_line_max
+        NP_lineAC_max[l.lineNumber]   = l.np_line_max
+        
+    for conv in grid.Converters_ACDC:
+        NumConvP_i [conv.ConvNumber]  = conv.NumConvP+1 if conv.NumConvP+1<=conv.NumConvP_max else conv.NumConvP_max
+        NumConvP_max[conv.ConvNumber] = conv.NumConvP_max
+        S_limit_conv[conv.ConvNumber] = conv.MVA_max/grid.S_base
+    for l in grid.lines_DC:
+        P_lineDC_limit[l.lineNumber]  = l.MW_rating/grid.S_base
+        NP_lineDC_i[l.lineNumber]     = l.np_line+1 if l.np_line+1<=l.np_line_max else l.np_line_max
+        NP_lineDC_max[l.lineNumber]   = l.np_line_max
+        Line_length[l.lineNumber]     = l.Length_km
+        
+    
+    
+    conv_var=pack_variables(NumConvP_i,NumConvP_max,S_limit_conv,conv_phi)
+    DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi)
+    AC_line_var=pack_variables(NP_lineAC_i,NP_lineAC_max,Line_length,line_phi)
+
+
+    return conv_var,DC_line_var,AC_line_var
+
+def transmission_expansion(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,ObjRule=None):
+
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    weights_def = {
+       'Ext_Gen': {'w': 0},
+       'Energy_cost': {'w': 0},
+       'Curtailment_Red': {'w': 0},
+       'AC_losses': {'w': 0},
+       'DC_losses': {'w': 0},
+       'Converter_Losses': {'w': 0},
+       'PZ_cost_of_generation': {'w': 0},
+       'Renewable_profit': {'w': 0},
+       'Gen_set_dev': {'w': 0}
+    }
+
+    # If user provides specific weights, merge them with the default
+    if ObjRule is not None:
+       for key in ObjRule:
+           if key in weights_def:
+               weights_def[key]['w'] = ObjRule[key]
+
+    grid.TEP_n_years = n_years
+    grid.TEP_discount_rate =discount_rate
+
+def transmission_expansion_TS(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None,ObjRule=None):
+    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    weights_def = {
+       'Ext_Gen': {'w': 0},
+       'Energy_cost': {'w': 0},
+       'Curtailment_Red': {'w': 0},
+       'AC_losses': {'w': 0},
+       'DC_losses': {'w': 0},
+       'Converter_Losses': {'w': 0},
+       'PZ_cost_of_generation': {'w': 0},
+       'Renewable_profit': {'w': 0},
+       'Gen_set_dev': {'w': 0}
+    }
+
+    # If user provides specific weights, merge them with the default
+    if ObjRule is not None:
+       for key in ObjRule:
+           if key in weights_def:
+               weights_def[key]['w'] = ObjRule[key]
+
+
     from .Time_series import  modify_parameters
     from .Time_series_clustering import cluster_TS
 
@@ -275,54 +355,19 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
     else:
         n_clusters = len(grid.Time_series[0].data)
         
-    
-    index = ["A", "B", "D", "E"]
-    data = {
-    "80kV": [-251790, 0.03198, 220000, 8.98],
-    "150kV": [-100000, 0.0164, 220000, 8.98],
-    "320kV": [286000, 0.00969, 220000, 8.98],
-    "525kV": [745400, 0.0061, 220000, 8.98]
-    }
+    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
 
-
-    grid.DC_cables_cost_index= pd.DataFrame(data, index=index)
- 
+    NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
+    P_lineDC_limit,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
+    NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
     
-    NumConvP_i,NumConvP_max={},{}
-    S_limit_conv={}
-    P_lineDC_limit ={}
-    NP_lineDC_i,NP_lineDC_max ={},{}
-    NP_lineAC_i,NP_lineAC_max = {},{}
-    Line_length ={}
     lista_lineas_DC = list(range(0, grid.nl_DC))
     lista_conv = list(range(0, grid.nconv))
     lista_AC   = list(range(0,grid.nle_AC))
-    
-    line_phi={}
-    conv_phi={}
-    
-    for l in grid.lines_AC_exp:
-        NP_lineAC_i[l.lineNumber]     = l.np_line+1 if l.np_line+1<=l.np_line_max else l.np_line_max
-        NP_lineAC_max[l.lineNumber]   = l.np_line_max
-        
-    for conv in grid.Converters_ACDC:
-        NumConvP_i [conv.ConvNumber]  = conv.NumConvP+1 if conv.NumConvP+1<=conv.NumConvP_max else conv.NumConvP_max
-        NumConvP_max[conv.ConvNumber] = conv.NumConvP_max
-        S_limit_conv[conv.ConvNumber] = conv.MVA_max/grid.S_base
-    for l in grid.lines_DC:
-        P_lineDC_limit[l.lineNumber]  = l.MW_rating/grid.S_base
-        NP_lineDC_i[l.lineNumber]     = l.np_line+1 if l.np_line+1<=l.np_line_max else l.np_line_max
-        NP_lineDC_max[l.lineNumber]   = l.np_line_max
-        Line_length[l.lineNumber]     = l.Length_km
-        
-    
-    
-    conv_var=pack_variables(NumConvP_i,S_limit_conv,conv_phi)
-    line_var=pack_variables(P_lineDC_limit,NP_lineDC_i,Line_length,line_phi)
-    TEP=pack_variables(NP_lineDC_i,NumConvP_i)
+
     t1 = time.time()
     model = pyo.ConcreteModel()
-    model.name        ="TEP MTDC AC/DC hybrid OPF"
+    model.name        ="TEP TS MTDC AC/DC hybrid OPF"
     model.Time_frames = pyo.Set(initialize=range(1, n_clusters + 1))
     
     #print(list(model.Time_frames))
@@ -335,7 +380,7 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
     coeff={}
     
     base_model = pyo.ConcreteModel()
-    base_model = OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
+    OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
     
     s=1
     
@@ -352,7 +397,7 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
                      price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
         modify_parameters(grid,model.submodel[t],False,True)
         
-        TEP_subObj(model.submodel[t])
+        TEP_subObj(model.submodel[t],grid,weights_def,OnlyAC)
         if clustering:
             w[t]= float(grid.Clusters[n_clusters][t-1])
             # num_time_frames = len(model.Time_frames)
@@ -419,15 +464,19 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
     model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
     
     model.weights = pyo.Param(model.Time_frames, initialize=w)
-    obj_rule= TEP_obj(model,grid,line_var,conv_var,costmodel,NPV,n_years,discount_rate)
+    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_weighted = weighted_subobj(model,NPV,n_years,discount_rate)
     
+    total_cost = obj_TEP + obj_weighted
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+
     t2 = time.time()  
     t_modelcreate = t2-t1
     
     model_results,solver_stats = OPF_solve(model,grid)
     
     t1 = time.time()
-    TEP_res = ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering)   
+    TEP_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering)   
     t2 = time.time()  
     t_modelexport = t2-t1
         
@@ -443,20 +492,17 @@ def TEP_expansion_model(grid,costmodel='Linear',increase_Pmin=False,NPV=False,n_
     
     return model, model_results ,TEP_res, timing_info, solver_stats
 
-def TEP_subObj(submodel):
-    # Define the social cost submodel function that can access the submodel's attributes
-    def social_cost_submodel(model=None, index=None):
-        return sum(submodel.SocialCost[price_zone] for price_zone in submodel.M)
-    
-    submodel.obj = pyo.Objective(rule=social_cost_submodel, sense=pyo.minimize)
+def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
+    OnlyGen=True
 
-def TEP_obj(model,grid,line_var,conv_var,costmodel,NPV,n_years,discount_rate):
-    P_lineDC_limit,NP_lineDC_i,Line_length,line_phi = line_var
-    NumConvP_i,S_limit_conv,conv_phi = conv_var
-    
+    obj_rule= OPF_obj(submodel,grid,ObjRule,OnlyGen,OnlyAC)
+    submodel.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
+
+
+def TEP_obj(model,grid,NPV):
+  
     OnlyAC,TEP_AC,TAP_tf=analyse_OPF(grid) 
-    
-    
+      
     def AC_Line_investments():
         AC_Inv_lines=0
         for l in model.lines_AC_exp:
@@ -490,30 +536,6 @@ def TEP_obj(model,grid,line_var,conv_var,costmodel,NPV,n_years,discount_rate):
                  Inv_conv+=model.NumConvP[cn]*conv.MVA_max*conv.phi
         return Inv_conv
     
-    
-    # Calculate the weighted social cost for each submodel (subblock)
-    weighted_social_cost = 0
-    present_value =   (1 - (1 + discount_rate) ** -n_years) / discount_rate
-    
-        
-    for t in model.Time_frames:
-        submodel_sc = model.submodel[t].obj
-        # Print types of the variables
-        # print(f"t: {type(t)}")  # Check the type of t (likely int)
-        # print(f"model.weights[t]: {type(model.weights[t])}")  # Check the type of the weight (likely float)
-        # print(f"submodel_sc: {type(submodel_sc)}")  # Check the type of submodel_sc (should be a float or similar)
-        
-        # # Print values for debugging
-        # print(f'{t}: {model.weights[t]}')
-        
-        # Calculate weighted social cost
-        
-        weighted_social_cost += model.weights[t] * submodel_sc
-            
-        model.submodel[t].obj.deactivate()
-    if NPV:
-        weighted_social_cost *=present_value
-    
     if TEP_AC: 
         inv_line_AC = AC_Line_investments()
     else:
@@ -525,15 +547,24 @@ def TEP_obj(model,grid,line_var,conv_var,costmodel,NPV,n_years,discount_rate):
         inv_cable = 0
         inv_conv  = 0
 
+    return inv_line_AC+inv_cable + inv_conv
 
+def weighted_subobj(model,NPV,n_years,discount_rate):
     
-    total_cost = weighted_social_cost + (inv_line_AC+inv_cable + inv_conv)
+    # Calculate the weighted social cost for each submodel (subblock)
+    weighted_subobj = 0
+    present_value =   (1 - (1 + discount_rate) ** -n_years) / discount_rate
     
         
-        
-    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+    for t in model.Time_frames:
+        submodel_obj = model.submodel[t].obj
+        weighted_subobj += model.weights[t] * submodel_obj
+            
+        model.submodel[t].obj.deactivate()
+    if NPV:
+        weighted_subobj *=present_value
     
-    return total_cost 
+    return weighted_subobj 
 
 
 def get_price_zone_data(t, model, grid,n_clusters,clustering):
@@ -654,7 +685,7 @@ def get_weight_data(model, t):
     return pyo.value(model.weights[t])
 
 
-def ExportACDC_TEP_toPyflowACDC(model,grid,n_clusters,clustering):
+def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering):
     grid.V_AC =np.zeros(grid.nn_AC)
     grid.Theta_V_AC=np.zeros(grid.nn_AC)
     grid.V_DC=np.zeros(grid.nn_DC)

@@ -241,10 +241,10 @@ def change_line_AC_to_expandable(grid, line_name):
         line_vars = {
             'fromNode': l.fromNode,
             'toNode': l.toNode,
-            'Resistance': l.R,
-            'Reactance': l.X,
-            'Conductance': l.G,
-            'Susceptance': l.B,
+            'r': l.R,
+            'x': l.X,
+            'g': l.G,
+            'b': l.B,
             'MVA_rating': l.MVA_rating,
             'Length_km': l.Length_km,
             'm': l.m,
@@ -438,10 +438,10 @@ def add_generators_fromcsv(Grid,Gen_csv):
         
 def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,MWmax=99999,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type='Other',geometry= None):
     
-    if MVArmin is None:
-        MVArmin=-MWmax
     if MVArmax is None:
         MVArmax=MWmax
+    if MVArmin is None:
+        MVArmin=-MVArmax
     if Smax is not None:
         Smax/=Grid.S_base
     Max_pow_gen=MWmax/Grid.S_base

@@ -38,7 +38,7 @@ class Results:
         self.AC_lines_current()
         self.AC_lines_power()
         
-        if self.Grid.nodes_DC is not None:
+        if self.Grid.nodes_DC != []:
             if self.Grid.nconv != 0:
                 self.Converter()
             self.DC_bus()
@@ -333,6 +333,15 @@ class Results:
         print('')
         table_all = pt()
 
+        if self.Grid.OPF_run:
+            P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                    +sum(gen.PGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+            Q_AC = np.vstack([node.QGi+sum(gen.QGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+        else:
+            P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                    +sum(gen.Pset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+            Q_AC = np.vstack([node.QGi+sum(gen.Qset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+
         if self.Grid.nodes_DC == None:
             table_all.field_names = ["Node", "Power Gen (MW)", "Reactive Gen (MVAR)", "Power Load (MW)",
                                      "Reactive Load (MVAR)", "Power injected  (MW)", "Reactive injected  (MVAR)", "Grid"]
@@ -351,15 +360,16 @@ class Results:
 
                     for node in self.Grid.nodes_AC:
                         if self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber] == g:
-                            PGi = node.PGi+node.PGi_ren*node.curtailment +node.PGi_opt
-                            QGi = node.QGi +node.QGi_opt
-                            if node.type == 'Slack':
-                                PGi = node.P_INJ+node.PLi
-                                QGi = node.Q_INJ+node.QLi
+                            PGi = P_AC[node.nodeNumber].item()
+                            QGi = Q_AC[node.nodeNumber].item()
+                            
+                            if not self.Grid.OPF_run:
+                                if node.type == 'Slack':
+                                    PGi = node.P_INJ+node.PLi
+                                    QGi = node.Q_INJ+node.QLi
 
-                            if node.type == 'PV':
-                                node.QGi = node.Q_INJ - \
-                                    (node.Q_s+node.Q_s_fx)+node.QLi
+                                if node.type == 'PV':
+                                    node.QGi = node.Q_INJ - (node.Q_s+node.Q_s_fx)+node.QLi
 
                             table.add_row([node.name, 
                                            np.round(PGi*self.Grid.S_base, 
@@ -377,14 +387,16 @@ class Results:
 
                     for node in self.Grid.nodes_AC:
                         if self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber] == g:
-                            PGi = node.PGi +node.PGi_res*node.curtailment+node.PGi_opt
-                            QGi = node.QGi +node.QGi_opt
-                            if node.type == 'Slack':
-                                PGi = (node.P_INJ-node.P_s + node.PLi).item()
-                                QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
+                            
+                            PGi = P_AC[node.nodeNumber].item()
+                            QGi = Q_AC[node.nodeNumber].item()
+                            if not self.Grid.OPF_run:
+                                if node.type == 'Slack':
+                                    PGi = (node.P_INJ-node.P_s + node.PLi).item()
+                                    QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
 
-                            if node.type == 'PV':
-                                QGi = node.Q_INJ -(node.Q_s+node.Q_s_fx)+node.QLi
+                                if node.type == 'PV':
+                                    QGi = node.Q_INJ -(node.Q_s+node.Q_s_fx)+node.QLi
 
                             table.add_row([
                                 node.name,
@@ -423,15 +435,15 @@ class Results:
 
                     for node in self.Grid.nodes_AC:
                         if self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber] == g:
-                            PGi = node.PGi+node.PGi_ren*node.curtailment +node.PGi_opt
-                            QGi = node.QGi +node.QGi_opt
-                            if node.type == 'Slack':
-                                PGi = node.P_INJ+node.PLi
-                                QGi = node.Q_INJ+node.QLi
+                            PGi = P_AC[node.nodeNumber].item()
+                            QGi = Q_AC[node.nodeNumber].item()
+                            if not self.Grid.OPF_run:
+                                if node.type == 'Slack':
+                                    PGi = node.P_INJ+node.PLi
+                                    QGi = node.Q_INJ+node.QLi
 
-                            if node.type == 'PV':
-                                node.QGi = node.Q_INJ - \
-                                    (node.Q_s+node.Q_s_fx)+node.QLi
+                                if node.type == 'PV':
+                                    node.QGi = node.Q_INJ - (node.Q_s+node.Q_s_fx)+node.QLi
 
                             table.add_row([node.name, np.round(PGi*self.Grid.S_base, decimals=self.dec), np.round(QGi*self.Grid.S_base, decimals=self.dec), np.round(node.PLi*self.Grid.S_base, decimals=self.dec), np.round(
                                 node.QLi*self.Grid.S_base, decimals=self.dec), np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec)])
@@ -446,14 +458,16 @@ class Results:
 
                     for node in self.Grid.nodes_AC:
                         if self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber] == g:
-                            PGi = node.PGi+node.PGi_ren*node.curtailment +node.PGi_opt
-                            QGi = node.QGi +node.QGi_opt
-                            if node.type == 'Slack':
-                                PGi = (node.P_INJ-node.P_s + node.PLi).item()
-                                QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
+                            
+                            PGi = P_AC[node.nodeNumber].item()
+                            QGi = Q_AC[node.nodeNumber].item()
+                            if not self.Grid.OPF_run:
+                                if node.type == 'Slack':
+                                    PGi = (node.P_INJ-node.P_s + node.PLi).item()
+                                    QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
 
-                            if node.type == 'PV':
-                                QGi = node.Q_INJ -(node.Q_s+node.Q_s_fx)+node.QLi
+                                if node.type == 'PV':
+                                    QGi = node.Q_INJ -(node.Q_s+node.Q_s_fx)+node.QLi
 
                             table.add_row([node.name, 
                                            np.round(PGi*self.Grid.S_base, decimals=self.dec), 

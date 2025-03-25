@@ -93,7 +93,9 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     
     
     
-    [obj_rule,model]= OPF_obj(model,grid,weights_def,OnlyGen)
+    obj_rule= OPF_obj(model,grid,weights_def,OnlyGen)
+
+    model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
     """
     """
 
@@ -188,10 +190,11 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
                     
             
         modify_parameters(grid,model.submodel[t],False,True) 
-        OPF_obj(model.submodel[t],grid,weights_def,OnlyGen)
-        
+        subobj = OPF_obj(model.submodel[t],grid,weights_def,OnlyGen)
+        model.submodel[t].obj = pyo.Objective(rule=subobj, sense=pyo.minimize)
 
     obj_rule= TS_parallel_obj(model)
+    model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
     model_results,elapsed_time= OPF_solve(model,grid)
     
     Current_range_res = obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones)
@@ -274,8 +277,7 @@ def TS_parallel_obj(model):
         model.submodel[t].obj.deactivate()
         total_obj+=submodel_obj
       
-    model.obj = pyo.Objective(rule=total_obj, sense=pyo.minimize)
-    
+        
     return total_obj 
 
 
@@ -505,9 +507,8 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
     else:
         weighted_sum = sum(entry['w'] / total_weight * entry['f'] for entry in ObjRule.values())
     
-    model.obj = pyo.Objective(rule=weighted_sum, sense=pyo.minimize)
     
-    return weighted_sum ,model
+    return weighted_sum
 
 
 

@@ -120,7 +120,8 @@ __all__ = [
     'Translate_pyf_OPF',
     
     # TEP
-    'TEP_expansion_model',
+    'transmission_expansion',
+    'transmission_expansion_TS',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
     'update_attributes',
