@@ -1230,7 +1230,7 @@ class Results:
             loading= np.round(max(S,abs(P_DC))/(conv.MVA_max*conv.NumConvP)*100, decimals=self.dec)
             table.add_row([conv.name, conv.Node_AC.name,
                           conv.Node_DC.name, P_s,Q_s ,P_c, P_DC, Q_c, P_loss, Ploss_tf])
-            table2.add_row([conv.name, conv.AC_type, conv.type,loading,int(conv.MVA_max)])
+            table2.add_row([conv.name, conv.AC_type, conv.type,loading,int(conv.MVA_max)*conv.NumConvP])
 
         print('------------')
         print('AC DC Converters')

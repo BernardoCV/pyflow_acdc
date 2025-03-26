@@ -1181,7 +1181,7 @@ def Converter_constraints(model,grid,Conv_info):
     
     def Conv_DC_Limit_rule(model, conv):
         nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
-        return (model.P_conv_DC[nDC]**2) <= (P_conv_limit[nDC])**2
+        return (model.P_conv_c_AC[conv]+ model.P_conv_loss[conv])**2 <= (P_conv_limit[nDC])**2
     
     
    #AC elements losses 
@@ -1677,7 +1677,7 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         nconv = conv.ConvNumber
         if TEP:
             conv.NumConvP = nconv_TEP[nconv]
-        conv.P_DC      = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] * conv.NumConvP
+        conv.P_DC      = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] 
         conv.P_AC      = P_conv_s_AC_values[nconv] * conv.NumConvP
         conv.Q_AC      = Q_conv_s_AC_values[nconv] * conv.NumConvP
         conv.Pc        = P_conv_c_AC_values[nconv] * conv.NumConvP

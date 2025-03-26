@@ -186,6 +186,12 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
     return node
     
 def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu',Cable_type:str ='Custom'):
+    
+    if isinstance(fromNode, str):
+        fromNode = next((node for node in grid.nodes_AC if node.name == fromNode), None)
+    if isinstance(toNode, str):
+        toNode = next((node for node in grid.nodes_AC if node.name == toNode), None)
+    
     kV_base=toNode.kV_base
     if L_mH_km is not None:
         data_in = 'Real'
@@ -196,7 +202,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         Reactance_pu  = x  / Z_base if x!=0  else 0.00001
         Conductance_pu = g*Z_base
         Susceptance_pu = b*Z_base
-    elif data_in== 'Real': 
+    elif data_in== 'Real' and Cable_type == 'Custom': 
        [Resistance_pu, Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating] = Cable_parameters(grid.S_base, R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating, kV_base, Length_km,N_cables=N_cables)
     else:
         Resistance_pu = r if r!=0 else 0.00001
@@ -518,7 +524,7 @@ def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,M
         gen.lf= node.price
     Grid.Generators.append(gen)
 
-def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind'):
+def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind',min_gamma=0):
     if ren_source_name is None:
         ren_source_name= node_name
     found=False 
@@ -533,6 +539,7 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
                 rensource.geometry= geometry
+            rensource.min_gamma = min_gamma
             Grid.rs2node['AC'][rensource.rsNumber]=node.nodeNumber
             found = True
             break
@@ -542,6 +549,12 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
             rensource.PGi_available=available
             rensource.connected= 'DC'
             ACDC='DC'
+            rensource.rs_type= ren_type
+            if geometry is not None:
+                if isinstance(geometry, str): 
+                     geometry = loads(geometry)  
+                rensource.geometry= geometry
+            rensource.min_gamma = min_gamma
             Grid.rs2node['DC'][rensource.rsNumber]=node.nodeNumber
             found = True
             break    
@@ -856,8 +869,8 @@ def expand_cable_database(data, format='yaml', save_yalm=False):
     Units:
        - Resistance: ohm/km
        - Inductance: mH/km
-       - Capacitance: �F/km
-       - Conductance: �S/km
+       - Capacitance: uF/km
+       - Conductance: uS/km
        - Current rating: A
        - Power rating: MVA
        - Nominal voltage: kV
