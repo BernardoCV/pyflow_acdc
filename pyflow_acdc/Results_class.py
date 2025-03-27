@@ -178,7 +178,7 @@ class Results:
 
             
             for line in self.Grid.lines_AC_exp:
-                if line.np_line>0.001:
+                if line.np_line>0.01:
                     node = line.fromNode
                     G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                     Ploss = np.real(line.loss)*self.Grid.S_base
@@ -629,7 +629,7 @@ class Results:
         for g in range(self.Grid.Num_Grids_AC):
             print(f'Grid AC {g+1}')
             for line in self.Grid.lines_AC_exp:
-               if line.np_line>0.001:  
+               if line.np_line>0.01:  
                     if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                         i = line.fromNode.nodeNumber
                         j = line.toNode.nodeNumber
@@ -934,7 +934,7 @@ class Results:
                 ini= l.np_line_i
                 opt=l.np_line
                 pr= opt*l.MVA_rating
-                cost=((opt)*l.MVA_rating*l.Length_km*l.phi)*l.life_time*8760/(10**6)
+                cost=opt*l.base_cost/(10**6)
                 tot+=cost
                 maxn=l.np_line_max
                 tot_n+=((opt)*l.MVA_rating*l.Length_km*l.phi)/1000
@@ -948,7 +948,7 @@ class Results:
                 ini= l.np_line_i
                 opt=l.np_line
                 pr= opt*l.MW_rating
-                cost=((opt)*l.MW_rating*l.Length_km*l.phi)*l.life_time*8760/(10**6)
+                cost=opt*l.base_cost/(10**6)
                 tot+=cost
                 maxn=l.np_line_max
                 tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
@@ -961,7 +961,7 @@ class Results:
                 ini=cn.NumConvP_i
                 opt=cn.NumConvP
                 pr=opt*cn.MVA_max
-                cost=((opt)*cn.MVA_max*cn.phi)*cn.life_time*8760/(10**6)
+                cost=opt*cn.base_cost/(10**6)
                 tot+=cost
                 tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
                 maxn=cn.NumConvP_max
@@ -1133,7 +1133,7 @@ class Results:
             tablei.align["Polarity"] = 'l'
 
             for line in self.Grid.lines_DC:
-                if line.np_line==0:
+                if line.np_line<0.01:
                     continue
                 if self.Grid.Graph_line_to_Grid_index_DC[line] == g:
 
@@ -1155,9 +1155,9 @@ class Results:
                         pol = "Bipolar"
 
                     tablei.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating) ,pol])
+                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating*line.np_line) ,pol])
                     table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating), pol, g+1])
+                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating*line.np_line), pol, g+1])
 
             if len(tablei.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablei)
@@ -1183,6 +1183,9 @@ class Results:
                                   "P from (MW)", "P to (MW)", "Power loss (MW)"]
 
             for line in self.Grid.lines_DC:
+                if line.np_line <= 0.01:
+                    continue
+                
                 if self.Grid.Graph_line_to_Grid_index_DC[line] == g:
                     
                    
@@ -1212,7 +1215,7 @@ class Results:
         table.field_names = ["Converter", "AC node", "DC node","Power s AC (MW)","Reactive s AC (MVAR)", "Power c AC (MW)", "Power DC(MW)", "Reactive power (MVAR)", "Power loss IGBTs (MW)", "Power loss AC elements (MW)"]
         table2.field_names = ["Converter","AC control mode", "DC control mode","Loading %","Capacity [MVA]"]
         for conv in self.Grid.Converters_ACDC:
-            if conv.NumConvP==0:
+            if conv.NumConvP<=0.01:
                 continue
             if conv.type == 'Slack':
                 P_DC = np.round(conv.Node_DC.P*self.Grid.S_base,
@@ -1230,7 +1233,7 @@ class Results:
             loading= np.round(max(S,abs(P_DC))/(conv.MVA_max*conv.NumConvP)*100, decimals=self.dec)
             table.add_row([conv.name, conv.Node_AC.name,
                           conv.Node_DC.name, P_s,Q_s ,P_c, P_DC, Q_c, P_loss, Ploss_tf])
-            table2.add_row([conv.name, conv.AC_type, conv.type,loading,int(conv.MVA_max)*conv.NumConvP])
+            table2.add_row([conv.name, conv.AC_type, conv.type,loading,int(conv.MVA_max*conv.NumConvP)])
 
         print('------------')
         print('AC DC Converters')

@@ -392,7 +392,13 @@ class Grid:
         for line in self.lines_DC:
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode, line=line)
             self.Graph_DC.add_edge(line.fromNode, line.toNode,line=line)
+            line.toNode.stand_alone = False
+            line.fromNode.stand_alone = False
 
+        for node in self.nodes_DC:
+            if node.stand_alone:
+                self.Graph_DC.add_node(node)
+                
         self.Grids_DC = list(nx.connected_components(self.Graph_DC))
         self.Num_Grids_DC = len(self.Grids_DC)
         self.Graph_node_to_Grid_index_DC = {}
@@ -418,7 +424,8 @@ class Grid:
             g=self.Graph_line_to_Grid_index_DC[line]
             self.Graph_number_lines_DC[g]+=1
             self.rating_grid_DC[g]+=line.MW_rating
-        
+            
+                
         self.num_slackDC = np.zeros(self.Num_Grids_DC)
         for i in range(self.Num_Grids_DC):
             if self.Graph_number_lines_DC[i] >=2:
@@ -1099,7 +1106,10 @@ class Node_DC:
         self.V = np.copy(self.V_ini)
         self.P_INJ = 0
         self.Pconv = 0
+        
         self.used = False
+        self.stand_alone=True
+        
         self.PconvDC = 0
         self.P = 0
         

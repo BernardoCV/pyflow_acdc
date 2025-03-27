@@ -670,8 +670,9 @@ def Create_grid_from_mat(matfile):
     converter_columns = ['busdc_i', 'busac_i', 'type_dc', 'type_ac', 'P_g', 'Q_g', 'islcc', 'Vtar', 'rtf', 'xtf', 'transformer', 'tm', 'bf', 'filter', 'rc', 'xc', 'reactor', 'basekVac', 'Vmmax', 'Vmmin', 'Imax', 'status', 'LossA', 'LossB', 'LossCrec', 'LossCinv', 'droop', 'Pdcset', 'Vdcset', 'dVdcset', 'Pacmax', 'Pacmin', 'Qacmax', 'Qacmin']
     branch_DC = ['fbusdc', 'tbusdc', 'r', 'l', 'c', 'rateA', 'rateB', 'rateC', 'status']
     
-
-
+    candidate_dc_bus = ['busdc_i' , 'grid' , 'Pdc' , 'Vdc' , 'basekVdc' , 'Vdcmax' , 'Vdcmin' , 'Cdc']
+    candidate_dc_branch = ['fbusdc' , 'tbusdc' , 'r' , 'l' , 'c' , 'rateA' , 'rateB' , 'rateC' , 'status' , 'cost']
+    candidate_conv = ['busdc_i' , 'busac_i' , 'type_dc' , 'type_ac' , 'P_g' , 'Q_g' , 'islcc' , 'Vtar' , 'rtf' , 'xtf' , 'transformer' , 'tm' , 'bf' , 'filter' , 'rc' , 'xc' , 'reactor' , 'basekVac' , 'Vmmax' , 'Vmmin' , 'Imax' , 'status' , 'LossA' , 'LossB' , 'LossCrec' , 'LossCinv' , 'droop' , 'Pdcset' , 'Vdcset' , 'dVdcset' , 'Pacmax' , 'Pacmin' , 'Qacmax' , 'Qacmin' , 'cost']
 
     S_base = data['baseMVA'][0, 0]
     
@@ -736,10 +737,36 @@ def Create_grid_from_mat(matfile):
     else:
         DC_node_data = None
 
+    if 'busdc_ne' in data:
+        num_data_columns = len(data['busdc_ne'][0])
+        if num_data_columns > len(candidate_dc_bus):
+            # Add extra column names if needed
+            extra_columns = [f"extra_column_{i}" for i in range(num_data_columns - len(candidate_dc_bus))]
+            candidate_dc_bus = candidate_dc_bus + extra_columns 
+        DC_exp_node_data = pd.DataFrame(data['busdc_ne'], columns=candidate_dc_bus)   
+    else:
+        DC_exp_node_data = None
+
+    DC_node_data = pd.concat([DC_node_data, DC_exp_node_data])
+
 
     DC_line_data=pd.DataFrame(data['branchdc'], columns=branch_DC) if 'branchdc' in data else None
-    Converter_data=pd.DataFrame(data['convdc'], columns=converter_columns) if 'convdc' in data else None
+    if DC_line_data is not None:
+        DC_line_data['cost'] = -1  # Add cost column with default value -1 for non expandable lines
+    
+    DC_exp_line_data=pd.DataFrame(data['branchdc_ne'], columns=candidate_dc_branch) if 'branchdc_ne' in data else None
+    
 
+    DC_line_data = pd.concat([DC_line_data, DC_exp_line_data])
+
+
+    
+    Converter_data=pd.DataFrame(data['convdc'], columns=converter_columns) if 'convdc' in data else None
+    if Converter_data is not None:
+        Converter_data['cost'] = -1  #
+    Conv_exp_data=pd.DataFrame(data['convdc_ne'], columns=candidate_conv) if 'convdc_ne' in data else None
+
+    Converter_data = pd.concat([Converter_data, Conv_exp_data])
     s=1
 
 
@@ -849,9 +876,8 @@ def Create_grid_from_mat(matfile):
             y_coord       = DC_node_data.at[index, 'y_coord']       if 'y_coord'       in DC_node_data.columns else None
             
             
-                
             DC_nodes[var_name] = Node_DC(
-                node_type, Voltage_0, Power_Gained, Power_load,kV_base ,name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
+                node_type,kV_base, Voltage_0, Power_Gained, Power_load ,name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
         DC_nodes_list = list(DC_nodes.values())
 
         # DC_line_data = DC_line_data.set_index('Line_id')
@@ -871,6 +897,13 @@ def Create_grid_from_mat(matfile):
             else:
                 pol = 'sm'
             DC_lines[var_name] = Line_DC(DC_nodes[fromNode], DC_nodes[toNode], Resistance, MW_rating, polarity=pol, name=str(var_name),S_base=S_base)
+
+            if DC_line_data.at[index, 'cost'] >= 0:
+                DC_lines[var_name].np_line_opf = True
+                DC_lines[var_name].np_line = 0
+                DC_lines[var_name].np_line_max = 3
+                DC_lines[var_name].base_cost = DC_line_data.at[index, 'cost']
+
         DC_lines_list = list(DC_lines.values())
 
     if Converter_data is None:
@@ -930,9 +963,14 @@ def Create_grid_from_mat(matfile):
             LossB           = Converter_data.at[index, 'LossB']
             LossCrec        = Converter_data.at[index, 'LossCrec']
             LossCinv        = Converter_data.at[index, 'LossCinv']
-            
-
+        
             Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,name=str(var_name))
+
+            if Converter_data.at[index, 'cost'] >= 0:
+                Converters[var_name].NUmConvP_opf = True
+                Converters[var_name].NumConvP = 0
+                Converters[var_name].NumConvP_max = 3
+                Converters[var_name].base_cost = Converter_data.at[index, 'cost']
         Convertor_list = list(Converters.values())
 
 
