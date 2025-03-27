@@ -442,8 +442,8 @@ class Grid:
                     f'For Grid DC {i+1} no slack bus found, results may not be accurate')
 
             if self.num_slackDC[i] > 1:
-                print(f'For Grid DC {i+1} more than one slack bus found')
-                sys.exit()
+                print(f'For Grid DC {i+1} more than one slack bus found, results may not be accurate')
+            
          
         s = 1
 

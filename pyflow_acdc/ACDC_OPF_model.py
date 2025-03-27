@@ -46,7 +46,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     AC_variables(model,grid,AC_info,PV_set)
 
     if not OnlyAC:
-        DC_variables(model,grid,DC_info)
+        DC_variables(model,grid,DC_info,TEP)
         Converter_variables(model,grid,Conv_info)
 
     if TEP:
@@ -717,7 +717,9 @@ def AC_constraints(model,grid,AC_info):
     s=1
         
 
-def DC_variables(model,grid,DC_info):
+def DC_variables(model,grid,DC_info,TEP=False):
+
+
     DC_Lists,DC_nodes_info,DC_lines_info = DC_info
         
     lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
@@ -753,6 +755,7 @@ def DC_variables(model,grid,DC_info):
     model.P_known_DC = pyo.Param(model.nodes_DC, initialize=P_known_DC,mutable=True)
     model.PGi_ren_DC = pyo.Var(model.nodes_DC, bounds=Pren_bounds_DC,initialize=0)
 
+    #if not TEP:
     model.DC_V_slack_constraint = pyo.Constraint(model.DC_slacks, rule=DC_V_slack_rule)
     
     #DC Lines variables
@@ -1466,7 +1469,7 @@ def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
             else:
                 return (NP_lineAC[line], NP_lineAC_max[line])
         
-        model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
+        model.NumLinesACP = pyo.Var(model.lines_AC_exp, within=pyo.NonNegativeIntegers,bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
         model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
 
     if not OnlyAC:
@@ -1479,7 +1482,7 @@ def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
             else:
                 return (NP_lineDC[line], NP_lineDC_max[line])
         
-        model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC_i)
+        model.NumLinesDCP = pyo.Var(model.lines_DC, within=pyo.NonNegativeIntegers,bounds=NPline_bounds,initialize=NP_lineDC_i)
         model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
         def NPconv_bounds(model, conv):
             element=grid.Converters_ACDC[conv]
@@ -1488,7 +1491,7 @@ def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
             else:
                 return (NumConvP[conv], NumConvP_max[conv])
         
-        model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
+        model.NumConvP = pyo.Var(model.conv, within=pyo.NonNegativeIntegers,bounds=NPconv_bounds,initialize=NumConvP_i)
         model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
 
 

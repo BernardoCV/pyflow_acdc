@@ -924,50 +924,53 @@ class Results:
     def TEP_N(self):
         
         table = pt()
-        table.field_names = ["Element","Type" ,"Initial", "Optimized N","Maximum","Optimized Power Rating [MW]","Expansion Cost [M€]"]
+        table.field_names = ["Element","Type" ,"Initial", "Optimized N","Maximum","Optimized Power Rating [MW]","Expansion Cost [€]"]
         tot=0
         tot_n=0
         
         for l in self.Grid.lines_AC_exp:
             if l.np_line_opf:
-                element= l.name
-                ini= l.np_line_i
-                opt=l.np_line
-                pr= opt*l.MVA_rating
-                cost=opt*l.base_cost/(10**6)
-                tot+=cost
-                maxn=l.np_line_max
-                tot_n+=((opt)*l.MVA_rating*l.Length_km*l.phi)/1000
-                table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+                if l.np_line>0.01:
+                    element= l.name
+                    ini= l.np_line_i
+                    opt=l.np_line
+                    pr= opt*l.MVA_rating
+                    cost=opt*l.base_cost
+                    tot+=cost
+                    maxn=l.np_line_max
+                    tot_n+=((opt)*l.MVA_rating*l.Length_km*l.phi)/1000
+                    table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{int(cost):,}".replace(',', ' ')])
         
         
         
         for l in self.Grid.lines_DC:
             if l.np_line_opf:
-                element= l.name
-                ini= l.np_line_i
-                opt=l.np_line
-                pr= opt*l.MW_rating
-                cost=opt*l.base_cost/(10**6)
-                tot+=cost
-                maxn=l.np_line_max
-                tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
-                table.add_row([element, "DC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+                if l.np_line>0.01:
+                    element= l.name
+                    ini= l.np_line_i
+                    opt=l.np_line
+                    pr= opt*l.MW_rating
+                    cost=opt*l.base_cost
+                    tot+=cost
+                    maxn=l.np_line_max
+                    tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
+                    table.add_row([element, "DC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{int(cost):,}".replace(',', ' ')])
                 
         
         for cn in self.Grid.Converters_ACDC:
             if cn.NUmConvP_opf:
-                element= cn.name
-                ini=cn.NumConvP_i
-                opt=cn.NumConvP
-                pr=opt*cn.MVA_max
-                cost=opt*cn.base_cost/(10**6)
-                tot+=cost
-                tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
-                maxn=cn.NumConvP_max
-                table.add_row([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+                if cn.NumConvP>0.01:
+                    element= cn.name
+                    ini=cn.NumConvP_i
+                    opt=cn.NumConvP
+                    pr=opt*cn.MVA_max
+                    cost=opt*cn.base_cost
+                    tot+=cost
+                    tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
+                    maxn=cn.NumConvP_max
+                    table.add_row([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{int(cost):,}".replace(',', ' ')])
         
-        table.add_row(["Total", "" ,"","", "", "",np.round(tot, decimals=2)])
+        table.add_row(["Total", "" ,"","", "", "",f"{int(tot):,}".replace(',', ' ')])
         
         print('--------------')
         print('Transmission Expansion Problem')

@@ -884,13 +884,18 @@ def Create_grid_from_mat(matfile):
         DC_lines = {}
         for index, row in DC_line_data.iterrows():
            if DC_line_data.at[index, 'status'] !=0:    
-            var_name = index+1
+            
 
             fromNode      = DC_line_data.at[index, 'fbusdc']
             toNode        = DC_line_data.at[index, 'tbusdc']
+
+            
+
             Resistance    = DC_line_data.at[index, 'r']
             MW_rating     = DC_line_data.at[index, 'rateA']    
             kV_base       = DC_nodes[toNode].kV_base 
+            
+            var_name = f'{DC_nodes[fromNode].name}-{DC_nodes[toNode].name}_{MW_rating}'
             
             if dcpol == 2:
                 pol = 'b'

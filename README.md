@@ -65,7 +65,7 @@ To merge your changes into the main branch please contact the repository owner.
 
 For Clustering you will need to install the following packages:
 ```bash
-pip install numpy <2.0.0
+pip install "numpy <2.0.0"
 pip install scikit-learn-extra
 pip install scikit-learn
 ```
@@ -77,11 +77,13 @@ pip install folium
 For OPF you will need to install the following packages:
 ```bash
 
-pip install numpy <2.0.0
+pip install "numpy <2.0.0"
 pip install pyomo
-pip install ipopt
+conda install -c conda-forge cyipopt
 
 ```
+
+
 
 For Dash you will need to install the following packages:
 ```bash

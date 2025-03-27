@@ -536,9 +536,9 @@ def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
 
             # Set line width based on line type
             if line in lines_dc_set:
-                line_width = line.np_line
+                line_width = line.np_line if line.np_line > 0 else 0
             elif line in lines_ac_exp_set:
-                line_width = line.np_line
+                line_width = line.np_line if line.np_line > 0 else 0
             else:
                 line_width = 1
             
@@ -550,6 +550,7 @@ def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
             mnode_x_data.append((x0 + x1) / 2)
             mnode_y_data.append((y0 + y1) / 2)
             mnode_txt_data.append(line.hover_text)
+            
             
             # Append edge trace data
             edge_traces_data.append((x0, y0, x1, y1, line_width, color))
@@ -570,7 +571,7 @@ def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
             if node in nodes_DC:
               if Grid.TEP_run:  
                 node_size = max(base_node_size * (node.Nconv - node.Nconv_i) + base_node_size, base_node_size)
-                node_opacity = min(node.Nconv, 1.0) if node.ConvInv else 1.0
+                node_opacity = max(min(node.Nconv, 1.0),0) if node.ConvInv else 1.0
             else:
                 node_size = base_node_size
                 node_opacity = 1.0

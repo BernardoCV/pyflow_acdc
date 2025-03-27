@@ -284,7 +284,7 @@ def fx_conv(model,grid):
     model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
 
 
-def OPF_solve(model,grid,solver_options=[]):
+def OPF_solve(model,grid,solver = 'ipopt'):
     
     if grid.MixedBinCont:
            # opt = pyo.SolverFactory("mindtpy")
@@ -315,7 +315,10 @@ def OPF_solve(model,grid,solver_options=[]):
     #tee = solver_options['tee'] if 'tee' in solver_options else True
     #keepfiles = tee
 
-    solver = 'ipopt'
+    
+
+    #bonmin
+    #ipopt
     #logging = solver_options['logging'] if 'logging' in solver_options else True
     
 

@@ -267,7 +267,7 @@ def get_TEP_variables(grid):
         NumConvP [conv.ConvNumber]  = conv.NumConvP 
         NumConvP_i[conv.ConvNumber] = (
             conv.NumConvP if not conv.NUmConvP_opf 
-            else min(conv.NumConvP + 1, conv.NumConvP_max)
+            else min(conv.NumConvP, conv.NumConvP_max)
         )
         NumConvP_max[conv.ConvNumber] = conv.NumConvP_max
         S_limit_conv[conv.ConvNumber] = conv.MVA_max/grid.S_base
@@ -290,7 +290,7 @@ def get_TEP_variables(grid):
 
     return conv_var,DC_line_var,AC_line_var
 
-def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=None):
+def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=None,solver='bonmin'):
 
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
@@ -328,7 +328,7 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
     t2 = time.time()  
     t_modelcreate = t2-t1
     
-    model_results,solver_stats = OPF_solve(model,grid)
+    model_results,solver_stats = OPF_solve(model,grid,solver)
 
     t1 = time.time()
     ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
@@ -347,7 +347,7 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
     return model, model_results , timing_info, solver_stats
 
 
-def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None,ObjRule=None):
+def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
@@ -498,7 +498,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
     t2 = time.time()  
     t_modelcreate = t2-t1
     
-    model_results,solver_stats = OPF_solve(model,grid)
+    model_results,solver_stats = OPF_solve(model,grid,solver)
     
     t1 = time.time()
     TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering)   
