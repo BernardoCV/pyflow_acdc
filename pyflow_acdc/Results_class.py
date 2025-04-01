@@ -57,6 +57,7 @@ class Results:
                 self.Price_Zone()    
         if self.Grid.TEP_run:
             self.AC_exp_lines_power()
+            
             self.TEP_N()
             if self.Grid.TEP_res is not None:
                 self.TEP_TS_norm()
@@ -154,7 +155,7 @@ class Results:
             
             for node in self.Grid.nodes_AC:
                 if not self.Grid.OPF_run and node.type == 'Slack':
-                      PGi = node.P_INJ-(node.P_s)+node.PLi
+                      PGi = node.P_INJ-(node.P_s.item())+node.PLi
                 else:
                       PGi = P_AC[node.nodeNumber].item()
                 generation += PGi*self.Grid.S_base      
@@ -447,8 +448,8 @@ class Results:
                                 np.round(node.PLi*self.Grid.S_base, decimals=self.dec),
                                 np.round(node.QLi*self.Grid.S_base, decimals=self.dec),
                                 np.round(node.P_s*self.Grid.S_base, decimals=self.dec).item(),
-                                np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(),
-                                np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec),
+                                np.round((node.Q_s+node.Q_s_fx)*self.Grid.S_base, decimals=self.dec).item(), 
+                                np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
                                 np.round(node.Q_INJ*self.Grid.S_base, decimals=self.dec),
                                 g+1
                             ])
@@ -625,7 +626,7 @@ class Results:
 
         tablep = pt()
         tablep.field_names = ["Line", "From bus", "To bus",
-                                "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)", "Power loss (MW)", "Q loss (MVAR)"]
+                                "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)", "Power loss (MW)", "Q loss (MVAR)","Loading %"]
         for g in range(self.Grid.Num_Grids_AC):
             print(f'Grid AC {g+1}')
             for line in self.Grid.lines_AC_exp:
@@ -633,6 +634,7 @@ class Results:
                     if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                         i = line.fromNode.nodeNumber
                         j = line.toNode.nodeNumber
+                        
                         
                         p_from = np.real(line.fromS)*self.Grid.S_base
                         Q_from = np.imag(line.fromS)*self.Grid.S_base
@@ -642,7 +644,12 @@ class Results:
     
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
-    
+
+                        Sfrom = abs(line.fromS)*self.Grid.S_base
+                        Sto   = abs(line.toS)*self.Grid.S_base
+
+                        load = max(Sfrom, Sto)/(line.MVA_rating*line.np_line)*100
+
                         tablep.add_row([
                             line.name, 
                             line.fromNode.name, 
@@ -652,11 +659,13 @@ class Results:
                             np.round(p_to, decimals=self.dec), 
                             np.round(Q_to, decimals=self.dec), 
                             np.round(Ploss, decimals=self.dec), 
-                            np.round(Qloss, decimals=self.dec)
+                            np.round(Qloss, decimals=self.dec),
+                            np.round(load, decimals=self.dec)
                         ])
                      
             if len(tablep.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablep)
+
 
     def AC_lines_power(self, Grid=None):
         
@@ -926,51 +935,47 @@ class Results:
         table = pt()
         table.field_names = ["Element","Type" ,"Initial", "Optimized N","Maximum","Optimized Power Rating [MW]","Expansion Cost [€]"]
         tot=0
-        tot_n=0
         
         for l in self.Grid.lines_AC_exp:
             if l.np_line_opf:
-                if l.np_line>0.01:
+                if (l.np_line-l.np_line_i)>0.01:
                     element= l.name
                     ini= l.np_line_i
                     opt=l.np_line
                     pr= opt*l.MVA_rating
-                    cost=opt*l.base_cost
+                    cost=(opt-ini)*l.base_cost
                     tot+=cost
                     maxn=l.np_line_max
-                    tot_n+=((opt)*l.MVA_rating*l.Length_km*l.phi)/1000
-                    table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{int(cost):,}".replace(',', ' ')])
+                    table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         
         
         
         for l in self.Grid.lines_DC:
             if l.np_line_opf:
-                if l.np_line>0.01:
+                if (l.np_line-l.np_line_i)>0.01:
                     element= l.name
                     ini= l.np_line_i
                     opt=l.np_line
                     pr= opt*l.MW_rating
-                    cost=opt*l.base_cost
+                    cost=(opt-ini)*l.base_cost
                     tot+=cost
                     maxn=l.np_line_max
-                    tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
-                    table.add_row([element, "DC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{int(cost):,}".replace(',', ' ')])
+                    table.add_row([element, "DC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
                 
         
         for cn in self.Grid.Converters_ACDC:
             if cn.NUmConvP_opf:
-                if cn.NumConvP>0.01:
+                if (cn.NumConvP-cn.NumConvP_i)>0.01:
                     element= cn.name
                     ini=cn.NumConvP_i
                     opt=cn.NumConvP
                     pr=opt*cn.MVA_max
-                    cost=opt*cn.base_cost
+                    cost=(opt-ini)*cn.base_cost
                     tot+=cost
-                    tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
                     maxn=cn.NumConvP_max
-                    table.add_row([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{int(cost):,}".replace(',', ' ')])
+                    table.add_row([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         
-        table.add_row(["Total", "" ,"","", "", "",f"{int(tot):,}".replace(',', ' ')])
+        table.add_row(["Total", "" ,"","", "", "",f"{tot:,.2f}".replace(',', ' ')])
         
         print('--------------')
         print('Transmission Expansion Problem')

@@ -189,7 +189,7 @@ def Jacobian_DC(grid, V_DC, P):
                             if Ya != 0:
                                 line = grid.get_lineDC_by_nodes(m, a)
                                 pola = line.pol
-                            J[m, n] += pola*-Ya*V[m]*V[m]
+                                J[m, n] += pola*-Ya*V[m]*V[m]
 
         else:
             grid.slack_bus_number_DC.append(m)
