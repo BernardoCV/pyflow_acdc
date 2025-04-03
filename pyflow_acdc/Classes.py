@@ -1368,6 +1368,7 @@ class Line_AC:
         branch_tt=(1/self.Z+self.Y/2)
         
         self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
+        
 class Exp_Line_AC(Line_AC):
     
     def __init__(self, *args, **kwargs):

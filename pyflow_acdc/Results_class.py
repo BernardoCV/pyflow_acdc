@@ -62,6 +62,9 @@ class Results:
             if self.Grid.TEP_res is not None:
                 self.TEP_TS_norm()
                 self.TEP_ts_res()
+            else:
+                self.TEP_norm()
+                
         print('------')
 
     def All_AC(self):
@@ -146,7 +149,7 @@ class Results:
         if self.Grid.nodes_AC is not None:
             if self.Grid.OPF_run:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
-                                        +sum(gen.PGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+                                        +sum(gen.PGen for gen in node.connected_gen if gen.PGen >0) for node in self.Grid.nodes_AC])
                 Q_AC = np.vstack([node.QGi+sum(gen.QGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
             else:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
@@ -159,7 +162,7 @@ class Results:
                 else:
                       PGi = P_AC[node.nodeNumber].item()
                 generation += PGi*self.Grid.S_base      
-                grid_loads += node.PLi*self.Grid.S_base
+                grid_loads += (node.PLi-sum(gen.PGen for gen in node.connected_gen if gen.PGen <0))*self.Grid.S_base
 
             self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
             
@@ -981,8 +984,10 @@ class Results:
         print('Transmission Expansion Problem')
         print(table)
 
-       
-     
+    def TEP_norm(self):
+        s=1
+        
+        
     def TEP_TS_norm(self):
 
         tot = 0

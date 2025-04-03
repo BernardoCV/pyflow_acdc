@@ -121,8 +121,16 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     "hover_text": getattr(line_obj, 'hover_text', 'No info'),
                     "color":color
                 })
-        return gpd.GeoDataFrame(line_data, geometry="geometry")
-    
+        
+        if lines:  # Using if lines instead of if lines != [] is more pythonic
+            return gpd.GeoDataFrame(line_data, geometry="geometry")
+        else:
+            # Create an empty GeoDataFrame with the expected columns
+            return gpd.GeoDataFrame(columns=['geometry', 'type', 'name', 'Direction', 'ant_viable', 
+                                           'thck', 'VL', 'area', 'tf', 'hover_text', 'color'], 
+                                  geometry='geometry')
+   
+   
     # Create GeoDataFrames for AC and HVDC lines
     gdf_lines_AC = extract_line_data(grid.lines_AC+grid.lines_AC_tf, "AC")
     if grid.lines_AC_exp != []:

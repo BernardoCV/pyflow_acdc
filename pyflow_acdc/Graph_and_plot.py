@@ -98,7 +98,8 @@ def update_lineAC_hovertext(line,S_base,text):
         rating = line.MVA_rating
         rating = np.round(rating,decimals=0)
         Line_tf = 'Transformer' if line.isTf else 'Line'
-        line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>Length: {l}km<br>Rating: {rating}MVA"
+        cable = line.Cable_type
+        line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>Length: {l}km<br>Rating: {rating}MVA<br>Type: {cable}"
 
     elif text=='inPu':
         
@@ -110,11 +111,12 @@ def update_lineAC_hovertext(line,S_base,text):
         load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
         Loading = np.round(load, decimals=dec)
         Line_tf = 'Transformer' if line.isTf else 'Line'
+        cable = line.Cable_type
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
         else:
             line_string = f"{fromnode} <- {tonode}"
-        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%"
+        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Type: {cable}"
     else:
         name= line.name
         fromnode = line.fromNode.name
@@ -124,11 +126,12 @@ def update_lineAC_hovertext(line,S_base,text):
         load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/line.MVA_rating*100
         Loading = np.round(load, decimals=0).astype(int)
         Line_tf = 'Transformer' if line.isTf else 'Line'
+        cable = line.Cable_type
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
         else:
             line_string = f"{fromnode} <- {tonode}"
-        line.hover_text = f"{Line_tf}: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%"
+        line.hover_text = f"{Line_tf}: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}<br>Type: {cable}%"
               
 def update_lineDC_hovertext(line,S_base,text):            
     dec=2

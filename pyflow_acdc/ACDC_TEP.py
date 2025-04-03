@@ -317,7 +317,7 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_OPF = OPF_obj(model,grid,weights_def,True,OnlyAC)
     
-    present_value =   (1 - (1 + discount_rate) ** -n_years) / discount_rate
+    present_value =   8760*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     if NPV:
         obj_OPF *=present_value
     
