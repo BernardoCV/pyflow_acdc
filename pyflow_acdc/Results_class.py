@@ -941,9 +941,9 @@ class Results:
         
         for l in self.Grid.lines_AC_exp:
             if l.np_line_opf:
-                if (l.np_line-l.np_line_i)>0.01:
+                if (l.np_line-l.np_line_b)>0.01:
                     element= l.name
-                    ini= l.np_line_i
+                    ini= l.np_line_b
                     opt=l.np_line
                     pr= opt*l.MVA_rating
                     cost=(opt-ini)*l.base_cost
@@ -955,9 +955,9 @@ class Results:
         
         for l in self.Grid.lines_DC:
             if l.np_line_opf:
-                if (l.np_line-l.np_line_i)>0.01:
+                if (l.np_line-l.np_line_b)>0.01:
                     element= l.name
-                    ini= l.np_line_i
+                    ini= l.np_line_b
                     opt=l.np_line
                     pr= opt*l.MW_rating
                     cost=(opt-ini)*l.base_cost
@@ -968,9 +968,9 @@ class Results:
         
         for cn in self.Grid.Converters_ACDC:
             if cn.NUmConvP_opf:
-                if (cn.NumConvP-cn.NumConvP_i)>0.01:
+                if (cn.NumConvP-cn.NumConvP_b)>0.01:
                     element= cn.name
-                    ini=cn.NumConvP_i
+                    ini=cn.NumConvP_b
                     opt=cn.NumConvP
                     pr=opt*cn.MVA_max
                     cost=(opt-ini)*cn.base_cost

@@ -271,6 +271,8 @@ def change_line_AC_to_expandable(grid, line_name):
     grid.create_Ybus_AC()
     for i, line in enumerate(grid.lines_AC_exp):
         line.lineNumber = i 
+        
+    return expandable_line    
 
 def change_line_AC_to_tap_transformer(grid, line_name):
     l = None
@@ -524,7 +526,7 @@ def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,M
         gen.lf= node.price
     Grid.Generators.append(gen)
 
-def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind',min_gamma=0):
+def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind',min_gamma=0,Qrel=0):
     if ren_source_name is None:
         ren_source_name= node_name
     found=False 
@@ -540,6 +542,8 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
                      geometry = loads(geometry)  
                 rensource.geometry= geometry
             rensource.min_gamma = min_gamma
+            rensource.Qmax = base*Qrel/Grid.S_base
+            rensource.Qmin = -base*Qrel/Grid.S_base
             Grid.rs2node['AC'][rensource.rsNumber]=node.nodeNumber
             found = True
             break

@@ -113,6 +113,7 @@ def expand_elements_from_pd(grid,exp_elements):
     exp_elements.iloc[:, 0].apply(lambda name: Expand_element(
         grid,
         name,
+        get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'N_b'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'N_i'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'N_max'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'Life_time'),
@@ -121,15 +122,19 @@ def expand_elements_from_pd(grid,exp_elements):
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'exp')
     ))
 
-def update_attributes(element, N_i, N_max, Life_time, base_cost, per_unit_cost, exp):
+def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_cost, exp):
    """Updates the attributes of the given element if not None."""
-   if N_i is not None:
+   if N_b is not None:
+       if N_i is None:
+           N_i = N_b
        if hasattr(element, 'np_line'):
-           element.np_line = N_i
+           element.np_line_b = N_b
+           element.np_line = N_b
        if hasattr(element, 'np_line_i'):
            element.np_line_i = N_i
        if hasattr(element, 'NumConvP'):
-           element.NumConvP = N_i  
+           element.NumConvP_b = N_b  
+           element.NumConvP = N_b
        if hasattr(element, 'NumConvP_i'):
            element.NumConvP_i = N_i      # Only set if it exists
    if N_max is not None:
@@ -156,33 +161,29 @@ def update_attributes(element, N_i, N_max, Life_time, base_cost, per_unit_cost, 
    if exp is not None:
        element.exp = exp
         
-def Expand_element(grid,name,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None, exp=None):
+def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None, exp=None):
     
     if N_max is None:
-        N_max= N_i+20
+        N_max= N_b+20
     
     for l in grid.lines_AC:
         if name == l.name:
             from .Class_editor import change_line_AC_to_expandable
-            change_line_AC_to_expandable(grid, name)
-    
-    
-    for l in grid.lines_AC_exp:
-        if name == l.name:
-            l.np_line_opf = True
-            update_attributes(l, N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
+            exp_l=change_line_AC_to_expandable(grid, name)
+            exp_l.np_line_opf = True
+            update_attributes(exp_l, N_b,N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
             continue
 
     for l in grid.lines_DC:
         if name == l.name:
             l.np_line_opf = True
-            update_attributes(l, N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
+            update_attributes(l, N_b, N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
             continue
             
     for cn in grid.Converters_ACDC:
         if name == cn.name:
             cn.NUmConvP_opf = True
-            update_attributes(cn, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
+            update_attributes(cn, N_b, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
             continue
             
 def base_cost_calculation(element):
@@ -245,7 +246,7 @@ def get_TEP_variables(grid):
         NP_lineAC[l.lineNumber]     = l.np_line
         NP_lineAC_i[l.lineNumber]   = (
             l.np_line if not l.np_line_opf 
-            else min(l.np_line + 1, l.np_line_max)
+            else max(l.np_line,min(l.np_line_i , l.np_line_max))
         )
         NP_lineAC_max[l.lineNumber]   = l.np_line_max
         
@@ -253,7 +254,7 @@ def get_TEP_variables(grid):
         NumConvP [conv.ConvNumber]  = conv.NumConvP 
         NumConvP_i[conv.ConvNumber] = (
             conv.NumConvP if not conv.NUmConvP_opf 
-            else min(conv.NumConvP, conv.NumConvP_max)
+            else max(conv.NumConvP,min(conv.NumConvP_i , conv.NumConvP_max))
         )
         NumConvP_max[conv.ConvNumber] = conv.NumConvP_max
         S_limit_conv[conv.ConvNumber] = conv.MVA_max/grid.S_base
@@ -262,7 +263,7 @@ def get_TEP_variables(grid):
         NP_lineDC[l.lineNumber]     = l.np_line 
         NP_lineDC_i[l.lineNumber]   = (
             l.np_line if not l.np_line_opf 
-            else min(l.np_line + 1, l.np_line_max)
+            else max(l.np_line,min(l.np_line_i , l.np_line_max))
         )
         NP_lineDC_max[l.lineNumber]   = l.np_line_max
         Line_length[l.lineNumber]     = l.Length_km
@@ -276,14 +277,13 @@ def get_TEP_variables(grid):
 
     return conv_var,DC_line_var,AC_line_var
 
-def transmission_expansion(grid,NPV=False,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',initial_guess=0):
 
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
-
    
     t1 = time.time()
     model = pyo.ConcreteModel()
@@ -328,7 +328,7 @@ def transmission_expansion(grid,NPV=False,n_years=25,Hy=8760,discount_rate=0.02,
     return model, model_results , timing_info, solver_stats
 
 
-def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)

@@ -95,6 +95,7 @@ class Grid:
 
         self.OPF_run= False
         self.TEP_run=False
+       
         self.TEP_res=None
         self.time_series_results = {
             'PF_results': pd.DataFrame(),  # Time_series_res
@@ -1223,7 +1224,7 @@ class Line_AC:
             if data_dict:
                 # Convert to pandas DataFrame
                 cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
-                print(f"Loaded {len(data_dict)} AC cables into database")
+                #print(f"Loaded {len(data_dict)} AC cables into database")
             else:
                 print("No AC cable data found in any YAML files")
 
@@ -1383,9 +1384,11 @@ class Exp_Line_AC(Line_AC):
         self.cost_perMVAkm = None
         self.phi=0
         
-        self.np_line=0
-        self.np_line_i= 0
-        self.np_line_max = 1
+        self.np_line=0  #Actual number of lines
+
+        self.np_line_b=0  #N_b base attribute
+        self.np_line_i= 0 #N_i initial guess
+        self.np_line_max = 1 #N_max max number of lines
         self.np_line_opf=True
         self.hover_text = None
         
@@ -1501,14 +1504,14 @@ class Line_DC:
                         cable_name = list(cable_data.keys())[0]
                         specs = cable_data[cable_name]
                         
-                        # Only include AC cables
+                        # Only include DC cables
                         if specs.get('Type', 'DC') == 'DC':
                             data_dict[cable_name] = specs
             
             if data_dict:
                 # Convert to pandas DataFrame
                 cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
-                print(f"Loaded {len(data_dict)} DC cables into database")
+                #print(f"Loaded {len(data_dict)} DC cables into database")
             else:
                 print("No DC cable data found in any YAML files")
 
@@ -1562,6 +1565,8 @@ class Line_DC:
         self.kV_base = toNode.kV_base
 
         self.np_line=N_cables
+
+        self.np_line_b=N_cables
         self.np_line_i= N_cables
         self.np_line_max = N_cables
         self.np_line_opf=False
@@ -1723,6 +1728,8 @@ class AC_DC_converter:
         # type: (1=P, 2=droop, 3=Slack)
         
         self._NumConvP= nConvP
+
+        self.NumConvP_b= nConvP
         self.NumConvP_i= nConvP
         self.NumConvP_max = nConvP
         

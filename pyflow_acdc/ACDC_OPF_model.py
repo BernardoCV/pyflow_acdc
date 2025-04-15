@@ -96,7 +96,8 @@ def AC_variables(model,grid,AC_info,PV_set):
     model.ren_sources= pyo.Set(initialize=lista_rs)
     
     model.AC_slacks  = pyo.Set(initialize=AC_slack)
-    model.AC_PVs     = pyo.Set(initialize=AC_PV)
+    if PV_set:
+        model.AC_PVs     = pyo.Set(initialize=AC_PV)
             
     "AC Variables"
     #AC nodes variables
