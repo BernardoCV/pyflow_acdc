@@ -102,9 +102,10 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
     """
     """
-
+    
     if grid.nn_DC!=0:
-            if any(conv.OPF_fx for conv in grid.Converters_ACDC):
+
+        if any(conv.OPF_fx for conv in grid.Converters_ACDC):
                     fx_conv(model, grid)
                 
                 
@@ -118,6 +119,9 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     # Call your function here
     ExportACDC_model_toPyflowACDC(model, grid, Price_Zones)
     # pr.disable()
+
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
     
     # s = StringIO()
     # ps = pstats.Stats(pr, stream=s)
@@ -128,7 +132,8 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     t_modelexport = t2-t1
    
        
-    grid.OPF_run=True  
+    grid.OPF_run=True 
+    grid.OPF_obj=weights_def
     timing_info = {
     "create": t_modelcreate,
     "solve": solver_stats['time'],
@@ -369,9 +374,7 @@ def OPF_updateParam(model,grid):
     return model
 
 def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
-    
-    
-    
+
     # for node in  model.nodes_AC:
     #     nAC=grid.nodes_AC[node]
     #     if nAC.Num_conv_connected >= 2:
@@ -844,3 +847,50 @@ def OPF_conv_results(model,grid):
 
 
       
+
+def calculate_objective(grid,obj,OnlyGen=True,OnlyAC=False):
+    s=1
+    if obj =='Ext_Gen':
+        return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
+
+    if obj =='Energy_cost':
+        return sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf) for gen in grid.Generators)
+
+        
+    if obj =='PZ_cost_of_generation':
+       return sum(pz.a*(pz.PN*grid.S_base)**2+pz.b*(pz.PN*grid.S_base) for pz in grid.Price_Zones)
+   
+    if obj =='AC_losses':
+        return (sum(line.P_loss for line in grid.lines_AC)+
+                sum(tf.P_loss for tf in grid.lines_AC_tf)+
+                sum(line.P_loss for line in grid.lines_AC_exp))*grid.S_base
+
+    if obj =='DC_losses':
+        return sum(line.loss for line in grid.lines_DC)*grid.S_base
+
+    if obj =='Converter_Losses':
+        return sum(conv.P_loss for conv in grid.Converters_ACDC)*grid.S_base
+
+    if obj =='General_Losses':
+        return (sum(line.P_loss for line in grid.lines_AC) +
+                sum(tf.P_loss for tf in grid.lines_AC_tf) +
+                sum(line.P_loss for line in grid.lines_AC_exp) +
+                sum(line.loss for line in grid.lines_DC) +
+                sum(conv.P_loss for conv in grid.Converters_ACDC))*grid.S_base
+
+    if obj =='Curtailment_Red':
+        ac_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_AC[grid.rs2node['AC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
+        if OnlyAC:
+            return ac_curt
+        
+        dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
+        
+        return ac_curt+dc_curt
+    
+    if obj=='PZ_cost_of_generation':
+           return  sum(pz.PN**2*pz.a+pz.PN*pz.b for pz in grid.Price_Zones)
+   
+    if obj=='Gen_set_dev':
+        return sum((gen.PGen-gen.Pset)**2 for gen in grid.Generators)
+    
+    return 0

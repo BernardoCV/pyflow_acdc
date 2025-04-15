@@ -670,6 +670,7 @@ def Create_grid_from_mat(matfile):
     converter_columns = ['busdc_i', 'busac_i', 'type_dc', 'type_ac', 'P_g', 'Q_g', 'islcc', 'Vtar', 'rtf', 'xtf', 'transformer', 'tm', 'bf', 'filter', 'rc', 'xc', 'reactor', 'basekVac', 'Vmmax', 'Vmmin', 'Imax', 'status', 'LossA', 'LossB', 'LossCrec', 'LossCinv', 'droop', 'Pdcset', 'Vdcset', 'dVdcset', 'Pacmax', 'Pacmin', 'Qacmax', 'Qacmin']
     branch_DC = ['fbusdc', 'tbusdc', 'r', 'l', 'c', 'rateA', 'rateB', 'rateC', 'status']
     
+    candidate_ac_branch = ['f_bus',	't_bus','br_r'	,'br_x'	,'br_b'	,'rate_a'	,'rate_b',	'rate_c',	'tap',	'shift',	'br_status',	'angmin'	,'angmax'	,'construction_cost']
     candidate_dc_bus = ['busdc_i' , 'grid' , 'Pdc' , 'Vdc' , 'basekVdc' , 'Vdcmax' , 'Vdcmin' , 'Cdc']
     candidate_dc_branch = ['fbusdc' , 'tbusdc' , 'r' , 'l' , 'c' , 'rateA' , 'rateB' , 'rateC' , 'status' , 'cost']
     candidate_conv = ['busdc_i' , 'busac_i' , 'type_dc' , 'type_ac' , 'P_g' , 'Q_g' , 'islcc' , 'Vtar' , 'rtf' , 'xtf' , 'transformer' , 'tm' , 'bf' , 'filter' , 'rc' , 'xc' , 'reactor' , 'basekVac' , 'Vmmax' , 'Vmmin' , 'Imax' , 'status' , 'LossA' , 'LossB' , 'LossCrec' , 'LossCinv' , 'droop' , 'Pdcset' , 'Vdcset' , 'dVdcset' , 'Pacmax' , 'Pacmin' , 'Qacmax' , 'Qacmin' , 'cost']
@@ -706,7 +707,11 @@ def Create_grid_from_mat(matfile):
     else:
         AC_line_data = None
     
-   
+    if 'ne_branch'in data:
+        EXP_line_data = pd.DataFrame(data['ne_branch'], columns=candidate_ac_branch) 
+    else:
+        EXP_line_data = None
+
     if 'gen' in data:
         num_data_columns = len(data['gen'][0])
         if num_data_columns > len(gen_columns):
@@ -905,7 +910,8 @@ def Create_grid_from_mat(matfile):
 
             if DC_line_data.at[index, 'cost'] >= 0:
                 DC_lines[var_name].np_line_opf = True
-                DC_lines[var_name].np_line = 0
+                DC_lines[var_name].np_line   = 0
+                DC_lines[var_name].np_line_i = 0
                 DC_lines[var_name].np_line_max = 3
                 DC_lines[var_name].base_cost = DC_line_data.at[index, 'cost']
 
@@ -973,7 +979,8 @@ def Create_grid_from_mat(matfile):
 
             if Converter_data.at[index, 'cost'] >= 0:
                 Converters[var_name].NUmConvP_opf = True
-                Converters[var_name].NumConvP = 0
+                Converters[var_name].NumConvP   = 0
+                Converters[var_name].NumConvP_i = 0
                 Converters[var_name].NumConvP_max = 3
                 Converters[var_name].base_cost = Converter_data.at[index, 'cost']
         Convertor_list = list(Converters.values())
@@ -984,6 +991,44 @@ def Create_grid_from_mat(matfile):
              lines_DC=DC_lines_list, Converters=Convertor_list)
     res = Results(G, decimals=3)
     
+    if EXP_line_data is not None:
+        
+        for index, row in EXP_line_data.iterrows():  
+              
+            fromNode     = EXP_line_data.at[index, 'f_bus']
+            toNode       = EXP_line_data.at[index, 't_bus']
+            r   = EXP_line_data.at[index, 'br_r']
+            x    = EXP_line_data.at[index, 'br_x']    
+            g  = 0
+            b  = EXP_line_data.at[index, 'br_b']  
+            
+            
+            
+            kV_base      = AC_nodes[toNode].kV_base 
+            MVA_rating   = EXP_line_data.at[index, 'rate_a']
+           
+            var_name =  f'{AC_nodes[fromNode].name}_{AC_nodes[toNode].name}_{MVA_rating}'
+
+            if EXP_line_data.at[index, 'tap']== 0:
+                m=1
+                shift=0
+            else:
+                m            = EXP_line_data.at[index, 'tap']  
+                shift        = np.radians(EXP_line_data.at[index, 'shift'])
+
+            km=1
+            
+            line = Exp_Line_AC(AC_nodes[fromNode], AC_nodes[toNode], r,
+                                         x, g, b, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
+    
+            line.base_cost = EXP_line_data.at[index, 'construction_cost']  
+            line.lineNumber = index
+            line.np_line = 0
+            line.np_line_i = 0
+            line.np_line_max = 3
+            G.lines_AC_exp.append(line)
+        G.Update_Graph_AC()
+
     if Gen_data is not None:        
         for index, row in Gen_data.iterrows():
           if Gen_data.at[index, 'status'] !=0:  

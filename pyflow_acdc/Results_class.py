@@ -985,7 +985,24 @@ class Results:
         print(table)
 
     def TEP_norm(self):
-        s=1
+        table=pt()
+        table.field_names = ["Objective","Weight" ,"Value","Weighted Value","NPV"]
+        
+        weights = self.Grid.OPF_obj
+
+        for key, value in weights.items():
+            # if value['w'] !=0:
+                table.add_row([
+                    key, 
+                    f"{value['w']:.2f}", 
+                    f"{value['v']:,.2f}".replace(',', ' '),
+                    f"{value['w']*value['v']:,.2f}".replace(',', ' '),
+                    f"{value['NPV']:,.2f}".replace(',', ' ')
+                ])
+        
+        print(table)
+
+
         
         
     def TEP_TS_norm(self):

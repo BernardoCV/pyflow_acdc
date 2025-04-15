@@ -12,8 +12,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC
+from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables
+from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC,calculate_objective
 
 
 __all__ = [
@@ -23,7 +23,8 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'transmission_expansion',
-    'transmission_expansion_TS'
+    'transmission_expansion_TS',
+    'export_TEP_TS_results_to_excel'
 ]
 
 def pack_variables(*args):
@@ -117,11 +118,10 @@ def expand_elements_from_pd(grid,exp_elements):
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'Life_time'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'base_cost'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'per_unit_cost'),
-        get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'phi'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'exp')
     ))
 
-def update_attributes(element, N_i, N_max, Life_time, base_cost, per_unit_cost, phi, exp):
+def update_attributes(element, N_i, N_max, Life_time, base_cost, per_unit_cost, exp):
    """Updates the attributes of the given element if not None."""
    if N_i is not None:
        if hasattr(element, 'np_line'):
@@ -149,14 +149,14 @@ def update_attributes(element, N_i, N_max, Life_time, base_cost, per_unit_cost, 
            element.cost_perMVAkm = per_unit_cost    
        if hasattr(element, 'cost_perMVA'):
            element.cost_perMVA = per_unit_cost
-   if phi is not None:
-       element.phi = phi
+   if base_cost is not None:
+       element.base_cost = base_cost
    else:
-       phi_calculation(element)
+       base_cost_calculation(element)
    if exp is not None:
        element.exp = exp
         
-def Expand_element(grid,name,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None,phi=None, exp=None):
+def Expand_element(grid,name,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None, exp=None):
     
     if N_max is None:
         N_max= N_i+20
@@ -170,44 +170,34 @@ def Expand_element(grid,name,N_i=None,N_max=None,Life_time=None,base_cost=None,p
     for l in grid.lines_AC_exp:
         if name == l.name:
             l.np_line_opf = True
-            update_attributes(l, N_i, N_max,Life_time, base_cost, per_unit_cost, phi, exp)
+            update_attributes(l, N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
             continue
 
     for l in grid.lines_DC:
         if name == l.name:
             l.np_line_opf = True
-            update_attributes(l, N_i, N_max,Life_time, base_cost, per_unit_cost, phi, exp)
+            update_attributes(l, N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
             continue
             
     for cn in grid.Converters_ACDC:
         if name == cn.name:
             cn.NUmConvP_opf = True
-            update_attributes(cn, N_i, N_max, Life_time, base_cost, per_unit_cost, phi, exp)
+            update_attributes(cn, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
             continue
             
-def phi_calculation(element):
+def base_cost_calculation(element):
     from .Classes import Exp_Line_AC 
     if isinstance(element, Exp_Line_AC):
-        if element.base_cost is not None:
-            element.phi= element.base_cost/(element.life_time*8760*element.Length_km*element.MVA_rating)
-            element.cost_perMVAkm = element.base_cost/(element.Length_km*element.MVA_rating)
-        elif element.cost_perMVAkm is not None:
-            element.phi= element.cost_perMVAkm/(element.life_time*8760)
-    
+        element.base_cost= element.cost_perMVAkm*element.Length_km*element.MW_rating
+
     from .Classes import Line_DC 
     if isinstance(element, Line_DC):
-        if element.base_cost is not None:
-            element.phi= element.base_cost/(element.life_time*8760*element.Length_km*element.MW_rating)
-            element.cost_perMVAkm = element.base_cost/(element.Length_km*element.MW_rating)
-        elif element.cost_perMWkm is not None:
-            element.phi= element.cost_perMWkm/(element.life_time*8760)
+        element.base_cost= element.cost_perMWkm*element.Length_km*element.MW_rating
+
     from .Classes import AC_DC_converter
     if isinstance(element, AC_DC_converter):
-        if element.base_cost is not None:
-            element.phi= element.base_cost/(element.life_time*8760*element.MVA_max)
-            element.cost_perMVA = element.base_cost/(element.MVA_max)
-        elif element.cost_perMVA is not None:
-            element.phi=element.cost_perMVA/(element.life_time*8760)
+        element.base_cost= element.cost_perMVA*element.MVA_max
+         
 
 def Translate_pd_TEP(grid):
     """Translation of element wise to internal numbering"""
@@ -250,11 +240,7 @@ def get_TEP_variables(grid):
     NP_lineDC,NP_lineDC_i,NP_lineDC_max ={},{},{}
     NP_lineAC,NP_lineAC_i,NP_lineAC_max = {},{},{}
     Line_length ={}
-    
-    
-    line_phi={}
-    conv_phi={}
-    
+        
     for l in grid.lines_AC_exp:
         NP_lineAC[l.lineNumber]     = l.np_line
         NP_lineAC_i[l.lineNumber]   = (
@@ -283,14 +269,14 @@ def get_TEP_variables(grid):
         
     
     
-    conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi)
-    DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi)
-    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi)
+    conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv)
+    DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length)
+    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length)
 
 
     return conv_var,DC_line_var,AC_line_var
 
-def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+def transmission_expansion(grid,NPV=False,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
 
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
@@ -298,16 +284,7 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
 
-    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
-
-    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
-    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
-    
-    lista_lineas_DC = list(range(0, grid.nl_DC))
-    lista_conv = list(range(0, grid.nconv))
-    lista_AC   = list(range(0,grid.nle_AC))
-
+   
     t1 = time.time()
     model = pyo.ConcreteModel()
     model.name        ="TEP MTDC AC/DC hybrid OPF"
@@ -317,7 +294,7 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_OPF = OPF_obj(model,grid,weights_def,True,OnlyAC)
     
-    present_value =   8760*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     if NPV:
         obj_OPF *=present_value
     
@@ -332,13 +309,17 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
 
     t1 = time.time()
     ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj,True,OnlyAC)
+        weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
     t2 = time.time() 
 
     t_modelexport = t2-t1
 
     grid.OPF_run=True  
     grid.TEP_run=True
-    
+    grid.OPF_obj = weights_def
+
     timing_info = {
     "create": t_modelcreate,
     "solve": solver_stats['time'],
@@ -347,18 +328,19 @@ def transmission_expansion(grid,NPV=False,n_years=25,discount_rate=0.02,ObjRule=
     return model, model_results , timing_info, solver_stats
 
 
-def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
 
     from .Time_series import  modify_parameters
-    from .Time_series_clustering import cluster_TS
+    
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
     clustering = False
     if clustering_options is not None:
+        from .Time_series_clustering import cluster_TS
         """
         clustering_options = {
             'n_clusters': 1,
@@ -384,12 +366,6 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
     else:
         n_clusters = len(grid.Time_series[0].data)
         
-    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
-
-    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
-    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
-    
     lista_lineas_DC = list(range(0, grid.nl_DC))
     lista_conv = list(range(0, grid.nconv))
     lista_AC   = list(range(0,grid.nle_AC))
@@ -408,7 +384,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
     w={}
 
     base_model = pyo.ConcreteModel()
-    OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
+    OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
     
     s=1
     
@@ -428,41 +404,14 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
         TEP_subObj(model.submodel[t],grid,weights_def,OnlyAC)
         if clustering:
             w[t]= float(grid.Clusters[n_clusters][t-1])
-            # num_time_frames = len(model.Time_frames)
-            # w[t]=1/num_time_frames
-    
+
+        elif any(ts.element_name == 'TEP_w' for ts in grid.Time_series):
+            w[t] = next(ts.data[t-1] for ts in grid.Time_series if ts.element_name == 'TEP_w')
         else:
             num_time_frames = len(model.Time_frames)
             w[t]=1/num_time_frames
     
-    
-    def NPline_bounds_AC(model, line):
-        element=grid.lines_AC_exp[line]
-        if element.np_line_opf:
-            return (NP_lineAC[line], NP_lineAC_max[line])
-        else:
-            return (NP_lineAC[line], NP_lineAC[line])
-    
-    model.NumLinesACP = pyo.Var(model.lines_AC_exp, bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
-    
-
-    def NPline_bounds(model, line):
-        element=grid.lines_DC[line]
-        if element.np_line_opf:
-            return (NP_lineDC[line], NP_lineDC_max[line])
-        else:
-            return (NP_lineDC[line], NP_lineDC[line])
-    
-    model.NumLinesDCP = pyo.Var(model.lines_DC, bounds=NPline_bounds,initialize=NP_lineDC_i)
-    
-    def NPconv_bounds(model, conv):
-        element=grid.Converters_ACDC[conv]
-        if element.NUmConvP_opf:
-            return (NumConvP[conv], NumConvP_max[conv])
-        else:
-            return (NumConvP[conv], NumConvP[conv])
-    
-    model.NumConvP = pyo.Var(model.conv, bounds=NPconv_bounds,initialize=NumConvP_i)
+    TEP_variables(model,grid)
     
     def NP_ACline_link(model,line,t):
         element=grid.lines_AC_exp[line]
@@ -492,7 +441,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_weighted = weighted_subobj(model,NPV,n_years,discount_rate)
     
-    total_cost = obj_TEP + obj_weighted
+    total_cost = obj_TEP + Hy*obj_weighted
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
 
     t2 = time.time()  
@@ -501,13 +450,15 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
     model_results,solver_stats = OPF_solve(model,grid,solver)
     
     t1 = time.time()
-    TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering)   
+    TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price_Zones)   
     t2 = time.time()  
     t_modelexport = t2-t1
         
     # TEP_TS_res ={}
     grid.OPF_run=True  
     grid.TEP_run=True
+    grid.TEP_res = TEP_TS_res
+    grid.OPF_obj = weights_def
     
     timing_info = {
     "create": t_modelcreate,
@@ -515,7 +466,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=False,n_years=25,disc
     "export": t_modelexport,
     }
     
-    return model, model_results ,TEP_TS_res, timing_info, solver_stats
+    return model, model_results , timing_info, solver_stats , TEP_TS_res
 
 def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
     OnlyGen=True
@@ -575,21 +526,21 @@ def TEP_obj(model,grid,NPV):
     return inv_line_AC+inv_cable + inv_conv
 
 def weighted_subobj(model,NPV,n_years,discount_rate):
-    
     # Calculate the weighted social cost for each submodel (subblock)
     weighted_subobj = 0
-    present_value =   (1 - (1 + discount_rate) ** -n_years) / discount_rate
-    
+    present_value = (1 - (1 + discount_rate) ** -n_years) / discount_rate
         
     for t in model.Time_frames:
-        submodel_obj = model.submodel[t].obj
+        # Get the objective expression directly
+        submodel_obj = model.submodel[t].obj.expr
         weighted_subobj += model.weights[t] * submodel_obj
             
         model.submodel[t].obj.deactivate()
-    if NPV:
-        weighted_subobj *=present_value
     
-    return weighted_subobj 
+    if NPV:
+        weighted_subobj *= present_value
+    
+    return weighted_subobj
 
 
 def get_price_zone_data(t, model, grid,n_clusters,clustering):
@@ -710,7 +661,7 @@ def get_weight_data(model, t):
     return pyo.value(model.weights[t])
 
 
-def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering):
+def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price_Zones):
     grid.V_AC =np.zeros(grid.nn_AC)
     grid.Theta_V_AC=np.zeros(grid.nn_AC)
     grid.V_DC=np.zeros(grid.nn_DC)
@@ -730,8 +681,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering):
         nAC = node.nodeNumber
         node.V_AC = np.float64(sum(pyo.value(model.submodel[t].V_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
         node.theta = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        node.P_s = np.float64(sum(pyo.value(model.submodel[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        node.Q_s = np.float64(sum(pyo.value(model.submodel[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        if not OnlyAC:
+            node.P_s = np.float64(sum(pyo.value(model.submodel[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+            node.Q_s = np.float64(sum(pyo.value(model.submodel[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
     
         node.PGi_opt = np.float64(sum(pyo.value(model.submodel[t].PGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
         node.QGi_opt = np.float64(sum(pyo.value(model.submodel[t].QGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
@@ -785,16 +737,22 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering):
         
     
     with ThreadPoolExecutor() as executor:
-        futures_ac = [executor.submit(process_ac_node, node) for node in grid.nodes_AC]
-        futures_dc = [executor.submit(process_dc_node, node) for node in grid.nodes_DC]
-        futures_conv = [executor.submit(process_converter, conv) for conv in grid.Converters_ACDC]
-        futures_price_zone = [executor.submit(process_price_zone, m) for m in grid.Price_Zones]
-        futures_rs      = [executor.submit(process_ren_source, m) for m in grid.RenSources]
-        futures_gen     = [executor.submit(process_gen, m) for m in grid.Generators]
-       
-    
+        # Submit all tasks
+        futures = []
+        futures.extend([executor.submit(process_ac_node, node) for node in grid.nodes_AC])
+        
+        if not OnlyAC:
+            futures.extend([executor.submit(process_dc_node, node) for node in grid.nodes_DC])
+            futures.extend([executor.submit(process_converter, conv) for conv in grid.Converters_ACDC])
+            
+        if Price_Zones:
+            futures.extend([executor.submit(process_price_zone, m) for m in grid.Price_Zones])
+            
+        futures.extend([executor.submit(process_ren_source, m) for m in grid.RenSources])
+        futures.extend([executor.submit(process_gen, m) for m in grid.Generators])
+        
         # Wait for all tasks to complete
-        for future in futures_ac + futures_dc + futures_conv + futures_price_zone+futures_rs+futures_gen:
+        for future in futures:
             future.result()
     
     Pf = np.zeros((grid.nn_AC, 1))
@@ -818,7 +776,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering):
         node.Q_INJ = Qf[i]
 
     NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}    
-    NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   
+    
+    if not OnlyAC:
+        NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   
 
     for line in grid.lines_AC_exp:
         line.np_line=NumLinesACP_values[line.lineNumber] 
@@ -931,7 +891,7 @@ def export_TEP_TS_results_to_excel(grid,export):
     [clustering,n_clusters,flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price] = grid.TEP_TS_res
            # Define the column names for the DataFrame
-    columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]","Unit cost [€/MVA]","Life time [years]", "phi [€/MVA-h]"]
+    columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]","Unit cost [€/MVA]","Life time [years]"]
     
     # Create an empty list to hold the data
     data = []
@@ -945,7 +905,7 @@ def export_TEP_TS_results_to_excel(grid,export):
             ini = l.np_line_i
             opt = l.np_line
             pr = opt * l.MW_rating
-            cost = ((opt - ini) * l.MW_rating * l.Length_km * l.phi) * l.life_time * 8760 / 1000
+            cost = ((opt - ini) * l.base_cost)  / 1000
             
             if l.cost_perMWkm is not None:
                 unit_cost= l.Length_km*l.cost_perMWkm
@@ -953,11 +913,9 @@ def export_TEP_TS_results_to_excel(grid,export):
                 unit_cost= l.base_cost /l.MW_rating
             else:
                 unit_cost = np.nan
-                
-            phi = l.phi
-            
+                            
             tot += cost
-            data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,l.life_time,phi])
+            data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,l.life_time])
     
     # Loop through ACDC converters and add data to the list
     for cn in grid.Converters_ACDC:
@@ -966,7 +924,7 @@ def export_TEP_TS_results_to_excel(grid,export):
             ini = cn.NumConvP_i
             opt = cn.NumConvP
             pr = opt * cn.MVA_max
-            cost = ((opt - ini) * cn.MVA_max * cn.phi) * cn.life_time * 8760 / 1000
+            cost = ((opt - ini) * cn.base_cost)  / 1000
             tot += cost
             
             if cn.cost_perMVA is not None:
@@ -976,9 +934,8 @@ def export_TEP_TS_results_to_excel(grid,export):
             else:
                 unit_cost = np.nan
                 
-            phi = cn.phi
             
-            data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,cn.life_time,phi])
+            data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,cn.life_time])
     
     # Create a pandas DataFrame with the collected data
     df = pd.DataFrame(data, columns=columns)    
@@ -1007,7 +964,7 @@ def export_TEP_TS_results_to_excel(grid,export):
 
     data_L = {}
 
-    # Loop through 
+    # Loop through
     for z in grid.Price_Zones:
         
         # Extract the zone name
@@ -1031,9 +988,11 @@ def export_TEP_TS_results_to_excel(grid,export):
     flipped_LF = Load_factors.T
     
     
-
-
-    with pd.ExcelWriter(f'{export}.xlsx') as writer:
+    if export.endswith('.xlsx'):
+        export=export
+    else:
+        export=f'{export}.xlsx'
+    with pd.ExcelWriter(export) as writer:
         df.to_excel(writer, sheet_name='TEP solution', index=True)
         flipped_data_SC.to_excel(writer, sheet_name='Social Cost k€', index=True)
         flipped_data_PN.to_excel(writer, sheet_name='Net price_zone power MW', index=True)

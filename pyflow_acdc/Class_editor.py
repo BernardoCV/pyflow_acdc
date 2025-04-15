@@ -678,8 +678,12 @@ def time_series_dict(grid, ts):
                 break  # Stop after assigning to the correct node
 
 
-def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None):
-    TS = Time_Series_data
+def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,name=None):
+    # Check if Time_Series_data is a numpy array and convert to pandas DataFrame if needed
+    if not isinstance(Time_Series_data, pd.DataFrame):
+        TS = pd.DataFrame(Time_Series_data, columns=[name])
+    else:
+        TS = Time_Series_data
     Time_series = {}
     # check if there are nan values in Time series and change to 0
     TS.fillna(0, inplace=True)

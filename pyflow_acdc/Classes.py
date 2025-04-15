@@ -705,6 +705,7 @@ class Grid:
             Sto = V_cart[j]*np.conj(i_to)
         
             line.loss = Sfrom+Sto
+            line.P_loss = np.real(line.loss)
             
             line.fromS=Sfrom
             line.toS=Sto
@@ -2010,6 +2011,8 @@ class Price_Zone:
         self.c=c
         self.PGL_min=-np.inf
         self.PGL_max=np.inf
+        
+        self.PN= 0
         
         
         self.TS_dict = {

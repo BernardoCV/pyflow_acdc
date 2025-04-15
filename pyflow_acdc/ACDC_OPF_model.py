@@ -50,7 +50,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
         Converter_variables(model,grid,Conv_info)
 
     if TEP:
-        TEP_variables(model,grid,AC_info,DC_info,Conv_info)
+        TEP_variables(model,grid)
     else:
         TEP_parameters(model,grid,AC_info,DC_info,Conv_info)
 
@@ -1444,20 +1444,16 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
         model.NumConvP = pyo.Param(model.conv,initialize=NumConvP)
 
 
-def TEP_variables(model,grid,AC_info,DC_info,Conv_info):
-
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info = AC_info
-    S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
-
+def TEP_variables(model,grid):
 
     OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
     from .ACDC_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
 
-    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv,conv_phi = conv_var
-    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length,line_phi = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,line_phi = AC_line_var
+    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
+    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length = AC_line_var
 
     "TEP variables"
     
@@ -1587,11 +1583,14 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         
     if Price_Zones:
         # Parallelize price zone processing
-        
+        pz_price = {k: np.float64(pyo.value(v)) for k, v in model.price_zone_price.items()}
+        pz_PN    = {k: np.float64(pyo.value(v)*grid.S_base) for k, v in model.PN.items()}
+
+
         def process_price_zone(m):
             nM = m.price_zone_num
-            m.price = np.float64(pyo.value(model.price_zone_price[nM]))
-
+            m.price = pz_price[nM]
+            m.PN    = pz_PN[nM]
         with ThreadPoolExecutor() as executor:
             executor.map(process_price_zone, grid.Price_Zones)
     if TEP_AC:
@@ -1699,6 +1698,6 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         executor.map(process_converter, grid.Converters_ACDC)
         
     
-    
     grid.Line_DC_calc()
 
+    

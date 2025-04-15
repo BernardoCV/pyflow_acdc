@@ -126,7 +126,8 @@ __all__ = [
     'expand_elements_from_pd',
     'update_attributes',
     'Expand_element',
-    'Translate_pd_TEP'
+    'Translate_pd_TEP',
+    'export_TEP_TS_results_to_excel',
 
     # Time Series Analysis
     'Time_series_PF',
