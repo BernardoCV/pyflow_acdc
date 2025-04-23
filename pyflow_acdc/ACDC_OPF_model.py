@@ -1461,7 +1461,7 @@ def TEP_variables(model,grid):
     if TEP_AC:
         def NPline_bounds_AC(model, line):
             element=grid.lines_AC_exp[line]
-            if element.np_line_opf==False:
+            if not element.np_line_opf:
                 return (NP_lineAC[line], NP_lineAC[line])
             else:
                 return (NP_lineAC[line], NP_lineAC_max[line])

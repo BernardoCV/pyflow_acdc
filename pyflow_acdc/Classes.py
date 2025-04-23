@@ -615,7 +615,8 @@ class Grid:
             line = self.lines_DC[k]
             fromNode = line.fromNode.nodeNumber
             toNode = line.toNode.nodeNumber
-
+            if line.R ==0:
+                s=1
             self.Ybus_DC[fromNode, toNode] -= 1/line.R
             self.Ybus_DC[toNode, fromNode] = self.Ybus_DC[fromNode, toNode]
 

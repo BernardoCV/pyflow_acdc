@@ -178,7 +178,7 @@ def create_dictionaries(grid):
                     "PZ" :node.PZ,
                     "geometry": node.geometry.wkt if node.geometry is not None else None
                 })
-
+                s=1
     # AC Lines
     if grid.lines_AC:
         for line in getattr(grid, "lines_AC", []):

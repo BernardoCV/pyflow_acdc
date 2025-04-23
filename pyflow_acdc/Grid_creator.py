@@ -253,6 +253,8 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             Conductance  = AC_line_data.at[index, 'G']   if 'G'   in AC_line_data.columns else 0
             Susceptance  = AC_line_data.at[index, 'B']   if 'B'   in AC_line_data.columns else 0
             MVA_rating   = AC_line_data.at[index, 'MVA_rating']   if 'MVA_rating'   in AC_line_data.columns else 99999
+            A_rating       = AC_line_data.at[index, 'A_rating']   if 'A_rating'   in AC_line_data.columns else None
+            
             km           = AC_line_data.at[index, 'Length_km']    if 'Length_km'    in AC_line_data.columns else 1
             kV_base      = toNode.kV_base 
             m            = AC_line_data.at[index, 'm']            if 'm'            in AC_line_data.columns else 1
@@ -261,7 +263,11 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
             isTF = True if  'transformer_id' in AC_line_data.columns else False
             
-            
+            if A_rating is not None:
+                N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
+                MVA_rating = N_cables*A_rating*kV_base*np.sqrt(3)/(1000)
+
+
             Z_base = kV_base**2/S_base
             
             Resistance = Resistance / Z_base if Resistance else 0.0001
@@ -752,8 +758,15 @@ def Create_grid_from_mat(matfile):
     else:
         DC_exp_node_data = None
 
-    DC_node_data = pd.concat([DC_node_data, DC_exp_node_data])
-
+    # Safe concatenation of DC_node_data and DC_exp_node_data
+    if DC_node_data is not None and DC_exp_node_data is not None:
+        DC_node_data = pd.concat([DC_node_data, DC_exp_node_data])
+    elif DC_node_data is None and DC_exp_node_data is not None:
+        DC_node_data = DC_exp_node_data
+    elif DC_node_data is not None and DC_exp_node_data is None:
+        pass  # DC_node_data remains unchanged
+    else:
+        DC_node_data = None  # Both are None
 
     DC_line_data=pd.DataFrame(data['branchdc'], columns=branch_DC) if 'branchdc' in data else None
     if DC_line_data is not None:
@@ -762,17 +775,31 @@ def Create_grid_from_mat(matfile):
     DC_exp_line_data=pd.DataFrame(data['branchdc_ne'], columns=candidate_dc_branch) if 'branchdc_ne' in data else None
     
 
-    DC_line_data = pd.concat([DC_line_data, DC_exp_line_data])
+    # Safe concatenation of DC_line_data and DC_exp_line_data
+    if DC_line_data is not None and DC_exp_line_data is not None:
+        DC_line_data = pd.concat([DC_line_data, DC_exp_line_data])
+    elif DC_line_data is None and DC_exp_line_data is not None:
+        DC_line_data = DC_exp_line_data
+    elif DC_line_data is not None and DC_exp_line_data is None:
+        pass  # DC_line_data remains unchanged
+    else:
+        DC_line_data = None  # Both are None
 
-
-    
+        
     Converter_data=pd.DataFrame(data['convdc'], columns=converter_columns) if 'convdc' in data else None
     if Converter_data is not None:
         Converter_data['cost'] = -1  #
     Conv_exp_data=pd.DataFrame(data['convdc_ne'], columns=candidate_conv) if 'convdc_ne' in data else None
 
-    Converter_data = pd.concat([Converter_data, Conv_exp_data])
-    s=1
+    # Safe concatenation of Converter_data and Conv_exp_data
+    if Converter_data is not None and Conv_exp_data is not None:
+        Converter_data = pd.concat([Converter_data, Conv_exp_data])
+    elif Converter_data is None and Conv_exp_data is not None:
+        Converter_data = Conv_exp_data
+    elif Converter_data is not None and Conv_exp_data is None:
+        pass  # Converter_data remains unchanged
+    else:
+        Converter_data = None  # Both are None
 
 
     if AC_node_data is None:
@@ -911,7 +938,8 @@ def Create_grid_from_mat(matfile):
             if DC_line_data.at[index, 'cost'] >= 0:
                 DC_lines[var_name].np_line_opf = True
                 DC_lines[var_name].np_line   = 0
-                DC_lines[var_name].np_line_i = 0
+                DC_lines[var_name].np_line_b = 0
+                DC_lines[var_name].np_line_i = 1
                 DC_lines[var_name].np_line_max = 3
                 DC_lines[var_name].base_cost = DC_line_data.at[index, 'cost']
 
@@ -980,8 +1008,9 @@ def Create_grid_from_mat(matfile):
             if Converter_data.at[index, 'cost'] >= 0:
                 Converters[var_name].NUmConvP_opf = True
                 Converters[var_name].NumConvP   = 0
-                Converters[var_name].NumConvP_i = 0
-                Converters[var_name].NumConvP_max = 3
+                Converters[var_name].NumConvP_b = 0
+                Converters[var_name].NumConvP_i = 1
+                Converters[var_name].NumConvP_max = 1
                 Converters[var_name].base_cost = Converter_data.at[index, 'cost']
         Convertor_list = list(Converters.values())
 
@@ -1024,7 +1053,8 @@ def Create_grid_from_mat(matfile):
             line.base_cost = EXP_line_data.at[index, 'construction_cost']  
             line.lineNumber = index
             line.np_line = 0
-            line.np_line_i = 0
+            line.np_line_b = 0
+            line.np_line_i = 1
             line.np_line_max = 3
             G.lines_AC_exp.append(line)
         G.Update_Graph_AC()
