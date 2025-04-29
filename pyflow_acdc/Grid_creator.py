@@ -733,7 +733,28 @@ def Create_grid_from_mat(matfile):
     
     
     # Gen_data = pd.DataFrame(data['gen'], columns=gen_columns)             if 'gen' in data else None    
-    Gen_data_cost = pd.DataFrame(data['gencost'], columns=gencost_columns) if 'gencost' in data else None
+    if 'gencost' in data:
+        num_cols = data['gencost'].shape[1]
+        first_model = int(data['gencost'][0, 0]) if data['gencost'].shape[0] > 0 else 2
+        if first_model == 1:
+            # Piecewise linear: model, startup, shutdown, n, (x1, y1), (x2, y2), ...
+            gencost_columns = ['model', 'startup', 'shutdown', 'n']
+            num_pairs = (num_cols - 4) // 2
+            for i in range(1, num_pairs + 1):
+                gencost_columns.extend([f'x{i}', f'y{i}'])
+            # If there are any remaining columns (in case of odd number), add generic names
+            if len(gencost_columns) < num_cols:
+                gencost_columns += [f'extra_{i}' for i in range(len(gencost_columns)+1, num_cols+1)]
+        else:
+            # Polynomial: use the default columns, but trim or extend as needed
+            default_poly_cols = ['model', 'startup', 'shutdown', 'n', 'c(n-1)', 'c(n-2)', 'c0']
+            if num_cols > len(default_poly_cols):
+                # Add extra columns if needed
+                default_poly_cols += [f'extra_{i}' for i in range(len(default_poly_cols)+1, num_cols+1)]
+            gencost_columns = default_poly_cols[:num_cols]
+        Gen_data_cost = pd.DataFrame(data['gencost'], columns=gencost_columns)
+    else:
+        Gen_data_cost = None
 
     if 'busdc' in data:
         num_data_columns = len(data['busdc'][0])
@@ -1076,8 +1097,35 @@ def Create_grid_from_mat(matfile):
             PsetMW = Gen_data.at[index,'Pg']
             QsetMVA = Gen_data.at[index,'Qg']
 
-            lf = Gen_data_cost.at[index, 'c(n-2)']   
-            qf = Gen_data_cost.at[index, 'c(n-1)'] 
+
+            if first_model == 1:
+                # Extract x/y pairs from the row
+                n_points = int(Gen_data_cost.at[index, 'n'])
+                x_vals = []
+                y_vals = []
+                for i in range(1, n_points + 1):
+                    x_col = f'x{i}'
+                    y_col = f'y{i}'
+                    if x_col in Gen_data_cost.columns and y_col in Gen_data_cost.columns:
+                        x_vals.append(Gen_data_cost.at[index, x_col])
+                        y_vals.append(Gen_data_cost.at[index, y_col])
+                # Fit quadratic: y = a*x^2 + b*x + c
+                if len(x_vals) >= 3:
+                    a, b, c = np.polyfit(x_vals, y_vals, 2)
+                    qf = a
+                    lf = b
+                    cf = c
+                elif len(x_vals) == 2:
+                    b, c = np.polyfit(x_vals, y_vals, 1)
+                    qf = 0
+                    lf = b
+                    cf = c
+                else:
+                    qf, lf, cf = 0, 0, 0
+            else:
+                qf = Gen_data_cost.at[index, 'c(n-1)']
+                lf = Gen_data_cost.at[index, 'c(n-2)']   
+                cf = Gen_data_cost.at[index, 'c0']
             
             price_zone_link = False
             
