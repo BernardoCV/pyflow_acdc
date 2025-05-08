@@ -305,9 +305,9 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     t2 = time.time()  
     t_modelcreate = t2-t1
     
-    
-    model_results,solver_stats = OPF_solve(model,grid,solver)
 
+    model_results,solver_stats = OPF_solve(model,grid,solver)
+    
     t1 = time.time()
     ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
     for obj in weights_def:
