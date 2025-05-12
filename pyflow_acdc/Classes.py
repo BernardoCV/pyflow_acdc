@@ -1464,6 +1464,126 @@ class Rep_Line_AC(Line_AC):
         self.Ybus_branch_new = np.array([[branch_ff_new, branch_ft_new],
                                         [branch_tf_new, branch_tt_new]])
 
+
+class Line_sizing(Line_AC):
+    def __init__(self, cable_types: list, active_config: int = 0, *args, **kwargs):
+        """
+        Initialize an Line_sizing with multiple possible cable configurations from the database.
+        
+        Parameters
+        ----------
+        cable_types : list
+            List of cable type names from the database to use as configurations
+        active_config : int
+            Index of the currently active configuration
+        """
+            
+        if not cable_types:
+            raise ValueError("At least one cable type must be provided")
+            
+        # Validate all cable types exist in database
+        for cable_type in cable_types:
+            if cable_type not in self._cable_database.index:
+                raise ValueError(f"Cable type '{cable_type}' not found in database")
+        
+        
+        super().__init__(*args,**kwargs)
+        
+        self.cable_types = cable_types
+        self._active_config = active_config
+        
+    
+
+        # Store parameters for each configuration
+        self._config_parameters = {}
+        self._calculate_all_parameters()
+        
+        # Add array-specific attributes
+        self.array_opf = True  # Flag for optimization
+     
+        # Connect to nodes
+        self.toNode.connected_toArrayLine.append(self)
+        self.fromNode.connected_fromArrayLine.append(self)
+        
+    @property
+    def active_config(self):
+        return self._active_config
+    
+    @active_config.setter
+    def active_config(self, value):
+        if not 0 <= value < len(self.cable_types):
+            raise ValueError(f"Configuration index must be between 0 and {len(self.cable_types)-1}")
+        self._active_config = value
+        self._update_active_parameters()
+        
+    def _update_active_parameters(self):
+        """Update the line parameters based on the active configuration."""
+        self.R = self.R_list[self._active_config]
+        self.X = self.X_list[self._active_config]
+        self.G = self.G_list[self._active_config]
+        self.B = self.B_list[self._active_config]
+        self.MVA_rating = self.MVA_rating_list[self._active_config]
+        self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
+        
+    def _calculate_all_parameters(self):
+        """Calculate and store parameters for all configurations."""
+            # Initialize parameter lists
+        self.R_list = []
+        self.X_list = []
+        self.G_list = []
+        self.B_list = []
+        self.MVA_rating_list = []
+        self.base_cost = []
+        self.Ybus_list = []
+        for cable_type in self.cable_types:
+            R, X, G, B, MVA_rating = self.get_cable_parameters(
+                cable_type,
+                self.S_base,
+                self.Length_km,
+                1, # Number of parallel lines set default to 1
+                self.kV_base
+            )
+            
+            self.R_list.append(R)
+            self.X_list.append(X)
+            self.G_list.append(G)
+            self.B_list.append(B)
+            self.MVA_rating_list.append(MVA_rating)
+            
+            cost_per_km = self.get_cost_parameter(cable_type)
+            self.base_cost.append(cost_per_km * self.Length_km)
+
+            # Calculate and store Ybus for this configuration
+            self.Z = R + X * 1j
+            self.Y = G + B * 1j
+            self._calculate_Ybus_branch()
+            self.Ybus_list.append(self.Ybus_branch.copy())
+        
+        # Set initial parameters
+        self._update_active_parameters()
+        
+    def add_cable_type(self, cable_type):
+        """Add a new cable type to the array."""
+        if cable_type not in self._cable_database.index:
+            raise ValueError(f"Cable type '{cable_type}' not found in database")
+        self.cable_types.append(cable_type)
+        self._calculate_all_parameters()
+        
+    def remove_cable_type(self, config_index):
+        """Remove a cable type from the array."""
+        if len(self.cable_types) <= 1:
+            raise ValueError("Cannot remove the last cable type")
+        if not 0 <= config_index < len(self.cable_types):
+            raise ValueError(f"Configuration index must be between 0 and {len(self.cable_types)-1}")
+            
+        self.cable_types.pop(config_index)
+        if self._active_config >= len(self.cable_types):
+            self._active_config = len(self.cable_types) - 1
+        self._calculate_all_parameters()
+
+    def get_cost_parameter(self,cable_type):
+        return self._cable_database.loc[cable_type, 'Cost_per_km'] if 'Cost_per_km' in self._cable_database.columns else 1
+    
 class TF_Line_AC:
     trafNumber = 0
     names = set()
@@ -2243,6 +2363,6 @@ class TimeSeries:
 
         TimeSeries.names.add(self.name)
 
-    
+
 Line_AC.load_cable_database()
 Line_DC.load_cable_database()
