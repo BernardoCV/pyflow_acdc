@@ -19,6 +19,7 @@ from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC
 __all__ = [
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
+    'repurpose_element_from_pd',
     'update_attributes',
     'Expand_element',
     'Translate_pd_TEP',
@@ -122,6 +123,28 @@ def expand_elements_from_pd(grid,exp_elements):
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'exp')
     ))
 
+def repurpose_element_from_pd(grid,rep_elements):
+    from .Class_editor import change_line_AC_to_repurposing
+    
+    def get_column_value(row, col_name,default_value=None):
+        return row[col_name] if col_name in row.index else default_value
+    
+    # Apply the Expand_element function for each element in exp_elements
+    rep_elements.iloc[:, 0].apply(lambda name: change_line_AC_to_repurposing(
+        grid,
+        name,
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'r_new',default_value=0.001),
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'x_new',default_value=0.001),
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'g_new',default_value=0),
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'b_new',default_value=0),
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'MVA_rating_new',default_value=99999),
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'Life_time',default_value=1),
+        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'base_cost',default_value=0),
+
+    ))
+
+
+
 def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_cost, exp):
    """Updates the attributes of the given element if not None."""
    if N_b is not None:
@@ -160,7 +183,8 @@ def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_co
        base_cost_calculation(element)
    if exp is not None:
        element.exp = exp
-        
+
+
 def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None, exp=None):
     
     if N_max is None:
@@ -241,7 +265,12 @@ def get_TEP_variables(grid):
     NP_lineDC,NP_lineDC_i,NP_lineDC_max ={},{},{}
     NP_lineAC,NP_lineAC_i,NP_lineAC_max = {},{},{}
     Line_length ={}
-        
+    REP_branch ={}
+
+
+    for l in grid.lines_AC_rep:
+        REP_branch[l.lineNumber] = 0 if not l.rep_branch  else 1
+
     for l in grid.lines_AC_exp:
         NP_lineAC[l.lineNumber]     = l.np_line
         NP_lineAC_i[l.lineNumber]   = (
@@ -272,14 +301,14 @@ def get_TEP_variables(grid):
     
     conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv)
     DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length)
-    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length)
+    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch)
 
 
     return conv_var,DC_line_var,AC_line_var
 
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',initial_guess=0):
 
-    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
@@ -330,7 +359,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
 
 
 def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
-    OnlyAC,TEP_AC,TAP_tf = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
 
@@ -478,7 +507,7 @@ def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
 
 def TEP_obj(model,grid,NPV):
   
-    OnlyAC,TEP_AC,TAP_tf=analyse_OPF(grid) 
+    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid) 
       
     def AC_Line_investments():
         AC_Inv_lines=0
@@ -491,6 +520,15 @@ def TEP_obj(model,grid,NPV):
                    AC_Inv_lines+=(model.NumLinesACP[l]-model.NumLinesACP_base[l])*line.base_cost/line.life_time_hours
     
         return AC_Inv_lines
+    
+    def Repurposing_investments():
+        Rep_Inv_lines=0
+        for l in model.lines_AC_rep:
+            line = grid.lines_AC_rep[l]
+            if line.rep_line_opf:
+                Rep_Inv_lines+=model.rep_branch[l]*line.base_cost
+        return Rep_Inv_lines
+    
     def Cables_investments():
         Inv_lines=0
         for l in model.lines_DC:
@@ -517,6 +555,12 @@ def TEP_obj(model,grid,NPV):
         inv_line_AC = AC_Line_investments()
     else:
         inv_line_AC=0
+
+    if REP_AC:
+        inv_line_AC_rep = Repurposing_investments()
+    else:
+        inv_line_AC_rep = 0
+
     if not OnlyAC:
         inv_cable = Cables_investments()
         inv_conv = Converter_investments()
@@ -524,7 +568,7 @@ def TEP_obj(model,grid,NPV):
         inv_cable = 0
         inv_conv  = 0
 
-    return inv_line_AC+inv_cable + inv_conv
+    return inv_line_AC+inv_line_AC_rep+inv_cable + inv_conv
 
 def weighted_subobj(model,NPV,n_years,discount_rate):
     # Calculate the weighted social cost for each submodel (subblock)

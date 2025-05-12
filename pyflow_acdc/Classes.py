@@ -67,6 +67,7 @@ class Grid:
                 line.S_base = self.S_base
                 self.lines_AC.append(line)
         self.lines_AC_exp = []
+        self.lines_AC_rep = []
         self.lines_AC_tf  = []
         
         self.Converters_ACDC = Converters if Converters else []
@@ -270,6 +271,10 @@ class Grid:
     @property
     def nle_AC(self): 
         return len(self.lines_AC_exp) if self.lines_AC_exp is not None else 0   
+    
+    @property
+    def nlr_AC(self): 
+        return len(self.lines_AC_rep) if self.lines_AC_rep is not None else 0   
     
     @property
     def nttf(self): 
@@ -484,7 +489,7 @@ class Grid:
 
     
         "Creating Graphs to differentiate Grids"
-        for line in self.lines_AC + self.lines_AC_exp+ self.lines_AC_tf:
+        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rep + self.lines_AC_tf:
             self.Graph_AC.add_edge(line.fromNode, line.toNode,line=line)
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode,line=line)
             line.toNode.stand_alone = False
@@ -506,12 +511,12 @@ class Grid:
         for i, Grid in enumerate(self.Grids_AC):
             for node in Grid:
                 self.Graph_node_to_Grid_index_AC[node.nodeNumber] = i
-                for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_tf:
+                for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rep + self.lines_AC_tf:
                     if line.fromNode == node or line.toNode == node:
                         self.Graph_line_to_Grid_index_AC[line] = i
         
 
-        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_tf:
+        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rep + self.lines_AC_tf:
             g=self.Graph_line_to_Grid_index_AC[line]
             self.rating_grid_AC[g]+=line.MVA_rating
             self.Graph_number_lines_AC[g]+=1
@@ -1012,8 +1017,13 @@ class Node_AC:
         # self.Min_pow_genR=0
         self.connected_gen=[]
         self.connected_RenSource=[]
+        
         self.connected_toExpLine=[]
         self.connected_fromExpLine=[]
+        
+        self.connected_toRepLine=[]
+        self.connected_fromRepLine=[]
+
         self.connected_toTFLine=[]
         self.connected_fromTFLine=[]
         
@@ -1395,6 +1405,64 @@ class Exp_Line_AC(Line_AC):
         
         self.toNode.connected_toExpLine.append(self)
         self.fromNode.connected_fromExpLine.append(self)
+
+class Rep_Line_AC(Line_AC):
+    
+    def __init__(self,r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+        self.kV_base = self.fromNode.kV_base
+        self.direction = 'from'
+        self.base_cost = base_cost
+        self.life_time = Life_time
+        self.exp_inv=1
+        self.cost_perMVAkm = None
+        self.phi=0
+
+        self.rep_branch = False
+        self.rep_line_opf=True
+
+        self.R_new = r_new
+        self.X_new = x_new
+        self.G_new = g_new
+        self.B_new = b_new
+        self.MVA_rating_new = MVA_rating_new
+        
+        # Calculate new Ybus_branch
+        self._calculate_Ybus_branch_new()
+
+        self.hover_text = None
+        
+        self.toNode.connected_toRepLine.append(self)
+        self.fromNode.connected_fromRepLine.append(self)
+        
+    def _calculate_Ybus_branch_new(self):
+        """
+        Calculate the new branch admittance matrix (Ybus_branch_new) using the new parameters.
+        
+        The matrix is structured as:
+        [[Yff  Yft]
+         [Ytf  Ytt]]
+        
+        where:
+        - Yff: admittance at from-bus to from-bus
+        - Yft: admittance at from-bus to to-bus
+        - Ytf: admittance at to-bus to from-bus
+        - Ytt: admittance at to-bus to to-bus
+        """
+        # Calculate new impedance and admittance
+        self.Z_new = self.R_new + self.X_new * 1j
+        self.Y_new = self.G_new + self.B_new * 1j       
+        
+        # Calculate new branch elements
+        branch_ft_new = -(1/self.Z_new)/np.conj(self.tap)
+        branch_tf_new = -(1/self.Z_new)/self.tap
+        branch_ff_new = (1/self.Z_new + self.Y_new/2)/(self.m**2)
+        branch_tt_new = (1/self.Z_new + self.Y_new/2)
+        
+        # Create new Ybus_branch matrix
+        self.Ybus_branch_new = np.array([[branch_ff_new, branch_ft_new],
+                                        [branch_tf_new, branch_tt_new]])
 
 class TF_Line_AC:
     trafNumber = 0

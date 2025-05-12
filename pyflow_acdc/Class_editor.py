@@ -41,6 +41,7 @@ __all__ = [
     
     # Line Modifications
     'change_line_AC_to_expandable',
+    'change_line_AC_to_repurposing',
     'change_line_AC_to_tap_transformer',
     
     # Zone Assignments
@@ -273,6 +274,46 @@ def change_line_AC_to_expandable(grid, line_name):
         line.lineNumber = i 
         
     return expandable_line    
+
+def change_line_AC_to_repurposing(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
+    l = None
+    for line_to_process in grid.lines_AC:
+        if line_name == line_to_process.name:
+            l = line_to_process
+            break
+            
+    if l is not None:    
+        grid.lines_AC.remove(l)
+        l.remove()
+        line_vars = {
+            'fromNode': l.fromNode,
+            'toNode': l.toNode,
+            'r': l.R,
+            'x': l.X,
+            'g': l.G,
+            'b': l.B,
+            'MVA_rating': l.MVA_rating,
+            'Length_km': l.Length_km,
+            'm': l.m,
+            'shift': l.shift,
+            'N_cables': l.N_cables,
+            'name': l.name,
+            'geometry': l.geometry,
+            'S_base': l.S_base,
+            'Cable_type': l.Cable_type
+        }
+        rep_line = Rep_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
+        grid.lines_AC_rep.append(rep_line)
+        grid.Update_Graph_AC()
+
+    # Reassign line numbers to ensure continuity
+    for i, line in enumerate(grid.lines_AC):
+        line.lineNumber = i 
+    grid.create_Ybus_AC()
+    for i, line in enumerate(grid.lines_AC_rep):
+        line.lineNumber = i 
+        
+    return rep_line  
 
 def change_line_AC_to_tap_transformer(grid, line_name):
     l = None

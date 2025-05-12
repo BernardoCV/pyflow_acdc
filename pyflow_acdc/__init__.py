@@ -124,6 +124,7 @@ __all__ = [
     'transmission_expansion_TS',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
+    'repurpose_element_from_pd',
     'update_attributes',
     'Expand_element',
     'Translate_pd_TEP',

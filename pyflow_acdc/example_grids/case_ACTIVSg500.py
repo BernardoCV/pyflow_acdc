@@ -1197,10 +1197,11 @@ def case_ACTIVSg500(TEP=False,exp='All',N_b=1,N_i=1,N_max=5):
         else:
             for line in list(grid.lines_AC):  
                 name = line.name
-                if name not in exp:
+                if name not in exp.keys():
                     continue
                 line_cost = lines_AC.loc[name,'Cost MUSD']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+                line_N_i = exp[name]
+                pyf.Expand_element(grid,name,N_b=N_b,N_i=line_N_i,N_max=N_max,base_cost=line_cost)
             s=1
     
     # Return the grid

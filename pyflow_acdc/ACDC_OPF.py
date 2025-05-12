@@ -510,10 +510,12 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     lista_lineas_AC = list(range(0, grid.nl_AC))
     lista_lineas_AC_exp = list(range(0, grid.nle_AC))
     lista_lineas_AC_tf = list(range(0, grid.nttf))
+    lista_lineas_AC_rep = list(range(0, grid.nlr_AC))
     # Dictionaries for AC variables
     price, V_ini_AC, Theta_ini = {}, {}, {}
     P_renSource, P_know, Q_know = {}, {}, {}
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
+    S_lineACrep_lim, S_lineACrep_lim_new,REP_AC_act = {}, {}, {}
     lf,qf = {}, {}
 
     u_min_ac = list(range(0, grid.nn_AC))
@@ -563,7 +565,12 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     for l in grid.lines_AC_exp:
         S_lineACexp_limit[l.lineNumber] = l.MVA_rating / grid.S_base
         NP_lineAC[l.lineNumber]         = l.np_line
-        
+
+    for l in grid.lines_AC_rep:
+        S_lineACrep_lim[l.lineNumber] = l.MVA_rating / grid.S_base
+        S_lineACrep_lim_new[l.lineNumber] = l.MVA_rating_new / grid.S_base
+        REP_AC_act[l.lineNumber] = 0 if not l.rep_branch  else 1
+
     for l in grid.lines_AC_tf:
         S_lineACtf_limit[l.lineNumber]  = l.MVA_rating / grid.S_base
         m_tf_og[l.lineNumber]           = l.m
@@ -571,9 +578,9 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     
     
     # Packing common AC info
-    AC_Lists = pack_variables(lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_exp,lista_lineas_AC_tf,lista_gen,lista_rs, AC_slack, AC_PV)
+    AC_Lists = pack_variables(lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_exp,lista_lineas_AC_tf,lista_lineas_AC_rep,lista_gen,lista_rs, AC_slack, AC_PV)
     AC_nodes_info = pack_variables(u_min_ac, u_max_ac, V_ini_AC, Theta_ini, P_know, Q_know, price)
-    AC_lines_info = pack_variables(S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC)
+    AC_lines_info = pack_variables(S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,S_lineACrep_lim,S_lineACrep_lim_new,m_tf_og,NP_lineAC,REP_AC_act)
     gen_info = pack_variables(lf,qf,P_renSource)
     AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,gen_info)
     

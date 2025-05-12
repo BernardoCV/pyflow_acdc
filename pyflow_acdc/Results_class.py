@@ -951,8 +951,17 @@ class Results:
                     maxn=l.np_line_max
                     table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         
-        
-        
+        for l in self.Grid.lines_AC_rep:
+            if l.rep_line_opf:
+                if l.rep_branch:
+                    element= l.name
+                    ini= 0
+                    opt= l.rep_branch
+                    pr= l.MVA_rating_new
+                    cost= l.base_cost
+                    tot+=cost
+                    table.add_row([element, "AC Upgrade" ,"", "","",np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
+
         for l in self.Grid.lines_DC:
             if l.np_line_opf:
                 if (l.np_line-l.np_line_b)>0.01:
