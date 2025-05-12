@@ -29,6 +29,8 @@ __all__ = [
     'add_extGrid',
     'add_RenSource',
     'add_generators_fromcsv',
+    'add_cable_option',
+    'add_line_sizing',
     
     # Add Zones
     'add_RenSource_zone',
@@ -48,6 +50,7 @@ __all__ = [
     'assign_RenToZone',
     'assign_nodeToPrice_Zone',
     'assign_ConvToPrice_Zone',
+    'assign_lineToCable_options',
     
     # Parameter Calculations
     'Cable_parameters',
@@ -352,6 +355,13 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     grid.create_Ybus_AC()
     s=1    
 
+def add_line_sizing(grid, fromNode, toNode,cable_types: list, active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None):       
+    line = Line_sizing(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
+    grid.lines_sizing.append(line)
+    if cable_option is not None:
+        assign_lineToCable_options(grid,line.name,cable_option)
+    return line
+
 def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu'):
     kV_base=toNode.kV_base
     if data_in == 'Ohm':
@@ -413,6 +423,11 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
     return conv
 
 "Zones"
+
+def add_cable_option(grid, cable_types: list,name=None):
+    cable_option = Cable_options(cable_types,name)
+    grid.Cable_options.append(cable_option)
+    return cable_option
 
 
 def add_RenSource_zone(Grid,name):
@@ -904,6 +919,50 @@ def assign_ConvToPrice_Zone(Grid, conv_name, new_price_zone_name):
         # Add node to the new price_zone
         if conv_to_reassign not in new_price_zone.ConvACDC:
             new_price_zone.ConvACDC.append(conv_to_reassign)            
+
+def assign_lineToCable_options(Grid,line_name, new_cable_option_name):
+    """ Assign line to a new cable_type and remove it from its previous cable_type """
+    new_cable_option = None
+    old_cable_option = None
+    line_to_reassign = None
+
+    for cable_option in Grid.Cable_options:
+        if cable_option.name == new_cable_option_name:
+            new_cable_option = cable_option
+            break
+
+    if new_cable_option is None:
+        raise ValueError(f"Cable_option {new_cable_option_name} not found.")
+
+    # Remove line from its old cable_option
+    for cable_option in Grid.Cable_options: 
+        for line in cable_option.lines:
+            if line.name == line_name:
+                old_cable_option = cable_option
+                line_to_reassign = line
+                break
+        if old_cable_option:
+            break
+
+    if old_cable_option is not None:
+        old_cable_option.lines = [line for line in old_cable_option.lines if line.name != line_name]    
+
+    if line_to_reassign is None:
+        for line in Grid.lines_sizing:
+            if line.name == line_name:
+                line_to_reassign = line
+                break
+        if line_to_reassign is None:
+            raise ValueError(f"Line {line_name} not found.")
+
+    # Add line to the new cable_option
+    if line_to_reassign not in new_cable_option.lines:
+        new_cable_option.lines.append(line_to_reassign) 
+        line_to_reassign.cable_types = new_cable_option.cable_types
+
+
+
+
 
 def expand_cable_database(data, format='yaml', save_yalm=False):
     """

@@ -511,12 +511,15 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     lista_lineas_AC_exp = list(range(0, grid.nle_AC))
     lista_lineas_AC_tf = list(range(0, grid.nttf))
     lista_lineas_AC_rep = list(range(0, grid.nlr_AC))
+    lista_lineas_AC_ct = list(range(0, grid.nl_AC_ct))
     # Dictionaries for AC variables
     price, V_ini_AC, Theta_ini = {}, {}, {}
     P_renSource, P_know, Q_know = {}, {}, {}
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
     S_lineACrep_lim, S_lineACrep_lim_new,REP_AC_act = {}, {}, {}
     lf,qf = {}, {}
+
+    S_lineACct_lim,cab_types_set,allowed_types = {},{},{}
 
     u_min_ac = list(range(0, grid.nn_AC))
     u_max_ac = list(range(0, grid.nn_AC))
@@ -575,14 +578,21 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
         S_lineACtf_limit[l.lineNumber]  = l.MVA_rating / grid.S_base
         m_tf_og[l.lineNumber]           = l.m
         
-    
+    for l in grid.lines_AC_ct:
+        for i in l.MVA_rating_list:
+            S_lineACct_lim[l.lineNumber,i] = i / grid.S_base
+    cab_types_set = list(range(0,len(l.MVA_rating_list)))
+    allowed_types = grid.cab_types_allowed
     
     # Packing common AC info
-    AC_Lists = pack_variables(lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_exp,lista_lineas_AC_tf,lista_lineas_AC_rep,lista_gen,lista_rs, AC_slack, AC_PV)
+    AC_Lists = pack_variables(lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_tf,lista_gen,lista_rs, AC_slack, AC_PV)
     AC_nodes_info = pack_variables(u_min_ac, u_max_ac, V_ini_AC, Theta_ini, P_know, Q_know, price)
-    AC_lines_info = pack_variables(S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,S_lineACrep_lim,S_lineACrep_lim_new,m_tf_og,NP_lineAC,REP_AC_act)
+    AC_lines_info = pack_variables(S_lineAC_limit,S_lineACtf_limit,m_tf_og)
     gen_info = pack_variables(lf,qf,P_renSource)
-    AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,gen_info)
+    EXP_info = pack_variables(lista_lineas_AC_exp,S_lineACexp_limit,NP_lineAC)
+    REP_info = pack_variables(lista_lineas_AC_rep,S_lineACrep_lim,S_lineACrep_lim_new,REP_AC_act)
+    CT_info = pack_variables(lista_lineas_AC_ct,S_lineACct_lim,cab_types_set,allowed_types)
+    AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,gen_info,EXP_info,REP_info,CT_info)
     
     "Price zone info"
    

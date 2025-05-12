@@ -573,7 +573,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     model = pyo.ConcreteModel()
     model.name="TS AC/DC hybrid OPF"
     
-    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
     
     t1 = time.time()
     OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)

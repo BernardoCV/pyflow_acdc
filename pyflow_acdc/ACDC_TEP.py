@@ -308,7 +308,7 @@ def get_TEP_variables(grid):
 
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',initial_guess=0):
 
-    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
@@ -359,7 +359,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
 
 
 def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
 
@@ -507,7 +507,7 @@ def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
 
 def TEP_obj(model,grid,NPV):
   
-    OnlyAC,TEP_AC,TAP_tf,REP_AC = analyse_OPF(grid) 
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid) 
       
     def AC_Line_investments():
         AC_Inv_lines=0
