@@ -189,7 +189,7 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
        
     return node
     
-def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu',Cable_type:str ='Custom'):
+def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu',Cable_type:str ='Custom',update_grid=True):
     
     if isinstance(fromNode, str):
         fromNode = next((node for node in grid.nodes_AC if node.name == fromNode), None)
@@ -218,18 +218,21 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
     if tap_changer:
         line = TF_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,m, shift, name)
         grid.lines_AC_tf.append(line)
-        grid.Update_Graph_AC()
+        if update_grid:
+            grid.Update_Graph_AC()
     elif Expandable:
         line = Exp_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating,Length_km,m, shift,N_cables, name,S_base=grid.S_base,Cable_type=Cable_type)
         grid.lines_AC_exp.append(line)
-        grid.Update_Graph_AC()
+        if update_grid:
+            grid.Update_Graph_AC()
         
     else:    
         line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating,Length_km,m, shift,N_cables, name,S_base=grid.S_base,Cable_type=Cable_type)
         
         grid.lines_AC.append(line)
-        grid.create_Ybus_AC()
-        grid.Update_Graph_AC()
+        if update_grid: 
+            grid.create_Ybus_AC()
+            grid.Update_Graph_AC()
         
     if geometry is not None:
        if isinstance(geometry, str): 
@@ -355,14 +358,21 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     grid.create_Ybus_AC()
     s=1    
 
-def add_line_sizing(grid, fromNode, toNode,cable_types: list, active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None):       
+def add_line_sizing(grid, fromNode, toNode,cable_types: list=[], active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None,update_grid=True,geometry=None):       
     line = Line_sizing(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
-    grid.lines_sizing.append(line)
+    grid.lines_AC_ct.append(line)
     if cable_option is not None:
         assign_lineToCable_options(grid,line.name,cable_option)
+    if update_grid:
+        grid.create_Ybus_AC()
+        grid.Update_Graph_AC() 
+    if geometry is not None:
+       if isinstance(geometry, str): 
+            geometry = loads(geometry)  
+       line.geometry = geometry
     return line
 
-def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu'):
+def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu',update_grid=True):
     kV_base=toNode.kV_base
     if data_in == 'Ohm':
         Z_base = kV_base**2/grid.S_base
@@ -389,8 +399,9 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
        if isinstance(geometry, str): 
             geometry = loads(geometry)  
        line.geometry = geometry
-    grid.create_Ybus_DC()
-    grid.Update_Graph_DC()
+    if update_grid:
+        grid.create_Ybus_DC()
+        grid.Update_Graph_DC()
     return line
 
 def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
@@ -948,7 +959,7 @@ def assign_lineToCable_options(Grid,line_name, new_cable_option_name):
         old_cable_option.lines = [line for line in old_cable_option.lines if line.name != line_name]    
 
     if line_to_reassign is None:
-        for line in Grid.lines_sizing:
+        for line in Grid.lines_AC_ct:
             if line.name == line_name:
                 line_to_reassign = line
                 break

@@ -278,7 +278,12 @@ def get_TEP_variables(grid):
             else max(l.np_line,min(l.np_line_i , l.np_line_max))
         )
         NP_lineAC_max[l.lineNumber]   = l.np_line_max
-        
+
+    ct_ini = {}
+    for l in grid.lines_AC_ct:
+        for ct in range(len(l._cable_types)):
+            ct_ini[l.lineNumber, ct] = 1 if ct == l.active_config else 0  
+             
     for conv in grid.Converters_ACDC:
         NumConvP [conv.ConvNumber]  = conv.NumConvP 
         NumConvP_i[conv.ConvNumber] = (
@@ -301,7 +306,7 @@ def get_TEP_variables(grid):
     
     conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv)
     DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length)
-    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch)
+    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch,ct_ini)
 
 
     return conv_var,DC_line_var,AC_line_var
@@ -334,6 +339,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     t2 = time.time()  
     t_modelcreate = t2-t1
     
+    # model.obj.pprint()
 
     model_results,solver_stats = OPF_solve(model,grid,solver)
     
@@ -399,6 +405,12 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     lista_lineas_DC = list(range(0, grid.nl_DC))
     lista_conv = list(range(0, grid.nconv))
     lista_AC   = list(range(0,grid.nle_AC))
+    lista_AC_rep = list(range(0,grid.nlr_AC))
+    lista_AC_ct = list(range(0,grid.nct_AC))
+    if grid.Cable_options is not None:
+        cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
+    else:
+        cab_types_set = []
 
     t1 = time.time()
     model = pyo.ConcreteModel()
@@ -410,7 +422,11 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     model.conv        = pyo.Set(initialize=lista_conv)
     model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
     model.lines_AC_exp= pyo.Set(initialize=lista_AC)
-    
+    model.lines_AC_rep= pyo.Set(initialize=lista_AC_rep)
+    model.lines_AC_ct = pyo.Set(initialize=lista_AC_ct)
+    model.ct_set = pyo.Set(initialize=cab_types_set)
+
+
     w={}
 
     base_model = pyo.ConcreteModel()
@@ -466,6 +482,26 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.Time_frames, rule=NP_ACline_link)
     model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.Time_frames, rule=NP_line_link)
     model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
+    
+    def NP_ACline_rep_link(model,line,t):
+        element=grid.lines_AC_rep[line]
+        if element.rep_line_opf:
+            return model.rep_branch[line] ==model.submodel[t].rep_branch[line]
+        else:
+            return pyo.Constraint.Skip
+    if REP_AC:
+        model.NP_ACline_rep_link_constraint = pyo.Constraint(model.lines_AC_rep,model.Time_frames, rule=NP_ACline_rep_link) 
+
+
+    def NP_ACline_ct_link(model,line,ct,t):
+        element=grid.lines_AC_ct[line]
+        if element.array_opf:
+            return model.ct_branch[line,ct] ==model.submodel[t].ct_branch[line,ct]
+        else:
+            return pyo.Constraint.Skip
+    if CT_AC:
+        model.NP_ACline_ct_link_constraint = pyo.Constraint(model.lines_AC_ct,model.ct_set,model.Time_frames, rule=NP_ACline_ct_link)
+
     
     model.weights = pyo.Param(model.Time_frames, initialize=w)
     obj_TEP = TEP_obj(model,grid,NPV)
@@ -539,7 +575,17 @@ def TEP_obj(model,grid,NPV):
              else:
                  Inv_lines+=(model.NumLinesDCP[l]-model.NumLinesDCP_base[l])*line.base_cost/line.life_time_hours
         return Inv_lines
-            
+
+    def Array_investments():
+        Inv_array=0
+        for l in model.lines_AC_ct:
+            line= grid.lines_AC_ct[l]
+            if line.array_opf:
+                for ct in model.ct_set:
+                    Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]
+        return Inv_array
+        
+    
     def Converter_investments():
         Inv_conv=0
         for cn in model.conv:
@@ -561,6 +607,11 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_line_AC_rep = 0
 
+    if CT_AC:
+        inv_array = Array_investments()
+    else:
+        inv_array = 0
+
     if not OnlyAC:
         inv_cable = Cables_investments()
         inv_conv = Converter_investments()
@@ -568,7 +619,7 @@ def TEP_obj(model,grid,NPV):
         inv_cable = 0
         inv_conv  = 0
 
-    return inv_line_AC+inv_line_AC_rep+inv_cable + inv_conv
+    return inv_line_AC+inv_line_AC_rep+inv_cable + inv_conv + inv_array
 
 def weighted_subobj(model,NPV,n_years,discount_rate):
     # Calculate the weighted social cost for each submodel (subblock)

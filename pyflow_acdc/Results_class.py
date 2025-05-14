@@ -961,6 +961,17 @@ class Results:
                     cost= l.base_cost
                     tot+=cost
                     table.add_row([element, "AC Upgrade" ,"", "","",np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
+        for l in self.Grid.lines_AC_ct:
+            if l.array_opf:
+                element= l.name
+                ini= l.cable_types[l.ini_active_config]
+                max=l.cable_types[l.max_active_config]
+                ct=l.active_config
+                type=l.cable_types[ct]
+                pr= l.MVA_rating
+                cost= l.base_cost[ct]
+                tot+=cost
+                table.add_row([element, "AC CT" ,ini, type, max,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
 
         for l in self.Grid.lines_DC:
             if l.np_line_opf:

@@ -1478,12 +1478,12 @@ class Rep_Line_AC(Line_AC):
 
 
 class Line_sizing(Line_AC):
-    line_sizing_num = 0
+    lineNumber = 0
     names = set()
 
     @classmethod
     def reset_class(cls):
-        cls.line_sizing_num = 0
+        cls.lineNumber = 0
         cls.names = set()
         
     @property
@@ -1508,8 +1508,11 @@ class Line_sizing(Line_AC):
             # Update active parameters
             self._update_active_parameters()
 
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC, cable_types: list = None, active_config: int = 0, Length_km:float=1.0, S_base:float=100, name=None):       
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC, cable_types: list = None, active_config: int = 0, Length_km:float=1.0, S_base:float=100, name=None,geometry=None):       
         # Initialize basic line parameters
+        self.lineNumber = Line_sizing.lineNumber
+        Line_sizing.lineNumber += 1
+        
         self.Length_km = Length_km
         self.S_base = S_base
         self.fromNode = fromNode
@@ -1521,8 +1524,9 @@ class Line_sizing(Line_AC):
         
         # Initialize cable-related attributes
         self._cable_types = cable_types if cable_types is not None else []
+        self.ini_active_config = active_config
         self._active_config = active_config
-        
+     
         # Initialize parameter lists
         self.R_list = []
         self.X_list = []
@@ -1531,8 +1535,12 @@ class Line_sizing(Line_AC):
         self.MVA_rating_list = []
         self.base_cost = []
         self.Ybus_list = []
-        
-        # If cable types are provided, validate and calculate parameters
+
+        self.geometry = geometry
+        self.fromS = 0
+        self.toS = 0
+        self.loss = 0
+        # If cablez types are provided, validate and calculate parameters
         if self._cable_types:
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
@@ -1541,7 +1549,8 @@ class Line_sizing(Line_AC):
             
             # Calculate parameters for all configurations
             self._calculate_all_parameters()
-        
+
+            
         # Add array-specific attributes
         self.array_opf = True  # Flag for optimization
 
@@ -1573,6 +1582,7 @@ class Line_sizing(Line_AC):
         self.B = self.B_list[self._active_config]
         self.MVA_rating = self.MVA_rating_list[self._active_config]
         self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
+        self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
         
     def _calculate_all_parameters(self):
         """Calculate and store parameters for all configurations."""
@@ -1584,6 +1594,7 @@ class Line_sizing(Line_AC):
         self.MVA_rating_list = []
         self.base_cost = []
         self.Ybus_list = []
+       
         for cable_type in self._cable_types:
             R, X, G, B, MVA_rating = self.get_cable_parameters(
                 cable_type,

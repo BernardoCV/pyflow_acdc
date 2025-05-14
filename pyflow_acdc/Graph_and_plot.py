@@ -131,7 +131,7 @@ def update_lineAC_hovertext(line,S_base,text):
             line_string = f"{fromnode} -> {tonode}"
         else:
             line_string = f"{fromnode} <- {tonode}"
-        line.hover_text = f"{Line_tf}: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}<br>Type: {cable}%"
+        line.hover_text = f"{Line_tf}: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Type: {cable}%"
               
 def update_lineDC_hovertext(line,S_base,text):            
     dec=2
@@ -209,7 +209,6 @@ def update_lineACexp_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS, decimals=dec)
         Sto = np.round(line.toS, decimals=dec)
-        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
         np_line = np.round(line.np_line, decimals=1)
         if np_line == 0:
             load = 0
@@ -240,6 +239,97 @@ def update_lineACexp_hovertext(line,S_base,text):
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Transformer' if line.isTf else 'Line'
         line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
+
+def update_lineACrep_hovertext(line,S_base,text):
+    dec=2
+    line.direction = 'from' if line.fromS >= 0 else 'to'
+    if text =='data':
+        name = line.name
+        fromnode = line.fromNode.name
+        tonode = line.toNode.name
+        l = int(line.Length_km)
+        z= np.round(line.Z,decimals=5) if not line.rep_branch else np.round(line.Z_rep,decimals=5)
+        y= np.round(line.Y,decimals=5) if not line.rep_branch else np.round(line.Y_rep,decimals=5)
+        rating = line.MVA_rating if not line.rep_branch else line.MVA_rating_new
+        rating = np.round(rating,decimals=0)
+        Line_tf = 'Reconductoring branch'
+        line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>Length: {l}km<br>Rating: {rating}MVA"
+
+    elif text=='inPu':
+        
+        name= line.name
+        fromnode = line.fromNode.name
+        tonode = line.toNode.name
+        Sfrom= np.round(line.fromS, decimals=dec)
+        Sto = np.round(line.toS, decimals=dec)
+        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
+        Loading = np.round(load, decimals=0).astype(int)    
+        if np.real(Sfrom) > 0:
+            line_string = f"{fromnode} -> {tonode}"
+        else:
+            line_string = f"{fromnode} <- {tonode}"
+        Line_tf = 'Reconductoring branch'
+        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Lines: {np_line}"
+    else:
+        name= line.name
+        fromnode = line.fromNode.name
+        tonode = line.toNode.name
+        Sfrom= np.round(line.fromS*S_base, decimals=0)
+        Sto = np.round(line.toS*S_base, decimals=0)
+        load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/(line.MVA_rating*line.np_line)*100
+        Loading = np.round(load, decimals=0).astype(int)
+        if np.real(Sfrom) > 0:
+            line_string = f"{fromnode} -> {tonode}"
+        else:
+            line_string = f"{fromnode} <- {tonode}"
+        Line_tf = 'Reconductoring branch'
+        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
+
+def update_lineACct_hovertext(line,S_base,text):
+    dec=2
+    line.direction = 'from' if line.fromS >= 0 else 'to'
+    if text =='data':
+        name = line.name
+        fromnode = line.fromNode.name
+        tonode = line.toNode.name
+        l = int(line.Length_km)
+        z= np.round(line.Z,decimals=5)
+        y= np.round(line.Y,decimals=5)
+        rating = line.MVA_rating
+        rating = np.round(rating,decimals=0)
+        Line_tf = 'Cable type line'
+        line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>Length: {l}km<br>Rating: {rating}MVA"
+
+    elif text=='inPu':
+        
+        name= line.name
+        fromnode = line.fromNode.name
+        tonode = line.toNode.name
+        Sfrom= np.round(line.fromS, decimals=dec)
+        Sto = np.round(line.toS, decimals=dec)
+        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
+        Loading = np.round(load, decimals=0).astype(int)    
+        if np.real(Sfrom) > 0:
+            line_string = f"{fromnode} -> {tonode}"
+        else:
+            line_string = f"{fromnode} <- {tonode}"
+        Line_tf = 'Cable type line'
+        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Lines: {np_line}"
+    else:
+        name= line.name
+        fromnode = line.fromNode.name
+        tonode = line.toNode.name
+        Sfrom= np.round(line.fromS*S_base, decimals=0)
+        Sto = np.round(line.toS*S_base, decimals=0)
+        load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/(line.MVA_rating*line.np_line)*100
+        Loading = np.round(load, decimals=0).astype(int)
+        if np.real(Sfrom) > 0:
+            line_string = f"{fromnode} -> {tonode}"
+        else:
+            line_string = f"{fromnode} <- {tonode}"
+        Line_tf = 'Cable type line'
+        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
+
 
 
 def update_tf_hovertext(line,S_base,text):            
@@ -404,6 +494,12 @@ def update_hovertexts(grid,text):
         if grid.lines_AC_exp is not None:    
             for line in grid.lines_AC_exp:
                 futures.append(executor.submit(update_lineACexp_hovertext, line, S_base, text))
+        if grid.lines_AC_rep is not None:
+            for line in grid.lines_AC_rep:
+                futures.append(executor.submit(update_lineACrep_hovertext, line, S_base, text))
+        if grid.lines_AC_ct is not None:
+            for line in grid.lines_AC_ct:
+                futures.append(executor.submit(update_lineACct_hovertext, line, S_base, text))
         if grid.lines_AC_tf is not None:    
             for line in grid.lines_AC_tf:
                 futures.append(executor.submit(update_tf_hovertext, line, S_base, text))
@@ -495,10 +591,14 @@ def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
  
     lines_ac = Grid.lines_AC if Grid.lines_AC is not None else []
     lines_ac_exp = Grid.lines_AC_exp if Grid.lines_AC_exp is not None else []
+    lines_ac_rep = Grid.lines_AC_rep if Grid.lines_AC_rep is not None else []
+    lines_ac_ct = Grid.lines_AC_ct if Grid.lines_AC_ct is not None else []
     lines_dc = Grid.lines_DC if Grid.lines_DC is not None else []
     nodes_DC = Grid.nodes_DC if Grid.nodes_DC is not None else []
     lines_dc_set = set(lines_dc)
     lines_ac_exp_set = set(lines_ac_exp)
+    lines_ac_rep_set = set(lines_ac_rep)
+    lines_ac_ct_set = set(lines_ac_ct)
 
 
     pio.renderers.default = 'browser'
@@ -967,7 +1067,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800):
         all_bounds = []
         
         # Add lines
-        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC:
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC+grid.lines_AC_rep+grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
                 all_bounds.append(line.geometry.bounds)
                 
@@ -1003,9 +1103,27 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800):
                 padding + (x - minx) * scale,
                 height - (padding + (y - miny) * scale)  # Flip Y axis
             )
-        
+        cable_type_colors = {
+        0: 'red', 
+        1: 'purple', 
+        2: 'orange', 
+        3: 'cyan', 
+        4: 'magenta', 
+        5: 'brown', 
+        6: 'gray', 
+        7: 'lime', 
+        8: 'navy', 
+        9: 'teal', 
+        10: 'violet', 
+        11: 'indigo', 
+        12: 'turquoise', 
+        13: 'beige', 
+        14: 'coral', 
+        15: 'salmon', 
+        16: 'olive'
+        }
         # Draw AC lines
-        for line in grid.lines_AC + grid.lines_AC_tf:
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rep + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
                 coords = list(line.geometry.coords)
                 path_data = "M "
@@ -1014,7 +1132,15 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800):
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]  # Remove last "L "
                 
-                color = "black" if getattr(line, 'isTf', False) else "red"
+
+                
+                if line in grid.lines_AC_rep and line.rep_branch:
+                    color = "green"
+                elif line in grid.lines_AC_ct:
+                     color = cable_type_colors.get(line.active_config, "red")  
+                else:
+                    color = "black" if getattr(line, 'isTf', False) else "red"  # Original logic for other lines
+                
                 dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2, fill='none'))
         
         # Draw DC lines
@@ -1036,8 +1162,32 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800):
                 color = "black" if isinstance(node, Node_AC) else "purple"
                 dwg.add(dwg.circle(center=(svg_x, svg_y), r=3, 
                                  fill=color, stroke=color))
-        
                 
+        if grid.nct_AC != 0 and hasattr(grid.lines_AC_ct[0], 'cable_types'):
+            # Transform the legend position to be within the visible bounds
+            legend_x, legend_y = transform_coords(minx, maxy)  # Use the top-left corner of the bounds
+            legend_spacing = 20  # Space between legend items
+            
+            # Add legend title
+            dwg.add(dwg.text("Cable Types", 
+                            insert=(legend_x, legend_y - 10),
+                            font_size=15,
+                            font_family="NewComputerModernSans"))
+            
+            # Add legend items
+            for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                color = cable_type_colors.get(i, "black")
+                # Add colored line
+                dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
+                               end=(legend_x + 30, legend_y + i * legend_spacing),
+                               stroke=color,
+                               stroke_width=2))
+                # Add text
+                dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
+                                font_size=12,
+                                font_family="NewComputerModernSans",
+                                fill=color))
         # Save the SVG file
         dwg.save()
         print(f"Network saved as {name}.svg")

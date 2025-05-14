@@ -2,8 +2,8 @@
 # Units:
 #   - Resistance: ohm/km
 #   - Inductance: mH/km
-#   - Capacitance: µF/km
-#   - Conductance: µS/km
+#   - Capacitance: ï¿½F/km
+#   - Conductance: ï¿½S/km
 #   - Current rating: A
 #   - Power rating: MVA
 #   - Nominal voltage: kV
@@ -20,3 +20,4 @@ ABB_Cu_XLPE_120mm2_66kV:
   conductor_size: 120
   Type: AC
   Reference: ABB
+  Cost_per_km: 157000

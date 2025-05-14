@@ -511,7 +511,7 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     lista_lineas_AC_exp = list(range(0, grid.nle_AC))
     lista_lineas_AC_tf = list(range(0, grid.nttf))
     lista_lineas_AC_rep = list(range(0, grid.nlr_AC))
-    lista_lineas_AC_ct = list(range(0, grid.nl_AC_ct))
+    lista_lineas_AC_ct = list(range(0, grid.nct_AC))
     # Dictionaries for AC variables
     price, V_ini_AC, Theta_ini = {}, {}, {}
     P_renSource, P_know, Q_know = {}, {}, {}
@@ -579,9 +579,12 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
         m_tf_og[l.lineNumber]           = l.m
         
     for l in grid.lines_AC_ct:
-        for i in l.MVA_rating_list:
-            S_lineACct_lim[l.lineNumber,i] = i / grid.S_base
-    cab_types_set = list(range(0,len(l.MVA_rating_list)))
+        for i in range(len(l.MVA_rating_list)):
+            S_lineACct_lim[l.lineNumber,i] = l.MVA_rating_list[i] / grid.S_base
+    if grid.Cable_options is not None:
+        cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
+    else:
+        cab_types_set = []
     allowed_types = grid.cab_types_allowed
     
     # Packing common AC info
