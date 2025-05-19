@@ -359,6 +359,11 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     s=1    
 
 def add_line_sizing(grid, fromNode, toNode,cable_types: list=[], active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None,update_grid=True,geometry=None):       
+    if isinstance(fromNode, str):
+        fromNode = next((node for node in grid.nodes_AC if node.name == fromNode), None)
+    if isinstance(toNode, str):
+        toNode = next((node for node in grid.nodes_AC if node.name == toNode), None)
+    
     line = Line_sizing(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
     grid.lines_AC_ct.append(line)
     if cable_option is not None:

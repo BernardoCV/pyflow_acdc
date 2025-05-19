@@ -20,6 +20,8 @@ def initialize_pyflowacdc():
     Node_AC.reset_class()
     Node_DC.reset_class()
     Line_AC.reset_class()
+    Line_sizing.reset_class()
+   
     Line_DC.reset_class()
     TF_Line_AC.reset_class()  # Add this
     AC_DC_converter.reset_class()
@@ -303,7 +305,9 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             A_rating = AC_line_data.at[index, 'A_rating']   if 'A_rating'   in AC_line_data.columns else 9999
             # kV_base = AC_line_data.at[index, 'kV_base']
             kV_base= toNode.kV_base 
+            #print(AC_line_data['Length_km'].dtype)
             km = AC_line_data.at[index, 'Length_km']      if 'Length_km'   in AC_line_data.columns else 1
+            #print(type(km))
             N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
             m    = AC_line_data.at[index, 'm']             if 'm'            in AC_line_data.columns else 1
             shift= AC_line_data.at[index, 'shift']         if 'shift'        in AC_line_data.columns else 0

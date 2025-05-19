@@ -98,6 +98,18 @@ class Grid:
         self.iter_flow_AC = []
         self.iter_flow_DC = []
 
+        self.OPF_obj = {
+       'Ext_Gen': {'w': 0},
+       'Energy_cost': {'w': 0},
+       'Curtailment_Red': {'w': 0},
+       'AC_losses': {'w': 0},
+       'DC_losses': {'w': 0},
+       'Converter_Losses': {'w': 0},
+       'General_Losses': {'w': 0},
+       'PZ_cost_of_generation': {'w': 0},
+       'Renewable_profit': {'w': 0},
+       'Gen_set_dev': {'w': 0}
+    }
         self.OPF_run= False
         self.TEP_run=False
        
@@ -878,7 +890,7 @@ class Ren_Source:
         self.Qmax=0
         self.Qmin=0
         
-        self.Max_S= None
+        self.Max_S= PGi_ren_base
             
         node.connected_RenSource.append(self)
         node.RenSource=True

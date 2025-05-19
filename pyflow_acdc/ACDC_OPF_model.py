@@ -730,14 +730,7 @@ def AC_constraints(model,grid,AC_info):
             loss += (model.ct_PAC_to[line,ct]+model.ct_PAC_from[line,ct])*(model.ct_branch[line,ct])
         return model.ct_PAC_line_loss[line]== loss
     
-    def ct_cable_type_rule(model, line):
-        return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
     
-    def ct_types_upper_bound(model, ct):
-        return sum(model.ct_branch[l, ct] for l in model.lines_AC_ct) <= len(model.lines_AC_ct) * model.ct_types[ct]
-
-    def ct_types_lower_bound(model, ct):
-        return model.ct_types[ct] <= sum(model.ct_branch[l, ct] for l in model.lines_AC_ct)
 
     if CT_AC:   
         model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
@@ -746,10 +739,7 @@ def AC_constraints(model,grid,AC_info):
         model.ct_Qfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=Q_from_AC_line_ct)
         model.ct_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_ct, rule=P_loss_AC_rule_ct)
 
-        model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)
-
-        model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
-        model.ct_types_lower_bound = pyo.Constraint(model.ct_set, rule=ct_types_lower_bound)
+        
     s=1
     def P_to_AC_line_tf(model,trafo):   
         tf = grid.lines_AC_tf[trafo]
@@ -914,13 +904,12 @@ def AC_constraints(model,grid,AC_info):
     def S_from_AC_limit_rule_ct(model,line,ct):
         return (model.ct_PAC_from[line,ct]**2+model.ct_QAC_from[line,ct]**2)*(model.ct_branch[line,ct]) <= S_lineACct_lim[line,ct]**2
    
-    def CT_limit_rule(model):
-        return sum(model.ct_types[ct] for ct in model.ct_set) <= allowed_types
+    
 
     if CT_AC:
         model.ct_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct)
         model.ct_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct)
-        model.CT_limit_constraint = pyo.Constraint(rule=CT_limit_rule)
+       
     s=1
         
 
@@ -1632,10 +1621,15 @@ def price_zone_parameters(model,grid,AC_info,DC_info):
         model.price_dc  = pyo.Param(model.nodes_DC, initialize=price_dc,mutable=True)
 
 def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    from .ACDC_TEP import get_TEP_variables
 
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REP_info,CT_info = AC_info
-    S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,S_lineACrep_lim,S_lineACrep_lim_new,m_tf_og,NP_lineAC,REP_branch = AC_lines_info
-   
+    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
+
+    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
+    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch,ct_ini = AC_line_var
+
 
     OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
     if TEP_AC:    
@@ -1643,6 +1637,10 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
 
     if REP_AC:
         model.rep_branch = pyo.Param(model.lines_AC_rep,initialize=REP_branch)
+    
+    if CT_AC:
+        model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
+
     if not OnlyAC:
         DC_Lists,DC_nodes_info,DC_lines_info = DC_info
         P_lineDC_limit,NP_lineDC    = DC_lines_info
@@ -1791,7 +1789,7 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             element.QGen = QGen_values[element.genNumber]
         elif hasattr(element, 'rsNumber'):  # Renewable Source
             element.gamma = gamma_values[element.rsNumber]
-            element.Qren  = Qren_values[element.rsNumber]
+            element.QGi_ren  = Qren_values[element.rsNumber]
 
     # Combine Generators and Renewable Sources into one iterable
     elements = grid.Generators + grid.RenSources

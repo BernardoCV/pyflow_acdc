@@ -55,9 +55,9 @@ class Results:
                 self.Ext_WPP()
             if self.Grid.Price_Zones != []: 
                 self.Price_Zone()    
-        if self.Grid.TEP_run:
+        
             self.AC_exp_lines_power()
-            
+        if self.Grid.TEP_run:    
             self.TEP_N()
             if self.Grid.TEP_res is not None:
                 self.TEP_TS_norm()
@@ -195,7 +195,22 @@ class Results:
                     self.Grid.load_grid_AC[G] += load
                     
                     self.lossP_AC[G] += Ploss
-                    
+
+            for line in (self.Grid.lines_AC_rep + self.Grid.lines_AC_ct):
+                node = line.fromNode
+                G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
+                Ploss = np.real(line.loss)*self.Grid.S_base
+                
+                Sfrom = abs(line.fromS)*self.Grid.S_base
+                Sto   = abs(line.toS)*self.Grid.S_base
+
+                load = max(Sfrom, Sto)
+                
+                self.Grid.load_grid_AC[G] += load
+                
+                self.lossP_AC[G] += Ploss
+
+           
             tot = 0
             for g in range(self.Grid.Num_Grids_AC):
                 if self.Grid.rating_grid_AC[g]!=0:
@@ -665,7 +680,78 @@ class Results:
                             np.round(Qloss, decimals=self.dec),
                             np.round(load, decimals=self.dec)
                         ])
-                     
+
+            for line in self.Grid.lines_AC_rep:
+                 if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
+                        i = line.fromNode.nodeNumber
+                        j = line.toNode.nodeNumber
+                        
+                        
+                        p_from = np.real(line.fromS)*self.Grid.S_base
+                        Q_from = np.imag(line.fromS)*self.Grid.S_base
+    
+                        p_to = np.real(line.toS)*self.Grid.S_base
+                        Q_to = np.imag(line.toS)*self.Grid.S_base
+    
+                        Ploss = np.real(line.loss)*self.Grid.S_base
+                        Qloss = np.imag(line.loss)*self.Grid.S_base
+
+                        Sfrom = abs(line.fromS)*self.Grid.S_base
+                        Sto   = abs(line.toS)*self.Grid.S_base
+
+                        if line.rep_branch:
+                            load = max(Sfrom, Sto)/(line.MVA_rating_new)*100
+                        else:
+                            load = max(Sfrom, Sto)/(line.MVA_rating)*100
+
+                        tablep.add_row([
+                            line.name, 
+                            line.fromNode.name, 
+                            line.toNode.name, 
+                            np.round(p_from, decimals=self.dec), 
+                            np.round(Q_from, decimals=self.dec), 
+                            np.round(p_to, decimals=self.dec), 
+                            np.round(Q_to, decimals=self.dec), 
+                            np.round(Ploss, decimals=self.dec), 
+                            np.round(Qloss, decimals=self.dec),
+                            np.round(load, decimals=self.dec)
+                        ])
+
+            for line in self.Grid.lines_AC_ct:
+                 if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
+                        i = line.fromNode.nodeNumber
+                        j = line.toNode.nodeNumber
+                        
+                        
+                        p_from = np.real(line.fromS)*self.Grid.S_base
+                        Q_from = np.imag(line.fromS)*self.Grid.S_base
+    
+                        p_to = np.real(line.toS)*self.Grid.S_base
+                        Q_to = np.imag(line.toS)*self.Grid.S_base
+    
+                        Ploss = np.real(line.loss)*self.Grid.S_base
+                        Qloss = np.imag(line.loss)*self.Grid.S_base
+
+                        Sfrom = abs(line.fromS)*self.Grid.S_base
+                        Sto   = abs(line.toS)*self.Grid.S_base
+
+                        chosen_line = line.active_config
+                        load = max(Sfrom, Sto)/(line.MVA_rating_list[chosen_line])*100
+
+
+                        tablep.add_row([
+                            line.name, 
+                            line.fromNode.name, 
+                            line.toNode.name, 
+                            np.round(p_from, decimals=self.dec), 
+                            np.round(Q_from, decimals=self.dec), 
+                            np.round(p_to, decimals=self.dec), 
+                            np.round(Q_to, decimals=self.dec), 
+                            np.round(Ploss, decimals=self.dec), 
+                            np.round(Qloss, decimals=self.dec),
+                            np.round(load, decimals=self.dec)
+                        ])
+
             if len(tablep.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablep)
 
@@ -803,7 +889,7 @@ class Results:
         print('--------------')
         print('Renewable energy sources')
         table = pt()
-        table.field_names = ["Bus", "Base Power (MW)", "Curtailment %","Power Injected (MW)","Price €/MWh","Cost k€","Curtailment Cost [k€]"]
+        table.field_names = ["Bus", "Base Power (MW)", "Curtailment %","Power Injected (MW)","Reactive Power Injected (MVAR)","Price €/MWh","Cost k€","Curtailment Cost [k€]"]
         bp=0
         tcur=0
         totcost=0
@@ -815,7 +901,7 @@ class Results:
                 cur= (1-rs.gamma)*100
                 tcur+=Pgi*(1-rs.gamma)
                 PGicur=Pgi*(rs.gamma)
-            
+                QGi=rs.QGi_ren*self.Grid.S_base
                 
                 if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
                    
@@ -834,7 +920,7 @@ class Results:
                     curcost=0
                 else:    
                     curcost= (Pgi-PGicur)*node.price*(self.Grid.sigma)/1000
-                table.add_row([rs.name, np.round(Pgi, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec),np.round(price, decimals=self.dec),np.round(cost, decimals=0),np.round(curcost, decimals=0)])
+                table.add_row([rs.name, np.round(Pgi, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec),np.round(QGi, decimals=self.dec),np.round(price, decimals=self.dec),np.round(cost, decimals=0),np.round(curcost, decimals=0)])
                 totcost+=cost
                 totcurcost+=curcost
         
@@ -843,7 +929,7 @@ class Results:
         PGicur=bp-tcur
         cur=(tcur)/bp*100
         
-        table.add_row(['Total', np.round(bp, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec) ,"",np.round(totcost, decimals=0),np.round(totcurcost, decimals=0)])
+        table.add_row(['Total', np.round(bp, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec), "","",np.round(totcost, decimals=0),np.round(totcurcost, decimals=0)])
 
         print(table)    
     

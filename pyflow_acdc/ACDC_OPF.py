@@ -581,7 +581,7 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     for l in grid.lines_AC_ct:
         for i in range(len(l.MVA_rating_list)):
             S_lineACct_lim[l.lineNumber,i] = l.MVA_rating_list[i] / grid.S_base
-    if grid.Cable_options is not None:
+    if grid.Cable_options is not None and len(grid.Cable_options) > 0:
         cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
     else:
         cab_types_set = []
@@ -868,8 +868,9 @@ def OPF_conv_results(model,grid):
 
       
 
-def calculate_objective(grid,obj,OnlyGen=True,OnlyAC=False):
-    s=1
+def calculate_objective(grid,obj,OnlyGen=True):
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+
     if obj =='Ext_Gen':
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
 

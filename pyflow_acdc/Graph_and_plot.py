@@ -269,7 +269,7 @@ def update_lineACrep_hovertext(line,S_base,text):
         else:
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Reconductoring branch'
-        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Lines: {np_line}"
+        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Reconductoring: {line.rep_branch}"
     else:
         name= line.name
         fromnode = line.fromNode.name
@@ -283,7 +283,7 @@ def update_lineACrep_hovertext(line,S_base,text):
         else:
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Reconductoring branch'
-        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
+        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Reconductoring: {line.rep_branch}"
 
 def update_lineACct_hovertext(line,S_base,text):
     dec=2
@@ -314,7 +314,7 @@ def update_lineACct_hovertext(line,S_base,text):
         else:
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Cable type line'
-        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Lines: {np_line}"
+        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Cable type: {line._active_config}"
     else:
         name= line.name
         fromnode = line.fromNode.name
@@ -328,7 +328,7 @@ def update_lineACct_hovertext(line,S_base,text):
         else:
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Cable type line'
-        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
+        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Cable type: {line._active_config}"
 
 
 

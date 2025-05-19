@@ -1,13 +1,19 @@
 from sklearn.cluster import KMeans, DBSCAN, OPTICS, AgglomerativeClustering, SpectralClustering, HDBSCAN
 from sklearn.metrics import pairwise_distances
 from sklearn.preprocessing import StandardScaler
-from sklearn_extra.cluster import KMedoids
+try:
+    from sklearn_extra.cluster import KMedoids
+    KMEDOIDS_AVAILABLE = True
+except ImportError:
+    KMEDOIDS_AVAILABLE = False
 from sklearn.metrics import davies_bouldin_score
 import os
 if 'MPLBACKEND' not in os.environ:
     os.environ['MPLBACKEND'] = 'Agg'
 import matplotlib.pyplot as plt
 import pandas as pd
+pd.options.compute.use_numexpr = False
+pd.options.compute.use_bottleneck = False
 import numpy as np
 import time as time
 from pathlib import Path
@@ -429,19 +435,21 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
 def cluster_TS(grid, n_clusters, time_series=[],central_market=[], algorithm='Kmeans', cv_threshold=0 ,correlation_threshold=0.8,print_details=False,corrolation_decisions=[]):
     algorithm = algorithm.lower()
     #check if algorithm is valid    
-    if algorithm not in {'kmeans','ward','dbscan','optics','kmedoids','spectral','hdbscan','pam_hierarchical'}:
+    valid_algorithms = {'kmeans','ward','dbscan','optics','spectral','hdbscan','pam_hierarchical'}
+    if KMEDOIDS_AVAILABLE:
+        valid_algorithms.add('kmedoids')
+    
+    if algorithm not in valid_algorithms:
         print(f"Algorithm {algorithm} not found, using Kmeans")
         algorithm='kmeans'
-        
     
-        
     [data_scaled,scaler, data],_ = identify_correlations(grid,time_series=time_series, correlation_threshold=correlation_threshold,cv_threshold=cv_threshold,central_market=central_market,print_details=print_details,corrolation_decisions=corrolation_decisions)
   
     if algorithm == 'kmeans':
         clusters, returns, data_info = cluster_Kmeans(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'ward':
         clusters, returns, data_info = cluster_Ward(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
-    elif algorithm == 'kmedoids':
+    elif algorithm == 'kmedoids' and KMEDOIDS_AVAILABLE:
         clusters, returns, data_info = cluster_Kmedoids(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
     elif algorithm == 'pam_hierarchical':
         clusters, returns, data_info = cluster_PAM_Hierarchical(grid, n_clusters, data, [data_scaled, scaler], print_details=print_details)
@@ -767,7 +775,11 @@ def print_clustering_results(algorithm, n_clusters, specific_info):
     return CoV    
 
 def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['kmeans', 'kmedoids', 'ward', 'pam_hierarchical'],n_clusters_list = [1, 4, 8, 16, 24, 48],time_series=[],print_details=False,ts_options=[None,0,0.8],corrolation_decisions=[True,'2',True],plotting=False, plotting_options=[None,'.png'],identifier=None):
-       
+    # Filter out kmedoids if not available
+    if not KMEDOIDS_AVAILABLE:
+        algorithms = [algo for algo in algorithms if algo != 'kmedoids']
+        if print_details:
+            print("Note: KMedoids clustering is not available (sklearn-extra not installed)")
     
     results = {
         'algorithm': [],

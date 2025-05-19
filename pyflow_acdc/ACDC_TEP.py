@@ -346,7 +346,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     t1 = time.time()
     ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
     for obj in weights_def:
-        weights_def[obj]['v']=calculate_objective(grid,obj,True,OnlyAC)
+        weights_def[obj]['v']=calculate_objective(grid,obj,True)
         weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
     t2 = time.time() 
 
@@ -407,7 +407,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     lista_AC   = list(range(0,grid.nle_AC))
     lista_AC_rep = list(range(0,grid.nlr_AC))
     lista_AC_ct = list(range(0,grid.nct_AC))
-    if grid.Cable_options is not None:
+    if grid.Cable_options is not None and len(grid.Cable_options) > 0:
         cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
     else:
         cab_types_set = []
@@ -419,12 +419,16 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     
     #print(list(model.Time_frames))
     model.submodel    = pyo.Block(model.Time_frames)
-    model.conv        = pyo.Set(initialize=lista_conv)
-    model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
-    model.lines_AC_exp= pyo.Set(initialize=lista_AC)
-    model.lines_AC_rep= pyo.Set(initialize=lista_AC_rep)
-    model.lines_AC_ct = pyo.Set(initialize=lista_AC_ct)
-    model.ct_set = pyo.Set(initialize=cab_types_set)
+    if not OnlyAC:
+        model.conv        = pyo.Set(initialize=lista_conv)
+        model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
+    if TEP_AC:
+        model.lines_AC_exp= pyo.Set(initialize=lista_AC)
+    if REP_AC:
+        model.lines_AC_rep= pyo.Set(initialize=lista_AC_rep)
+    if CT_AC:
+        model.lines_AC_ct = pyo.Set(initialize=lista_AC_ct)
+        model.ct_set = pyo.Set(initialize=cab_types_set)
 
 
     w={}
@@ -478,10 +482,12 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
             return model.NumConvP[conv] ==model.submodel[t].NumConvP[conv]
         else:
             return pyo.Constraint.Skip
-    
-    model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.Time_frames, rule=NP_ACline_link)
-    model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.Time_frames, rule=NP_line_link)
-    model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
+    if TEP_AC:
+        model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.Time_frames, rule=NP_ACline_link)
+
+    if not OnlyAC:
+        model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.Time_frames, rule=NP_line_link)
+        model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
     
     def NP_ACline_rep_link(model,line,t):
         element=grid.lines_AC_rep[line]
@@ -516,7 +522,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     model_results,solver_stats = OPF_solve(model,grid,solver)
     
     t1 = time.time()
-    TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price_Zones)   
+    TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
     t2 = time.time()  
     t_modelexport = t2-t1
         
@@ -607,7 +613,22 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_line_AC_rep = 0
 
+    def CT_limit_rule(model):
+            return sum(model.ct_types[ct] for ct in model.ct_set) <= grid.cab_types_allowed
+    def ct_cable_type_rule(model, line):
+        return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
+    
+    def ct_types_upper_bound(model, ct):
+        return sum(model.ct_branch[l, ct] for l in model.lines_AC_ct) <= len(model.lines_AC_ct) * model.ct_types[ct]
+
+    def ct_types_lower_bound(model, ct):
+        return model.ct_types[ct] <= sum(model.ct_branch[l, ct] for l in model.lines_AC_ct)
+        
     if CT_AC:
+        model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)
+        model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
+        model.ct_types_lower_bound = pyo.Constraint(model.ct_set, rule=ct_types_lower_bound)
+        model.CT_limit_constraint = pyo.Constraint(rule=CT_limit_rule)
         inv_array = Array_investments()
     else:
         inv_array = 0
@@ -720,17 +741,61 @@ def get_curtailment_data(t, model, grid,n_clusters,clustering):
 
 def get_line_data(t, model, grid):
     row_data_lines = {'Time_Frame': t}
-
-    for l in grid.lines_DC:
-        if l.np_line_opf:
-            ln = l.lineNumber
-            if l.np_line <= 0.00001:
-                row_data_lines[l.name] = np.nan
-            else:
-                p_to = np.float64(pyo.value(model.submodel[t].PDC_to[ln])) * grid.S_base
-                p_from = np.float64(pyo.value(model.submodel[t].PDC_from[ln])) * grid.S_base
-                load = max(p_to, p_from) / l.MW_rating * 100
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    if TEP_AC:
+        for l in grid.lines_AC_exp:
+            if l.np_line_opf:
+                ln = l.lineNumber
+                P_to = np.float64(pyo.value(model.submodel[t].exp_PAC_to[ln])) * grid.S_base
+                P_from = np.float64(pyo.value(model.submodel[t].exp_PAC_from[ln])) * grid.S_base
+                Q_to = np.float64(pyo.value(model.submodel[t].exp_QAC_to[ln])) * grid.S_base
+                Q_from = np.float64(pyo.value(model.submodel[t].exp_QAC_from[ln])) * grid.S_base
+                S_to = np.sqrt(P_to**2 + Q_to**2)
+                S_from = np.sqrt(P_from**2 + Q_from**2)
+                load = max(S_to, S_from) / l.MVA_rating * 100
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
+    if REP_AC:
+        for l in grid.lines_AC_rep:
+            if l.rep_line_opf:
+                ln = l.lineNumber
+                state = 1 if pyo.value(model.rep_branch[ln]) >= 0.99999 else 0
+                P_to = np.float64(pyo.value(model.submodel[t].rep_PAC_to[ln,state])) * grid.S_base
+                P_from = np.float64(pyo.value(model.submodel[t].rep_PAC_from[ln,state])) * grid.S_base
+                Q_to = np.float64(pyo.value(model.submodel[t].rep_QAC_to[ln,state])) * grid.S_base
+                Q_from = np.float64(pyo.value(model.submodel[t].rep_QAC_from[ln,state])) * grid.S_base
+                S_to = np.sqrt(P_to**2 + Q_to**2)
+                S_from = np.sqrt(P_from**2 + Q_from**2)
+                if state == 1:
+                    load = max(S_to, S_from) / l.MVA_rating_new * 100
+                else:   
+                    load = max(S_to, S_from) / l.MVA_rating * 100 
+                row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
+                
+    if CT_AC:
+        for l in grid.lines_AC_ct:
+            if l.array_opf:
+                ln = l.lineNumber
+                active_config = np.where([pyo.value(model.ct_branch[ln,ct]) >= 0.99999 for ct in model.ct_set])[0][0]
+                ct = list(model.ct_set)[active_config]
+                P_to = np.float64(pyo.value(model.submodel[t].ct_PAC_to[ln,ct])) * grid.S_base
+                P_from = np.float64(pyo.value(model.submodel[t].ct_PAC_from[ln,ct])) * grid.S_base
+                Q_to = np.float64(pyo.value(model.submodel[t].ct_QAC_to[ln,ct])) * grid.S_base
+                Q_from = np.float64(pyo.value(model.submodel[t].ct_QAC_from[ln,ct])) * grid.S_base
+                S_to = np.sqrt(P_to**2 + Q_to**2)
+                S_from = np.sqrt(P_from**2 + Q_from**2)
+                load = max(S_to, S_from) / l.MVA_rating_list[active_config] * 100
+                row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
+    if not OnlyAC:
+        for l in grid.lines_DC:
+            if l.np_line_opf:
+                ln = l.lineNumber
+                if l.np_line <= 0.00001:
+                    row_data_lines[l.name] = np.nan
+                else:
+                    p_to = np.float64(pyo.value(model.submodel[t].PDC_to[ln])) * grid.S_base
+                    p_from = np.float64(pyo.value(model.submodel[t].PDC_from[ln])) * grid.S_base
+                    load = max(p_to, p_from) / l.MW_rating * 100
+                    row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
 
     return row_data_lines
 
@@ -756,12 +821,35 @@ def get_converter_data(t, model, grid):
 def get_weight_data(model, t):
     return pyo.value(model.weights[t])
 
+def get_gen_data(t, model, grid):
+    row_data_gen = {'Time_Frame': t}
+    row_data_qgen = {'Time_Frame': t}
+    for gen in grid.Generators:
+            gn = gen.genNumber
+            PGen = np.float64(pyo.value(model.submodel[t].PGi_gen[gn])) * grid.S_base
+            QGen = np.float64(pyo.value(model.submodel[t].QGi_gen[gn])) * grid.S_base
+            row_data_gen[f'G_{gen.name}'] = np.round(PGen, decimals=0)
+            row_data_qgen[f'G_{gen.name}'] = np.round(QGen, decimals=0)
+    for rg in grid.RenSources:
+            rn = rg.rsNumber
+            PGen = np.float64(pyo.value(model.submodel[t].P_renSource[rn]*model.submodel[t].gamma[rn])) * grid.S_base
+            QGen = np.float64(pyo.value(model.submodel[t].Q_renSource[rn])) * grid.S_base
+            row_data_gen[f'R_{rg.name}'] = np.round(PGen, decimals=0)
+            row_data_qgen[f'R_{rg.name}'] = np.round(QGen, decimals=0)
+    
+    return row_data_gen,row_data_qgen
 
-def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price_Zones):
+
+
+
+def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones):
     grid.V_AC =np.zeros(grid.nn_AC)
     grid.Theta_V_AC=np.zeros(grid.nn_AC)
     grid.V_DC=np.zeros(grid.nn_DC)
-    
+
+
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+
     SW= sum(pyo.value(model.weights[t]) for t in model.Time_frames)
     def process_ren_source(renSource):
         rs = renSource.rsNumber
@@ -871,16 +959,26 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price
         node.P_INJ = Pf[i]
         node.Q_INJ = Qf[i]
 
-    NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}    
+    if TEP_AC:  
+        NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}    
+        for line in grid.lines_AC_exp:
+            line.np_line=NumLinesACP_values[line.lineNumber] 
+    if REP_AC:
+        lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rep_branch.items()}
+        for line in grid.lines_AC_rep:
+            l = line.lineNumber
+            line.rep_branch = True if lines_AC_REP[l] >= 0.99999 else False
+    if CT_AC:
+        lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+        for line in grid.lines_AC_ct:
+            l=line.lineNumber
+            line.active_config = np.where([lines_AC_CT[l][ct] >= 0.75 for ct in model.ct_set])[0][0]
     
     if not OnlyAC:
         NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   
+        for line in grid.lines_DC:
+            line.np_line = NumLinesDCP_values[line.lineNumber]
 
-    for line in grid.lines_AC_exp:
-        line.np_line=NumLinesACP_values[line.lineNumber] 
-    # Parallelize DC line processing
-    for line in grid.lines_DC:
-        line.np_line = NumLinesDCP_values[line.lineNumber]
 
     for z in grid.RenSource_zones:
         if clustering:
@@ -890,13 +988,15 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price
            
     # Multithreading the time frame processing
     data_rows_PN = []
-    data_rows_GEN= []
+    data_rows_PZGEN= []
     data_rows_SC = []
     data_rows_curt = []
     data_rows_curt_per = []
     data_rows_lines = []
     data_rows_conv = []
     data_rows_price = []
+    data_rows_pgen = []
+    data_rows_qgen = []
     
     weights_row = []
     
@@ -909,45 +1009,53 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price
             futures.append(executor.submit(get_line_data, t, model, grid))
             futures.append(executor.submit(get_converter_data, t, model, grid))
             futures.append(executor.submit(get_weight_data, model, t))
+            futures.append(executor.submit(get_gen_data, t, model, grid))
     
         # Retrieve results
-        for i in range(0, len(futures), 5):
-            price_data, SC_data, PN_data,GEN_data = futures[i].result()
+        for i in range(0, len(futures), 6):
+            price_data, SC_data, PN_data,PZ_GEN_data = futures[i].result()
             curt_data,curt_data_per = futures[i+1].result()
             lines_data = futures[i+2].result()
             conv_data = futures[i+3].result()
             weight_data = futures[i+4].result()
+            pgen_data,qgen_data = futures[i+5].result()
     
             data_rows_price.append(price_data)
             data_rows_SC.append(SC_data)
             data_rows_PN.append(PN_data)
-            data_rows_GEN.append(GEN_data)
+            data_rows_PZGEN.append(PZ_GEN_data)
             data_rows_curt.append(curt_data)
             data_rows_curt_per.append(curt_data_per)
             data_rows_lines.append(lines_data)
             data_rows_conv.append(conv_data)
             weights_row.append(weight_data)
+            data_rows_pgen.append(pgen_data)
+            data_rows_qgen.append(qgen_data)
     
     # Convert to DataFrames
     data_PN = pd.DataFrame(data_rows_PN)
-    data_GEN = pd.DataFrame(data_rows_GEN)
+    data_PZGEN = pd.DataFrame(data_rows_PZGEN)
     data_SC = pd.DataFrame(data_rows_SC)
     data_curt = pd.DataFrame(data_rows_curt)
     data_curt_per = pd.DataFrame(data_rows_curt_per)
     data_lines = pd.DataFrame(data_rows_lines)
     data_conv = pd.DataFrame(data_rows_conv)
     data_price = pd.DataFrame(data_rows_price)
+    data_pgen = pd.DataFrame(data_rows_pgen)
+    data_qgen = pd.DataFrame(data_rows_qgen)
     
+
     # Transpose the DataFrame to flip rows and columns
     flipped_data_PN = data_PN.set_index('Time_Frame').T 
-    flipped_data_GEN = data_GEN.set_index('Time_Frame').T 
+    flipped_data_PZGEN = data_PZGEN.set_index('Time_Frame').T 
     flipped_data_SC = data_SC.set_index('Time_Frame').T 
     flipped_data_curt = data_curt.set_index('Time_Frame').T 
     flipped_data_curt_per = data_curt_per.set_index('Time_Frame').T 
     flipped_data_lines = data_lines.set_index('Time_Frame').T 
     flipped_data_conv = data_conv.set_index('Time_Frame').T 
     flipped_data_price = data_price.set_index('Time_Frame').T 
-    
+    flipped_data_pgen = data_pgen.set_index('Time_Frame').T 
+    flipped_data_qgen = data_qgen.set_index('Time_Frame').T 
     # Calculate Total SC
     total_sc = np.round(flipped_data_SC.sum(), decimals=2)
     
@@ -972,8 +1080,8 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price
     
     # Pack all variables into the final result
     TEP_TS_res = pack_variables(clustering,n_clusters,
-        flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
-        flipped_data_conv, flipped_data_price
+        flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
+        flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen
     )
     grid.TEP_TS_res=TEP_TS_res
     
@@ -984,55 +1092,86 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,OnlyAC,Price
     return TEP_TS_res
 
 def export_TEP_TS_results_to_excel(grid,export):
-    [clustering,n_clusters,flipped_data_PN,flipped_data_GEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
-        flipped_data_conv, flipped_data_price] = grid.TEP_TS_res
+    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    [clustering,n_clusters,flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
+        flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_TS_res
            # Define the column names for the DataFrame
-    columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]","Unit cost [€/MVA]","Life time [years]"]
+    columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]"]
     
     # Create an empty list to hold the data
     data = []
     
     tot = 0
-    
-    # Loop through DC lines and add data to the list
-    for l in grid.lines_DC:
-        if l.np_line_opf:
-            element = l.name
-            ini = l.np_line_i
-            opt = l.np_line
-            pr = opt * l.MW_rating
-            cost = ((opt - ini) * l.base_cost)  / 1000
-            
-            if l.cost_perMWkm is not None:
-                unit_cost= l.Length_km*l.cost_perMWkm
-            elif l.base_cost is not None:
-                unit_cost= l.base_cost /l.MW_rating
-            else:
-                unit_cost = np.nan
-                            
-            tot += cost
-            data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,l.life_time])
-    
-    # Loop through ACDC converters and add data to the list
-    for cn in grid.Converters_ACDC:
-        if cn.NUmConvP_opf:
-            element = cn.name
-            ini = cn.NumConvP_i
-            opt = cn.NumConvP
-            pr = opt * cn.MVA_max
-            cost = ((opt - ini) * cn.base_cost)  / 1000
-            tot += cost
-            
-            if cn.cost_perMVA is not None:
-                unit_cost= cn.cost_perMVA
-            elif cn.base_cost is not None:
-                unit_cost= cn.base_cost /cn.MVA_max
-            else:
-                unit_cost = np.nan
+
+    if TEP_AC:
+        for l in grid.lines_AC_exp:
+            if l.np_line_opf:
+                element = l.name
+                ini = l.np_line_i
+                opt = l.np_line
+                pr = opt * l.MVA_rating
+                cost = ((opt - ini) * l.base_cost)  / 1000
+                tot += cost
+                data.append([element, "AC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+    if REP_AC:
+        for l in grid.lines_AC_rep:
+            if l.rep_line_opf:
+                element = l.name
+                ini = " "
+                opt = l.rep_branch
+                if l.rep_branch:
+                    pr = l.MVA_rating_new
+                    cost = l.base_cost  / 1000
+                else:
+                    pr = l.MVA_rating
+                    cost = 0
+                tot += cost
+                data.append([element, "Reconducting Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+    if CT_AC:
+        for l in grid.lines_AC_ct:
+            if l.array_opf:
+                element = l.name
+                ini = l.ini_active_config
+                opt = l.active_config
+                pr = l.MVA_rating_list[opt]
+                cost = l.base_cost[opt] / 1000
+                tot += cost
+                data.append([element, "Cable type Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
                 
-            
-            data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2),unit_cost,cn.life_time])
-    
+
+    if not OnlyAC:
+        # Loop through DC lines and add data to the list
+        for l in grid.lines_DC:
+            if l.np_line_opf:
+                element = l.name
+                ini = l.np_line_i
+                opt = l.np_line
+                pr = opt * l.MW_rating
+                cost = ((opt - ini) * l.base_cost)  / 1000
+                
+                tot += cost
+                data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+        
+        # Loop through ACDC converters and add data to the list
+        for cn in grid.Converters_ACDC:
+            if cn.NUmConvP_opf:
+                element = cn.name
+                ini = cn.NumConvP_i
+                opt = cn.NumConvP
+                pr = opt * cn.MVA_max
+                cost = ((opt - ini) * cn.base_cost)  / 1000
+                tot += cost
+                
+                if cn.cost_perMVA is not None:
+                    unit_cost= cn.cost_perMVA
+                elif cn.base_cost is not None:
+                    unit_cost= cn.base_cost /cn.MVA_max
+                else:
+                    unit_cost = np.nan
+                    
+                
+                data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
+        
     # Create a pandas DataFrame with the collected data
     df = pd.DataFrame(data, columns=columns)    
     
@@ -1093,7 +1232,9 @@ def export_TEP_TS_results_to_excel(grid,export):
         flipped_data_SC.to_excel(writer, sheet_name='Social Cost k€', index=True)
         flipped_data_PN.to_excel(writer, sheet_name='Net price_zone power MW', index=True)
         flipped_data_price.to_excel(writer, sheet_name='Price_Zone Price  € per MWh', index=True)
-        flipped_data_GEN.to_excel(writer, sheet_name='Power Generation MW', index=True)
+        flipped_data_PZGEN.to_excel(writer, sheet_name='Price Zone Generation MW', index=True)
+        flipped_data_pgen.to_excel(writer, sheet_name='Generation MW', index=True)
+        flipped_data_qgen.to_excel(writer, sheet_name='Generation MVAR', index=True)
         flipped_data_curt.to_excel(writer, sheet_name='Curtailment MW', index=True)
         flipped_data_curt_per.to_excel(writer, sheet_name='Curtailment %', index=True)
         flipped_data_lines.to_excel(writer, sheet_name='Line loading %', index=True)

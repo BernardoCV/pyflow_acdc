@@ -154,47 +154,46 @@ def create_dictionaries(grid):
         "RenSources": [],
     }
     
-    
     # AC Nodes
     if grid.nodes_AC:
         for node in getattr(grid, "nodes_AC", []):
             if node:
                 data["nodes_AC"].append({
-                    "type": node.type,
-                    "Voltage_0": node.V_ini,
-                    "theta_0": node.theta_ini,
-                    "kV_base": node.kV_base,
-                    "Power_Gained": node.PGi,
-                    "Reactive_Gained": node.QGi,
-                    "Power_load": node.PLi,
-                    "Reactive_load": node.QLi,
                     "Node_id": node.name,
-                    "Umin": node.Umin,
-                    "Umax": node.Umax,
-                    "Gs": np.real(node.Reactor),
-                    "Bs": np.imag(node.Reactor),
-                    "x_coord": node.x_coord,
-                    "y_coord": node.y_coord,
-                    "PZ" :node.PZ,
+                    "type": node.type,
+                    "Voltage_0": float(node.V_ini),
+                    "theta_0": float(node.theta_ini),
+                    "kV_base": float(node.kV_base),
+                    "Power_Gained": float(node.PGi),
+                    "Reactive_Gained": float(node.QGi),
+                    "Power_load": float(node.PLi),
+                    "Reactive_load": float(node.QLi),
+                    "Umin": float(node.Umin),
+                    "Umax": float(node.Umax),
+                    "Gs": float(np.real(node.Reactor)),
+                    "Bs": float(np.imag(node.Reactor)),
+                    "x_coord": float(node.x_coord),
+                    "y_coord": float(node.y_coord),
+                    "PZ": node.PZ,
                     "geometry": node.geometry.wkt if node.geometry is not None else None
                 })
-                s=1
+
     # AC Lines
     if grid.lines_AC:
         for line in getattr(grid, "lines_AC", []):
             if line:
                 data["lines_AC"].append({
+                    "Line_id": line.name,
                     "fromNode": line.fromNode.name,
                     "toNode": line.toNode.name,
-                    "r": line.R,
-                    "x": line.X,
-                    "g": line.G,
-                    "b": line.B,
-                    "MVA_rating": line.MVA_rating,
-                    "kV_base": line.kV_base,
-                    "m": line.m,
-                    "shift": line.shift,
-                    "Line_id": line.name,
+                    "r": float(line.R),
+                    "x": float(line.X),
+                    "g": float(line.G),
+                    "b": float(line.B),
+                    "MVA_rating": float(line.MVA_rating),
+                    "m": float(line.m),
+                    "shift": float(line.shift),
+                    "Length_km": float(line.Length_km),
                     "geometry": line.geometry.wkt if line.geometry is not None else None
                 })
 
@@ -203,17 +202,17 @@ def create_dictionaries(grid):
         for node in getattr(grid, "nodes_DC", []):
             if node:
                 data["nodes_DC"].append({
-                    "type":   node.type,
-                    "Voltage_0":   node.V_ini,
-                    "Power_Gained":node.PGi,
-                    "Power_load":  node.PLi,
-                    "kV_base":     node.kV_base,
-                    "Node_id":        node.name,
-                    "Umin":        node.Umin,
-                    "Umax":        node.Umax,
-                    "x_coord":     node.x_coord,
-                    "y_coord":     node.y_coord,
-                    "PZ" :node.PZ,
+                    "type": node.type,
+                    "Voltage_0": float(node.V_ini),
+                    "Power_Gained": float(node.PGi),
+                    "Power_load": float(node.PLi),
+                    "kV_base": float(node.kV_base),
+                    "Node_id": node.name,
+                    "Umin": float(node.Umin),
+                    "Umax": float(node.Umax),
+                    "x_coord": float(node.x_coord),
+                    "y_coord": float(node.y_coord),
+                    "PZ": node.PZ,
                     "geometry": node.geometry.wkt if node.geometry is not None else None
                 })
 
@@ -229,10 +228,10 @@ def create_dictionaries(grid):
                 data["lines_DC"].append({
                     "fromNode":   line.fromNode.name,
                     "toNode":     line.toNode.name,
-                    "r": line.R,
-                    "MW_rating":  line.MW_rating,
-                    "kV_base":    line.kV_base,
-                    "Length_km":         line.Length_km,
+                    "r": float(line.R),
+                    "MW_rating":  float(line.MW_rating),
+                    "kV_base":    float(line.kV_base),
+                    "Length_km":         float(line.Length_km),
                     "Mono_Bi_polar":   pol,
                     "Line_id":       line.name,     
                     "geometry": line.geometry.wkt if line.geometry is not None else None
@@ -247,26 +246,26 @@ def create_dictionaries(grid):
                     "DC_type": conv.type,
                     "AC_node": conv.Node_AC.name,
                     "DC_node": conv.Node_DC.name,
-                    "P_AC":    conv.P_AC,
-                    "Q_AC":    conv.Q_AC,
-                    "P_DC":    conv.P_DC,
-                    "T_r": conv.R_t *conv.cn_pol,
-                    "T_x":  conv.X_t *conv.cn_pol,
-                    "PR_r":        conv.PR_R*conv.cn_pol,
-                    "PR_x":        conv.PR_X*conv.cn_pol,
-                    "Filter":                 conv.Bf  /conv.cn_pol,
-                    "Droop":    conv.Droop_rate,
-                    "AC_kV_base":  conv.AC_kV_base,
-                    "MVA_rating":  conv.MVA_max/conv.cn_pol,
-                    "Nconverter":   conv._NumConvP,
-                    "pol": conv.cn_pol,
+                    "P_AC": float(conv.P_AC),
+                    "Q_AC": float(conv.Q_AC),
+                    "P_DC": float(conv.P_DC),
+                    "T_r": float(conv.R_t * conv.cn_pol),
+                    "T_x": float(conv.X_t * conv.cn_pol),
+                    "PR_r": float(conv.PR_R * conv.cn_pol),
+                    "PR_x": float(conv.PR_X * conv.cn_pol),
+                    "Filter": float(conv.Bf / conv.cn_pol),
+                    "Droop": float(conv.Droop_rate),
+                    "AC_kV_base": float(conv.AC_kV_base),
+                    "MVA_rating": float(conv.MVA_max / conv.cn_pol),
+                    "Nconverter": float(conv._NumConvP),
+                    "pol": float(conv.cn_pol),
                     "Conv_id": conv.name,
-                    "lossa":      conv.a_conv_og/conv.cn_pol,
-                    "lossb":      conv.b_conv_og,
-                    "losscrect":  conv.c_rect_og*conv.cn_pol,
-                    "losscinv":   conv.c_inver_og*conv.cn_pol,
-                    "Ucmin": conv.Ucmin,
-                    "Ucmax": conv.Ucmax,
+                    "lossa": float(conv.a_conv_og / conv.cn_pol),
+                    "lossb": float(conv.b_conv_og),
+                    "losscrect": float(conv.c_rect_og * conv.cn_pol),
+                    "losscinv": float(conv.c_inver_og * conv.cn_pol),
+                    "Ucmin": float(conv.Ucmin),
+                    "Ucmax": float(conv.Ucmax),
                     "geometry": conv.geometry.wkt if conv.geometry is not None else None        
                 })
     
