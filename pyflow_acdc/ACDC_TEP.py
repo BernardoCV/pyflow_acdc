@@ -568,7 +568,10 @@ def TEP_obj(model,grid,NPV):
         for l in model.lines_AC_rep:
             line = grid.lines_AC_rep[l]
             if line.rep_line_opf:
-                Rep_Inv_lines+=model.rep_branch[l]*line.base_cost
+                if NPV:
+                    Rep_Inv_lines+=model.rep_branch[l]*line.base_cost
+                else:
+                    Rep_Inv_lines+=model.rep_branch[l]*line.base_cost/line.life_time_hours
         return Rep_Inv_lines
     
     def Cables_investments():
@@ -587,8 +590,12 @@ def TEP_obj(model,grid,NPV):
         for l in model.lines_AC_ct:
             line= grid.lines_AC_ct[l]
             if line.array_opf:
-                for ct in model.ct_set:
-                    Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]
+                if NPV:
+                    for ct in model.ct_set:
+                        Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]
+                else:
+                    for ct in model.ct_set:
+                        Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]/line.life_time_hours
         return Inv_array
         
     
@@ -828,14 +835,14 @@ def get_gen_data(t, model, grid):
             gn = gen.genNumber
             PGen = np.float64(pyo.value(model.submodel[t].PGi_gen[gn])) * grid.S_base
             QGen = np.float64(pyo.value(model.submodel[t].QGi_gen[gn])) * grid.S_base
-            row_data_gen[f'G_{gen.name}'] = np.round(PGen, decimals=0)
-            row_data_qgen[f'G_{gen.name}'] = np.round(QGen, decimals=0)
+            row_data_gen[f'G_{gen.name}'] = np.round(PGen, decimals=2)
+            row_data_qgen[f'G_{gen.name}'] = np.round(QGen, decimals=2)
     for rg in grid.RenSources:
             rn = rg.rsNumber
             PGen = np.float64(pyo.value(model.submodel[t].P_renSource[rn]*model.submodel[t].gamma[rn])) * grid.S_base
             QGen = np.float64(pyo.value(model.submodel[t].Q_renSource[rn])) * grid.S_base
-            row_data_gen[f'R_{rg.name}'] = np.round(PGen, decimals=0)
-            row_data_qgen[f'R_{rg.name}'] = np.round(QGen, decimals=0)
+            row_data_gen[f'R_{rg.name}'] = np.round(PGen, decimals=2)
+            row_data_qgen[f'R_{rg.name}'] = np.round(QGen, decimals=2)
     
     return row_data_gen,row_data_qgen
 

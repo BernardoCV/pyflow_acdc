@@ -1053,10 +1053,17 @@ def create_subgraph_color_dict(G):
 
 
 
-def save_network_svg(grid, name='grid_network', width=1000, height=800):
+def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=True,legend=True):
     """Save the network as SVG file"""
     try:
         import svgwrite
+
+        if journal:
+            # Convert 88mm to pixels (assuming 96 DPI)
+            width = int(88 * 96 / 25.4)  # 25.4mm = 1 inch
+            # Maintain aspect ratio
+            height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
+
 
         print(f"Current working directory: {os.getcwd()}")
         print(f"Will save as: {os.path.abspath(f'{name}.svg')}")
@@ -1175,19 +1182,20 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800):
                             font_family="NewComputerModernSans"))
             
             # Add legend items
-            for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
-                color = cable_type_colors.get(i, "black")
-                # Add colored line
-                dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
-                               end=(legend_x + 30, legend_y + i * legend_spacing),
-                               stroke=color,
-                               stroke_width=2))
-                # Add text
-                dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
-                                insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
-                                font_size=12,
-                                font_family="NewComputerModernSans",
-                                fill=color))
+            if legend:
+                for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                    color = cable_type_colors.get(i, "black")
+                    # Add colored line
+                    dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
+                                end=(legend_x + 30, legend_y + i * legend_spacing),
+                                stroke=color,
+                                stroke_width=2))
+                    # Add text
+                    dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                    insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
+                                    font_size=12,
+                                    font_family="NewComputerModernSans",
+                                    fill=color))
         # Save the SVG file
         dwg.save()
         print(f"Network saved as {name}.svg")
