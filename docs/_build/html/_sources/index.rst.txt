@@ -65,6 +65,12 @@ API Documentation
 
 .. toctree::
    :maxdepth: 3
+   :caption: Transmission Expansion Planning:
+
+   api/tep
+
+.. toctree::
+   :maxdepth: 3
    :caption: Visualization & Export:
 
    api/plotting

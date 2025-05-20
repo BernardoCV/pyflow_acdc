@@ -241,6 +241,164 @@ Example Usage:
 
 .. _DC_node_modelling:
 
+AC expandable branch modelling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+.. figure:: ../images/AC_ybusbranch.svg
+   :width: 400
+   :alt: AC expandable branch model
+   :align: center
+
+   AC expandable branch model
+
+The AC branch is modeled with in admittance matrix model from [4]_:
+
+.. math::
+    :label: eq:Seqexpbranch
+
+    S_{from_h-eq} = n_h \cdot S_{from_h} \\
+    S_{to_h-eq} = n_h \cdot S_{to_h}
+
+
+Class Reference: :class:`pyflow_acdc.Classes.Exp_Line_AC`
+
+Inherits from :class:`Line_AC` with the following additional attributes:
+
+.. list-table::
+   :widths: 20 10 70
+   :header-rows: 1
+
+   * - Attribute
+     - Type
+     - Description
+   * - ``base_cost``
+     - float
+     - Base cost of the line
+   * - ``life_time``
+     - float
+     - Lifetime of the line
+   * - ``np_line_b``
+     - float
+     - Base number of lines
+   * - ``np_line_i``
+     - float
+     - Initial number of lines
+   * - ``np_line_max``
+     - float
+     - Maximum number of lines
+
+Where :math:`n_b \leq n_i \leq n_{max}` 
+
+AC reconducting branch modelling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+.. figure:: ../images/AC_reconducting.svg
+   :width: 400
+   :alt: AC expandable branch model
+   :align: center
+
+   AC reconducting branch model
+
+The AC branch is modeled with in admittance matrix model from [4]_:
+
+.. math::
+    :label: eq:Seqrepbranch
+
+    S_{from_u-eq} = (1-\xi_u) \cdot S_{from_u} + \xi_u \cdot S_{from_h}^{'} \\
+    S_{to_u-eq}   = (1-\xi_u) \cdot S_{to_u} + \xi_u \cdot S_{to_h}^{'}
+
+Class Reference: :class:`pyflow_acdc.Classes.Rep_Line_AC`
+
+Inherits from :class:`Line_AC` with the following additional attributes:
+
+.. list-table::
+   :widths: 20 10 70
+   :header-rows: 1
+
+   * - Attribute
+     - Type
+     - Description
+   * - ``r_new``
+     - float
+     - Resistance of the new conductor in pu
+   * - ``x_new``
+     - float
+     - Reactance of the new conductor in pu
+   * - ``g_new``
+     - float
+     - Conductance of the new conductor in pu
+   * - ``b_new``
+     - float
+     - Susceptance of the new conductor in pu
+   * - ``MVA_rating_new``
+     - float
+     - MVA rating of the new conductor
+   * - ``Life_time``
+     - float
+     - Lifetime of the conductor
+   * - ``base_cost``
+     - float
+     - Base cost of the conductor
+
+AC branch selection modelling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+.. figure:: ../images/AC_array.svg
+   :width: 400
+   :alt: AC expandable branch model
+   :align: center
+
+   AC branch selection model
+
+The AC branch is modeled with in admittance matrix model from [4]_:
+
+.. math::
+    :label: eq:Seqarraybranch
+
+    S_{from_n-eq} = \xi_{a,n} \cdot S_{from_n}   \\
+    S_{to_n-eq}   = \xi_{a,n} \cdot S_{to_n}
+
+Class Reference: :class:`pyflow_acdc.Classes.Line_sizing`
+
+Inherits from :class:`Line_AC` with the following additional attributes:
+
+.. list-table::
+   :widths: 20 10 70
+   :header-rows: 1
+
+   * - Attribute
+     - Type
+     - Description
+   * - ``fromNode``
+     - :class:`Node_AC`
+     - The starting node of the line
+   * - ``toNode``
+     - :class:`Node_AC`
+     - The ending node of the line
+   * - ``cable_types``
+     - list
+     - List of possible cable types for sizing
+   * - ``active_config``
+     - int
+     - Index of the currently active cable configuration
+   * - ``Length_km``
+     - float
+     - Length of the line in kilometers
+   * - ``S_base``
+     - float
+     - Base power in MVA
+   * - ``name``
+     - str
+     - Name of the line
+   * - ``geometry``
+     - str
+     - Geometry of the line
+
+Important to note that this class only takes in the cable types and not the line parameters. The parameters for these have to be uploaded as yalm files in the ``Cable_database`` folder.
+
 DC System Modelling
 ------------------- 
 
@@ -402,7 +560,17 @@ Example Usage:
 
         line_2 = pyf.Line_DC(node1, node2, S_base=100, Length_km=100, Cable_type='NREL_HVDC_2000mm_320kV')
 
+DC expansion modelling
+^^^^^^^^^^^^^^^^^^^^^^^
 
+.. figure:: ../images/DC_expbranch.svg
+   :width: 400
+   :alt: DC expansion model
+   :align: center
+
+   DC expansion model
+
+The expanded branch object is inside the :class:`Line_DC` class. 
 
 
 .. _ACDC_converter_modelling:
@@ -797,6 +965,11 @@ Key Attributes:
        Education," Power Systems, IEEE Transactions on, vol. 26, no. 1, pp. 12–19,
        Feb. 2011.
 
-.. [3] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
-       "Optimizing Offshore Wind Integration through Multi-Terminal DC Grids: A
-       Market-Based OPF Framework for the North Sea Interconnectors"
+.. [3] B. C. Valerio, V. A. Lacerda, M. Cheah-Mañe, P. Gebraad, and O. Gomis-Bellmunt,
+       "Optimizing offshore wind integration through multi-terminal DC grids: a market-based
+       OPF framework for the North Sea interconnectors," IET Conference Proceedings, vol. 2025,
+       no. 6, pp. 150–155, 2025. doi: 10.1049/icp.2025.1198
+
+.. [4] B. C. Valerio, M. Cheah-Mane, V. A. Lacerda, P. Gebraad and O. Gomis-Bellmunt,
+       "Transmission expansion planning for hybrid AC/DC grids using a
+       Mixed-Integer Non-linear Programming approach"

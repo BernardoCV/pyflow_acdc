@@ -77,12 +77,18 @@ pip install folium
 For OPF you will need to install the following packages:
 ```bash
 
-pip install "numpy <2.0.0"
 pip install pyomo
 conda install -c conda-forge cyipopt
 
 ```
+For OPF run in Linux for the TEP:
+```bash
 
+sudo apt-get update
+sudo apt-get install coinor-bonmin
+conda install -c conda-forge bonmin
+
+```
 
 
 For Dash you will need to install the following packages:
@@ -103,7 +109,7 @@ To build the documentation:
 ```bash
 cd docs
 pip install -r requirements.txt
-make html
+.\make html
 ```
 
 The documentation will be available in `docs/_build/html/index.html`

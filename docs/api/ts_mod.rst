@@ -433,6 +433,7 @@ For a dataset of length n, the CSV will follow this format: Position 0 is treate
 
 **References**
 
-.. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt,
-       "Optimizing Offshore Wind Integration through Multi-Terminal DC Grids: A
-       Market-Based OPF Framework for the North Sea Interconnectors"
+.. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mañe, P. Gebraad, and O. Gomis-Bellmunt,
+       "Optimizing offshore wind integration through multi-terminal DC grids: a market-based
+       OPF framework for the North Sea interconnectors," IET Conference Proceedings, vol. 2025,
+       no. 6, pp. 150–155, 2025. doi: 10.1049/icp.2025.1198
