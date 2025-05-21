@@ -240,7 +240,7 @@ def update_lineACexp_hovertext(line,S_base,text):
         Line_tf = 'Transformer' if line.isTf else 'Line'
         line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Lines: {np_line}"
 
-def update_lineACrep_hovertext(line,S_base,text):
+def update_lineACrec_hovertext(line,S_base,text):
     dec=2
     line.direction = 'from' if line.fromS >= 0 else 'to'
     if text =='data':
@@ -248,9 +248,9 @@ def update_lineACrep_hovertext(line,S_base,text):
         fromnode = line.fromNode.name
         tonode = line.toNode.name
         l = int(line.Length_km)
-        z= np.round(line.Z,decimals=5) if not line.rep_branch else np.round(line.Z_rep,decimals=5)
-        y= np.round(line.Y,decimals=5) if not line.rep_branch else np.round(line.Y_rep,decimals=5)
-        rating = line.MVA_rating if not line.rep_branch else line.MVA_rating_new
+        z= np.round(line.Z,decimals=5) if not line.rec_branch else np.round(line.Z_new,decimals=5)
+        y= np.round(line.Y,decimals=5) if not line.rec_branch else np.round(line.Y_new,decimals=5)
+        rating = line.MVA_rating if not line.rec_branch else line.MVA_rating_new
         rating = np.round(rating,decimals=0)
         Line_tf = 'Reconductoring branch'
         line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>Length: {l}km<br>Rating: {rating}MVA"
@@ -269,7 +269,7 @@ def update_lineACrep_hovertext(line,S_base,text):
         else:
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Reconductoring branch'
-        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Reconductoring: {line.rep_branch}"
+        line.hover_text = f"{Line_tf}: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%<br>Reconductoring: {line.rec_branch}"
     else:
         name= line.name
         fromnode = line.fromNode.name
@@ -283,7 +283,7 @@ def update_lineACrep_hovertext(line,S_base,text):
         else:
             line_string = f"{fromnode} <- {tonode}"
         Line_tf = 'Reconductoring branch'
-        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Reconductoring: {line.rep_branch}"
+        line.hover_text = f"Line: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%<br>Reconductoring: {line.rec_branch}"
 
 def update_lineACct_hovertext(line,S_base,text):
     dec=2
@@ -494,9 +494,9 @@ def update_hovertexts(grid,text):
         if grid.lines_AC_exp is not None:    
             for line in grid.lines_AC_exp:
                 futures.append(executor.submit(update_lineACexp_hovertext, line, S_base, text))
-        if grid.lines_AC_rep is not None:
-            for line in grid.lines_AC_rep:
-                futures.append(executor.submit(update_lineACrep_hovertext, line, S_base, text))
+        if grid.lines_AC_rec is not None:
+            for line in grid.lines_AC_rec:
+                futures.append(executor.submit(update_lineACrec_hovertext, line, S_base, text))
         if grid.lines_AC_ct is not None:
             for line in grid.lines_AC_ct:
                 futures.append(executor.submit(update_lineACct_hovertext, line, S_base, text))
@@ -591,13 +591,13 @@ def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
  
     lines_ac = Grid.lines_AC if Grid.lines_AC is not None else []
     lines_ac_exp = Grid.lines_AC_exp if Grid.lines_AC_exp is not None else []
-    lines_ac_rep = Grid.lines_AC_rep if Grid.lines_AC_rep is not None else []
+    lines_ac_rec = Grid.lines_AC_rec if Grid.lines_AC_rec is not None else []
     lines_ac_ct = Grid.lines_AC_ct if Grid.lines_AC_ct is not None else []
     lines_dc = Grid.lines_DC if Grid.lines_DC is not None else []
     nodes_DC = Grid.nodes_DC if Grid.nodes_DC is not None else []
     lines_dc_set = set(lines_dc)
     lines_ac_exp_set = set(lines_ac_exp)
-    lines_ac_rep_set = set(lines_ac_rep)
+    lines_ac_rec_set = set(lines_ac_rec)
     lines_ac_ct_set = set(lines_ac_ct)
 
 
@@ -1074,7 +1074,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
         all_bounds = []
         
         # Add lines
-        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC+grid.lines_AC_rep+grid.lines_AC_ct:
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC+grid.lines_AC_rec+grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
                 all_bounds.append(line.geometry.bounds)
                 
@@ -1130,7 +1130,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
         16: 'olive'
         }
         # Draw AC lines
-        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rep + grid.lines_AC_ct:
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
                 coords = list(line.geometry.coords)
                 path_data = "M "
@@ -1141,7 +1141,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
                 
 
                 
-                if line in grid.lines_AC_rep and line.rep_branch:
+                if line in grid.lines_AC_rec and line.rec_branch:
                     color = "green"
                 elif line in grid.lines_AC_ct:
                      color = cable_type_colors.get(line.active_config, "red")  

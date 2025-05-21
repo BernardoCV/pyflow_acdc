@@ -52,10 +52,12 @@ class Results:
         if self.Grid.OPF_run :
             self.Ext_gen()
             if any(node.RenSource for node in self.Grid.nodes_AC):
-                self.Ext_WPP()
+                self.Ext_REN()
+            if not self.Grid.TEP_run:
+                self.OBJ_res()
             if self.Grid.Price_Zones != []: 
                 self.Price_Zone()    
-        
+        if self.Grid.lines_AC_exp+self.Grid.lines_AC_rec+self.Grid.lines_AC_ct != []:
             self.AC_exp_lines_power()
         if self.Grid.TEP_run:    
             self.TEP_N()
@@ -196,7 +198,7 @@ class Results:
                     
                     self.lossP_AC[G] += Ploss
 
-            for line in (self.Grid.lines_AC_rep + self.Grid.lines_AC_ct):
+            for line in (self.Grid.lines_AC_rec + self.Grid.lines_AC_ct):
                 node = line.fromNode
                 G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                 Ploss = np.real(line.loss)*self.Grid.S_base
@@ -681,7 +683,7 @@ class Results:
                             np.round(load, decimals=self.dec)
                         ])
 
-            for line in self.Grid.lines_AC_rep:
+            for line in self.Grid.lines_AC_rec:
                  if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                         i = line.fromNode.nodeNumber
                         j = line.toNode.nodeNumber
@@ -699,7 +701,7 @@ class Results:
                         Sfrom = abs(line.fromS)*self.Grid.S_base
                         Sto   = abs(line.toS)*self.Grid.S_base
 
-                        if line.rep_branch:
+                        if line.rec_branch:
                             load = max(Sfrom, Sto)/(line.MVA_rating_new)*100
                         else:
                             load = max(Sfrom, Sto)/(line.MVA_rating)*100
@@ -885,7 +887,7 @@ class Results:
         table.add_row(['Total abs',"", np.round(Pabs, decimals=self.dec), np.round(Qabs, decimals=self.dec), "","",np.round(load, decimals=self.dec),""])
         print(table)
     
-    def Ext_WPP(self):
+    def Ext_REN(self):
         print('--------------')
         print('Renewable energy sources')
         table = pt()
@@ -1037,12 +1039,12 @@ class Results:
                     maxn=l.np_line_max
                     table.add_row([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         
-        for l in self.Grid.lines_AC_rep:
-            if l.rep_line_opf:
-                if l.rep_branch:
+        for l in self.Grid.lines_AC_rec:
+            if l.rec_line_opf:
+                if l.rec_branch:
                     element= l.name
                     ini= 0
-                    opt= l.rep_branch
+                    opt= l.rec_branch
                     pr= l.MVA_rating_new
                     cost= l.base_cost
                     tot+=cost

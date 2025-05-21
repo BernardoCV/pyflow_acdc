@@ -139,7 +139,7 @@ def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     "solve": solver_stats['time'],
     "export": t_modelexport,
     }
-    return model, timing_info, [model_res,solver_stats]
+    return model, timing_info, model_res,solver_stats
 
 
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
@@ -510,13 +510,13 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     lista_lineas_AC = list(range(0, grid.nl_AC))
     lista_lineas_AC_exp = list(range(0, grid.nle_AC))
     lista_lineas_AC_tf = list(range(0, grid.nttf))
-    lista_lineas_AC_rep = list(range(0, grid.nlr_AC))
+    lista_lineas_AC_rec = list(range(0, grid.nlr_AC))
     lista_lineas_AC_ct = list(range(0, grid.nct_AC))
     # Dictionaries for AC variables
     price, V_ini_AC, Theta_ini = {}, {}, {}
     P_renSource, P_know, Q_know = {}, {}, {}
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
-    S_lineACrep_lim, S_lineACrep_lim_new,REP_AC_act = {}, {}, {}
+    S_lineACrec_lim, S_lineACrec_lim_new,REC_AC_act = {}, {}, {}
     lf,qf = {}, {}
 
     S_lineACct_lim,cab_types_set,allowed_types = {},{},{}
@@ -569,10 +569,10 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
         S_lineACexp_limit[l.lineNumber] = l.MVA_rating / grid.S_base
         NP_lineAC[l.lineNumber]         = l.np_line
 
-    for l in grid.lines_AC_rep:
-        S_lineACrep_lim[l.lineNumber] = l.MVA_rating / grid.S_base
-        S_lineACrep_lim_new[l.lineNumber] = l.MVA_rating_new / grid.S_base
-        REP_AC_act[l.lineNumber] = 0 if not l.rep_branch  else 1
+    for l in grid.lines_AC_rec:
+        S_lineACrec_lim[l.lineNumber] = l.MVA_rating / grid.S_base
+        S_lineACrec_lim_new[l.lineNumber] = l.MVA_rating_new / grid.S_base
+        REC_AC_act[l.lineNumber] = 0 if not l.rec_branch  else 1
 
     for l in grid.lines_AC_tf:
         S_lineACtf_limit[l.lineNumber]  = l.MVA_rating / grid.S_base
@@ -593,9 +593,9 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     AC_lines_info = pack_variables(S_lineAC_limit,S_lineACtf_limit,m_tf_og)
     gen_info = pack_variables(lf,qf,P_renSource)
     EXP_info = pack_variables(lista_lineas_AC_exp,S_lineACexp_limit,NP_lineAC)
-    REP_info = pack_variables(lista_lineas_AC_rep,S_lineACrep_lim,S_lineACrep_lim_new,REP_AC_act)
+    REC_info = pack_variables(lista_lineas_AC_rec,S_lineACrec_lim,S_lineACrec_lim_new,REC_AC_act)
     CT_info = pack_variables(lista_lineas_AC_ct,S_lineACct_lim,cab_types_set,allowed_types)
-    AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,gen_info,EXP_info,REP_info,CT_info)
+    AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,gen_info,EXP_info,REC_info,CT_info)
     
     "Price zone info"
    
@@ -869,7 +869,7 @@ def OPF_conv_results(model,grid):
       
 
 def calculate_objective(grid,obj,OnlyGen=True):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
 
     if obj =='Ext_Gen':
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)

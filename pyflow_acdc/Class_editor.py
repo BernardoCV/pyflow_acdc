@@ -28,7 +28,7 @@ __all__ = [
     'add_gen',
     'add_extGrid',
     'add_RenSource',
-    'add_generators_fromcsv',
+    'add_generators',
     'add_cable_option',
     'add_line_sizing',
     
@@ -43,7 +43,7 @@ __all__ = [
     
     # Line Modifications
     'change_line_AC_to_expandable',
-    'change_line_AC_to_repurposing',
+    'change_line_AC_to_reconducting',
     'change_line_AC_to_tap_transformer',
     
     # Zone Assignments
@@ -281,7 +281,7 @@ def change_line_AC_to_expandable(grid, line_name):
         
     return expandable_line    
 
-def change_line_AC_to_repurposing(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
+def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -308,8 +308,8 @@ def change_line_AC_to_repurposing(grid, line_name, r_new,x_new,g_new,b_new,MVA_r
             'S_base': l.S_base,
             'Cable_type': l.Cable_type
         }
-        rep_line = Rep_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
-        grid.lines_AC_rep.append(rep_line)
+        rec_line = rec_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
+        grid.lines_AC_rep.append(rec_line)
         grid.Update_Graph_AC()
 
     # Reassign line numbers to ensure continuity
@@ -319,7 +319,7 @@ def change_line_AC_to_repurposing(grid, line_name, r_new,x_new,g_new,b_new,MVA_r
     for i, line in enumerate(grid.lines_AC_rep):
         line.lineNumber = i 
         
-    return rep_line  
+    return rec_line  
 
 def change_line_AC_to_tap_transformer(grid, line_name):
     l = None
@@ -485,7 +485,7 @@ def add_offshore_price_zone(Grid,main_price_zone,name):
 
 "Components for optimal power flow"
 
-def add_generators_fromcsv(Grid,Gen_csv):
+def add_generators(Grid,Gen_csv):
     if isinstance(Gen_csv, pd.DataFrame):
         Gen_data = Gen_csv
     else:

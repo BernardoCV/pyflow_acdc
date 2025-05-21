@@ -126,8 +126,9 @@ Add AC Node
 
 Add AC Line
 ^^^^^^^^^^^^
-.. py:function:: add_line_AC(grid, fromNode, toNode, MVA_rating=None, r=0, x=0, b=0, g=0, R_Ohm_km=None, L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None, m=1, shift=0, name=None, tap_changer=False, Expandable=False, N_cables=1, Length_km=1, geometry=None, data_in='pu', Cable_type='Custom')
 
+.. py:function:: add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu',Cable_type:str ='Custom',update_grid=True):
+    
    Adds an AC line to the grid.
 
    .. list-table::
@@ -321,6 +322,134 @@ Add AC Line
 
        #For pre defined cable types database
        line_db = pyf.add_line_AC(grid, node1, node2, Cable_type='NREL_XLPE_185mm_66kV',Length_km=10)
+
+Line sizing
+^^^^^^^^^^^
+
+Add Cable Options
+~~~~~~~~~~~~~~~~~
+
+.. py:function:: add_cable_option(grid, cable_types: list,name=None)
+
+   Adds a cable option to the grid. This is a list that will link different line sizing options to one singular cable type list, so that only a set maximum number of different ones are used.
+
+   .. list-table::
+      :widths: 15 10 50 10 15
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description 
+        - Default
+        - Unit
+      * - ``grid``
+        - Grid
+        - Grid to modify
+        - Required
+        - -
+      * - ``cable_types``
+        - list
+        - List of cable types
+        - Required
+        - -
+      * - ``name``
+        - str
+        - Name of the cable option
+        - None
+        - -
+
+   **Example**
+
+   .. code-block:: python
+
+        cable_option = pyf.add_cable_option(grid,[
+        'ABB_Cu_XLPE_95mm2_66kV', #0
+        'ABB_Cu_XLPE_120mm2_66kV', #1
+        'ABB_Cu_XLPE_150mm2_66kV', #2
+        'ABB_Cu_XLPE_185mm2_66kV', #3
+        'ABB_Cu_XLPE_240mm2_66kV', #4
+        'ABB_Cu_XLPE_300mm2_66kV', #5
+        'ABB_Cu_XLPE_400mm2_66kV', #6
+        'ABB_Cu_XLPE_500mm2_66kV', #7
+        'ABB_Cu_XLPE_630mm2_66kV', #8
+        'ABB_Cu_XLPE_800mm2_66kV', #9
+        'ABB_Cu_XLPE_1000mm2_66kV'] )#10
+
+        grid.cab_types_allowed = 3 
+
+Add Line sizing
+~~~~~~~~~~~~~~~
+
+.. py:function:: add_line_sizing(grid, fromNode, toNode, cable_types: list=[], active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None,update_grid=True,geometry=None)
+
+   Adds a line sizing to the grid.
+
+   .. list-table::
+      :widths: 15 10 50 10 15
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+        - Default
+        - Unit
+      * - ``grid``
+        - Grid
+        - Grid to modify
+        - Required
+        - -
+      * - ``fromNode``
+        - Node_AC
+        - Source node
+        - Required
+        - -
+      * - ``toNode``
+        - Node_AC
+        - Destination node
+        - Required
+        - -
+      * - ``cable_types`` 
+        - list
+        - List of cable types
+        - Required
+        - -
+      * - ``active_config``
+        - int
+        - Active configuration
+        - First of the list
+        - -
+      * - ``Length_km``
+        - float
+        - Line length
+        - 1
+        - km
+      * - ``S_base``
+        - float
+        - Base power
+        - 100
+        - MVA
+      * - ``name``
+        - str
+        - Name of the line sizing
+        - None
+        - -
+      * - ``cable_option``
+        - str
+        - Cable option
+        -   
+        - -
+      * - ``update_grid``
+        - bool
+        - Update the grid
+        - True
+        - -
+      * - ``geometry``
+        - Geometry
+        - Shapely geometry object
+        - None
+        - -
+
+
 
 Add DC Node
 ^^^^^^^^^^^^
@@ -858,6 +987,63 @@ Change Line to Expandable
    .. code-block:: python
 
        pyf.change_line_AC_to_expandable(grid, "line1")
+
+Change Line to Reconducting
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. py:function:: change_line_AC_to_reconducting(grid, line_name, r_new, x_new, g_new, b_new, MVA_rating_new, Life_time, base_cost)
+
+   Converts an AC line to a reconducting line.
+
+   .. list-table::
+      :widths: 20 10 70
+      :header-rows: 1
+
+      * - Parameter
+        - Type
+        - Description
+      * - ``grid``
+        - Grid
+        - Grid containing line
+      * - ``line_name``
+        - str
+        - Name of line to convert
+      * - ``r_new``
+        - float
+        - Resistance of reconducting line
+      * - ``x_new``
+        - float
+        - Reactance of reconducting line
+      * - ``g_new``
+        - float
+        - Conductance of reconducting line
+      * - ``b_new``
+        - float
+        - Susceptance of reconducting line
+      * - ``MVA_rating_new``
+        - float
+        - MVA rating of reconducting line
+      * - ``Life_time``
+        - float
+        - Life time of reconducting line
+      * - ``base_cost``
+        - float
+        - Base cost of reconducting line
+
+   Internally the original line is included into the reconducting line, as a base line, ``line.rec_branch`` is set to False. When set to True, the reconducted line is active in the grid.
+
+   **Example**
+
+   .. code-block:: python
+
+       pyf.change_line_AC_to_reconducting(grid, "line1", r_new=0.1, x_new=0.2, g_new=0, b_new=0.1, MVA_rating_new=100, Life_time=20, base_cost=1000000)
+
+
+
+
+
+
+
 
 Change Line to Transformer
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

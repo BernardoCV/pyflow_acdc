@@ -570,6 +570,7 @@ DC expansion modelling
 
    DC expansion model
 
+The expanded branch object is inside the :class:`Line_DC` class. 
 
 
 .. _ACDC_converter_modelling:

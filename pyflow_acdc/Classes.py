@@ -67,7 +67,7 @@ class Grid:
                 line.S_base = self.S_base
                 self.lines_AC.append(line)
         self.lines_AC_exp = []
-        self.lines_AC_rep = []
+        self.lines_AC_rec = []
         self.lines_AC_tf  = []
 
         self.Cable_options=[]
@@ -290,7 +290,7 @@ class Grid:
     
     @property
     def nlr_AC(self): 
-        return len(self.lines_AC_rep) if self.lines_AC_rep is not None else 0   
+        return len(self.lines_AC_rec) if self.lines_AC_rec is not None else 0   
     
     @property
     def nct_AC(self):
@@ -509,7 +509,7 @@ class Grid:
 
     
         "Creating Graphs to differentiate Grids"
-        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rep + self.lines_AC_tf + self.lines_AC_ct:
+        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rec + self.lines_AC_tf + self.lines_AC_ct:
             self.Graph_AC.add_edge(line.fromNode, line.toNode,line=line)
             self.Graph_toPlot.add_edge(line.fromNode, line.toNode,line=line)
             line.toNode.stand_alone = False
@@ -531,12 +531,12 @@ class Grid:
         for i, Grid in enumerate(self.Grids_AC):
             for node in Grid:
                 self.Graph_node_to_Grid_index_AC[node.nodeNumber] = i
-                for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rep + self.lines_AC_tf + self.lines_AC_ct:
+                for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rec + self.lines_AC_tf + self.lines_AC_ct:
                     if line.fromNode == node or line.toNode == node:
                         self.Graph_line_to_Grid_index_AC[line] = i
         
 
-        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rep + self.lines_AC_tf + self.lines_AC_ct:
+        for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rec + self.lines_AC_tf + self.lines_AC_ct:
             g=self.Graph_line_to_Grid_index_AC[line]
             self.rating_grid_AC[g]+=line.MVA_rating
             self.Graph_number_lines_AC[g]+=1
@@ -1430,7 +1430,7 @@ class Exp_Line_AC(Line_AC):
         self.toNode.connected_toExpLine.append(self)
         self.fromNode.connected_fromExpLine.append(self)
 
-class Rep_Line_AC(Line_AC):
+class rec_Line_AC(Line_AC):
     
     def __init__(self,r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1443,8 +1443,8 @@ class Rep_Line_AC(Line_AC):
         self.cost_perMVAkm = None
         self.phi=0
 
-        self.rep_branch = False
-        self.rep_line_opf=True
+        self.rec_branch = False
+        self.rec_line_opf=True
 
         self.R_new = r_new
         self.X_new = x_new

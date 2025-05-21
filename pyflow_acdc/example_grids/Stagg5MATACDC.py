@@ -77,11 +77,18 @@ def Stagg5MATACDC():
     ]
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 
+    gen_data = [
+        {'Gen_name': '1','Node': '1', 'PsetMW': 0,'QsetMVA': 0,'MWmax': 250,'MWmin': 10,'MVARmax': 500,'MVARmin': -500},
+        {'Gen_name': '2','Node': '2', 'PsetMW': 40,'QsetMVA': 0,'MWmax': 300,'MWmin': 10,'MVARmax': 300,'MVARmin': -300}
+    ]
+    gen = pd.DataFrame(gen_data)
+
+
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
     grid.name = 'Stagg 5-bus System ACDC'
-    
+    pyf.add_generators(grid,gen)
     
     # Return the grid
     return grid,res

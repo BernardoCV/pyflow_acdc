@@ -22,9 +22,9 @@ def analyse_OPF(grid):
     TEP_AC = False
     if grid.nle_AC!=0:
         TEP_AC = True
-    REP_AC = False
+    REC_AC = False
     if grid.nlr_AC!=0:
-        REP_AC = True
+        REC_AC = True
     TAP_tf = False
     if grid.nttf !=0:
         TAP_tf = True
@@ -33,13 +33,13 @@ def analyse_OPF(grid):
         CT_AC = True
    
     
-    return OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC
+    return OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC
     
 
 def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     from .ACDC_OPF import Translate_pyf_OPF 
     
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     
     
     if OnlyAC:
@@ -78,9 +78,9 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     s=1
 def AC_variables(model,grid,AC_info,PV_set):
     
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
 
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REP_info,CT_info = AC_info
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REC_info,CT_info = AC_info
     lf,qf,P_renSource = gen_info
     
     lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_tf,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists
@@ -88,7 +88,7 @@ def AC_variables(model,grid,AC_info,PV_set):
     S_lineAC_limit,S_lineACtf_limit,m_tf_og = AC_lines_info
 
     lista_lineas_AC_exp,S_lineACexp_limit,NP_lineAC = EXP_info
-    lista_lineas_AC_rep,S_lineACrep_lim,S_lineACrep_lim_new,REP_AC_act = REP_info
+    lista_lineas_AC_rec,S_lineACrec_lim,S_lineACrec_lim_new,REC_AC_act = REC_info
     lista_lineas_AC_ct,S_lineACct_lim,cab_types_set,allowed_types = CT_info
 
     "Model Sets"
@@ -99,8 +99,8 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.lines_AC_exp = pyo.Set(initialize=lista_lineas_AC_exp)
     if TAP_tf:
         model.lines_AC_tf  = pyo.Set(initialize=lista_lineas_AC_tf) 
-    if REP_AC:
-        model.lines_AC_rep = pyo.Set(initialize=lista_lineas_AC_rep)
+    if REC_AC:
+        model.lines_AC_rec = pyo.Set(initialize=lista_lineas_AC_rec)
     if CT_AC:
         model.lines_AC_ct = pyo.Set(initialize=lista_lineas_AC_ct)
     
@@ -219,8 +219,8 @@ def AC_variables(model,grid,AC_info,PV_set):
     fromExp_opt_bounds  = make_opt_bounds('connected_fromExpLine')
     toTF_opt_bounds     = make_opt_bounds('connected_toTFLine')
     fromTF_opt_bounds   = make_opt_bounds('connected_fromTFLine')
-    toREP_opt_bounds    = make_opt_bounds('connected_toRepLine')
-    fromREP_opt_bounds  = make_opt_bounds('connected_fromRepLine')
+    toREC_opt_bounds    = make_opt_bounds('connected_toRepLine')
+    fromREC_opt_bounds  = make_opt_bounds('connected_fromRepLine')
     toCT_opt_bounds     = make_opt_bounds('connected_toCTLine')
     fromCT_opt_bounds   = make_opt_bounds('connected_fromCTLine')
 
@@ -236,11 +236,11 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.Qto_TF   = pyo.Var(model.nodes_AC,bounds=toTF_opt_bounds ,initialize=0)
         model.Qfrom_TF = pyo.Var(model.nodes_AC,bounds=fromTF_opt_bounds ,initialize=0)
    
-    if REP_AC:
-        model.Pto_REP   = pyo.Var(model.nodes_AC,bounds=toREP_opt_bounds ,initialize=0)
-        model.Pfrom_REP = pyo.Var(model.nodes_AC,bounds=fromREP_opt_bounds ,initialize=0)
-        model.Qto_REP   = pyo.Var(model.nodes_AC,bounds=toREP_opt_bounds ,initialize=0)
-        model.Qfrom_REP = pyo.Var(model.nodes_AC,bounds=fromREP_opt_bounds ,initialize=0)
+    if REC_AC:
+        model.Pto_REP   = pyo.Var(model.nodes_AC,bounds=toREC_opt_bounds ,initialize=0)
+        model.Pfrom_REP = pyo.Var(model.nodes_AC,bounds=fromREC_opt_bounds ,initialize=0)
+        model.Qto_REP   = pyo.Var(model.nodes_AC,bounds=toREC_opt_bounds ,initialize=0)
+        model.Qfrom_REP = pyo.Var(model.nodes_AC,bounds=fromREC_opt_bounds ,initialize=0)
 
     if CT_AC:
         model.Pto_CT   = pyo.Var(model.nodes_AC,bounds=toCT_opt_bounds ,initialize=0)
@@ -300,20 +300,20 @@ def AC_variables(model,grid,AC_info,PV_set):
 
     def state_based_bounds(model, line, state):
             if state == 0:
-                return (-S_lineACrep_lim[line], S_lineACrep_lim[line])
+                return (-S_lineACrec_lim[line], S_lineACrec_lim[line])
             else:
-                return (-S_lineACrep_lim_new[line], S_lineACrep_lim_new[line])
+                return (-S_lineACrec_lim_new[line], S_lineACrec_lim_new[line])
             
-    if REP_AC:
+    if REC_AC:
         # Define a set for the branch states (0=old, 1=new)
         model.branch_states = pyo.Set(initialize=[0, 1])
         
         # Single variable for all power flows with two indices
-        model.rep_PAC_to   = pyo.Var(model.lines_AC_rep,model.branch_states,bounds=state_based_bounds,initialize=0)
-        model.rep_PAC_from = pyo.Var(model.lines_AC_rep,model.branch_states,bounds=state_based_bounds,initialize=0)
-        model.rep_QAC_to   = pyo.Var(model.lines_AC_rep,model.branch_states,bounds=state_based_bounds,initialize=0)
-        model.rep_QAC_from = pyo.Var(model.lines_AC_rep,model.branch_states,bounds=state_based_bounds,initialize=0)
-        model.rep_PAC_line_loss = pyo.Var(model.lines_AC_rep,initialize=0)
+        model.rec_PAC_to   = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
+        model.rec_PAC_from = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
+        model.rec_QAC_to   = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
+        model.rec_QAC_from = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
+        model.rec_PAC_line_loss = pyo.Var(model.lines_AC_rec,initialize=0)
     
     def set_based_bounds(model, line, cab_type):
          return (-S_lineACct_lim[line,cab_type], S_lineACct_lim[line,cab_type])
@@ -330,12 +330,12 @@ def AC_variables(model,grid,AC_info,PV_set):
         
 
 def AC_constraints(model,grid,AC_info):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REP_info,CT_info = AC_info
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REC_info,CT_info = AC_info
     S_lineAC_limit,S_lineACtf_limit,m_tf_og = AC_lines_info
 
     lista_lineas_AC_exp,S_lineACexp_limit,NP_lineAC = EXP_info
-    lista_lineas_AC_rep,S_lineACrep_lim,S_lineACrep_lim_new,REP_AC_act = REP_info
+    lista_lineas_AC_rec,S_lineACrec_lim,S_lineACrec_lim_new,REC_AC_act = REC_info
     lista_lineas_AC_ct,S_lineACct_lim,cab_types_set,allowed_types = CT_info
 
     "AC equality constraints"
@@ -353,7 +353,7 @@ def AC_constraints(model,grid,AC_info):
             P_sum += model.Pto_Exp[node]+model.Pfrom_Exp[node]
         if TAP_tf:
             P_sum += model.Pto_TF[node]+model.Pfrom_TF[node]
-        if REP_AC:
+        if REC_AC:
             P_sum += model.Pto_REP[node]+model.Pfrom_REP[node]
         if CT_AC:
             P_sum += model.Pto_CT[node]+model.Pfrom_CT[node]
@@ -374,7 +374,7 @@ def AC_constraints(model,grid,AC_info):
             Q_sum += model.Qto_Exp[node]+model.Qfrom_Exp[node]
         if TAP_tf:
             Q_sum += model.Qto_TF[node]+model.Qfrom_TF[node]
-        if REP_AC:
+        if REC_AC:
             Q_sum += model.Qto_REP[node]+model.Qfrom_REP[node]
         if CT_AC:
             Q_sum += model.Qto_CT[node]+model.Qfrom_CT[node]
@@ -463,28 +463,28 @@ def AC_constraints(model,grid,AC_info):
    
     def toPre_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toPre = sum(model.rep_PAC_to[l.lineNumber,0]*(1-model.rep_branch[l.lineNumber])+model.rep_PAC_to[l.lineNumber,1]*model.rep_branch[l.lineNumber] for l in nAC.connected_toRepLine)                  
+       toPre = sum(model.rec_PAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)                  
        return  model.Pto_REP[node] ==  toPre
     def fromPre_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromPre = sum(model.rep_PAC_from[l.lineNumber,0]*(1-model.rep_branch[l.lineNumber])+model.rep_PAC_from[l.lineNumber,1]*model.rep_branch[l.lineNumber] for l in nAC.connected_fromRepLine)                
+       fromPre = sum(model.rec_PAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)                
        return  model.Pfrom_REP[node] ==   fromPre
     
-    def toQrep_rule(model,node):
+    def toQrec_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toQrep = sum(model.rep_QAC_to[l.lineNumber,0]*(1-model.rep_branch[l.lineNumber])+model.rep_QAC_to[l.lineNumber,1]*model.rep_branch[l.lineNumber] for l in nAC.connected_toRepLine)                  
+       toQrep = sum(model.rec_QAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_QAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)                  
        return  model.Qto_REP[node] ==  toQrep
     
-    def fromQrep_rule(model,node):
+    def fromQrec_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromQrep = sum(model.rep_QAC_from[l.lineNumber,0]*(1-model.rep_branch[l.lineNumber])+model.rep_QAC_from[l.lineNumber,1]*model.rep_branch[l.lineNumber] for l in nAC.connected_fromRepLine)                  
+       fromQrep = sum(model.rec_QAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_QAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)                  
        return  model.Qfrom_REP[node] ==  fromQrep   
    
-    if REP_AC:
-        model.rep_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPre_rule)
-        model.rep_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPre_rule)
-        model.rep_Qto_constraint  = pyo.Constraint(model.nodes_AC, rule=toQrep_rule)
-        model.rep_Qfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromQrep_rule)
+    if REC_AC:
+        model.rec_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPre_rule)
+        model.rec_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPre_rule)
+        model.rec_Qto_constraint  = pyo.Constraint(model.nodes_AC, rule=toQrec_rule)
+        model.rec_Qfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromQrec_rule)
 
     def toCT_rule(model,node):
        nAC = grid.nodes_AC[node]
@@ -659,50 +659,50 @@ def AC_constraints(model,grid,AC_info):
         model.exp_Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=Q_from_AC_line_exp)
         model.exp_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_exp, rule=P_loss_AC_rule_exp)
     
-    def P_to_AC_line_rep(model,line,state):   
-        l = grid.lines_AC_rep[line]
+    def P_to_AC_line_rec(model,line,state):   
+        l = grid.lines_AC_rec[line]
         if state ==  0:
             Pto = calculate_P(model,l,'to')
         else:
             Pto = calculate_P(model,l,'to',idx='new')
-        return model.rep_PAC_to[line,state] == Pto
+        return model.rec_PAC_to[line,state] == Pto
     
-    def P_from_AC_line_rep(model,line,state):       
-       l = grid.lines_AC_rep[line]
+    def P_from_AC_line_rec(model,line,state):       
+       l = grid.lines_AC_rec[line]
        if state == 0:
            Pfrom = calculate_P(model,l,'from')
        else:
            Pfrom = calculate_P(model,l,'from',idx='new')
-       return model.rep_PAC_from[line,state] == Pfrom
+       return model.rec_PAC_from[line,state] == Pfrom
     
-    def Q_to_AC_line_rep(model,line,state):   
-        l = grid.lines_AC_rep[line]
+    def Q_to_AC_line_rec(model,line,state):   
+        l = grid.lines_AC_rec[line]
         if state == 0:
             Qto = calculate_Q(model,l,'to')
         else:
             Qto = calculate_Q(model,l,'to',idx='new')
-        return model.rep_QAC_to[line,state] == Qto
+        return model.rec_QAC_to[line,state] == Qto
     
-    def Q_from_AC_line_rep(model,line,state):       
-       l = grid.lines_AC_rep[line]
+    def Q_from_AC_line_rec(model,line,state):       
+       l = grid.lines_AC_rec[line]
        if state == 0:
            Qfrom = calculate_Q(model,l,'from')
        else:
            Qfrom = calculate_Q(model,l,'from',idx='new')
-       return model.rep_QAC_from[line,state] == Qfrom
+       return model.rec_QAC_from[line,state] == Qfrom
    
-    def P_loss_AC_rule_rep(model,line):
-        return model.rep_PAC_line_loss[line]== (model.rep_PAC_to[line,0]+model.rep_PAC_from[line,0])*(1-model.rep_branch[line])+\
-                                               (model.rep_PAC_to[line,1]+model.rep_PAC_from[line,1])*model.rep_branch[line]  
+    def P_loss_AC_rule_rec(model,line):
+        return model.rec_PAC_line_loss[line]== (model.rec_PAC_to[line,0]+model.rec_PAC_from[line,0])*(1-model.rec_branch[line])+\
+                                               (model.rec_PAC_to[line,1]+model.rec_PAC_from[line,1])*model.rec_branch[line]  
     
     
-    if REP_AC:
+    if REC_AC:
      
-        model.rep_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_rep, model.branch_states, rule=P_to_AC_line_rep)
-        model.rep_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rep, model.branch_states, rule=P_from_AC_line_rep)
-        model.rep_Qto_AC_line_constraint = pyo.Constraint( model.lines_AC_rep, model.branch_states, rule=Q_to_AC_line_rep)
-        model.rep_Qfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rep, model.branch_states, rule=Q_from_AC_line_rep)
-        model.rep_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_rep, rule=P_loss_AC_rule_rep)
+        model.rec_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=P_to_AC_line_rec)
+        model.rec_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=P_from_AC_line_rec)
+        model.rec_Qto_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=Q_to_AC_line_rec)
+        model.rec_Qfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=Q_from_AC_line_rec)
+        model.rec_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_rec, rule=P_loss_AC_rule_rec)
     
     def P_to_AC_line_ct(model,line,ct):   
         l = grid.lines_AC_ct[line]
@@ -883,20 +883,20 @@ def AC_constraints(model,grid,AC_info):
         model.tf_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_tf, rule=S_to_AC_limit_rule_tf)
         model.tf_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_tf, rule=S_from_AC_limit_rule_tf)
     
-    def S_to_AC_line_rule_rep(model, line, state):
+    def S_to_AC_line_rule_rec(model, line, state):
         if state == 0:
-            return (model.rep_PAC_to[line,0]**2+model.rep_QAC_to[line,0]**2)*(1-model.rep_branch[line]) <= S_lineACrep_lim[line]**2
+            return (model.rec_PAC_to[line,0]**2+model.rec_QAC_to[line,0]**2)*(1-model.rec_branch[line]) <= S_lineACrec_lim[line]**2
         else:
-            return (model.rep_PAC_to[line,1]**2+model.rep_QAC_to[line,1]**2)*model.rep_branch[line] <= S_lineACrep_lim_new[line]**2 
-    def S_from_AC_limit_rule_rep(model,line,state):
+            return (model.rec_PAC_to[line,1]**2+model.rec_QAC_to[line,1]**2)*model.rec_branch[line] <= S_lineACrec_lim_new[line]**2 
+    def S_from_AC_limit_rule_rec(model,line,state):
         if state == 0:
-            return (model.rep_PAC_from[line,0]**2+model.rep_QAC_from[line,0]**2)*(1-model.rep_branch[line]) <= S_lineACrep_lim[line]**2
+            return (model.rec_PAC_from[line,0]**2+model.rec_QAC_from[line,0]**2)*(1-model.rec_branch[line]) <= S_lineACrec_lim[line]**2
         else:
-            return (model.rep_PAC_from[line,1]**2+model.rep_QAC_from[line,1]**2)*model.rep_branch[line] <= S_lineACrep_lim_new[line]**2
+            return (model.rec_PAC_from[line,1]**2+model.rec_QAC_from[line,1]**2)*model.rec_branch[line] <= S_lineACrec_lim_new[line]**2
    
-    if REP_AC:
-        model.rep_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rep, model.branch_states, rule=S_to_AC_line_rule_rep)
-        model.rep_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rep, model.branch_states, rule=S_from_AC_limit_rule_rep)
+    if REC_AC:
+        model.rec_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec)
+        model.rec_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec)
    
    
     def S_to_AC_line_rule_ct(model, line, ct):
@@ -1399,9 +1399,9 @@ def Converter_constraints(model,grid,Conv_info):
     
 
 def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REP_info,CT_info = AC_info
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REC_info,CT_info = AC_info
     lf,qf,P_renSource = gen_info
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
     
@@ -1606,11 +1606,11 @@ def price_zone_constraints(model,grid,Price_Zone_info):
 
 def price_zone_parameters(model,grid,AC_info,DC_info):
 
-    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REP_info,CT_info = AC_info
+    AC_Lists,AC_nodes_info,AC_lines_info,gen_info,EXP_info,REC_info,CT_info = AC_info
     lf,qf,P_renSource = gen_info
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
 
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     "Price Zone Parameters"
     model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
     model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)
@@ -1621,22 +1621,22 @@ def price_zone_parameters(model,grid,AC_info,DC_info):
         model.price_dc  = pyo.Param(model.nodes_DC, initialize=price_dc,mutable=True)
 
 def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     from .ACDC_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
 
     NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
     P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch,ct_ini = AC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
 
 
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     if TEP_AC:    
         model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)    
 
-    if REP_AC:
-        model.rep_branch = pyo.Param(model.lines_AC_rep,initialize=REP_branch)
+    if REC_AC:
+        model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch)
     
     if CT_AC:
         model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
@@ -1654,14 +1654,14 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
 
 def TEP_variables(model,grid):
 
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     from .ACDC_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
 
     NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
     P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch,ct_ini = AC_line_var
+    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
 
     "TEP variables"
     
@@ -1676,8 +1676,8 @@ def TEP_variables(model,grid):
         model.NumLinesACP = pyo.Var(model.lines_AC_exp, within=pyo.NonNegativeIntegers,bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
         model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
 
-    if REP_AC:
-        model.rep_branch = pyo.Var(model.lines_AC_rep,domain=pyo.Binary,initialize=REP_branch)
+    if REC_AC:
+        model.rec_branch = pyo.Var(model.lines_AC_rec,domain=pyo.Binary,initialize=REC_branch)
 
     if CT_AC:
         model.ct_branch = pyo.Var(model.lines_AC_ct,model.ct_set,domain=pyo.Binary,initialize=ct_ini)
@@ -1710,7 +1710,7 @@ def TEP_variables(model,grid):
 
 
 def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     
     grid.V_AC = np.zeros(grid.nn_AC)
     grid.Theta_V_AC = np.zeros(grid.nn_AC)
@@ -1829,26 +1829,26 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         with ThreadPoolExecutor() as executor:
             executor.map(process_line_AC_TEP, grid.lines_AC_exp)
 
-    if REP_AC:
-        lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rep_branch.items()}
-        lines_AC_REP_fromP = {k: {state: np.float64(pyo.value(model.rep_PAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rep}
-        lines_AC_REP_toP = {k: {state: np.float64(pyo.value(model.rep_PAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rep}
-        lines_AC_REP_fromQ = {k: {state: np.float64(pyo.value(model.rep_QAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rep}
-        lines_AC_REP_toQ = {k: {state: np.float64(pyo.value(model.rep_QAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rep}
-        lines_AC_REP_P_loss = {k: np.float64(pyo.value(v)) for k, v in model.rep_PAC_line_loss.items()}
+    if REC_AC:
+        lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rec_branch.items()}
+        lines_AC_REC_fromP = {k: {state: np.float64(pyo.value(model.rec_PAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+        lines_AC_REC_toP = {k: {state: np.float64(pyo.value(model.rec_PAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+        lines_AC_REC_fromQ = {k: {state: np.float64(pyo.value(model.rec_QAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+        lines_AC_REC_toQ = {k: {state: np.float64(pyo.value(model.rec_QAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+        lines_AC_REC_P_loss = {k: np.float64(pyo.value(v)) for k, v in model.rec_PAC_line_loss.items()}
         
         
         def process_line_AC_REP(line):
             l = line.lineNumber
-            line.rep_branch = True if lines_AC_REP[l] >= 0.99999 else False
-            line.P_loss = lines_AC_REP_P_loss[l]
-            state = 1 if line.rep_branch else 0
-            line.fromS = (lines_AC_REP_fromP[l][state] + 1j*lines_AC_REP_fromQ[l][state])
-            line.toS = (lines_AC_REP_toP[l][state] + 1j*lines_AC_REP_toQ[l][state])
+            line.rec_branch = True if lines_AC_REP[l] >= 0.99999 else False
+            line.P_loss = lines_AC_REC_P_loss[l]
+            state = 1 if line.rec_branch else 0
+            line.fromS = (lines_AC_REC_fromP[l][state] + 1j*lines_AC_REC_fromQ[l][state])
+            line.toS = (lines_AC_REC_toP[l][state] + 1j*lines_AC_REC_toQ[l][state])
             line.loss = line.fromS + line.toS
 
         with ThreadPoolExecutor() as executor:
-            executor.map(process_line_AC_REP, grid.lines_AC_rep)    
+            executor.map(process_line_AC_REP, grid.lines_AC_rec)    
 
     if CT_AC:   
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}

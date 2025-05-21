@@ -123,23 +123,23 @@ def expand_elements_from_pd(grid,exp_elements):
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'exp')
     ))
 
-def repurpose_element_from_pd(grid,rep_elements):
-    from .Class_editor import change_line_AC_to_repurposing
+def repurpose_element_from_pd(grid,rec_elements):
+    from .Class_editor import change_line_AC_to_reconducting
     
     def get_column_value(row, col_name,default_value=None):
         return row[col_name] if col_name in row.index else default_value
     
     # Apply the Expand_element function for each element in exp_elements
-    rep_elements.iloc[:, 0].apply(lambda name: change_line_AC_to_repurposing(
+    rec_elements.iloc[:, 0].apply(lambda name: change_line_AC_to_reconducting(
         grid,
         name,
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'r_new',default_value=0.001),
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'x_new',default_value=0.001),
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'g_new',default_value=0),
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'b_new',default_value=0),
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'MVA_rating_new',default_value=99999),
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'Life_time',default_value=1),
-        get_column_value(rep_elements.loc[rep_elements[rep_elements.iloc[:, 0] == name].index[0], :], 'base_cost',default_value=0),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'r_new',default_value=0.001),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'x_new',default_value=0.001),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'g_new',default_value=0),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'b_new',default_value=0),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'MVA_rating_new',default_value=99999),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'Life_time',default_value=1),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'base_cost',default_value=0),
 
     ))
 
@@ -265,11 +265,11 @@ def get_TEP_variables(grid):
     NP_lineDC,NP_lineDC_i,NP_lineDC_max ={},{},{}
     NP_lineAC,NP_lineAC_i,NP_lineAC_max = {},{},{}
     Line_length ={}
-    REP_branch ={}
+    REC_branch ={}
 
 
-    for l in grid.lines_AC_rep:
-        REP_branch[l.lineNumber] = 0 if not l.rep_branch  else 1
+    for l in grid.lines_AC_rec:
+        REC_branch[l.lineNumber] = 0 if not l.rec_branch  else 1
 
     for l in grid.lines_AC_exp:
         NP_lineAC[l.lineNumber]     = l.np_line
@@ -306,14 +306,14 @@ def get_TEP_variables(grid):
     
     conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv)
     DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length)
-    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REP_branch,ct_ini)
+    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini)
 
 
     return conv_var,DC_line_var,AC_line_var
 
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',initial_guess=0):
 
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
@@ -365,7 +365,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
 
 
 def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
 
@@ -405,7 +405,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     lista_lineas_DC = list(range(0, grid.nl_DC))
     lista_conv = list(range(0, grid.nconv))
     lista_AC   = list(range(0,grid.nle_AC))
-    lista_AC_rep = list(range(0,grid.nlr_AC))
+    lista_AC_rec = list(range(0,grid.nlr_AC))
     lista_AC_ct = list(range(0,grid.nct_AC))
     if grid.Cable_options is not None and len(grid.Cable_options) > 0:
         cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
@@ -424,8 +424,8 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
         model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
     if TEP_AC:
         model.lines_AC_exp= pyo.Set(initialize=lista_AC)
-    if REP_AC:
-        model.lines_AC_rep= pyo.Set(initialize=lista_AC_rep)
+    if REC_AC:
+        model.lines_AC_rec= pyo.Set(initialize=lista_AC_rec)
     if CT_AC:
         model.lines_AC_ct = pyo.Set(initialize=lista_AC_ct)
         model.ct_set = pyo.Set(initialize=cab_types_set)
@@ -489,14 +489,14 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
         model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.Time_frames, rule=NP_line_link)
         model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
     
-    def NP_ACline_rep_link(model,line,t):
-        element=grid.lines_AC_rep[line]
-        if element.rep_line_opf:
-            return model.rep_branch[line] ==model.submodel[t].rep_branch[line]
+    def NP_ACline_rec_link(model,line,t):
+        element=grid.lines_AC_rec[line]
+        if element.rec_line_opf:
+            return model.rec_branch[line] ==model.submodel[t].rec_branch[line]
         else:
             return pyo.Constraint.Skip
-    if REP_AC:
-        model.NP_ACline_rep_link_constraint = pyo.Constraint(model.lines_AC_rep,model.Time_frames, rule=NP_ACline_rep_link) 
+    if REC_AC:
+        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.Time_frames, rule=NP_ACline_rec_link) 
 
 
     def NP_ACline_ct_link(model,line,ct,t):
@@ -549,7 +549,7 @@ def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
 
 def TEP_obj(model,grid,NPV):
   
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid) 
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid) 
       
     def AC_Line_investments():
         AC_Inv_lines=0
@@ -565,13 +565,13 @@ def TEP_obj(model,grid,NPV):
     
     def Repurposing_investments():
         Rep_Inv_lines=0
-        for l in model.lines_AC_rep:
-            line = grid.lines_AC_rep[l]
-            if line.rep_line_opf:
+        for l in model.lines_AC_rec:
+            line = grid.lines_AC_rec[l]
+            if line.rec_line_opf:
                 if NPV:
-                    Rep_Inv_lines+=model.rep_branch[l]*line.base_cost
+                    Rep_Inv_lines+=model.rec_branch[l]*line.base_cost
                 else:
-                    Rep_Inv_lines+=model.rep_branch[l]*line.base_cost/line.life_time_hours
+                    Rep_Inv_lines+=model.rec_branch[l]*line.base_cost/line.life_time_hours
         return Rep_Inv_lines
     
     def Cables_investments():
@@ -615,10 +615,10 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_line_AC=0
 
-    if REP_AC:
-        inv_line_AC_rep = Repurposing_investments()
+    if REC_AC:
+        inv_line_AC_rec = Repurposing_investments()
     else:
-        inv_line_AC_rep = 0
+        inv_line_AC_rec = 0
 
     def CT_limit_rule(model):
             return sum(model.ct_types[ct] for ct in model.ct_set) <= grid.cab_types_allowed
@@ -647,7 +647,7 @@ def TEP_obj(model,grid,NPV):
         inv_cable = 0
         inv_conv  = 0
 
-    return inv_line_AC+inv_line_AC_rep+inv_cable + inv_conv + inv_array
+    return inv_line_AC+inv_line_AC_rec+inv_cable + inv_conv + inv_array
 
 def weighted_subobj(model,NPV,n_years,discount_rate):
     # Calculate the weighted social cost for each submodel (subblock)
@@ -748,7 +748,7 @@ def get_curtailment_data(t, model, grid,n_clusters,clustering):
 
 def get_line_data(t, model, grid):
     row_data_lines = {'Time_Frame': t}
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     if TEP_AC:
         for l in grid.lines_AC_exp:
             if l.np_line_opf:
@@ -761,15 +761,15 @@ def get_line_data(t, model, grid):
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating * 100
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
-    if REP_AC:
-        for l in grid.lines_AC_rep:
-            if l.rep_line_opf:
+    if REC_AC:
+        for l in grid.lines_AC_rec:
+            if l.rec_line_opf:
                 ln = l.lineNumber
-                state = 1 if pyo.value(model.rep_branch[ln]) >= 0.99999 else 0
-                P_to = np.float64(pyo.value(model.submodel[t].rep_PAC_to[ln,state])) * grid.S_base
-                P_from = np.float64(pyo.value(model.submodel[t].rep_PAC_from[ln,state])) * grid.S_base
-                Q_to = np.float64(pyo.value(model.submodel[t].rep_QAC_to[ln,state])) * grid.S_base
-                Q_from = np.float64(pyo.value(model.submodel[t].rep_QAC_from[ln,state])) * grid.S_base
+                state = 1 if pyo.value(model.rec_branch[ln]) >= 0.99999 else 0
+                P_to = np.float64(pyo.value(model.submodel[t].rec_PAC_to[ln,state])) * grid.S_base
+                P_from = np.float64(pyo.value(model.submodel[t].rec_PAC_from[ln,state])) * grid.S_base
+                Q_to = np.float64(pyo.value(model.submodel[t].rec_QAC_to[ln,state])) * grid.S_base
+                Q_from = np.float64(pyo.value(model.submodel[t].rec_QAC_from[ln,state])) * grid.S_base
                 S_to = np.sqrt(P_to**2 + Q_to**2)
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 if state == 1:
@@ -855,7 +855,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     grid.V_DC=np.zeros(grid.nn_DC)
 
 
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
 
     SW= sum(pyo.value(model.weights[t]) for t in model.Time_frames)
     def process_ren_source(renSource):
@@ -970,11 +970,11 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}    
         for line in grid.lines_AC_exp:
             line.np_line=NumLinesACP_values[line.lineNumber] 
-    if REP_AC:
-        lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rep_branch.items()}
-        for line in grid.lines_AC_rep:
+    if REC_AC:
+        lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rec_branch.items()}
+        for line in grid.lines_AC_rec:
             l = line.lineNumber
-            line.rep_branch = True if lines_AC_REP[l] >= 0.99999 else False
+            line.rec_branch = True if lines_AC_REP[l] >= 0.99999 else False
     if CT_AC:
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         for line in grid.lines_AC_ct:
@@ -1099,7 +1099,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     return TEP_TS_res
 
 def export_TEP_TS_results_to_excel(grid,export):
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
     [clustering,n_clusters,flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_TS_res
            # Define the column names for the DataFrame
@@ -1120,13 +1120,13 @@ def export_TEP_TS_results_to_excel(grid,export):
                 cost = ((opt - ini) * l.base_cost)  / 1000
                 tot += cost
                 data.append([element, "AC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
-    if REP_AC:
-        for l in grid.lines_AC_rep:
-            if l.rep_line_opf:
+    if REC_AC:
+        for l in grid.lines_AC_rec:
+            if l.rec_line_opf:
                 element = l.name
                 ini = " "
-                opt = l.rep_branch
-                if l.rep_branch:
+                opt = l.rec_branch
+                if l.rec_branch:
                     pr = l.MVA_rating_new
                     cost = l.base_cost  / 1000
                 else:

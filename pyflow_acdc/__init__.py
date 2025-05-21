@@ -69,7 +69,7 @@ __all__ = [
     'add_gen',
     'add_extGrid',
     'add_RenSource',
-    'add_generators_fromcsv',
+    'add_generators',
     
     # Add Zones
     'add_RenSource_zone',
