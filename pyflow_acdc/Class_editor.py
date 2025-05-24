@@ -25,6 +25,7 @@ __all__ = [
     'add_line_AC',
     'add_line_DC',
     'add_ACDC_converter',
+    'add_DCDC_converter',
     'add_gen',
     'add_extGrid',
     'add_RenSource',
@@ -275,10 +276,10 @@ def change_line_AC_to_expandable(grid, line_name):
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
         line.lineNumber = i 
-    grid.create_Ybus_AC()
+    
     for i, line in enumerate(grid.lines_AC_exp):
         line.lineNumber = i 
-        
+    grid.create_Ybus_AC()
     return expandable_line    
 
 def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
@@ -309,16 +310,16 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
             'Cable_type': l.Cable_type
         }
         rec_line = rec_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
-        grid.lines_AC_rep.append(rec_line)
+        grid.lines_AC_rec.append(rec_line)
         grid.Update_Graph_AC()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
         line.lineNumber = i 
-    grid.create_Ybus_AC()
-    for i, line in enumerate(grid.lines_AC_rep):
+    
+    for i, line in enumerate(grid.lines_AC_rec):
         line.lineNumber = i 
-        
+    grid.create_Ybus_AC()    
     return rec_line  
 
 def change_line_AC_to_tap_transformer(grid, line_name):
@@ -378,6 +379,12 @@ def add_line_sizing(grid, fromNode, toNode,cable_types: list=[], active_config: 
     return line
 
 def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu',update_grid=True):
+    
+    if isinstance(fromNode, str):
+        fromNode = next((node for node in grid.nodes_DC if node.name == fromNode), None)
+    if isinstance(toNode, str):
+        toNode = next((node for node in grid.nodes_DC if node.name == toNode), None)
+    
     kV_base=toNode.kV_base
     if data_in == 'Ohm':
         Z_base = kV_base**2/grid.S_base
@@ -410,6 +417,14 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
     return line
 
 def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
+    if isinstance(DC_node, str):
+        DC_node = next((node for node in grid.nodes_DC if node.name == DC_node), None)
+    if isinstance(AC_node, str):
+        AC_node = next((node for node in grid.nodes_AC if node.name == AC_node), None)
+    
+    
+    
+    
     if MVA_max is None:
         MVA_max= grid.S_base*100
     if kV_base is None:
@@ -436,6 +451,24 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
     conv.c_rect  = conv.c_rect_og*conv.basekA**2/grid.S_base     
 
     grid.Converters_ACDC.append(conv)
+    return conv
+
+def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r=0.0001, MW_rating=99999,name=None,geometry=None):
+    if isinstance(fromNode, str):
+        fromNode = next((node for node in grid.nodes_DC if node.name == fromNode), None)
+    if isinstance(toNode, str):
+        toNode = next((node for node in grid.nodes_DC if node.name == toNode), None)
+    
+    if R_Ohm is not None:
+        Z_base = toNode.kV_base**2/grid.S_base
+        r = R_Ohm/Z_base
+    if P_MW is not None:
+        Pset = P_MW/grid.S_base
+    if Pset is None:
+        Pset = MW_rating/(2*grid.S_base)
+    
+    conv = DCDC_converter(fromNode , toNode , Pset, r, MW_rating,name,geometry)
+    grid.Converters_DCDC.append(conv)
     return conv
 
 "Zones"

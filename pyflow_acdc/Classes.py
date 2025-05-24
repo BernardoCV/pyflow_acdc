@@ -90,7 +90,11 @@ class Grid:
                 # Set grid's S_base for each line
                 line.S_base = self.S_base
                 self.lines_DC.append(line)
-            
+
+        self.CFC_DC = []
+
+        self.Converters_DCDC = []
+
         self.slack_bus_number_AC = []
         self.slack_bus_number_DC = []
         
@@ -345,6 +349,15 @@ class Grid:
     def nl_DC(self):
         return len(self.lines_DC) if self.lines_DC is not None else 0   
        
+    @property
+    def ncfc_DC(self):
+        return len(self.CFC_DC) if self.CFC_DC is not None else 0  # Number of Current Flow Controller
+
+    
+    @property
+    def ncdc_DC(self):
+        return len(self.Converters_DCDC) if self.Converters_DCDC is not None else 0  # Number of DC-DC converters
+
     # ACDC Converter properties
     @property
     def nconv(self):
@@ -579,16 +592,21 @@ class Grid:
     
     def Update_P_DC(self):
 
-        self.P_DC = np.vstack([node.P_DC for node in self.nodes_DC])
+        self.P_DC = np.vstack([node.PGi-node.PLi
+                               +node.PconvDC
+                               +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                for node in self.nodes_DC])
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
-        self.Pconv_DCDC = np.vstack([node.PconvDC for node in self.nodes_DC])
+        
+        s=1
     def Update_PQ_AC(self):
         for node in self.nodes_AC:
             node.Q_s_fx=sum(self.Converters_ACDC[conv].Q_AC for conv  in node.connected_conv if self.Converters_ACDC[conv].AC_type=='PQ')
             node.Q_s   = sum(self.Converters_ACDC[conv].Q_AC for conv  in node.connected_conv if self.Converters_ACDC[conv].AC_type!='PQ')
         # # Negative means power leaving the system, positive means injected into the system at a node  
        
-        self.P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+        self.P_AC = np.vstack([node.PGi
+                               +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
                                +sum(gen.PGen for gen in node.connected_gen)
                                -node.PLi for node in self.nodes_AC])
         self.Q_AC = np.vstack([node.QGi+sum(gen.QGen for gen in node.connected_gen)
@@ -599,6 +617,7 @@ class Grid:
         s = 1
 
     def create_Ybus_AC(self):
+        
         self.Ybus_AC = np.zeros((self.nn_AC, self.nn_AC), dtype=complex)
         self.AdmitanceVec_AC = np.zeros((self.nn_AC), dtype=complex)
         Ybus_nn= np.zeros((self.nn_AC),dtype=complex)
@@ -623,14 +642,78 @@ class Grid:
             
             Ybus_nn[fromNode] += branch_ff
             Ybus_nn[toNode] += branch_tt
-            
 
+
+        self.Ybus_AC_full = np.copy(self.Ybus_AC)    
+        Ybus_nn_full = np.copy(Ybus_nn)
+
+        for k in range(self.nle_AC):
+            line = self.lines_AC_exp[k]
+            fromNode = line.fromNode.nodeNumber
+            toNode = line.toNode.nodeNumber
+
+            branch_ff = line.Ybus_branch[0, 0]*line.np_line
+            branch_ft = line.Ybus_branch[0, 1]*line.np_line
+            branch_tf = line.Ybus_branch[1, 0]*line.np_line
+            branch_tt = line.Ybus_branch[1, 1]*line.np_line
+
+            self.Ybus_AC_full[toNode, fromNode]+=branch_tf
+            self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+            
+            
+            Ybus_nn_full[fromNode] += branch_ff
+            Ybus_nn_full[toNode] += branch_tt
+
+        for k in range(self.nlr_AC):
+            line = self.lines_AC_rec[k]
+            fromNode = line.fromNode.nodeNumber
+            toNode = line.toNode.nodeNumber
+
+            if line.rec_branch:
+                branch_ff = line.Ybus_branch_new[0, 0]
+                branch_ft = line.Ybus_branch_new[0, 1]
+                branch_tf = line.Ybus_branch_new[1, 0]
+                branch_tt = line.Ybus_branch_new[1, 1]
+            else:    
+                branch_ff = line.Ybus_branch[0, 0]
+                branch_ft = line.Ybus_branch[0, 1]
+                branch_tf = line.Ybus_branch[1, 0]
+                branch_tt = line.Ybus_branch[1, 1]
+
+            self.Ybus_AC_full[toNode, fromNode]+=branch_tf
+            self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+            
+            
+            Ybus_nn_full[fromNode] += branch_ff
+            Ybus_nn_full[toNode] += branch_tt
+
+
+        for k in range(self.nct_AC):
+            line = self.lines_AC_ct[k]
+            fromNode = line.fromNode.nodeNumber
+            toNode = line.toNode.nodeNumber
+
+            branch_ff = line.Ybus_list[line.active_config][0, 0]
+            branch_ft = line.Ybus_list[line.active_config][0, 1]
+            branch_tf = line.Ybus_list[line.active_config][1, 0]
+            branch_tt = line.Ybus_list[line.active_config][1, 1]
+
+            self.Ybus_AC_full[toNode, fromNode]+=branch_tf
+            self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+            
+            
+            Ybus_nn_full[fromNode] += branch_ff
+            Ybus_nn_full[toNode] += branch_tt
+        
         for m in range(self.nn_AC):
             node = self.nodes_AC[m]
 
             self.AdmitanceVec_AC[m] += node.Reactor
             Ybus_nn[m] += node.Reactor
+            Ybus_nn_full[m] += node.Reactor
+
             self.Ybus_AC[m, m] = Ybus_nn[m]
+            self.Ybus_AC_full[m, m] = Ybus_nn_full[m]
             
     def create_Ybus_DC(self):
         self.Ybus_DC = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
@@ -642,7 +725,7 @@ class Grid:
             toNode = line.toNode.nodeNumber
             if line.R ==0:
                 s=1
-            self.Ybus_DC[fromNode, toNode] -= 1/line.R
+            self.Ybus_DC[fromNode, toNode] -= line.np_line/line.R
             self.Ybus_DC[toNode, fromNode] = self.Ybus_DC[fromNode, toNode]
 
         # Diagonal elements
@@ -1139,7 +1222,7 @@ class Node_DC:
             'price': None,
             }
         
-        self.P_DC = self.PGi-self.PLi
+        
         self.V = np.copy(self.V_ini)
         self.P_INJ = 0
         self.Pconv = 0
@@ -1148,8 +1231,9 @@ class Node_DC:
         self.stand_alone=True
         
         self.PconvDC = 0
-        self.P = 0
-        
+        self.connected_DCDC_to=set()
+        self.connected_DCDC_from=set()
+                
         self.price = 0.0
         
         self.Nconv= None
@@ -1955,7 +2039,16 @@ class Line_DC:
         self._Cable_type = new_type
         if new_type != 'Custom':
             self.R, self.MW_rating = self.get_cable_parameters(new_type, self.S_base, self.Length_km, self.np_line,self.kV_base)
-           
+
+class CFC_DC:
+    CFC_num = 0
+    names = set()
+
+    @classmethod
+    def reset_class(cls):
+        cls.CFC_num = 0
+        cls.names = set()
+
 class AC_DC_converter:
     """
     Attributes
@@ -2199,9 +2292,9 @@ class AC_DC_converter:
         AC_DC_converter.names.add(self.name)
         self.Node_AC.connected_conv.add(self.ConvNumber)
 
-        
+     
 
-class DC_DC_converter:
+class DCDC_converter:
     ConvNumber = 0
     names = set()
 
@@ -2215,29 +2308,32 @@ class DC_DC_converter:
     def name(self):
         return self._name
 
-    def __init__(self, element_type: str, fromNode: Node_DC, toNode: Node_DC, PowerTo: float, R: float, name=None):
-        self.ConvNumber = DC_DC_converter.ConvNumber
-        DC_DC_converter.ConvNumber += 1
+    def __init__(self, fromNode: Node_DC, toNode: Node_DC, Pset: float, r: float, MW_rating: float, name=None,geometry=None):
+        self.ConvNumber = DCDC_converter.ConvNumber
+        DCDC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
-        self.type = element_type
-        self.ConvNumber = DC_DC_converter.ConvNumber
+        # self.type = element_type
+
+        
         self.fromNode = fromNode
         self.toNode = toNode
-        self.PowerTo = PowerTo
-        self.R = R
-
-        toNode.PconvDC += self.PowerTo
-        self.Powerfrom = self.PowerTo+self.PowerTo**2*R
-
-        fromNode.PconvDC -= self.Powerfrom
-
+        self.Pset = Pset
+        self.r = r
+        self.MW_rating = MW_rating
+        self.Powerto = Pset
+        self.Powerfrom = -( Pset+Pset**2*r)
+        self.loss = Pset**2*r
+        fromNode.PconvDC += self.Powerfrom
+        fromNode.connected_DCDC_from.add(self.ConvNumber)
+        toNode.PconvDC += self.Powerto
+        toNode.connected_DCDC_to.add(self.ConvNumber)
         
         if name is None:
             self._name = str(self.ConvNumber)
         else:
             self._name = name
 
-        DC_DC_converter.names.add(self.name)
+        DCDC_converter.names.add(self.name)
 
 class Ren_source_zone:
     ren_source_num = 0

@@ -25,7 +25,7 @@ def initialize_pyflowacdc():
     Line_DC.reset_class()
     TF_Line_AC.reset_class()  # Add this
     AC_DC_converter.reset_class()
-    DC_DC_converter.reset_class()
+    DCDC_converter.reset_class()
     TimeSeries.reset_class()
     Ren_source_zone.reset_class()  # Add this
     # Add these classes:

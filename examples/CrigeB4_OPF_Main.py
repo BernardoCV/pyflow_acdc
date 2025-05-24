@@ -40,9 +40,7 @@ pyf.add_extGrid(grid, 'BaB0')
 
 
 
-[model, model_res , timing_info]=pyf.OPF_ACDC(grid)
-
-[opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] =pyf.OPF_conv_results(model,grid)
+model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
 
 
 end_time = time.time()

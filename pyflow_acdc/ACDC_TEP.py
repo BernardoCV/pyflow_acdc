@@ -311,9 +311,11 @@ def get_TEP_variables(grid):
 
     return conv_var,DC_line_var,AC_line_var
 
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',initial_guess=0):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
 
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
@@ -326,7 +328,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     OPF_createModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
 
     obj_TEP = TEP_obj(model,grid,NPV)
-    obj_OPF = OPF_obj(model,grid,weights_def,True,OnlyAC)
+    obj_OPF = OPF_obj(model,grid,weights_def,True,ACmode,DCmode)
     
     present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     if NPV:
@@ -365,7 +367,9 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
 
 
 def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
 
@@ -419,9 +423,10 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     
     #print(list(model.Time_frames))
     model.submodel    = pyo.Block(model.Time_frames)
-    if not OnlyAC:
-        model.conv        = pyo.Set(initialize=lista_conv)
+    if DCmode:
         model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
+    if ACmode and DCmode:
+        model.conv        = pyo.Set(initialize=lista_conv)
     if TEP_AC:
         model.lines_AC_exp= pyo.Set(initialize=lista_AC)
     if REC_AC:
@@ -451,7 +456,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
                      price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
         modify_parameters(grid,model.submodel[t],False,True)
         
-        TEP_subObj(model.submodel[t],grid,weights_def,OnlyAC)
+        TEP_subObj(model.submodel[t],grid,weights_def,ACmode,DCmode)
         if clustering:
             w[t]= float(grid.Clusters[n_clusters][t-1])
 
@@ -485,8 +490,9 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     if TEP_AC:
         model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.Time_frames, rule=NP_ACline_link)
 
-    if not OnlyAC:
+    if DCmode:
         model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.Time_frames, rule=NP_line_link)
+    if ACmode and DCmode:
         model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
     
     def NP_ACline_rec_link(model,line,t):
@@ -540,16 +546,18 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
-def TEP_subObj(submodel,grid,ObjRule,OnlyAC):
+def TEP_subObj(submodel,grid,ObjRule,ACmode,DCmode):
     OnlyGen=True
 
-    obj_rule= OPF_obj(submodel,grid,ObjRule,OnlyGen,OnlyAC)
+    obj_rule= OPF_obj(submodel,grid,ObjRule,OnlyGen,ACmode,DCmode)
     submodel.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
 
 
 def TEP_obj(model,grid,NPV):
   
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid) 
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd 
       
     def AC_Line_investments():
         AC_Inv_lines=0
@@ -640,11 +648,14 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_array = 0
 
-    if not OnlyAC:
+    if DCmode:
         inv_cable = Cables_investments()
-        inv_conv = Converter_investments()
     else:
         inv_cable = 0
+
+    if ACmode and DCmode:
+        inv_conv = Converter_investments()
+    else:
         inv_conv  = 0
 
     return inv_line_AC+inv_line_AC_rec+inv_cable + inv_conv + inv_array
@@ -748,7 +759,9 @@ def get_curtailment_data(t, model, grid,n_clusters,clustering):
 
 def get_line_data(t, model, grid):
     row_data_lines = {'Time_Frame': t}
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
     if TEP_AC:
         for l in grid.lines_AC_exp:
             if l.np_line_opf:
@@ -792,7 +805,7 @@ def get_line_data(t, model, grid):
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating_list[active_config] * 100
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
-    if not OnlyAC:
+    if DCmode:
         for l in grid.lines_DC:
             if l.np_line_opf:
                 ln = l.lineNumber
@@ -855,7 +868,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     grid.V_DC=np.zeros(grid.nn_DC)
 
 
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
 
     SW= sum(pyo.value(model.weights[t]) for t in model.Time_frames)
     def process_ren_source(renSource):
@@ -872,7 +887,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         nAC = node.nodeNumber
         node.V_AC = np.float64(sum(pyo.value(model.submodel[t].V_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
         node.theta = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        if not OnlyAC:
+        if DCmode:
             node.P_s = np.float64(sum(pyo.value(model.submodel[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
             node.Q_s = np.float64(sum(pyo.value(model.submodel[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
     
@@ -932,8 +947,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         futures = []
         futures.extend([executor.submit(process_ac_node, node) for node in grid.nodes_AC])
         
-        if not OnlyAC:
+        if DCmode:
             futures.extend([executor.submit(process_dc_node, node) for node in grid.nodes_DC])
+        if ACmode and DCmode:
             futures.extend([executor.submit(process_converter, conv) for conv in grid.Converters_ACDC])
             
         if Price_Zones:
@@ -981,11 +997,11 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
             l=line.lineNumber
             line.active_config = np.where([lines_AC_CT[l][ct] >= 0.75 for ct in model.ct_set])[0][0]
     
-    if not OnlyAC:
+    if DCmode:
         NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   
         for line in grid.lines_DC:
             line.np_line = NumLinesDCP_values[line.lineNumber]
-
+    
 
     for z in grid.RenSource_zones:
         if clustering:
@@ -1099,7 +1115,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     return TEP_TS_res
 
 def export_TEP_TS_results_to_excel(grid,export):
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
     [clustering,n_clusters,flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_TS_res
            # Define the column names for the DataFrame
@@ -1146,7 +1164,7 @@ def export_TEP_TS_results_to_excel(grid,export):
                 data.append([element, "Cable type Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
                 
 
-    if not OnlyAC:
+    if DCmode:
         # Loop through DC lines and add data to the list
         for l in grid.lines_DC:
             if l.np_line_opf:
@@ -1158,7 +1176,8 @@ def export_TEP_TS_results_to_excel(grid,export):
                 
                 tot += cost
                 data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
-        
+    
+    if ACmode and DCmode:
         # Loop through ACDC converters and add data to the list
         for cn in grid.Converters_ACDC:
             if cn.NUmConvP_opf:

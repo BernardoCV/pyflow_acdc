@@ -219,20 +219,21 @@ Solvers
 The OPF module supports the following solvers:
 
 - IPOPT
+- Bonmin
 
-.. function::  OPF_solve(model,grid,solver_options=[])
+.. function::  OPF_solve(model,grid,solver = 'ipopt')
 
    Solves the OPF model using the specified solver.
 
    :param model: The optimization model
    :param grid: The grid to optimize
-   :param solver_options: Additional solver options
+   :param solver: The solver to use
 
    **Example**
 
    .. code-block:: python
 
-      results, solver_stats =pyf.OPF_solve(model,grid,solver_options=[])
+        results, solver_stats =pyf.OPF_solve(model,grid)
 
 
 **References**

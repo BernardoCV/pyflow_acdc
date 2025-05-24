@@ -13,7 +13,7 @@ Running the OPF
 
 This function runs the AC/DC hybrid optimal power flow calculation. It creates the :ref:`model <model_creation>`, chooses an :ref:`objective function <obj_functions>`, and :ref:`solves <model_solving>` the model.
 
-.. py:function::  OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+.. py:function::  Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
 
    Performs AC/DC hybrid optimal power flow calculation.
 
@@ -216,23 +216,32 @@ The user can define the objective by setting the weight of each sub objective. T
 Solvers
 ^^^^^^^
 
-The OPF module supports the following solvers:
+The OPF module supports pyomo solvers.
+
+To see the available solvers, use the following command:
+
+.. code-block:: bash
+
+  pyomo help --solvers
+
+Tested with:
 
 - IPOPT
+- Bonmin
 
-.. function::  OPF_solve(model,grid,solver_options=[])
+.. function::  OPF_solve(model,grid,solver = 'ipopt')
 
    Solves the OPF model using the specified solver.
 
    :param model: The optimization model
    :param grid: The grid to optimize
-   :param solver_options: Additional solver options
+   :param solver: The solver to use
 
    **Example**
 
    .. code-block:: python
 
-      results, solver_stats =pyf.OPF_solve(model,grid,solver_options=[])
+        results, solver_stats =pyf.OPF_solve(model,grid)
 
 
 **References**

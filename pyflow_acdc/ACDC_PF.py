@@ -40,9 +40,10 @@ def cartz2pol(z):
     return r, theta
 
 
-def AC_PowerFlow(grid, tol_lim=1e-8, maxIter=100):
+def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
     time_1 = time.time()
     grid.Update_PQ_AC()
+    grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
     load_flow_AC(grid, tol_lim, maxIter)
     grid.Update_PQ_AC()
@@ -50,16 +51,16 @@ def AC_PowerFlow(grid, tol_lim=1e-8, maxIter=100):
     time_2 = time.time()
     return time_2-time_1
     
-def DC_PowerFlow(grid, tol_lim=1e-8, maxIter=100):
+def DC_PowerFlow(grid, tol_lim=1e-10, maxIter=100,Droop_PF=True):
     time_1 = time.time()
     grid.Update_P_DC()
-    load_flow_DC(grid, tol_lim, maxIter)
+    load_flow_DC(grid, tol_lim, maxIter,Droop_PF)
     grid.Update_P_DC()
     grid.Line_DC_calc()
     time_2 = time.time()
     return time_2-time_1
 
-def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QLimit=False):
+def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, change_slack2Droop=False, QLimit=False,Droop_PF=True):
     time_1 = time.time()
     tolerance = 1
     grid.iter_num_seq = 0
@@ -75,7 +76,10 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
             s = 1
             
     grid.Update_PQ_AC()
+    grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
+    # Initialize ps_iterations as a numpy array with shape (maxIter, nn_AC)
+    ps_iterations = np.zeros((maxIter, grid.nn_AC))
     
     while tolerance > tol_lim and grid.iter_num_seq < maxIter:
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
@@ -133,7 +137,10 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
         P_dif = Ps-Ps_AC_new
 
         tolerance = np.max(abs(P_dif))
-
+        
+        # Store the current iteration's Ps values
+        ps_iterations[grid.iter_num_seq, :] = Ps_AC_new.flatten()
+        
         s = 1
         for node in grid.nodes_AC:
             node.P_s = Ps_AC_new[node.nodeNumber]
@@ -156,8 +163,8 @@ def ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QL
     time_2=time.time()
     t = time_2-time_1
     
-    return t
-def Jacobian_DC(grid, V_DC, P):
+    return t , ps_iterations
+def Jacobian_DC(grid, V_DC, P,Droop_PF):
     grid.slack_bus_number_DC = []
     J = np.zeros((grid.nn_DC, grid.nn_DC))
     V = V_DC
@@ -180,7 +187,7 @@ def Jacobian_DC(grid, V_DC, P):
                 else:
                     J[m, n] = P[m]
                     if grid.nconv != 0:
-                        if grid.nodes_DC[k].type == 'Droop':
+                        if grid.nodes_DC[k].type == 'Droop' and Droop_PF:
                             J[m, n] += grid.nodes_DC[k].Droop_rate * V[m]
 
                     for a in range(grid.nn_DC):
@@ -196,7 +203,7 @@ def Jacobian_DC(grid, V_DC, P):
 
     return J
 
-def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
+def load_flow_DC(grid, tol_lim=1e-8, maxIter=100,Droop_PF=True):
 
     iter_num = 0
 
@@ -210,7 +217,7 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
     
     
     
-    P_known = np.copy(grid.P_DC+grid.Pconv_DC+grid.Pconv_DCDC)
+    P_known = np.copy(grid.P_DC+grid.Pconv_DC)
     while tol > tol_lim and iter_num < maxIter:
         iter_num += 1
 
@@ -229,24 +236,23 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
                     if Y != 0:
                         line = grid.get_lineDC_by_nodes(i, k)
                         pol = line.pol
-                        npar = line.np_line
-                    Y = -npar*Y
-                    P[i] += pol*V[i]*(V[i]-V[k])*Y
+                        G = 1/line.R
+                        P[i] += pol*V[i]*(V[i]-V[k])*G
 
         for node in grid.nodes_DC:
             if grid.nconv != 0:
-                if node.type == 'Droop':
+                if node.type == 'Droop' and Droop_PF:
                     n = node.nodeNumber
                     Droop_change = (node.V_ini-V[n])*node.Droop_rate
-                    P_known[n] = np.copy(grid.P_DC[n]+grid.Pconv_DC[n]+grid.Pconv_DCDC[n]) + Droop_change
-                    s = 1
+                    P_known[n] = np.copy(grid.P_DC[n]+grid.Pconv_DC[n]) + Droop_change
+                    s = 1        
 
         # print (P1)
         # print (P)
         # print('------')
         dPa = P_known-P
 
-        J_DC = Jacobian_DC(grid,V, P)
+        J_DC = Jacobian_DC(grid,V, P,Droop_PF)
 
         if len(grid.slack_bus_number_DC) == 0:
             J_modified = J_DC
@@ -269,7 +275,7 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
 
         if iter_num == maxIter:
             print('')
-            print(f'Warning  load flow DC did not converge')
+            print(f'Warning  load flow DC did not converge in {maxIter} iterations')
             print(f'Lowest tolerance reached: {np.round(tol,decimals=6)}')
 
     grid.iter_flow_DC.append(iter_num)
@@ -277,7 +283,6 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
     grid.V_DC = V
 
     for node in grid.nodes_DC:
-
         i = node.nodeNumber
         for k in range(grid.nn_DC):
             Y = grid.Ybus_DC[i, k]
@@ -285,19 +290,13 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
                 if Y != 0:
                     line = grid.get_lineDC_by_nodes(i, k)
                     pol = line.pol
-                Y = -Y
-                Pf[i] += pol*V[i]*(V[i]-V[k])*Y
-                grid.nodes_DC[i].V = V[i]
+                    npar = line.np_line
+                    G = 1/line.R
+                    Pf[i] += pol*V[i]*(V[i]-V[k])*G
+        grid.nodes_DC[i].V = V[i]
+        node.P_INJ = Pf[i].item()
     dPa = P_known-Pf
 
-    for node in grid.nodes_DC:
-        n = node.nodeNumber
-        node.P_INJ = Pf[n].item()
-        node.P = P_known[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
-        if node.type == 'Slack':
-            node.P = Pf[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
-
-    s = 1
 
     grid.P_DC_INJ = np.vstack([node.P_INJ for node in grid.nodes_DC])
 
@@ -305,12 +304,13 @@ def load_flow_DC(grid, tol_lim=1e-8, maxIter=20):
 
         for conv in grid.Converters_ACDC:
             n = conv.Node_DC.nodeNumber
-            if conv.type== 'Droop':
-                conv.P_DC = P_known[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
+            if conv.type== 'Droop' and Droop_PF:
+                conv.P_DC         = P_known[n].item()-grid.P_DC[n].item()
+                conv.Node_DC.Pconv= P_known[n].item()-grid.P_DC[n].item()
                 s = 1
             elif conv.type== 'Slack':
-                conv.Node_DC.Pconv = Pf[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
-                conv.P_DC = Pf[n].item()-grid.P_DC[n].item()-grid.Pconv_DCDC[n].item()
+                conv.Node_DC.Pconv = Pf[n].item()-grid.P_DC[n].item()
+                conv.P_DC          = Pf[n].item()-grid.P_DC[n].item()
                 s = 1
     grid.Update_P_DC()
     s = 1
@@ -329,8 +329,8 @@ def Jacobian_AC(grid, Voltages, Angles,P,Q):
     
     grid.slack_bus_number_AC = [grid.nodes_AC[i].nodeNumber for i in slack_indices]
 
-    Gm = np.real(grid.Ybus_AC)
-    Bm = np.imag(grid.Ybus_AC)
+    Gm = np.real(grid.Ybus_AC_full)
+    Bm = np.imag(grid.Ybus_AC_full)
 
     # Precompute angle differences and trigonometric values
     angle_diff = th[:, None] - th[None, :]
@@ -380,8 +380,8 @@ def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
     V = np.array([node.V for node in grid.nodes_AC])
     angles = np.array([node.theta for node in grid.nodes_AC])
     
-    G = np.real(grid.Ybus_AC)
-    B = np.imag(grid.Ybus_AC)
+    G = np.real(grid.Ybus_AC_full)
+    B = np.imag(grid.Ybus_AC_full)
 
     
     tol = 1
@@ -474,7 +474,7 @@ def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
         if iter_num == maxIter:
             print('')
             print(f'Warning  load flow AC did not converge')
-            print(f'Lowest tolerance reached: {np.round(tol,decimals=6)}')
+            print(f'Lowest tolerance reached: {np.round(tol,decimals=int(-np.log10(tol_lim)))}')
 
     grid.iter_flow_AC.append(iter_num)
 
@@ -495,8 +495,8 @@ def load_flow_AC(grid, tol_lim=1e-8, maxIter=100):
     for node in grid.nodes_AC:
         i = node.nodeNumber
         for k in range(grid.nn_AC):
-            G = np.real(grid.Ybus_AC[i, k])
-            B = np.imag(grid.Ybus_AC[i, k])
+            G = np.real(grid.Ybus_AC_full[i, k])
+            B = np.imag(grid.Ybus_AC_full[i, k])
             Pf[i] += V[i]*V[k] * \
                 (G*np.cos(angles[i]-angles[k]) +
                  B*np.sin(angles[i]-angles[k]))
@@ -858,7 +858,7 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     
     conv.Pc = Pc
     conv.Qc = Qc
-    
+
     conv.U_c = Uc
     conv.th_c = th_c
    

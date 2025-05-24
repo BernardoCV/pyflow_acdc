@@ -45,6 +45,9 @@ class Results:
             self.DC_lines_current()
             self.DC_lines_power()
             self.Slack_All()
+
+            if self.Grid.Converters_DCDC != []:
+                self.DC_converter()
         else:
             self.Slack_AC()
 
@@ -329,7 +332,7 @@ class Results:
         print('')
         table_all = pt()
         table_all.field_names = [
-            "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", 
+            "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", "Power Converter DCDC (MW)",
             "Power injected (MW)", "Voltage (pu)", "Grid"]  # 7 fields
 
         for g in range(self.Grid.Num_Grids_DC):
@@ -340,7 +343,7 @@ class Results:
             # Define the table headers
             table.field_names = [
                 "Node", "Power Gen (MW)", "Power Load (MW)", "Power Converter ACDC (MW)", 
-                "Power injected (MW)", "Voltage (pu)"]  # 6 fields
+                "Power Converter DCDC (MW)", "Power injected (MW)", "Voltage (pu)"]  # 7 fields
 
             for node in self.Grid.nodes_DC:
                 if self.Grid.Graph_node_to_Grid_index_DC[node.nodeNumber] == g:
@@ -350,12 +353,13 @@ class Results:
                                 node.PGi = node.P_INJ
                             else:
                                 node.PLi = abs(node.P_INJ)
-                    conv  = np.round(node.P*self.Grid.S_base, decimals=self.dec)
+                    conv  = np.round(node.Pconv*self.Grid.S_base, decimals=self.dec)
                     table.add_row([
                         node.name, 
                         np.round(node.PGi*self.Grid.S_base, decimals=self.dec), 
                         np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
                         conv,
+                        np.round(node.PconvDC*self.Grid.S_base, decimals=self.dec),
                         np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
                         np.round(node.V, decimals=self.dec)
                     ])
@@ -364,6 +368,7 @@ class Results:
                         np.round(node.PGi*self.Grid.S_base, decimals=self.dec), 
                         np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
                         conv,
+                        np.round(node.PconvDC*self.Grid.S_base, decimals=self.dec),
                         np.round(node.P_INJ*self.Grid.S_base, decimals=self.dec), 
                         np.round(node.V, decimals=self.dec),
                         g+1
@@ -1363,6 +1368,25 @@ class Results:
             with open(csv_filename, 'w', newline='') as csvfile:
                 csvfile.write(csv_data)
 
+    def DC_converter(self):
+        table = pt()
+
+        table.field_names = ["Converter", "From node", "To node",
+                             "Power from (MW)", "Power To (MW))", "Power Loss (MW)"]
+        for conv in self.Grid.Converters_DCDC:
+            convid = conv.name
+            fromnode = conv.fromNode.name
+            tonode = conv.toNode.name
+            fromMW = conv.Powerfrom*self.Grid.S_base
+            toMW = conv.Powerto*self.Grid.S_base
+            loss = np.abs(fromMW+toMW)
+
+            table.add_row([convid, fromnode, tonode, np.round(fromMW, decimals=self.dec), np.round(
+                toMW, decimals=self.dec), np.round(loss, decimals=self.dec)])
+        print('-----------')
+        print('DC DC Coverters')
+        print(table)
+
     def Converter(self):
         table = pt()
         table2 = pt()
@@ -1371,11 +1395,7 @@ class Results:
         for conv in self.Grid.Converters_ACDC:
             if conv.NumConvP<=0.01:
                 continue
-            if conv.type == 'Slack':
-                P_DC = np.round(conv.Node_DC.P*self.Grid.S_base,
-                                decimals=self.dec)
-            else:
-                P_DC = np.round(conv.P_DC*self.Grid.S_base, decimals=self.dec)
+            P_DC = np.round(conv.P_DC*self.Grid.S_base, decimals=self.dec)
             P_s = np.round(conv.P_AC*self.Grid.S_base, decimals=self.dec)
             Q_s = np.round(conv.Q_AC*self.Grid.S_base, decimals=self.dec)
             P_c = np.round(conv.Pc*self.Grid.S_base, decimals=self.dec)

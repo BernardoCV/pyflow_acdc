@@ -66,6 +66,7 @@ __all__ = [
     'add_line_AC',
     'add_line_DC',
     'add_ACDC_converter',
+    'add_DCDC_converter',
     'add_gen',
     'add_extGrid',
     'add_RenSource',
@@ -111,7 +112,7 @@ __all__ = [
     'ACDC_sequential',
     
     # OPF
-    'OPF_ACDC',
+    'Optimal_PF',
     'OPF_solve',
     'OPF_obj',
     'OPF_line_res',

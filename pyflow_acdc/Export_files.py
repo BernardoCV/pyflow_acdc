@@ -172,8 +172,8 @@ def create_dictionaries(grid):
                     "Umax": float(node.Umax),
                     "Gs": float(np.real(node.Reactor)),
                     "Bs": float(np.imag(node.Reactor)),
-                    "x_coord": float(node.x_coord),
-                    "y_coord": float(node.y_coord),
+                    "x_coord": float(node.x_coord) if node.x_coord is not None else None,
+                    "y_coord": float(node.y_coord) if node.y_coord is not None else None,
                     "PZ": node.PZ,
                     "geometry": node.geometry.wkt if node.geometry is not None else None
                 })
@@ -210,8 +210,8 @@ def create_dictionaries(grid):
                     "Node_id": node.name,
                     "Umin": float(node.Umin),
                     "Umax": float(node.Umax),
-                    "x_coord": float(node.x_coord),
-                    "y_coord": float(node.y_coord),
+                    "x_coord": float(node.x_coord) if node.x_coord is not None else None,
+                    "y_coord": float(node.y_coord) if node.y_coord is not None else None,
                     "PZ": node.PZ,
                     "geometry": node.geometry.wkt if node.geometry is not None else None
                 })

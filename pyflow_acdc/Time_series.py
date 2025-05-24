@@ -455,20 +455,17 @@ def reset_to_initialize(model, initial_values):
             for index in var_obj:
                 var_obj[index].set_value(initial_values[var_obj.name].get(index, 0))
                 
-def modify_parameters(grid,model,OnlyAC,Price_Zones):
-    if  OnlyAC:
-        [AC_info,Price_Zone_info]=Translate_pyf_OPF(grid,OnlyAC,Price_Zones=Price_Zones)
-    else:
-        [AC_info,DC_info,_,Price_Zone_info]=Translate_pyf_OPF(grid,OnlyAC,Price_Zones=Price_Zones)    
+def modify_parameters(grid,model,ACmode,DCmode,Price_Zones):
+    [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=Price_Zones)    
 
-    AC_Lists, AC_nodes_info, AC_lines_info,gen_info,EXP_info,REP_info,CT_info = AC_info
-    lf,_,P_renSource = gen_info
+    AC_Lists, AC_nodes_info, AC_lines_info,EXP_info,REP_info,CT_info = AC_info
+    lf,qf,P_renSource,lista_gen,lista_rs = gen_info
     
     # lista_nodos_AC, lista_lineas_AC,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists
     _,_,_,_, P_know,Q_know,price = AC_nodes_info
     #S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
-    if not OnlyAC:
-        DC_Lists,DC_nodes_info,_ = DC_info
+    if DCmode:
+        DC_Lists,DC_nodes_info,_,_ = DC_info
     
         # lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
         _, _ ,_,P_known_DC,price_dc  = DC_nodes_info
@@ -509,7 +506,7 @@ def modify_parameters(grid,model,OnlyAC,Price_Zones):
         model.Q_known_AC[idx].set_value(val)
     for idx, val in P_renSource.items():
         model.P_renSource[idx].set_value(val)
-    if not OnlyAC:
+    if DCmode:
         for idx, val in P_known_DC.items():
             model.P_known_DC[idx].set_value(val)
     
@@ -573,7 +570,9 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     model = pyo.ConcreteModel()
     model.name="TS AC/DC hybrid OPF"
     
-    OnlyAC,TEP_AC,TAP_tf,REP_AC,CT_AC = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
     
     t1 = time.time()
     OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)
@@ -600,7 +599,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t1= time.time()          
         reset_to_initialize(model, initial_values)
     
-        modify_parameters(grid,model,OnlyAC,price_zone_restrictions)
+        modify_parameters(grid,model,ACmode,DCmode,price_zone_restrictions)
         t2= time.time()  
         t_modelupdate = t2-t1
         

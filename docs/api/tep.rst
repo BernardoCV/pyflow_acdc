@@ -1,17 +1,19 @@
 Transmission Expansion Planning Module
-====================================
+======================================
 
 This module provides functions for transmission expansion planning (TEP) analysis of AC/DC hybrid power systems. [1]_
 
 Functions are found in pyflow_acdc.ACDC_TEP
 
 Transmission Expansion Planning
------------------------------
+-------------------------------
 
-Running the TEP
-^^^^^^^^^^^^^^
+This section creates an OPF :ref:`model <model_creation>`, chooses a state :ref:`objective function <obj_functions>`. Afterwards it will include transmission expansion planning in the model and :ref:`TEP objectives <TEP_obj_functions>`, finally :ref:`solves <model_solving>` the model.
 
-.. py:function:: transmission_expansion(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, solver='bonmin', initial_guess=0)
+Running one state transmission expansion planning
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. py:function:: transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin')
 
    Performs transmission expansion planning analysis.
 
@@ -51,10 +53,7 @@ Running the TEP
         - str
         - Solver to use
         - 'bonmin'
-      * - ``initial_guess``
-        - int
-        - Initial guess for optimization
-        - 0
+     
 
    **Returns**
 
@@ -71,12 +70,12 @@ Running the TEP
 
        model, results, timing, stats = pyf.transmission_expansion(grid)
 
-Time Series TEP
-^^^^^^^^^^^^^^
+Running time series based transmission expansion planning
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: transmission_expansion_TS(grid, increase_Pmin=False, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, clustering_options=None, ObjRule=None, solver='bonmin')
+.. py:function:: transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin')
 
-   Performs time series transmission expansion planning analysis.
+   Performs a time series based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states.
 
    .. list-table::
       :widths: 20 10 50 10
@@ -139,8 +138,41 @@ Time Series TEP
 
        model, results, timing, stats, ts_results = pyf.transmission_expansion_TS(grid)
 
+
+.. _TEP_obj_functions:
+
+Transmission Expansion Planning objectives
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. py:function:: TEP_obj(model,grid,NPV)
+
+   Returns the objective function for the transmission expansion planning based on [1]_:
+
+   .. list-table::
+    :widths: 40 40
+    :header-rows: 1
+
+    * - Description
+      - Formula
+    * - AC expansion
+      - :math:`\Psi_{exp}=\sum_{h=1}^{\mathcal{E}_{ac}} \left[(n_h - n_{h,\text{b}}) \cdot \psi_h(L_h) \right]`
+    * - AC reconducting
+      - :math:`\Psi_{rec}=\sum_{u=1}^{\mathcal{U}_{ac}} \left[\xi_u \cdot \psi_u(L_u) \right]`
+    * - AC line selection
+      - :math:`\Psi_{a}=\sum_{a \in \mathcal{E}_a} \sum_{n \in \mathcal{CT}} \left[ \xi_{a,n} \cdot \psi_n(L_a) \right]`
+    * - DC expansion
+      - :math:`\Psi_{dc}=\sum_{e=1}^{\mathcal{E}_{dc}} \left[(n_e - n_{e,\text{b}}) \cdot \psi_e(L_e, p_e) \right]`
+    * - Converter expansion
+      - :math:`\Psi_{conv}=\sum_{cn=1}^{\mathcal{E}_{cn}} \left[(n_{cn} - n_{cn,\text{b}}) \cdot \psi_{cn}(p_{cn}) \right]`
+    * - General objective function
+      - :math:`\Psi = \Psi_{exp}+\Psi_{rec}+\Psi_{a}+\Psi_{dc}+\Psi_{conv}`
+    * - State objective function
+      - :math:`\phi =` :ref:`OPF function <obj_functions>`
+    * - Net present value
+      - :math:`\min \left[\frac{1 - \left(1 + r\right)^{-y}}{r} \cdot H_y  \cdot \phi  + \Psi \right]`
+
 Export Results
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 .. py:function:: export_TEP_TS_results_to_excel(grid, export)
 

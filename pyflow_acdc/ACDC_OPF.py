@@ -23,7 +23,7 @@ from pyomo.util.infeasible import log_infeasible_constraints
 
 __all__ = [
     'Translate_pyf_OPF',
-    'OPF_ACDC',
+    'Optimal_PF',
     'TS_parallel_OPF',
     'OPF_solve',
     'OPF_updateParam',
@@ -67,7 +67,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones):
         grid.CurtCost=True
 
     return weights_def, Price_Zones
-def OPF_ACDC(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
+def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones)
         
@@ -291,6 +291,8 @@ def fx_conv(model,grid):
 
 def OPF_solve(model,grid,solver = 'ipopt'):
     
+    solver = solver.lower()
+
     if grid.MixedBinCont:
            # opt = pyo.SolverFactory("mindtpy")
            # results = opt.solve(model,mip_solver='glpk',nlp_solver='ipopt')
@@ -373,13 +375,16 @@ def OPF_updateParam(model,grid):
 
     return model
 
-def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
-
+def OPF_obj(model,grid,ObjRule,OnlyGen=True):
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC,CDC = DCadd
     # for node in  model.nodes_AC:
     #     nAC=grid.nodes_AC[node]
     #     if nAC.Num_conv_connected >= 2:
     #         obj_expr += sum(model.Q_conv_s_AC[conv]**2 for conv in nAC.connected_conv)
 
+   
     def formula_Min_Ext_Gen():
         if ObjRule['Ext_Gen']['w']==0:
             return 0
@@ -399,12 +404,24 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
     def formula_AC_losses():
         if ObjRule['AC_losses']['w']==0:
             return 0
-        return sum(model.PAC_line_loss[line] for line in model.lines_AC)
+        loss = sum(model.PAC_line_loss[line] for line in model.lines_AC)
+        if TAP_tf:
+            loss += sum(model.tf_PAC_line_loss[tf] for tf in model.lines_AC_tf)
+        if TEP_AC:
+            loss += sum(model.exp_PAC_line_loss[exp] for exp in model.lines_AC_exp)   
+        if REC_AC:
+            loss += sum(model.rec_PAC_line_loss[rec] for rec in model.lines_AC_rec)
+        if CT_AC:
+            loss += sum(model.ct_PAC_line_loss[ct] for ct in model.lines_AC_ct)
+        return loss
 
     def formula_DC_losses():
         if ObjRule['DC_losses']['w']==0:
             return 0
-        return sum(model.PDC_line_loss[line] for line in model.lines_DC)
+        loss = sum(model.PDC_line_loss[line] for line in model.lines_DC)
+        if CDC:
+            loss += sum(model.CDC_loss[conv] for conv in model.DCDC_conv)
+        return loss
 
     def formula_Converter_Losses():
         if ObjRule['Converter_Losses']['w']==0:
@@ -429,13 +446,12 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
     def formula_curtailment_red():
         if ObjRule['Curtailment_Red']['w']==0:
             return 0
-        
-        ac_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price[grid.rs2node['AC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
-        if OnlyAC:
-            return ac_curt
-        
-        dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
-        
+        ac_curt=0
+        dc_curt=0
+        if ACmode:
+            ac_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price[grid.rs2node['AC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
+        if DCmode:
+            dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
         return ac_curt+dc_curt
     def formula_CG():
        if ObjRule['PZ_cost_of_generation']['w']==0:
@@ -502,9 +518,10 @@ def OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False):
 
 
 
-def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
+def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
     """Translation of element wise to internal numbering"""
-    
+    AC_info, DC_info, Conv_info,DCDC_info = None, None, None,None
+
     "AC system info"
     lista_nodos_AC = list(range(0, grid.nn_AC))
     lista_lineas_AC = list(range(0, grid.nl_AC))
@@ -534,69 +551,16 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
         qf[gen.genNumber] = gen.qf
     
     lista_gen = list(range(0, nn_gen))
-    
-     
-    
+       
     nn_rs=0
     for rs in grid.RenSources:
         nn_rs+=1
         P_renSource[rs.rsNumber]=rs.PGi_ren
         
     lista_rs = list(range(0, nn_rs))
-    
-    for n in grid.nodes_AC:
-        V_ini_AC[n.nodeNumber] = n.V_ini
-        Theta_ini[n.nodeNumber] = n.theta_ini
-        
-        P_know[n.nodeNumber] = n.PGi - n.PLi
-        Q_know[n.nodeNumber] = n.QGi - n.QLi
-        
-        u_min_ac[n.nodeNumber] = n.Umin
-        u_max_ac[n.nodeNumber] = n.Umax
-        
-        price[n.nodeNumber] = n.price
-        
-        if n.type == 'Slack':
-            AC_slack.append(n.nodeNumber)
-        elif n.type == 'PV':
-            AC_PV.append(n.nodeNumber)
-        
-       
-    for l in grid.lines_AC:
-        S_lineAC_limit[l.lineNumber]    = l.MVA_rating / grid.S_base
-    
-    for l in grid.lines_AC_exp:
-        S_lineACexp_limit[l.lineNumber] = l.MVA_rating / grid.S_base
-        NP_lineAC[l.lineNumber]         = l.np_line
 
-    for l in grid.lines_AC_rec:
-        S_lineACrec_lim[l.lineNumber] = l.MVA_rating / grid.S_base
-        S_lineACrec_lim_new[l.lineNumber] = l.MVA_rating_new / grid.S_base
-        REC_AC_act[l.lineNumber] = 0 if not l.rec_branch  else 1
+    gen_info = pack_variables(lf,qf,P_renSource,lista_gen,lista_rs)
 
-    for l in grid.lines_AC_tf:
-        S_lineACtf_limit[l.lineNumber]  = l.MVA_rating / grid.S_base
-        m_tf_og[l.lineNumber]           = l.m
-        
-    for l in grid.lines_AC_ct:
-        for i in range(len(l.MVA_rating_list)):
-            S_lineACct_lim[l.lineNumber,i] = l.MVA_rating_list[i] / grid.S_base
-    if grid.Cable_options is not None and len(grid.Cable_options) > 0:
-        cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
-    else:
-        cab_types_set = []
-    allowed_types = grid.cab_types_allowed
-    
-    # Packing common AC info
-    AC_Lists = pack_variables(lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_tf,lista_gen,lista_rs, AC_slack, AC_PV)
-    AC_nodes_info = pack_variables(u_min_ac, u_max_ac, V_ini_AC, Theta_ini, P_know, Q_know, price)
-    AC_lines_info = pack_variables(S_lineAC_limit,S_lineACtf_limit,m_tf_og)
-    gen_info = pack_variables(lf,qf,P_renSource)
-    EXP_info = pack_variables(lista_lineas_AC_exp,S_lineACexp_limit,NP_lineAC)
-    REC_info = pack_variables(lista_lineas_AC_rec,S_lineACrec_lim,S_lineACrec_lim_new,REC_AC_act)
-    CT_info = pack_variables(lista_lineas_AC_ct,S_lineACct_lim,cab_types_set,allowed_types)
-    AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,gen_info,EXP_info,REC_info,CT_info)
-    
     "Price zone info"
    
     price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max, PL_price_zone =  {}, {}, {}, {}, {}, {}
@@ -605,7 +569,7 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
     price_zone2node = {'DC': {}, 'AC': {}}
     if Price_Zones:
         for m in grid.Price_Zones:
-            price_zone2node['AC'][m.price_zone_num] = []
+            
             nn_M += 1
             price_zone_prices[m.price_zone_num] = m.price
             price_zone_as[m.price_zone_num] = m.a
@@ -613,95 +577,152 @@ def Translate_pyf_OPF(grid,OnlyAC,Price_Zones=False):
             import_M = m.import_pu_L
             export_M = m.export_pu_G * (sum(sum(rs.PGi_ren for rs in node.connected_RenSource) + sum(gen.Max_pow_gen for gen in node.connected_gen) for node in m.nodes_AC))
             PL_price_zone[m.price_zone_num] = 0
-            for n in m.nodes_AC:
-                price_zone2node['AC'][m.price_zone_num].append(n.nodeNumber)
-                node2price_zone['AC'][n.nodeNumber] = m.price_zone_num
+            
+            if ACmode:
+                price_zone2node['AC'][m.price_zone_num] = []
+                for n in m.nodes_AC:
+                    price_zone2node['AC'][m.price_zone_num].append(n.nodeNumber)
+                    node2price_zone['AC'][n.nodeNumber] = m.price_zone_num
                 PL_price_zone[m.price_zone_num] += n.PLi
+            
+            if DCmode:
+                price_zone2node['DC'][m.price_zone_num] = []
+                for n in m.nodes_DC:
+                    price_zone2node['DC'][m.price_zone_num].append(n.nodeNumber)
+                    node2price_zone['DC'][n.nodeNumber] = m.price_zone_num
+                    PL_price_zone[m.price_zone_num] += n.PLi
             PGL_min[m.price_zone_num] = max(m.PGL_min, -import_M * PL_price_zone[m.price_zone_num])
             PGL_max[m.price_zone_num] = min(m.PGL_max, export_M)
         lista_M = list(range(0, nn_M))
     
-    
-   
-    
-    if OnlyAC:
-        Price_Zone_Lists = pack_variables(lista_M, node2price_zone, price_zone2node)
-        Price_Zone_lim = pack_variables(price_zone_as, price_zone_bs, PGL_min, PGL_max)
-        Price_Zone_info = pack_variables(Price_Zone_Lists, Price_Zone_lim)
-        
-        return pack_variables(AC_info,Price_Zone_info)
-    
-    
-    if Price_Zones:
-        for m in grid.Price_Zones:
-            price_zone2node['DC'][m.price_zone_num] = []
-            for n in m.nodes_DC:
-                price_zone2node['DC'][m.price_zone_num].append(n.nodeNumber)
-                node2price_zone['DC'][n.nodeNumber] = m.price_zone_num
-                PL_price_zone[m.price_zone_num] += n.PLi
-                
-                
-    # DC and Converter Variables (if not OnlyAC)
-    lista_nodos_DC = list(range(0, grid.nn_DC))
-    lista_nodos_DC_sin_cn=lista_nodos_DC
-    lista_lineas_DC = list(range(0, grid.nl_DC))
-    lista_conv = list(range(0, grid.nconv))
-
-    u_min_dc = list(range(0, grid.nn_DC))
-    u_max_dc = list(range(0, grid.nn_DC))
-    u_c_min = list(range(0, grid.nconv))
-    u_c_max = list(range(0, grid.nconv))
-
-    V_ini_DC, P_known_DC, P_conv_limit,price_dc = {}, {}, {},{}
-    P_lineDC_limit, NP_lineDC = {}, {}
-
-    AC_nodes_connected_conv, DC_nodes_connected_conv = [], []
-    S_limit_conv, NumConvP, P_conv_loss = {}, {}, {}
-    DC_slack = []
-
-    
-    
-    for n in grid.nodes_DC:
-        V_ini_DC[n.nodeNumber] = n.V_ini
-        P_known_DC[n.nodeNumber] = n.P_DC
-        u_min_dc[n.nodeNumber] = n.Umin
-        u_max_dc[n.nodeNumber] = n.Umax
-        price_dc[n.nodeNumber] = n.price
-        if n.type == 'Slack':
-            DC_slack.append(n.nodeNumber)
-
-    for l in grid.lines_DC:
-        P_lineDC_limit[l.lineNumber] = l.MW_rating / grid.S_base
-        NP_lineDC[l.lineNumber] = l.np_line
-
-    for conv in grid.Converters_ACDC:
-        AC_nodes_connected_conv.append(conv.Node_AC.nodeNumber)
-        DC_nodes_connected_conv.append(conv.Node_DC.nodeNumber)
-        P_conv_limit[conv.Node_DC.nodeNumber] = conv.MVA_max / grid.S_base
-        S_limit_conv[conv.ConvNumber] = conv.MVA_max / grid.S_base
-        NumConvP[conv.ConvNumber] = conv.NumConvP
-        u_c_min[conv.ConvNumber] = conv.Ucmin
-        u_c_max[conv.ConvNumber] = conv.Ucmax
-        P_conv_loss[conv.ConvNumber] = conv.P_loss
-      
-
-    # Packing AC, DC, Converter, and Price_Zone info
-    DC_Lists = pack_variables(lista_nodos_DC, lista_lineas_DC, DC_slack,DC_nodes_connected_conv)
-    DC_nodes_info = pack_variables(u_min_dc, u_max_dc, V_ini_DC, P_known_DC,price_dc)
-    DC_lines_info = pack_variables(P_lineDC_limit, NP_lineDC)
-    DC_info = pack_variables(DC_Lists, DC_nodes_info, DC_lines_info)
-   
-    Conv_Lists = pack_variables(lista_conv, NumConvP)
-    Conv_Volt = pack_variables(u_c_min, u_c_max, S_limit_conv, P_conv_limit) 
-    Conv_info = pack_variables(Conv_Lists, Conv_Volt)
-    
     Price_Zone_Lists = pack_variables(lista_M, node2price_zone, price_zone2node)
     Price_Zone_lim = pack_variables(price_zone_as, price_zone_bs, PGL_min, PGL_max)
     Price_Zone_info = pack_variables(Price_Zone_Lists, Price_Zone_lim)
+
+    if ACmode:
+        for n in grid.nodes_AC:
+            V_ini_AC[n.nodeNumber] = n.V_ini
+            Theta_ini[n.nodeNumber] = n.theta_ini
+            
+            P_know[n.nodeNumber] = n.PGi - n.PLi
+            Q_know[n.nodeNumber] = n.QGi - n.QLi
+            
+            u_min_ac[n.nodeNumber] = n.Umin
+            u_max_ac[n.nodeNumber] = n.Umax
+            
+            price[n.nodeNumber] = n.price
+            
+            if n.type == 'Slack':
+                AC_slack.append(n.nodeNumber)
+            elif n.type == 'PV':
+                AC_PV.append(n.nodeNumber)
+            
+        
+        for l in grid.lines_AC:
+            S_lineAC_limit[l.lineNumber]    = l.MVA_rating / grid.S_base
+        
+        for l in grid.lines_AC_exp:
+            S_lineACexp_limit[l.lineNumber] = l.MVA_rating / grid.S_base
+            NP_lineAC[l.lineNumber]         = l.np_line
+
+        for l in grid.lines_AC_rec:
+            S_lineACrec_lim[l.lineNumber] = l.MVA_rating / grid.S_base
+            S_lineACrec_lim_new[l.lineNumber] = l.MVA_rating_new / grid.S_base
+            REC_AC_act[l.lineNumber] = 0 if not l.rec_branch  else 1
+
+        for l in grid.lines_AC_tf:
+            S_lineACtf_limit[l.lineNumber]  = l.MVA_rating / grid.S_base
+            m_tf_og[l.lineNumber]           = l.m
+            
+        for l in grid.lines_AC_ct:
+            for i in range(len(l.MVA_rating_list)):
+                S_lineACct_lim[l.lineNumber,i] = l.MVA_rating_list[i] / grid.S_base
+        if grid.Cable_options is not None and len(grid.Cable_options) > 0:
+            cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
+        else:
+            cab_types_set = []
+        allowed_types = grid.cab_types_allowed
+        
+        # Packing common AC info
+        AC_Lists = pack_variables(lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_tf,AC_slack, AC_PV)
+        AC_nodes_info = pack_variables(u_min_ac, u_max_ac, V_ini_AC, Theta_ini, P_know, Q_know, price)
+        AC_lines_info = pack_variables(S_lineAC_limit,S_lineACtf_limit,m_tf_og)
+        
+        EXP_info = pack_variables(lista_lineas_AC_exp,S_lineACexp_limit,NP_lineAC)
+        REC_info = pack_variables(lista_lineas_AC_rec,S_lineACrec_lim,S_lineACrec_lim_new,REC_AC_act)
+        CT_info = pack_variables(lista_lineas_AC_ct,S_lineACct_lim,cab_types_set,allowed_types)
+        AC_info = pack_variables(AC_Lists, AC_nodes_info, AC_lines_info,EXP_info,REC_info,CT_info)
     
    
-    return pack_variables(AC_info, DC_info, Conv_info, Price_Zone_info)
+    if DCmode:
 
+        # DC and Converter Variables (if not OnlyAC)
+        lista_nodos_DC = list(range(0, grid.nn_DC))
+        lista_nodos_DC_sin_cn=lista_nodos_DC
+        lista_lineas_DC = list(range(0, grid.nl_DC))
+        lista_conv = list(range(0, grid.nconv))
+
+
+        u_min_dc = list(range(0, grid.nn_DC))
+        u_max_dc = list(range(0, grid.nn_DC))
+        u_c_min = list(range(0, grid.nconv))
+        u_c_max = list(range(0, grid.nconv))
+
+        V_ini_DC, P_known_DC, P_conv_limit,price_dc = {}, {}, {},{}
+        P_lineDC_limit, NP_lineDC = {}, {}
+
+        AC_nodes_connected_conv, DC_nodes_connected_conv = [], []
+        S_limit_conv, NumConvP, P_conv_loss = {}, {}, {}
+        DC_slack = []
+
+        P_DCDC_limit, Pset_DCDC = {}, {}
+        
+        
+        for n in grid.nodes_DC:
+            V_ini_DC[n.nodeNumber] = n.V_ini
+            P_known_DC[n.nodeNumber] = n.PGi-n.PLi
+            u_min_dc[n.nodeNumber] = n.Umin
+            u_max_dc[n.nodeNumber] = n.Umax
+            price_dc[n.nodeNumber] = n.price
+            if n.type == 'Slack':
+                DC_slack.append(n.nodeNumber)
+
+        for l in grid.lines_DC:
+            P_lineDC_limit[l.lineNumber] = l.MW_rating / grid.S_base
+            NP_lineDC[l.lineNumber] = l.np_line
+
+        lista_DCDC = list(range(0, grid.ncdc_DC))
+
+        for cn in grid.Converters_DCDC:
+            P_DCDC_limit[cn.ConvNumber] = cn.MW_rating / grid.S_base
+            Pset_DCDC[cn.ConvNumber] = cn.Powerto
+
+        
+        DCDC_info = pack_variables(lista_DCDC,P_DCDC_limit,Pset_DCDC)
+        # Packing AC, DC, Converter, and Price_Zone info
+        DC_Lists = pack_variables(lista_nodos_DC, lista_lineas_DC, DC_slack,DC_nodes_connected_conv)
+        DC_nodes_info = pack_variables(u_min_dc, u_max_dc, V_ini_DC, P_known_DC,price_dc)
+        DC_lines_info = pack_variables(P_lineDC_limit, NP_lineDC)
+        DC_info = pack_variables(DC_Lists, DC_nodes_info, DC_lines_info,DCDC_info)
+   
+    if ACmode and DCmode:
+
+        for conv in grid.Converters_ACDC:
+            AC_nodes_connected_conv.append(conv.Node_AC.nodeNumber)
+            DC_nodes_connected_conv.append(conv.Node_DC.nodeNumber)
+            P_conv_limit[conv.Node_DC.nodeNumber] = conv.MVA_max / grid.S_base
+            S_limit_conv[conv.ConvNumber] = conv.MVA_max / grid.S_base
+            NumConvP[conv.ConvNumber] = conv.NumConvP
+            u_c_min[conv.ConvNumber] = conv.Ucmin
+            u_c_max[conv.ConvNumber] = conv.Ucmax
+            P_conv_loss[conv.ConvNumber] = conv.P_loss
+
+        Conv_Lists = pack_variables(lista_conv, NumConvP)
+        Conv_Volt = pack_variables(u_c_min, u_c_max, S_limit_conv, P_conv_limit) 
+        Conv_info = pack_variables(Conv_Lists, Conv_Volt)
+    
+   
+    return pack_variables(AC_info, DC_info, Conv_info, Price_Zone_info,gen_info)
 
 
 
@@ -869,8 +890,9 @@ def OPF_conv_results(model,grid):
       
 
 def calculate_objective(grid,obj,OnlyGen=True):
-    OnlyAC,TEP_AC,TAP_tf,REC_AC,CT_AC = analyse_OPF(grid)
-
+    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC,CDC = DCadd
     if obj =='Ext_Gen':
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
 
@@ -882,12 +904,15 @@ def calculate_objective(grid,obj,OnlyGen=True):
        return sum(pz.a*(pz.PN*grid.S_base)**2+pz.b*(pz.PN*grid.S_base) for pz in grid.Price_Zones)
    
     if obj =='AC_losses':
-        return (sum(line.P_loss for line in grid.lines_AC)+
-                sum(tf.P_loss for tf in grid.lines_AC_tf)+
-                sum(line.P_loss for line in grid.lines_AC_exp))*grid.S_base
+        return (sum(line.loss for line in grid.lines_AC)+
+                sum(tf.loss for tf in grid.lines_AC_tf)+
+                sum(line.loss for line in grid.lines_AC_exp)+
+                sum(line.loss for line in grid.lines_AC_rec)+
+                sum(line.loss for line in grid.lines_AC_ct))*grid.S_base
 
     if obj =='DC_losses':
-        return sum(line.loss for line in grid.lines_DC)*grid.S_base
+        return (sum(line.loss for line in grid.lines_DC)+
+                sum(conv.loss for conv in grid.DCDC_conv))*grid.S_base
 
     if obj =='Converter_Losses':
         return sum(conv.P_loss for conv in grid.Converters_ACDC)*grid.S_base
@@ -900,12 +925,12 @@ def calculate_objective(grid,obj,OnlyGen=True):
                 sum(conv.P_loss for conv in grid.Converters_ACDC))*grid.S_base
 
     if obj =='Curtailment_Red':
-        ac_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_AC[grid.rs2node['AC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
-        if OnlyAC:
-            return ac_curt
-        
-        dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
-        
+        ac_curt=0
+        dc_curt=0
+        if ACmode:
+            ac_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_AC[grid.rs2node['AC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
+        if  DCmode:
+            dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
         return ac_curt+dc_curt
     
     if obj=='PZ_cost_of_generation':

@@ -84,8 +84,8 @@ conda install -c conda-forge cyipopt
 For OPF run in Linux for the TEP:
 ```bash
 
-sudo apt-get update
-sudo apt-get install coinor-bonmin
+sudo apt update
+sudo apt install coinor-libbonmin-dev
 conda install -c conda-forge bonmin
 
 ```
