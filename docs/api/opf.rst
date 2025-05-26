@@ -50,7 +50,7 @@ This function runs the AC/DC hybrid optimal power flow calculation. It creates t
 
    .. code-block:: python
 
-      model, timing, solver_data =pyf.OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+      model, timing_info, model_res,solver_stats =pyf.OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
 
 .. _model_creation:
 
@@ -129,7 +129,7 @@ The user can define the objective by setting the weight of each sub objective. T
   This function creates a weighted sum of the different sub objectives.
 
   .. math::
-    \min \frac{\sum_{i=1}^{O} \left( w_i \cdot f_i \right)}{\sum_{i=1}^{O} w_i}
+    \min \frac{\sum_{i \in O} \left( w_i \cdot f_i \right)}{\sum_{i \in O} w_i}
 
   where :math:`f_i` is the sub objective and :math:`w_i` is the weight.
 
@@ -145,25 +145,25 @@ The user can define the objective by setting the weight of each sub objective. T
       - Formula
     * - ``Ext_Gen``
       - External generation minimization or maximum export
-      - :math:`\sum_{g=1}^{G} \cdot P_{g}`
+      - :math:`\sum_{g \in G} \cdot P_{g}`
     * - ``Energy_cost``
       - Energy cost
-      - :math:`\sum_{g=1}^{\mathcal{G}_{ac}} \left(P_{g}^2 \cdot \alpha_g + P_{g} \cdot \beta_g  \right)`
+      - :math:`\sum_{g \in \mathcal{G}_{ac}} \left(P_{g}^2 \cdot \alpha_g + P_{g} \cdot \beta_g  \right)`
     * - ``Curtailment_Red``
       - Renewable curtailment reduction
-      - :math:`\sum_{rg=1}^{ \mathcal{RG}_{ac}}\left((1-\gamma_rg)P_{rg}\cdot \rho_{rg} \sigma_{rg}\right)`
+      - :math:`\sum_{rg \in  \mathcal{RG}_{ac}}\left((1-\gamma_rg)P_{rg}\cdot \rho_{rg} \sigma_{rg}\right)`
     * - ``AC_losses``
       - AC transmission losses
-      - :math:`\sum_{j=1}^{\mathcal{B}_{ac}}  \left( P_{j,\text{from}} +P_{j,\text{to}} \right)`
+      - :math:`\sum_{j \in \mathcal{B}_{ac}}  \left( P_{j,\text{from}} +P_{j,\text{to}} \right)`
     * - ``DC_losses``
       - DC transmission losses
-      - :math:`\sum_{e=1}^{\mathcal{B}_{dc}} \left( P_{e,\text{from}} +P_{e,\text{to}} \right)`
+      - :math:`\sum_{e \in \mathcal{B}_{dc}} \left( P_{e,\text{from}} +P_{e,\text{to}} \right)`
     * - ``Converter_Losses``
       - Converter losses
-      - :math:`\sum_{cn=1}^{\mathcal{C}_{n}} \left( P_{loss_{cn}} + |\left(P_{c_{cn}}-P_{s_{cn}}\right)| \right)`
+      - :math:`\sum_{cn \in \mathcal{C}_{n}} \left( P_{loss_{cn}} + |\left(P_{c_{cn}}-P_{s_{cn}}\right)| \right)`
     * - ``General_Losses``
       - Generation minus demand
-      - :math:`\left(\sum^{\mathcal{G}} P_{g}+\sum^{\mathcal{RG}} P_{rg}*\gamma_{rg}- \sum^{\mathcal{L}} P_{L} \right)`
+      - :math:`\left(\sum_{g \in \mathcal{G}} P_{g}+\sum_{rg \in \mathcal{RG}} P_{rg}*\gamma_{rg}- \sum_{l \in \mathcal{L}} P_{L} \right)`
 
   The following table shows the pre-built objective functions as defined in [2]_:
 
@@ -176,7 +176,7 @@ The user can define the objective by setting the weight of each sub objective. T
       - Formula 
     * - ``PZ_cost_of_generation``
       - Price zone generation cost
-      - :math:`\sum^{\mathcal{M}}_m CG(P_N)_m`
+      - :math:`\sum_{m \in \mathcal{M}} CG(P_N)_m`
 
   The following table shows the pre-built objective functions in development:
 
@@ -189,10 +189,10 @@ The user can define the objective by setting the weight of each sub objective. T
       - Formula
     * - ``Renewable_profit``
       - Renewable generation profit
-      - :math:`- \left(\sum^{\mathcal{RG}} P_{rg}*\gamma_{rg} + \sum^{\mathcal{C}} \left(P_{loss,c} + P_{AC,loss,c}\right)\right)`
+      - :math:`- \left(\sum_{rg \in \mathcal{RG}} P_{rg}*\gamma_{rg} + \sum_{cn \in \mathcal{C}} \left(P_{loss,cn} + P_{AC,loss,cn}\right)\right)`
     * - ``Gen_set_dev``
       - Generator setpoint deviation
-      - :math:`\sum_{g=1}^{G}  \left(P_g -P_{g,set}\right)^2`
+      - :math:`\sum_{g \in G}  \left(P_g -P_{g,set}\right)^2`
       
 
   **Example**

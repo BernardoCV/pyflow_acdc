@@ -155,15 +155,15 @@ Transmission Expansion Planning objectives
     * - Description
       - Formula
     * - AC expansion
-      - :math:`\Psi_{exp}=\sum_{h=1}^{\mathcal{E}_{ac}} \left[(n_h - n_{h,\text{b}}) \cdot \psi_h(L_h) \right]`
+      - :math:`\Psi_{exp}=\sum_{h \in \mathcal{E}_{ac}} \left[(n_h - n_{h,\text{b}}) \cdot \psi_h(L_h) \right]`
     * - AC reconducting
-      - :math:`\Psi_{rec}=\sum_{u=1}^{\mathcal{U}_{ac}} \left[\xi_u \cdot \psi_u(L_u) \right]`
+      - :math:`\Psi_{rec}=\sum_{u \in \mathcal{U}_{ac}} \left[\xi_u \cdot \psi_u(L_u) \right]`
     * - AC line selection
       - :math:`\Psi_{a}=\sum_{a \in \mathcal{E}_a} \sum_{n \in \mathcal{CT}} \left[ \xi_{a,n} \cdot \psi_n(L_a) \right]`
     * - DC expansion
-      - :math:`\Psi_{dc}=\sum_{e=1}^{\mathcal{E}_{dc}} \left[(n_e - n_{e,\text{b}}) \cdot \psi_e(L_e, p_e) \right]`
+      - :math:`\Psi_{dc}=\sum_{e \in \mathcal{E}_{dc}} \left[(n_e - n_{e,\text{b}}) \cdot \psi_e(L_e, p_e) \right]`
     * - Converter expansion
-      - :math:`\Psi_{conv}=\sum_{cn=1}^{\mathcal{E}_{cn}} \left[(n_{cn} - n_{cn,\text{b}}) \cdot \psi_{cn}(p_{cn}) \right]`
+      - :math:`\Psi_{conv}=\sum_{cn \in \mathcal{E}_{cn}} \left[(n_{cn} - n_{cn,\text{b}}) \cdot \psi_{cn}(p_{cn}) \right]`
     * - General objective function
       - :math:`\Psi = \Psi_{exp}+\Psi_{rec}+\Psi_{a}+\Psi_{dc}+\Psi_{conv}`
     * - State objective function

@@ -12,8 +12,8 @@ AC System Modelling
 
 .. _AC_node_modelling:
 
-AC node modelling
-^^^^^^^^^^^^^^^^^
+AC node
+^^^^^^^
 
 .. figure:: ../images/AC_node_model.svg
    :width: 250
@@ -27,12 +27,20 @@ The active and reactive power injections at the AC node are given by [1]_:
 .. math::
     :label: eq:PnodeAC
 
-    \sum P_{g_i} +  \sum \gamma_{rg_i}P_{rg_i} - P_{l_i} + \sum P_{cn_i} = \sum_{k=1}^{\mathcal{N}_{ac}} |V_i||V_k| [ G_{ik} \cos(\theta_i-\theta_k) + B_{ik} \sin(\theta_i-\theta_k) ] \qquad \forall i \in \mathcal{N}_{ac} 
+    \begin{align}
+      P_{net}^{ac} &= P_{flow}^{ac} \\
+      P_{net}^{ac} &= \sum P_{g_i} +  \sum \gamma_{rg_i}P_{rg_i} - P_{l_i} + \sum P_{cn_i} \\
+      P_{flow}^{ac} &= \sum_{k \in \mathcal{N}_{ac}} |V_i||V_k| [ G_{ik} \cos(\theta_i-\theta_k) + B_{ik} \sin(\theta_i-\theta_k) ] \qquad \forall i \in \mathcal{N}_{ac} 
+    \end{align}
 
 .. math::
     :label: eq:QnodeAC
 
-    \sum Q_{g_i} + \sum Q_{rg_i} -Q_{l_i}+\sum Q_{cn_{i}}  = \sum_{k=1}^{\mathcal{N}_{ac}} |V_i||V_k|[G_{ik} \sin(\theta_i-\theta_k)-B_{ik} \cos(\theta_i-\theta_{k})] \qquad \forall i \in \mathcal{N}_{ac} 
+    \begin{align}
+      Q_{net}^{ac} &= Q_{flow}^{ac} \\
+      Q_{net}^{ac} &=  \sum Q_{g_i} + \sum Q_{rg_i} -Q_{l_i}+\sum Q_{cn_{i}} \\
+      Q_{flow}^{ac} &= \sum_{k \in \mathcal{N}_{ac}} |V_i||V_k|[G_{ik} \sin(\theta_i-\theta_k)-B_{ik} \cos(\theta_i-\theta_{k})] \qquad \forall i \in \mathcal{N}_{ac} 
+    \end{align}
 
 .. math::
     :label: eq:Vac
@@ -119,8 +127,8 @@ Example Usage:
 
 .. _AC_branch_modelling:
 
-AC branch modelling
-^^^^^^^^^^^^^^^^^^^
+AC branch
+^^^^^^^^^
 
 .. figure:: ../images/AC_line_pi.svg
    :width: 400
@@ -239,11 +247,10 @@ Example Usage:
 
 
 
-.. _DC_node_modelling:
 
-AC expandable branch modelling
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+AC expandable branch
+^^^^^^^^^^^^^^^^^^^^
 
 .. figure:: ../images/AC_ybusbranch.svg
    :width: 400
@@ -252,13 +259,32 @@ AC expandable branch modelling
 
    AC expandable branch model
 
-The AC branch is modeled with in admittance matrix model from [4]_:
+The AC expandable branch :math:`h` is modeled with in admittance matrix model from [4]_:
+
+.. math::
+    :label: eq:PQ_expandable
+
+    \begin{align}
+        P_{flow}^{ac} +=  \sum n_{h} P_{hf_i} + \sum n_{h} P_{ht_i} \\
+        Q_{flow}^{ac} +=  \sum n_{h} Q_{hf_i} + \sum n_{h} Q_{ht_i}
+    \end{align}
+
+.. math::
+    :label: eq:exp_case
+
+    \text{Expandable}\qquad & 
+        \begin{cases}
+            n_{h}S_{h{\text{ from}}}, &  \text{if } i \text{ is } \textit{from node} \text{ of } h \\
+            n_{h}S_{h{\text{ to}}}, &  \text{if } i \text{ is } \textit{to node} \text{ of } h
+        \end{cases} 
 
 .. math::
     :label: eq:Seqexpbranch
 
-    S_{from_h-eq} = n_h \cdot S_{from_h} \\
-    S_{to_h-eq} = n_h \cdot S_{to_h}
+    \begin{align} 
+        S_{from_h-eq} &= n_h \cdot S_{from_h} \\
+        S_{to_h-eq} &= n_h \cdot S_{to_h}
+    \end{align}
 
 
 Class Reference: :class:`pyflow_acdc.Classes.Exp_Line_AC`
@@ -290,9 +316,8 @@ Inherits from :class:`Line_AC` with the following additional attributes:
 
 Where :math:`n_b \leq n_i \leq n_{max}` 
 
-AC reconducting branch modelling
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
+AC reconducting branch
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. figure:: ../images/AC_reconducting.svg
    :width: 400
@@ -301,7 +326,26 @@ AC reconducting branch modelling
 
    AC reconducting branch model
 
-The AC branch is modeled with in admittance matrix model from [4]_:
+The AC reconducting branch :math:`u` is modeled with in admittance matrix model from [4]_:
+
+
+.. math::
+    :label: eq:PQ_reconducting
+
+    \begin{align}
+        P_{flow}^{ac} += \sum P_{uf_i\text{-eq}} + \sum P_{ut_i\text{-eq}} \\
+        Q_{flow}^{ac} += \sum  Q_{uf_i\text{-eq}} + \sum  Q_{ut_i\text{-eq}}
+    \end{align}
+
+.. math::
+    :label: eq:rec_case
+
+    \text{reconductable}\qquad & 
+        \begin{cases}
+            S_{u{\text{ from-eq}}}, &  \text{if } i \text{ is } \textit{from node} \text{ of } u \\
+           S_{u{\text{ to-eq}}}, &  \text{if } i \text{ is } \textit{to node} \text{ of } u
+        \end{cases} 
+
 
 .. math::
     :label: eq:Seqrepbranch
@@ -342,8 +386,8 @@ Inherits from :class:`Line_AC` with the following additional attributes:
      - float
      - Base cost of the conductor
 
-AC branch selection modelling
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AC branch selection
+^^^^^^^^^^^^^^^^^^^
 
 
 .. figure:: ../images/AC_array.svg
@@ -353,13 +397,50 @@ AC branch selection modelling
 
    AC branch selection model
 
-The AC branch is modeled with in admittance matrix model from [4]_:
+The AC branch selection :math:`a` is modeled with in admittance matrix model from [4]_:
+
+
+.. math::
+    :label: eq:PQ_array
+
+    \begin{align}
+        P_{flow}^{ac} += \sum P_{af_i\text{-eq}} + \sum P_{at_i\text{-eq}} \\
+        Q_{flow}^{ac} += \sum Q_{af_i\text{-eq}} + \sum  Q_{at_i\text{-eq}}
+    \end{align}
+
+.. math::
+    :label: eq:array_case
+
+    \text{type selection}\qquad & 
+        \begin{cases}
+            S_{a{\text{ from-eq}}}, &  \text{if } i \text{ is } \textit{from node} \text{ of } a \\
+           S_{a{\text{ to-eq}}}, &  \text{if } i \text{ is } \textit{to node} \text{ of } a
+        \end{cases} 
+        
+For the branches $a$ an additional equality constraint is introduced to keep one type of branch per connection, such that :
+
+.. math::
+    :label: eq:ct_unique_constraint
+
+    \sum_{n \in\mathcal{CT}} \xi_{a, n} = 1 \qquad \forall a \in \mathcal{E}_a 
 
 .. math::
     :label: eq:Seqarraybranch
 
     S_{from_n-eq} = \xi_{a,n} \cdot S_{from_n}   \\
     S_{to_n-eq}   = \xi_{a,n} \cdot S_{to_n}
+
+Additionally, to limit the number of branch types in the evaluated system, inequality constraints are included such that:
+
+.. math::
+    :label: eq:ct_constraints
+
+    \begin{align}
+        &\sum_{a\in\mathcal{E}_a} \xi_{a, n} \leq |\mathcal{E}_a| \cdot \nu_n \qquad \forall n \in \mathcal{CT} \\
+        &\nu_n \leq \sum_{a\in\mathcal{E}_a} \xi_{a, n} \qquad\qquad\;  \forall n \in \mathcal{CT}  \\
+        &\sum_{n\in \mathcal{CT}} \nu_n \leq \mathfrak{N}
+    \end{align}
+
 
 Class Reference: :class:`pyflow_acdc.Classes.Line_sizing`
 
@@ -402,8 +483,10 @@ Important to note that this class only takes in the cable types and not the line
 DC System Modelling
 ------------------- 
 
-DC node modelling
-^^^^^^^^^^^^^^^^^
+.. _DC_node_modelling:
+
+DC node
+^^^^^^^
 
 .. figure:: ../images/DC_node_model.svg
    :width: 250
@@ -417,7 +500,11 @@ The AC node is modeled using voltage :math:`U_d` where [1]_:
 .. math::
     :label: eq:PdciSUM
 
-    P_{DC_d} = P_{cn_d} + \sum \gamma_{rg_d}P_{rg_d} - P_{l_d} = U_d \sum_{f=1 ;f \neq d} ^{\mathcal{N}_{dc}} \left( (U_d-U_f) \cdot p_{e} \cdot \left(\frac{1}{R_{df}} \right) \right), \left\{ R_{df} \neq 0 \right\} \qquad \forall d \in \mathcal{N}_{dc}
+    \begin{align}
+        P_{net}^{dc} &= P_{flow}^{dc} \\
+        P_{net}^{dc} &= P_{cn_d} + \sum \gamma_{rg_d}P_{rg_d} - P_{l_d} \\
+        P_{flow}^{dc} &= U_d \sum_{\substack{f \in \mathcal{N}_{dc} \\ f \neq d}}  \left( (U_d-U_f) \cdot p_{e} \cdot \left(\frac{1}{R_{df}} \right) \right), \left\{ R_{df} \neq 0 \right\} \qquad \forall d \in \mathcal{N}_{dc}
+    \end{align}
 
 .. math::
     :label: eq:Udc
@@ -479,8 +566,8 @@ Example Usage:
 
 .. _DC_line_modelling:
 
-DC line modelling
-^^^^^^^^^^^^^^^^^
+DC line
+^^^^^^^
 
 .. figure:: ../images/DC_line.svg
    :width: 400
@@ -560,8 +647,8 @@ Example Usage:
 
         line_2 = pyf.Line_DC(node1, node2, S_base=100, Length_km=100, Cable_type='NREL_HVDC_2000mm_320kV')
 
-DC expansion modelling
-^^^^^^^^^^^^^^^^^^^^^^^
+DC line expansion
+^^^^^^^^^^^^^^^^^
 
 .. figure:: ../images/DC_expbranch.svg
    :width: 400
@@ -572,11 +659,106 @@ DC expansion modelling
 
 The expanded branch object is inside the :class:`Line_DC` class. 
 
+The expanded branch :math:`e` is modelled as:
+
+.. math::
+    :label: eq:PexpfromDC
+
+    \begin{align}
+        P_{from,d}=&U_d(U_d-U_f) p_{e} \left(\frac{n_e}{R_{df}} \right) \\
+        P_{to,f}=&U_f(U_f-U_d)p_{e} \left(\frac{n_e}{R_{df}} \right) \\
+        -P_{e, rating} \leq& P_{to/from} \leq P_{e,rating} \qquad \forall e \in \mathcal{E}_{dc}
+    \end{align}
+
+DCDC converter  
+^^^^^^^^^^^^^^^
+
+
+
+.. figure:: ../images/DCDC_conv.svg
+   :width: 400
+   :alt: DCDC converter model
+   :align: center
+
+   DCDC converter model
+   
+The DCDC converter is modelled very simply, with the set power injected into the ``toNode`` and the power drawn from the ``fromNode``.
+To include losses there is a simple resistive model. For power flow calculations the power injected in either node is kept constant as the losses are pre calculated with the assumption of :math:`V_{to} = 1 pu`. 
+
+.. math::
+    :label: eq:DCDCLoss
+
+    P_{from} + P_{to} + P_{loss} = 0 \\
+    P_{loss} = \left(\frac{P_{to}}{V_{to}}\right)^2 \cdot R
+
+.. math::
+    :label: eq:DCDC_net
+
+    P_{net}^{dc} += \sum P_{DCDC_{from}} + \sum P_{DCDC_{to}}
+   
+
+.. math::
+    :label: eq:DCDC_case
+
+    \text{DCDC converter}\qquad & 
+        \begin{cases}
+            P_{DCDC_{from}}, &  \text{if } d \text{ is } \textit{from node} \text{ of } DCDC \\
+            P_{DCDC_{to}}, &  \text{if } d \text{ is } \textit{to node} \text{ of } DCDC
+        \end{cases} 
+
+
+
+Class Reference: :class:`pyflow_acdc.Classes.DCDC_converter`
+
+Key attributes:
+
+.. list-table::
+   :widths: 20 10 70
+   :header-rows: 1
+
+   * - Attribute
+     - Type
+     - Description
+   * - ``fromNode``
+     - Node_DC
+     - The starting node
+   * - ``toNode``
+     - Node_DC
+     - The ending node
+   * - ``R``
+     - float
+     - Resistance of the converter
+   * - ``P_set``
+     - float
+     - Power set point of the converter
+   * - ``MW_rating``
+     - float
+     - Power rating of the converter
+   * - ``name``
+     - str
+     - Name of the converter
+   * - ``geometry``
+     - str
+     - Geometry of the converter
+
+Example Usage:
+    .. code-block:: python
+
+        import pyflow_acdc as pyf
+        # Create an AC node
+        node1 = pyf.Node_DC('Slack', 1, 0,0,525,name='Bus1')
+        node2 = pyf.Node_DC('P', 1, 0,0,525,name='Bus2')  
+
+        conv = pyf.add_DCDC_converter(grid,fromNode , toNode ,Pset=0.1, r=0.0001, MW_rating=99999,name='DCDC1')
+
+Inputs can be given in MW or pu. For pu use the ``r`` and ``Pset`` parameters. For MW use the ``R_Ohm`` and ``P_MW`` parameters.
+
 
 .. _ACDC_converter_modelling:
 
-ACDC Converter Modelling
-------------------------
+ACDC Converter
+--------------
+
 .. figure:: ../images/assymetrical.svg
    :width: 400
    :alt: Asymmetrical monopolar converter configuration
@@ -743,8 +925,8 @@ Key Attributes:
      - str
      - Name of the converter
 
-Renewable Source Modelling
----------------------------
+Renewable Source
+----------------
 
 .. figure:: ../images/Ren_sources_model.svg
    :width: 250
@@ -811,8 +993,8 @@ Key Attributes:
 
 .. _Generator_modelling:
 
-Generator Modelling
---------------------
+Generator
+---------
 
 .. figure:: ../images/Gen_model.svg
    :width: 250
@@ -933,8 +1115,8 @@ Key Attributes:
 
 .. _Price_zone_modelling:
 
-Price Zone Modelling
----------------------
+Price Zone 
+----------
 
 
 

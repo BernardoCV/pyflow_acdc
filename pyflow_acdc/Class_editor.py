@@ -378,7 +378,7 @@ def add_line_sizing(grid, fromNode, toNode,cable_types: list=[], active_config: 
        line.geometry = geometry
     return line
 
-def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu',update_grid=True):
+def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,A_rating=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu',update_grid=True):
     
     if isinstance(fromNode, str):
         fromNode = next((node for node in grid.nodes_DC if node.name == fromNode), None)
@@ -391,8 +391,10 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
         
         Resistance_pu = r / Z_base if r!=0 else 0.00001
 
-    elif data_in== 'Real': 
-       [Resistance_pu, _, _, _, MW_rating] = Cable_parameters(grid.S_base, R_Ohm_km, 0, 0, 0, 0, kV_base, Length_km,N_cables=1)
+    elif data_in== 'Real' or R_Ohm_km is not None: 
+        if A_rating is None:
+            A_rating = MW_rating*1000/kV_base     
+        [Resistance_pu, _, _, _, MW_rating] = Cable_parameters(grid.S_base, R_Ohm_km, 0, 0, 0, A_rating, kV_base, Length_km,N_cables=1)
     else:
         Resistance_pu = r if r!=0 else 0.00001
       
@@ -632,6 +634,8 @@ def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,M
     Grid.Generators.append(gen)
 
 def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind',min_gamma=0,Qrel=0):
+    
+    
     if ren_source_name is None:
         ren_source_name= node_name
     found=False 

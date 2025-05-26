@@ -328,7 +328,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     OPF_createModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
 
     obj_TEP = TEP_obj(model,grid,NPV)
-    obj_OPF = OPF_obj(model,grid,weights_def,True,ACmode,DCmode)
+    obj_OPF = OPF_obj(model,grid,weights_def,True)
     
     present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     if NPV:
@@ -456,7 +456,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
                      price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
         modify_parameters(grid,model.submodel[t],False,True)
         
-        TEP_subObj(model.submodel[t],grid,weights_def,ACmode,DCmode)
+        TEP_subObj(model.submodel[t],grid,weights_def)
         if clustering:
             w[t]= float(grid.Clusters[n_clusters][t-1])
 
@@ -546,10 +546,10 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
-def TEP_subObj(submodel,grid,ObjRule,ACmode,DCmode):
+def TEP_subObj(submodel,grid,ObjRule):
     OnlyGen=True
 
-    obj_rule= OPF_obj(submodel,grid,ObjRule,OnlyGen,ACmode,DCmode)
+    obj_rule= OPF_obj(submodel,grid,ObjRule,OnlyGen)
     submodel.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
 
 

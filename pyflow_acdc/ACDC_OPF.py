@@ -904,15 +904,15 @@ def calculate_objective(grid,obj,OnlyGen=True):
        return sum(pz.a*(pz.PN*grid.S_base)**2+pz.b*(pz.PN*grid.S_base) for pz in grid.Price_Zones)
    
     if obj =='AC_losses':
-        return (sum(line.loss for line in grid.lines_AC)+
-                sum(tf.loss for tf in grid.lines_AC_tf)+
-                sum(line.loss for line in grid.lines_AC_exp)+
-                sum(line.loss for line in grid.lines_AC_rec)+
-                sum(line.loss for line in grid.lines_AC_ct))*grid.S_base
+        return (sum(line.P_loss for line in grid.lines_AC)+
+                sum(tf.P_loss for tf in grid.lines_AC_tf)+
+                sum(line.P_loss for line in grid.lines_AC_exp)+
+                sum(line.P_loss for line in grid.lines_AC_rec)+
+                sum(line.P_loss for line in grid.lines_AC_ct))*grid.S_base
 
     if obj =='DC_losses':
         return (sum(line.loss for line in grid.lines_DC)+
-                sum(conv.loss for conv in grid.DCDC_conv))*grid.S_base
+                sum(conv.loss for conv in grid.Converters_DCDC))*grid.S_base
 
     if obj =='Converter_Losses':
         return sum(conv.P_loss for conv in grid.Converters_ACDC)*grid.S_base

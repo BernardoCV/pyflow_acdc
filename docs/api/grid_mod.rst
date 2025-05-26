@@ -550,8 +550,8 @@ Add DC Node
 Add DC Line
 ^^^^^^^^^^^^
 
-.. py:function:: add_line_DC(grid, fromNode, toNode, Resistance_pu=0.001, MW_rating=9999, Length_km=1, polarity='m', name=None, geometry=None, Cable_type='Custom')
-
+.. py:function:: add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,A_rating=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu',update_grid=True):
+    
    Adds a DC line to the grid.
 
    .. list-table::
@@ -578,14 +578,14 @@ Add DC Line
         - Destination node
         - Required
         - -
-      * - ``Resistance_pu``
+      * - ``r``
         - float
-        - Line resistance 
+        - Line resistance
         - 0.001
         - p.u.
       * - ``MW_rating``
         - float
-        - Power rating 
+        - Power rating
         - 9999
         - MW
       * - ``Length_km``
@@ -593,9 +593,19 @@ Add DC Line
         - Line length
         - 1
         - km
+      * - ``R_Ohm_km``
+        - float
+        - Line resistance in ohms per kilometer
+        - None
+        - Ω/km
+      * - ``A_rating``
+        - float
+        - Line rating
+        - None
+        - A
       * - ``polarity``
         - str
-        - 'm' for asymmetric monopolar,'sm' for symmetric monopolar, 'b' for bipolar
+        - 'm' for asymmetric monopolar, 'sm' for symmetric monopolar, 'b' for bipolar
         - 'm'
         - -
       * - ``name``
@@ -613,7 +623,16 @@ Add DC Line
         - Cable specification name
         - 'Custom'
         - -
-     
+      * - ``data_in``
+        - str
+        - Input data format ('pu' or 'Ohm')
+        - 'pu'
+        - -
+      * - ``update_grid``
+        - bool
+        - Whether to update the grid after adding the line
+        - True
+        - -
 
    **Example**
 

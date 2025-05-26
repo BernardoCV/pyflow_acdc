@@ -32,11 +32,11 @@ class Results:
     # def export(self):
 
     def All(self):
-
-        self.AC_Powerflow()
-        self.AC_voltage()
-        self.AC_lines_current()
-        self.AC_lines_power()
+        if self.Grid.nodes_AC != []:
+            self.AC_Powerflow()
+            self.AC_voltage()
+            self.AC_lines_current()
+            self.AC_lines_power()
         
         if self.Grid.nodes_DC != []:
             if self.Grid.nconv != 0:
@@ -44,17 +44,22 @@ class Results:
             self.DC_bus()
             self.DC_lines_current()
             self.DC_lines_power()
-            self.Slack_All()
+            
 
             if self.Grid.Converters_DCDC != []:
                 self.DC_converter()
-        else:
+        
+        if self.Grid.nodes_AC != [] and self.Grid.nodes_DC != []:
+            self.Slack_All()
+            
+        elif self.Grid.nodes_AC != []:
             self.Slack_AC()
 
         self.Power_loss()
         if self.Grid.OPF_run :
-            self.Ext_gen()
-            if any(node.RenSource for node in self.Grid.nodes_AC):
+            if self.Grid.Generators != []:
+                self.Ext_gen()
+            if self.Grid.RenSources:
                 self.Ext_REN()
             if not self.Grid.TEP_run:
                 self.OBJ_res()
@@ -149,9 +154,9 @@ class Results:
         table.field_names = ["Grid", "Power Loss (MW)","Load %"]
         generation=0 
         grid_loads = 0
+        tot=0
         
-        
-        if self.Grid.nodes_AC is not None:
+        if self.Grid.nodes_AC != []:
             if self.Grid.OPF_run:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
                                         +sum(gen.PGen for gen in node.connected_gen if gen.PGen >0) for node in self.Grid.nodes_AC])
@@ -216,7 +221,7 @@ class Results:
                 self.lossP_AC[G] += Ploss
 
            
-            tot = 0
+            
             for g in range(self.Grid.Num_Grids_AC):
                 if self.Grid.rating_grid_AC[g]!=0:
                     gload=self.Grid.load_grid_AC[g]/self.Grid.rating_grid_AC[g]*100
@@ -225,7 +230,7 @@ class Results:
                 table.add_row([f'AC Grid {g+1}', np.round(self.lossP_AC[g], decimals=self.dec),np.round(gload, decimals=self.dec)])
                 tot += self.lossP_AC[g]
 
-        if self.Grid.nodes_DC is not None:
+        if self.Grid.nodes_DC != []:
             for node in self.Grid.nodes_DC:
                 generation+= (node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource))*self.Grid.S_base
                 grid_loads += node.PLi*self.Grid.S_base
@@ -327,6 +332,13 @@ class Results:
         print(table)
 
     def DC_bus(self):
+
+        if self.Grid.OPF_run:
+            P_DC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                    +sum(gen.PGen for gen in node.connected_gen) for node in self.Grid.nodes_DC])
+        else:
+            P_DC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                                    +sum(gen.Pset for gen in node.connected_gen) for node in self.Grid.nodes_DC])
         print('--------------')
         print('Results DC')
         print('')
@@ -347,16 +359,17 @@ class Results:
 
             for node in self.Grid.nodes_DC:
                 if self.Grid.Graph_node_to_Grid_index_DC[node.nodeNumber] == g:
-                    if node.type == 'Slack':
-                        if self.Grid.nconv == 0:
-                            if node.P_INJ > 0:
-                                node.PGi = node.P_INJ
-                            else:
-                                node.PLi = abs(node.P_INJ)
+                    if not self.Grid.OPF_run:
+                        if node.type == 'Slack':
+                            if self.Grid.nconv == 0:
+                                if node.P_INJ > 0:
+                                    node.PGi = node.P_INJ
+                                else:
+                                    node.PLi = abs(node.P_INJ)
                     conv  = np.round(node.Pconv*self.Grid.S_base, decimals=self.dec)
                     table.add_row([
                         node.name, 
-                        np.round(node.PGi*self.Grid.S_base, decimals=self.dec), 
+                        np.round(P_DC[node.nodeNumber].item()*self.Grid.S_base, decimals=self.dec), 
                         np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
                         conv,
                         np.round(node.PconvDC*self.Grid.S_base, decimals=self.dec),
@@ -365,7 +378,7 @@ class Results:
                     ])
                     table_all.add_row([
                         node.name, 
-                        np.round(node.PGi*self.Grid.S_base, decimals=self.dec), 
+                        np.round(P_DC[node.nodeNumber].item()*self.Grid.S_base, decimals=self.dec), 
                         np.round(node.PLi*self.Grid.S_base, decimals=self.dec), 
                         conv,
                         np.round(node.PconvDC*self.Grid.S_base, decimals=self.dec),

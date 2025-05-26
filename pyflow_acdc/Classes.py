@@ -1251,6 +1251,8 @@ class Node_DC:
         self.PZ = None
         self.hover_text = None
         self.geometry=None
+
+        self.connected_gen=[]
         self.connected_RenSource=[]
         
         
@@ -2321,8 +2323,8 @@ class DCDC_converter:
         self.r = r
         self.MW_rating = MW_rating
         self.Powerto = Pset
-        self.Powerfrom = -( Pset+Pset**2*r)
-        self.loss = Pset**2*r
+        self.Powerfrom = -( Pset+Pset**2*r) #Current assumed at VDC = 1 pu
+        self.loss = Pset**2*r               #Current assumed at VDC = 1 pu
         fromNode.PconvDC += self.Powerfrom
         fromNode.connected_DCDC_from.add(self.ConvNumber)
         toNode.PconvDC += self.Powerto

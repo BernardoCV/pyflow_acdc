@@ -1111,7 +1111,8 @@ def DC_constraints(model,grid):
 
         def DCDC_loss_rule(model,conv):
             cn = grid.Converters_DCDC[conv]
-            return  model.CDC_loss[conv] == model.cn_DCDC_to[conv]**2*cn.r*2
+            nt = cn.toNode.nodeNumber
+            return  model.CDC_loss[conv] == (model.cn_DCDC_to[conv]/model.V_DC[nt])**2*cn.r
         
         model.P_DCDC_rule = pyo.Constraint(model.nodes_DC, rule=P_DCDC_rule)
         model.P_DCDC_to_constraint = pyo.Constraint(model.nodes_DC, rule=P_DCDC_to_rule)
@@ -1696,17 +1697,19 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     model.export_constraint = pyo.Constraint(model.M,rule=export_rule)    
 
 def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
-
-    AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
-    lf,qf,P_renSource,lista_gen,lista_rs = gen_info
-    u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
-
+    "Price Zone Parameters"
     ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
-    "Price Zone Parameters"
-    model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
-    model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)
+    
+    if ACmode:
+        AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
+        lf,qf,P_renSource,lista_gen,lista_rs = gen_info
+        u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
+        
+        model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
+        model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)
+        
     if DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info

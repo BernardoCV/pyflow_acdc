@@ -4,6 +4,8 @@ import importlib.util
 from io import StringIO
 import contextlib
 from typing import Dict, List
+import warnings
+import re
 
 # Configuration
 TEST_DIR = Path(__file__).parent
@@ -37,8 +39,8 @@ CASES = [
     'ts_dash.py'
 ]
 
-def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str]:
-    """Run a test case and return (success, error_message)."""
+def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List[str]]:
+    """Run a test case and return (success, error_message, warnings)."""
     if show_output:
         print(f"\nRunning test case: {case}")
         print("-" * 70)
@@ -49,23 +51,33 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str]:
     if spec is None or spec.loader is None:
         error_msg = f"Error: Could not load module {case}"
         print(error_msg)
-        return False, error_msg
+        return False, error_msg, []
         
     module = importlib.util.module_from_spec(spec)
+    
+    # Capture warnings
+    captured_warnings = []
     
     try:
         if show_output:
             # Run the module directly to see all output
             spec.loader.exec_module(module)
         else:
-            # Capture output but don't show it
-            with contextlib.redirect_stdout(StringIO()):
+            # Capture stdout to check for warning messages
+            stdout_capture = StringIO()
+            with contextlib.redirect_stdout(stdout_capture):
                 spec.loader.exec_module(module)
-        return True, ""
+            
+            # Check stdout for explicit warning messages
+            for line in stdout_capture.getvalue().split('\n'):
+                if 'Warning' in line or 'warning' in line: # or 'WARNING' in line:
+                    captured_warnings.append(line.strip())
+            
+        return True, "", captured_warnings
     except Exception as e:
         error_msg = f"Error running {case}: {str(e)}"
         print(error_msg)
-        return False, error_msg
+        return False, error_msg, captured_warnings
     finally:
         if show_output:
             print("-" * 70)
@@ -79,28 +91,36 @@ def main():
         print("Showing full output for each test case")
     print("-" * 70)
     
-    results: Dict[str, tuple[bool, str]] = {}
+    results: Dict[str, tuple[bool, str, List[str]]] = {}
     
     for case in CASES:
-        success, error_msg = run_test_case(case, show_output)
-        results[case] = (success, error_msg)
+        success, error_msg, warnings = run_test_case(case, show_output)
+        results[case] = (success, error_msg, warnings)
         if not show_output:
             status = "✓ Passed" if success else "✗ Failed"
             print(f"{status} - {case}")
+            if warnings:
+                print("\nWarnings:")
+                for warning in warnings:
+                    print(f"  {warning}")
     
     print("-" * 70)
     
     # Print summary
-    success_count = sum(1 for success, _ in results.values() if success)
+    success_count = sum(1 for result in results.values() if result[0])
     print(f"Summary: {success_count}/{len(CASES)} tests passed")
     
     # Print detailed error report if any tests failed
-    failed_tests = [(case, error) for case, (success, error) in results.items() if not success]
+    failed_tests = [(case, error, warnings) for case, (success, error, warnings) in results.items() if not success]
     if failed_tests:
         print("\nFailed Tests:")
-        for case, error in failed_tests:
+        for case, error, warnings in failed_tests:
             print(f"\n{case}:")
             print(f"  {error}")
+            if warnings:
+                print("\nWarnings:")
+                for warning in warnings:
+                    print(f"  {warning}")
 
 if __name__ == "__main__":
     main()
