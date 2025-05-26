@@ -17,6 +17,7 @@ CASES = [
     'CigreB4_PF.py',
 
     #OPF
+    'DC_OPF.py',
     'CigreB4_OPF.py',
     'case39ac_OPF.py',
     'case39acdc_OPF.py',
