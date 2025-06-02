@@ -1966,6 +1966,7 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_fromQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_toQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
             
             def process_line_AC_CT(line):
                 l = line.lineNumber
@@ -1978,6 +1979,7 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
                 line.fromS = (Pfrom + 1j*Qfrom)
                 line.toS = (Pto + 1j*Qto)
                 line.loss = line.fromS + line.toS
+                line.P_loss = lines_AC_CT_loss[l]
 
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_AC_CT, grid.lines_AC_ct)

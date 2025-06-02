@@ -11,6 +11,7 @@ __all__ = [
     'AC_PowerFlow',
     'DC_PowerFlow',
     'ACDC_sequential',
+    'Power_flow'
 ]
 
 
@@ -38,6 +39,21 @@ def cartz2pol(z):
     r = np.abs(z)
     theta = np.angle(z)
     return r, theta
+
+def Power_flow(grid,tol_lim=1e-10, maxIter=100):
+    ACmode = False
+    if grid.nn_AC!=0:
+        ACmode = True
+    DCmode = False
+    if grid.nn_DC!=0:
+        DCmode = True   
+    if ACmode and DCmode:
+        t,_=ACDC_sequential(grid,tol_lim, maxIter)
+    elif ACmode:
+        t=AC_PowerFlow(grid,tol_lim, maxIter)
+    elif DCmode:
+        t=DC_PowerFlow(grid,tol_lim, maxIter)
+    return t
 
 
 def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):

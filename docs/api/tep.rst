@@ -201,8 +201,7 @@ Export Results
 
        pyf.export_TEP_TS_results_to_excel(grid, "results.xlsx")
 
-References
-----------
+**References**
 
 .. [1] B. C. Valerio, M. Cheah-Mane, V. A. Lacerda, P. Gebraad and O. Gomis-Bellmunt,
        "Transmission expansion planning for hybrid AC/DC grids using a

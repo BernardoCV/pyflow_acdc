@@ -274,8 +274,7 @@ Results Export
 
        pyf.results_TS_OPF(grid, "results", stats=stats_df)
 
-References
-----------
+**References**
 
 .. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mañe, P. Gebraad, and O. Gomis-Bellmunt,
        "Optimizing offshore wind integration through multi-terminal DC grids: a market-based
