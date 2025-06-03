@@ -116,8 +116,10 @@ class Grid:
     }
         self.OPF_run= False
         self.TEP_run=False
-       
+        self.MP_TEP_run=False
+
         self.TEP_res=None
+        self.MP_TEP_res=None
         self.time_series_results = {
             'PF_results': pd.DataFrame(),  # Time_series_res
             'line_loading': pd.DataFrame(),  # Time_series_line_res
