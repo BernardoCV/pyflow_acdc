@@ -24,7 +24,7 @@ from .Market_Coeff import *
 try:
     from .ACDC_OPF import *
     from .ACDC_TEP import *
-    from .ACDC_MP_TEP import *
+    
     HAS_OPF = True
 except ImportError:
     HAS_OPF = False
@@ -132,7 +132,6 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'export_TEP_TS_results_to_excel',
-    'multi_period_TEP',
 
     # Time Series Analysis
     'Time_series_PF',
