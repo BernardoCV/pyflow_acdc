@@ -45,7 +45,7 @@ for conv in DCDC_data.itertuples():
 
 
 # pyf.ACDC_sequential(grid)
-model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
+model, model_res , timing_info, solver_stats=pyf.Optimal_PF(grid)
 
 res.All()
 end_time = time.time()
