@@ -84,11 +84,14 @@ def generate_add_gen_code(gens,S_base):
         code += f"    pyf.add_gen(grid, '{gen['node']}', '{gen['name']}', "
         
         # Dynamically handle parameters
-        code += f"price_zone_link={gen['price_zone_link']}, "
-        code += f"lf={gen['lf']}, qf={gen['qf']}, "
+        if gen['price_zone_link'] != False:
+            code += f"price_zone_link={gen['price_zone_link']}, "
+        code += f"np_gen={gen['np_gen']}, "
+        code += f"fc={gen['fc']},lf={gen['lf']}, qf={gen['qf']}, "
         code += f"MWmax={gen['Max_pow_gen']*S_base}, MWmin={gen['Min_pow_gen']*S_base}, "
         code += f"MVArmax={gen['Max_pow_genR']*S_base}, MVArmin={gen['Min_pow_genR']*S_base}, "
         code += f"PsetMW={gen['Pset']*S_base}, QsetMVA={gen['Qset']*S_base})\n"
+
     
     return code
 
@@ -318,8 +321,10 @@ def create_dictionaries(grid):
                     "Min_pow_gen":  gen.Min_pow_gen,
                     "Max_pow_genR": gen.Max_pow_genR,
                     "Min_pow_genR": gen.Min_pow_genR,
+                    "np_gen": gen.np_gen,
                     "qf": gen.qf,
-                    "lf":    gen.lf,
+                    "lf":  gen.lf,
+                    "fc": gen.fc,
                     "Pset": gen.Pset,
                     "Qset": gen.Qset,
                     "S_rated": gen.Max_S,
@@ -399,28 +404,28 @@ def {file_name}():
 
     """
     
-    # If nodes_DC code exists, add the code for assigning price zones to nodes_DC
-    if data_dict["nodes_AC"]:
-        main_code += f"""
-    # Assign Price Zones to Nodes
-    for index, row in nodes_AC.iterrows():
-        node_name = nodes_AC.at[index, 'Node_id']
-        price_zone = nodes_AC.at[index, 'PZ']
-        ACDC = 'AC'
-        if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
-    """
+    # If nodes_AC code exists, add the code for assigning price zones to nodes_AC
+        if data_dict["nodes_AC"]:
+            main_code += f"""
+        # Assign Price Zones to Nodes
+        for index, row in nodes_AC.iterrows():
+            node_name = nodes_AC.at[index, 'Node_id']
+            price_zone = nodes_AC.at[index, 'PZ']
+            ACDC = 'AC'
+            if price_zone is not None:
+                pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
+        """
     
     # If nodes_DC code exists, add the code for assigning price zones to nodes_DC
-    if data_dict["nodes_DC"]:
-        main_code += f"""
-    for index, row in nodes_DC.iterrows():
-        node_name = nodes_DC.at[index, 'Node_id']
-        price_zone = nodes_DC.at[index, 'PZ']
-        ACDC = 'DC'
-        if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
-    """
+        if data_dict["nodes_DC"]:
+            main_code += f"""
+        for index, row in nodes_DC.iterrows():
+            node_name = nodes_DC.at[index, 'Node_id']
+            price_zone = nodes_DC.at[index, 'PZ']
+            ACDC = 'DC'
+            if price_zone is not None:
+                pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
+        """
     
     
     main_code+=f"""

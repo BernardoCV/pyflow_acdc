@@ -376,7 +376,7 @@ def OPF_updateParam(model,grid):
     return model
 
 def OPF_obj(model,grid,ObjRule,OnlyGen=True):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC,CDC = DCadd
     # for node in  model.nodes_AC:
@@ -394,11 +394,11 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         if ObjRule['Energy_cost']['w']==0:
             return 0
         elif OnlyGen:
-            return sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]) for gen in grid.Generators)
+            return sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
         else :
             nodes_with_RenSource = [node for node in model.nodes_AC if grid.nodes_AC[node].RenSource]
             nodes_with_conv= [node for node in model.nodes_AC if grid.nodes_AC[node].Num_conv_connected != 0]
-            return sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]) for gen in grid.Generators)  \
+            return sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)  \
                     + sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base \
                     + sum(model.P_conv_AC[node]*model.price[node] for node in nodes_with_conv)*grid.S_base
     def formula_AC_losses():
@@ -534,7 +534,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
     P_renSource, P_know, Q_know = {}, {}, {}
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
     S_lineACrec_lim, S_lineACrec_lim_new,REC_AC_act = {}, {}, {}
-    lf,qf = {}, {}
+    lf,qf,c0,np_gen = {}, {}, {}, {}
 
     S_lineACct_lim,cab_types_set,allowed_types = {},{},{}
 
@@ -549,6 +549,8 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
         nn_gen += 1
         lf[gen.genNumber] = gen.lf
         qf[gen.genNumber] = gen.qf
+        c0[gen.genNumber] = gen.c0
+        np_gen[gen.genNumber] = gen.np_gen
     
     lista_gen = list(range(0, nn_gen))
        
@@ -559,7 +561,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
         
     lista_rs = list(range(0, nn_rs))
 
-    gen_info = pack_variables(lf,qf,P_renSource,lista_gen,lista_rs)
+    gen_info = pack_variables(lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs)
 
     "Price zone info"
    
@@ -890,14 +892,14 @@ def OPF_conv_results(model,grid):
       
 
 def calculate_objective(grid,obj,OnlyGen=True):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC,CDC = DCadd
     if obj =='Ext_Gen':
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
 
     if obj =='Energy_cost':
-        return sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf) for gen in grid.Generators)
+        return sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
 
         
     if obj =='PZ_cost_of_generation':

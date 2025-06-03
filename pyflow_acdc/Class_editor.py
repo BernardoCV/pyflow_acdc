@@ -542,6 +542,7 @@ def add_generators(Grid,Gen_csv):
         QsetMVA= Gen_data.at[index, 'QsetMVA'] if 'QsetMVA' in Gen_data.columns else 0
         lf = Gen_data.at[index, 'Linear factor']    if 'Linear factor' in Gen_data.columns else 0
         qf = Gen_data.at[index, 'Quadratic factor'] if 'Quadratic factor' in Gen_data.columns else 0
+        fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
         price_zone_link = False
         
@@ -549,9 +550,9 @@ def add_generators(Grid,Gen_csv):
         if fuel_type.lower() in ["wind", "solar"]:
             add_RenSource(Grid,node_name, MWmax,ren_source_name=var_name ,geometry=geo,ren_type=fuel_type)
         else:
-            add_gen(Grid, node_name,var_name, price_zone_link,lf,qf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo)  
+            add_gen(Grid, node_name,var_name, price_zone_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo)  
         
-def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,MWmax=99999,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type='Other',geometry= None):
+def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=99999,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type='Other',geometry= None,installation_cost:float=0,np_gen:int=1):
     
     if MVArmax is None:
         MVArmax=MWmax
@@ -570,7 +571,7 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,MWmax
     for node in Grid.nodes_AC:
    
         if node_name == node.name:
-             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,Pset,Qset,Smax)
+             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,fc,Pset,Qset,Smax,installation_cost)
              node.PGi = 0
              node.QGi = 0
              if fuel_type not in [
@@ -579,6 +580,7 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,MWmax
              ]:
                  fuel_type = 'Other'
              gen.gen_type = fuel_type
+             gen.np_gen = np_gen
              if geometry is not None:
                  if isinstance(geometry, str): 
                       geometry = loads(geometry)  

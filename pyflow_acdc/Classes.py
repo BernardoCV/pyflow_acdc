@@ -881,7 +881,7 @@ class Gen_AC:
         return self._name
 
     
-    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other'):
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other',installation_cost:float=0):
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
         self.Node_AC=node.name
@@ -897,8 +897,14 @@ class Gen_AC:
         
         self.Max_S= S_rated
         
+        self.np_gen=1
+        self.np_gen_max=3
+        self.np_gen_opf =False
+
+        self.c0 = installation_cost
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
+        self.fc=fixed_cost
         
         self.price_zone_link = False
         

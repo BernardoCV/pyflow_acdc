@@ -24,6 +24,7 @@ from .Market_Coeff import *
 try:
     from .ACDC_OPF import *
     from .ACDC_TEP import *
+    from .ACDC_MP_TEP import *
     HAS_OPF = True
 except ImportError:
     HAS_OPF = False

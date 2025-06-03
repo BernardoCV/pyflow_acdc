@@ -459,7 +459,7 @@ def modify_parameters(grid,model,ACmode,DCmode,Price_Zones):
     [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=Price_Zones)    
 
     AC_Lists, AC_nodes_info, AC_lines_info,EXP_info,REP_info,CT_info = AC_info
-    lf,qf,P_renSource,lista_gen,lista_rs = gen_info
+    lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
     
     # lista_nodos_AC, lista_lineas_AC,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists
     _,_,_,_, P_know,Q_know,price = AC_nodes_info
@@ -570,7 +570,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     model = pyo.ConcreteModel()
     model.name="TS AC/DC hybrid OPF"
     
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     

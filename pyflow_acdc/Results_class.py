@@ -61,7 +61,7 @@ class Results:
                 self.Ext_gen()
             if self.Grid.RenSources:
                 self.Ext_REN()
-            if not self.Grid.TEP_run:
+            if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.OBJ_res()
             if self.Grid.Price_Zones != []: 
                 self.Price_Zone()    
@@ -74,7 +74,8 @@ class Results:
                 self.TEP_ts_res()
             else:
                 self.TEP_norm()
-                
+        if self.Grid.MP_TEP_run:
+            self.MP_TEP_results()
         print('------')
 
     def All_AC(self):
@@ -452,7 +453,8 @@ class Results:
                 else:
                     # Define the table headers
                     table.field_names = ["Node", "Power Gen (MW)", "Reactive Gen (MVAR)", "Power Load (MW)", "Reactive Load (MVAR)",
-                                         "Power converters DC(MW)", "Reactive converters DC (MVAR)", "Power injected  (MW)", "Reactive injected  (MVAR)"]
+                                         "Power converters DC(MW)", "Reactive converters DC (MVAR)", "Power injected  (MW)",
+                                         "Reactive injected  (MVAR)"]
 
                     for node in self.Grid.nodes_AC:
                         if self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber] == g:
@@ -873,7 +875,7 @@ class Results:
         Stot=0
         Ltot=0
         costtot=0
-        table.field_names = ["Generator","Node" ,"Power (MW)", "Reactive power (MVAR)","Quadratic Price €/MWh^2","Linear Price €/MWh","Loading %","Cost k€"]
+        table.field_names = ["Generator","Node" ,"Power (MW)", "Reactive power (MVAR)","Quadratic Price €/MWh^2","Linear Price €/MWh","Fixed Cost €","Loading %","Cost k€"]
         for gen in self.Grid.Generators:
             Pgi=gen.PGen #+node.PGi_ren*node.curtailment
             Qgi=gen.QGen
@@ -884,11 +886,15 @@ class Results:
                 base=np.sqrt(gen.Max_pow_gen**2+max(abs(gen.Min_pow_genR),gen.Max_pow_genR)**2)
             else:
                 base=gen.Max_S
+            base *= gen.np_gen
             load=S/base*100
-            cost=(Pgi**2*gen.qf+Pgi*gen.lf)/1000
+            fc=gen.fc*gen.np_gen
+            cost=(Pgi**2*gen.qf+Pgi*gen.lf+fc)/1000
            
                 
-            table.add_row([gen.name,gen.Node_AC, np.round(Pgi, decimals=self.dec), np.round(Qgi, decimals=self.dec),  np.round(gen.qf, decimals=self.dec),  np.round(gen.lf, decimals=self.dec),np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
+            table.add_row([gen.name,gen.Node_AC, np.round(Pgi, decimals=self.dec), np.round(Qgi, decimals=self.dec),
+                           np.round(gen.qf, decimals=self.dec),  np.round(gen.lf, decimals=self.dec),np.round(fc, decimals=self.dec),
+                           np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
             Pabs+=abs(Pgi)
             Qabs+=abs(Qgi)
             Ptot+=Pgi
@@ -901,8 +907,8 @@ class Results:
             load=Stot/Ltot*100
         else:
             load=0
-        table.add_row(['Total',"", np.round(Ptot, decimals=self.dec), np.round(Qtot, decimals=self.dec),"",""," ", np.round(costtot, decimals=0)])
-        table.add_row(['Total abs',"", np.round(Pabs, decimals=self.dec), np.round(Qabs, decimals=self.dec), "","",np.round(load, decimals=self.dec),""])
+        table.add_row(['Total',"", np.round(Ptot, decimals=self.dec), np.round(Qtot, decimals=self.dec),"",""," ","", np.round(costtot, decimals=0)])
+        table.add_row(['Total abs',"", np.round(Pabs, decimals=self.dec), np.round(Qabs, decimals=self.dec), "","","",np.round(load, decimals=self.dec),""])
         print(table)
     
     def Ext_REN(self):
@@ -1225,6 +1231,18 @@ class Results:
             f"{-np.round(tot_pv + tot, decimals=2):,}".replace(',', ' ')
         ])  
         print(table)
+
+    def MP_TEP_results(self):
+        # Check if the attribute exists and is a DataFrame
+        if hasattr(self.Grid, "MP_TEP_results") and isinstance(self.Grid.MP_TEP_results, pd.DataFrame):
+            df = self.Grid.MP_TEP_results
+            table = pt()
+            table.field_names = list(df.columns)
+            for row in df.itertuples(index=False):
+                table.add_row(list(row))
+            print(table)
+        else:
+            print(self.Grid.MP_TEP_results)
         
     def Price_Zone(self):
         print('--------------')

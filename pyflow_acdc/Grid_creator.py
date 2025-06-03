@@ -1086,7 +1086,7 @@ def Create_grid_from_mat(matfile):
 
     if Gen_data is not None:        
         for index, row in Gen_data.iterrows():
-          if Gen_data.at[index, 'status'] !=0:  
+            
             var_name = index+1 
             node_name = str(Gen_data.at[index, 'bus'])
             
@@ -1133,10 +1133,13 @@ def Create_grid_from_mat(matfile):
             
             price_zone_link = False
             
-        
+            if Gen_data.at[index, 'status'] == 0:
+                np_gen = 0
+            else:
+                np_gen = 1
 
-            add_gen(G, node_name,var_name, price_zone_link,lf,qf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA) 
-            
+            gen = add_gen(G, node_name,var_name, price_zone_link,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA) 
+            gen.np_gen = np_gen
     
     return [G, res]
 

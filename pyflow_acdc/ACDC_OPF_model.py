@@ -39,14 +39,18 @@ def analyse_OPF(grid):
         CFC = True
     CDC = False
     if grid.ncdc_DC!=0:
-        CDC = True
-    return ACmode,DCmode,[TEP_AC,TAP_tf,REC_AC,CT_AC],[CFC,CDC]
+        CDC = True  
+    GPR = False
+    if any(gen.np_gen_opf for gen in grid.Generators):
+        GPR = True
+
+    return ACmode,DCmode,[TEP_AC,TAP_tf,REC_AC,CT_AC],[CFC,CDC],[GPR]
     
 
 def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     from .ACDC_OPF import Translate_pyf_OPF 
     
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC,CDC = DCadd
     
@@ -87,10 +91,13 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     
 
 def Generation_variables(model,grid,gen_info):
-    lf,qf,P_renSource,lista_gen,lista_rs = gen_info
-   
+    lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
+    GPR = False
+    if any(gen.np_gen_opf for gen in grid.Generators):
+        GPR = True
+
     model.gen_AC     = pyo.Set(initialize=lista_gen)
-    
+        
     model.ren_sources= pyo.Set(initialize=lista_rs)
 
 
@@ -143,13 +150,17 @@ def Generation_variables(model,grid,gen_info):
              ini=gen.Max_pow_genR    
         return (ini)
     
-    model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
-    model.QGi_gen = pyo.Var(model.gen_AC,bounds=Q_Gen_bounds, initialize=Q_gen_ini) 
+    if GPR:
+        model.PGi_gen = pyo.Var(model.gen_AC, initialize=P_gen_ini)
+        model.QGi_gen = pyo.Var(model.gen_AC, initialize=Q_gen_ini) 
+    else:
+        model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
+        model.QGi_gen = pyo.Var(model.gen_AC,bounds=Q_Gen_bounds, initialize=Q_gen_ini) 
 
     s=1
 def AC_variables(model,grid,AC_info,PV_set):
     
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
 
@@ -350,7 +361,7 @@ def AC_variables(model,grid,AC_info,PV_set):
         
 
 def AC_constraints(model,grid,AC_info):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
@@ -859,7 +870,7 @@ def AC_constraints(model,grid,AC_info):
         if gen.Max_S is None:
             return pyo.Constraint.Skip
         else:    
-            return model.PGi_gen[ngen]**2+model.QGi_gen[ngen]**2 <= gen.Max_S**2 
+            return model.PGi_gen[ngen]**2+model.QGi_gen[ngen]**2 <= (gen.Max_S*model.np_gen[ngen])**2 
     
     model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
     #AC Ren sources inequality
@@ -937,7 +948,7 @@ def AC_constraints(model,grid,AC_info):
 
 def DC_variables(model,grid,DC_info,TEP=False):
 
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC,CDC = DCadd
 
@@ -1013,7 +1024,7 @@ def DC_variables(model,grid,DC_info,TEP=False):
         model.CDC_loss= pyo.Var(model.DCDC_conv, initialize=0)
 
 def DC_constraints(model,grid):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC,CDC = DCadd
 
@@ -1489,12 +1500,12 @@ def Converter_constraints(model,grid,Conv_info):
     
 
 def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
-    lf,qf,P_renSource,lista_gen,lista_rs = gen_info
+    lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
     
     if DCmode:
@@ -1698,13 +1709,13 @@ def price_zone_constraints(model,grid,Price_Zone_info):
 
 def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
     "Price Zone Parameters"
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     
     if ACmode:
         AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
-        lf,qf,P_renSource,lista_gen,lista_rs = gen_info
+        lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
         u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
         
         model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
@@ -1717,22 +1728,24 @@ def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
         model.price_dc  = pyo.Param(model.nodes_DC, initialize=price_dc,mutable=True)
 
 def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     from .ACDC_TEP import get_TEP_variables
 
-    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
+    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
     NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
     P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
     NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
+    np_gen,np_gen_max = gen_var
 
-
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     
+    model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
+
     if ACmode:
         if TEP_AC:    
             model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)    
@@ -1759,17 +1772,46 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
 
 def TEP_variables(model,grid):
 
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     from .ACDC_TEP import get_TEP_variables
 
-    conv_var,DC_line_var,AC_line_var = get_TEP_variables(grid)
+    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
     NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
     P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
     NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
+    np_gen,np_gen_max = gen_var    
 
+    def np_gen_bounds(model,gen):
+        g = grid.Generators[gen]
+        if g.np_gen_opf:
+            return (np_gen[gen],np_gen_max[gen])
+        else:
+            return (np_gen[gen],np_gen[gen])
+    
+    if GPR:
+
+        def P_gen_constraint_rule(model, gen):
+            g = grid.Generators[gen]
+            return (g.Min_pow_gen * model.np_gen[gen] <= model.PGi_gen[gen], model.PGi_gen[gen] <= g.Max_pow_gen * model.np_gen[gen])
+
+        def Q_gen_constraint_rule(model, gen):
+            g = grid.Generators[gen]
+            return (g.Min_pow_genR * model.np_gen[gen] <= model.QGi_gen[gen], model.QGi_gen[gen] <= g.Max_pow_genR * model.np_gen[gen])
+
+
+        model.np_gen = pyo.Var(model.gen_AC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen)
+        model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)  
+
+        model.PGi_bounds = pyo.Constraint(model.gen_AC,rule=P_gen_constraint_rule)
+        model.QGi_bounds = pyo.Constraint(model.gen_AC,rule=Q_gen_constraint_rule)
+
+
+    else:
+        model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
+        
     "TEP variables"
     if ACmode:
         if TEP_AC:
@@ -1815,10 +1857,11 @@ def TEP_variables(model,grid):
 
 
 def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
-    ACmode,DCmode,ACadd,DCadd = analyse_OPF(grid)
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC,CDC = DCadd
     
+    grid.OPF_run=True
 
     #Generation 
     
@@ -1919,6 +1962,10 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             node.P_INJ = Pf[i]
             node.Q_INJ = Qf[i]
             
+        if GPR:
+            np_gen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_gen.items()}
+            for gen in grid.Generators:
+                gen.np_gen = np_gen_values[gen.genNumber]
         
         if TEP_AC:
             lines_AC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}
