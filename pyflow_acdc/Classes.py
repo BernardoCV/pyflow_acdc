@@ -899,7 +899,7 @@ class Gen_AC:
         
         self.np_gen=1
         self.np_gen_max=3
-        self.np_gen_opf =False
+        self.np_gen_opf = False
 
         self.c0 = installation_cost
         self.lf=linear_cost_factor

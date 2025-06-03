@@ -28,6 +28,8 @@ CASES = [
     'folium_test.py',
     
     #Transmission Expansion
+    #make sure OPF still works
+    'case24_OPF.py',
     #DC
     'case6_TEP_DC.py',
     #AC
