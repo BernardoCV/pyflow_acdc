@@ -599,7 +599,7 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,
         gen.lf= node.price
     Grid.Generators.append(gen)
     
-   
+    return gen
             
             
 def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
