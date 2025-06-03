@@ -50,7 +50,7 @@ This function runs the AC/DC hybrid optimal power flow calculation. It creates t
 
    .. code-block:: python
 
-      model, timing_info, model_res,solver_stats =pyf.OPF_ACDC(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+      model, model_res , timing_info, solver_stats =pyf.Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
 
 .. _model_creation:
 

@@ -139,7 +139,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     "solve": solver_stats['time'],
     "export": t_modelexport,
     }
-    return model, timing_info, model_res,solver_stats
+    return model, model_res , timing_info, solver_stats
 
 
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):

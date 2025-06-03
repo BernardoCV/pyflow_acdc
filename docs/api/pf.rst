@@ -313,8 +313,7 @@ Running the Sequential AC/DC Power Flow
 
        time = pyf.ACDC_sequential(grid)
 
-References
-----------
+**References**
 
 .. [1] Arthur R. Bergen. "Power systems analysis". eng. In: Power systems analysis. 2nd ed.
        Upper Saddle River, N.J: Prentice-Hall, 2000. Chap. 10, pp. 323–352. isbn: 0136919901.
