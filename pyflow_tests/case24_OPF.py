@@ -182,13 +182,13 @@ obj = {'Energy_cost': 1}
 
 pyf.expand_elements_from_pd(grid,expandable_data)
 
-model, timing_info, model_res,solver_stats= pyf.Optimal_PF(grid,ObjRule=obj)
+model, model_res,timing_info,solver_stats= pyf.Optimal_PF(grid,ObjRule=obj)
 
 
 
 res.All()
 
-
+print(model_res)
 print(timing_info)
 model.obj.display()
 t2= time.time()

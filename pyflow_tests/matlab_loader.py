@@ -28,7 +28,11 @@ print(nac)
 
 JustOne = True
     
-model, timing_info, model_res,solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
+model, model_res,timing_info, solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
 
 res.All()
+
+print(timing_info)
+print(model_res)
+model.obj.display()
     

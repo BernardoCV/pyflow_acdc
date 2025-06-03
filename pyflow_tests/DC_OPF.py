@@ -30,11 +30,14 @@ grid.Update_Graph_DC()
 pyf.add_RenSource(grid,'Node_1', 2000)
    
 
-model, Current_range_res,t,elapsed_time =pyf.Optimal_PF(grid)
+model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
 
 # model.pprint()
 res.All()
 
+print(model_res)
+print(timing_info)
+model.obj.display()
 
 
 
