@@ -57,7 +57,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     
     [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=Price_Zones)
    
-    Generation_variables(model,grid,gen_info)
+    Generation_variables(model,grid,gen_info,TEP)
 
     if ACmode:
         AC_variables(model,grid,AC_info,PV_set)
@@ -90,10 +90,10 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
 
     
 
-def Generation_variables(model,grid,gen_info):
+def Generation_variables(model,grid,gen_info,TEP):
     lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
     GPR = False
-    if any(gen.np_gen_opf for gen in grid.Generators):
+    if any(gen.np_gen_opf for gen in grid.Generators) and TEP:
         GPR = True
 
     model.gen_AC     = pyo.Set(initialize=lista_gen)
