@@ -255,6 +255,17 @@ class Grid:
         self._droop_nodes = None
         self._slackDC_nodes = None
         self._nodes_dict_DC = None        
+    #Generation
+
+    @property
+    def nn_gen(self):
+        return len(self.Generators) if self.Generators is not None else 0  # Number of generators
+    
+    @property
+    def nn_ren(self):
+        return len(self.RenSources) if self.RenSources is not None else 0  # Number of renewable sources
+    
+
     # AC grid properties
     @property
     def nn_AC(self):

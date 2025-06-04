@@ -50,7 +50,7 @@ def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,disc
         model.lines_AC_ct = pyo.Set(initialize=list(range(0,grid.nct_AC)))
         model.ct_set = pyo.Set(initialize=list(range(0,len(grid.Cable_options[0].cable_types))))
     if GPR:
-        model.gen_AC = pyo.Set(initialize=list(range(0,grid.ngen_AC)))
+        model.gen_AC = pyo.Set(initialize=list(range(0,grid.nn_gen)))
 
     model.inv_model = pyo.Block(model.inv_periods)
 
@@ -81,14 +81,11 @@ def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,disc
     if GPR:
         np_gen,np_gen_max = gen_var
 
-        def np_gen_bounds(model,gen):
-            g = grid.Generators[gen]
-            if g.np_gen_opf:
-                return (np_gen[gen],np_gen_max[gen])
-            else:
-                return (np_gen[gen],np_gen[gen])
+        model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
+        def np_gen_bounds(model,gen,i):
+            return (np_gen[gen],np_gen_max[gen])
             
-        model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,initialize=np_gen,bounds=np_gen_bounds)
+        model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds)
 
         def MP_gen_lower_bound(model,gen,i):
             if i == 0:
@@ -101,24 +98,25 @@ def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,disc
             return model.inv_model[i].np_gen[gen] == model.np_gen[gen,i]
         model.MP_gen_link_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_link)
 
+    
     if ACmode:
         NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
-        
-        model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
-        def MP_AC_line_bounds(model,l,i):
-            return (NP_lineAC[l],NP_lineAC_max[l])
-        model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds)
-
-        def MP_AC_line_lower_bound(model,l,i):
-            if i == 0:
-                return pyo.Constraint.Skip
-            else:
-                return model.ACLinesMP[l,i] >= model.ACLinesMP[l,i-1]
-        model.MP_AC_line_lower_bound_constraint = pyo.Constraint(model.lines_AC_exp,model.inv_periods, rule=MP_AC_line_lower_bound)
-
-        def MP_AC_line_link(model, l, i):
-            return model.inv_model[i].NumLinesACP[l] == model.ACLinesMP[l, i]
-        model.MP_AC_line_link_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_link)
+        if TEP_AC:
+            model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
+            def MP_AC_line_bounds(model,l,i):
+                return (NP_lineAC[l],NP_lineAC_max[l])
+            model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds)
+    
+            def MP_AC_line_lower_bound(model,l,i):
+                if i == 0:
+                    return pyo.Constraint.Skip
+                else:
+                    return model.ACLinesMP[l,i] >= model.ACLinesMP[l,i-1]
+            model.MP_AC_line_lower_bound_constraint = pyo.Constraint(model.lines_AC_exp,model.inv_periods, rule=MP_AC_line_lower_bound)
+    
+            def MP_AC_line_link(model, l, i):
+                return model.inv_model[i].NumLinesACP[l] == model.ACLinesMP[l, i]
+            model.MP_AC_line_link_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_link)
 
     if DCmode:
         NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
@@ -201,15 +199,28 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
     for i in model.inv_periods:
         inv_cost = 0
         
-        if ACmode:
-            AC_Inv_lines=0
-            for l in model.lines_AC_exp:
-                line = grid.lines_AC_exp[l]
-                if i ==0:
-                    AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
+        if GPR:
+            inv_gen= 0
+            for g in model.gen_AC:
+                gen = grid.Generators[g]
+                if i == 0:
+                    inv_gen+=(model.np_gen[g,i]-model.np_gen_base[g])*gen.base_cost
                 else:
-                    AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1])*line.base_cost
-            inv_cost += AC_Inv_lines
+                    inv_gen+=(model.np_gen[g,i]-model.np_gen[g,i-1])*gen.base_cost
+        else:
+            inv_gen=0
+
+
+        if ACmode:
+            if TEP_AC:
+                AC_Inv_lines=0
+                for l in model.lines_AC_exp:
+                    line = grid.lines_AC_exp[l]
+                    if i ==0:
+                        AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
+                    else:
+                        AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1])*line.base_cost
+                inv_cost += AC_Inv_lines
         if DCmode:
             DC_Inv_lines=0
             for l in model.lines_DC:
@@ -250,29 +261,52 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,inv_periods,MINLP=False):
     
     rows = []
     
-
-    if ACmode:
+    if GPR:
         if MINLP:
-            ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i])) for (l, i) in model.ACLinesMP}   
+            gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i])) for (g, i) in model.np_gen}
         else:
-            ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i]),2) for (l, i) in model.ACLinesMP}   
-        for line in grid.lines_AC_exp:
-            l = line.lineNumber
-            row = {'Element': str(line.name)}
-            row['Type'] = 'AC Line'
-            row['Initial'] = pyo.value(model.NumLinesACP_base[l])
+            gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i]),2) for (g, i) in model.np_gen}
+        for gen in grid.Generators:
+            g = gen.genNumber
+            row = {'Element': str(gen.name)}
+            row['Type'] = 'Generator'
+            row['Initial'] = pyo.value(model.np_gen_base[g])
             total_cost = 0
             for i in range(len(inv_periods)):
-                n_val = ac_lines_mp_values[l, i]
+                n_val = gen_mp_values[g, i]
                 if i == 0:
-                    cost = (n_val - pyo.value(model.NumLinesACP_base[l])) * line.base_cost
+                    cost = (n_val - pyo.value(model.np_gen_base[g])) * gen.base_cost
                 else:
-                    cost = (n_val - ac_lines_mp_values[l, i-1]) * line.base_cost
+                    cost = (n_val - gen_mp_values[g, i-1]) * gen.base_cost
                 row[f"N_{inv_periods[i]}"] = n_val
                 row[f"Cost_{inv_periods[i]}"] = cost
                 total_cost += cost
             row['Total_Cost'] = total_cost
             rows.append(row)
+
+    if ACmode:
+        if TEP_AC:
+            if MINLP:
+                ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i])) for (l, i) in model.ACLinesMP}   
+            else:
+                ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i]),2) for (l, i) in model.ACLinesMP}   
+            for line in grid.lines_AC_exp:
+                l = line.lineNumber
+                row = {'Element': str(line.name)}
+                row['Type'] = 'AC Line'
+                row['Initial'] = pyo.value(model.NumLinesACP_base[l])
+                total_cost = 0
+                for i in range(len(inv_periods)):
+                    n_val = ac_lines_mp_values[l, i]
+                    if i == 0:
+                        cost = (n_val - pyo.value(model.NumLinesACP_base[l])) * line.base_cost
+                    else:
+                        cost = (n_val - ac_lines_mp_values[l, i-1]) * line.base_cost
+                    row[f"N_{inv_periods[i]}"] = n_val
+                    row[f"Cost_{inv_periods[i]}"] = cost
+                    total_cost += cost
+                row['Total_Cost'] = total_cost
+                rows.append(row)
         
         
 
