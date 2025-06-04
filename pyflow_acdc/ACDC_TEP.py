@@ -160,16 +160,23 @@ def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_co
            element.NumConvP = N_b
        if hasattr(element, 'NumConvP_i'):
            element.NumConvP_i = N_i      # Only set if it exists
+       if hasattr(element, 'np_gen'):
+           element.np_gen_b = N_b
+           element.np_gen = N_b
+       if hasattr(element, 'np_gen_i'):
+           element.np_gen_i = N_i
+       
    if N_max is not None:
        if hasattr(element, 'np_line_max'):
            element.np_line_max = N_max
        if hasattr(element, 'NumConvP_max'):
            element.NumConvP_max = N_max  
+       if hasattr(element, 'np_gen_max'):
+           element.np_gen_max = N_max     
     
    if Life_time is not None:
        element.life_time = Life_time
-   if base_cost is not None:
-       element.base_cost = base_cost
+   
    if per_unit_cost is not None:
        if hasattr(element, 'cost_perMWkm'):
            element.cost_perMWkm = per_unit_cost
@@ -209,6 +216,12 @@ def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_co
             cn.NUmConvP_opf = True
             update_attributes(cn, N_b, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
             continue
+        
+    for gen in grid.Generators:
+        if name == gen.name:
+            gen.np_gen_opf = True
+            update_attributes(gen, N_b, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
+            continue
             
 def base_cost_calculation(element):
     from .Classes import Exp_Line_AC 
@@ -222,7 +235,16 @@ def base_cost_calculation(element):
     from .Classes import AC_DC_converter
     if isinstance(element, AC_DC_converter):
         element.base_cost= element.cost_perMVA*element.MVA_max
-         
+    
+    from .Classes import Generator
+    if isinstance(element, Generator):
+        if element.Max_S is not None:
+            element.base_cost= element.cost_perMVA*element.Max_S
+        elif element.Max_pow_gen !=0:
+            element.base_cost= element.cost_perMVA*element.Max_pow_gen
+        else:
+            element.base_cost= element.cost_perMVA*element.Max_pow_genR
+
 
 def Translate_pd_TEP(grid):
     """Translation of element wise to internal numbering"""
@@ -565,7 +587,15 @@ def TEP_obj(model,grid,NPV):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd 
-      
+
+    def Gen_investments():
+        Gen_Inv=0
+        for g in model.gen_AC:
+            gen = grid.Generators[g]
+            if gen.np_gen_opf:
+                Gen_Inv+=(model.np_gen[g]-model.np_gen_base[g])*gen.base_cost
+        return Gen_Inv
+
     def AC_Line_investments():
         AC_Inv_lines=0
         for l in model.lines_AC_exp:
@@ -625,6 +655,11 @@ def TEP_obj(model,grid,NPV):
                  Inv_conv+=(model.NumConvP[cn]-model.NumConvP_base[cn])*conv.base_cost/conv.life_time_hours
         return Inv_conv
     
+    if GPR:
+        inv_gen= Gen_investments()
+    else:
+        inv_gen=0
+    
     if TEP_AC: 
         inv_line_AC = AC_Line_investments()
     else:
@@ -665,7 +700,7 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_conv  = 0
 
-    return inv_line_AC+inv_line_AC_rec+inv_cable + inv_conv + inv_array
+    return inv_gen+inv_line_AC+inv_line_AC_rec+inv_cable + inv_conv + inv_array
 
 def weighted_subobj(model,NPV,n_years,discount_rate):
     # Calculate the weighted social cost for each submodel (subblock)

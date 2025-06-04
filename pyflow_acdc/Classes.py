@@ -897,15 +897,27 @@ class Gen_AC:
         
         self.Max_S= S_rated
         
-        self.np_gen=1
+        self.np_gen_i = 1
+        self.np_gen_b = 1
+        self.np_gen = 1
         self.np_gen_max=3
         self.np_gen_opf = False
 
-        self.c0 = installation_cost
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
         self.fc=fixed_cost
+
+        self.Life_time = 30
+        self.base_cost = installation_cost
         
+        if S_rated is not None:
+            self.cost_perMVA = installation_cost/S_rated
+        elif Max_pow_gen >0:
+            self.cost_perMVA = installation_cost/Max_pow_gen
+        else:
+            self.cost_perMVA = installation_cost/Max_pow_genR
+            
+            
         self.price_zone_link = False
         
         node.connected_gen.append(self)
