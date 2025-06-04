@@ -877,6 +877,7 @@ class Results:
         costtot=0
         table.field_names = ["Generator","Node" ,"Power (MW)", "Reactive power (MVAR)","Quadratic Price €/MWh^2","Linear Price €/MWh","Fixed Cost €","Loading %","Cost k€"]
         for gen in self.Grid.Generators:
+          if gen.np_gen>0.001:  
             Pgi=gen.PGen #+node.PGi_ren*node.curtailment
             Qgi=gen.QGen
             S= np.sqrt(Pgi**2+Qgi**2)
@@ -1110,6 +1111,24 @@ class Results:
                     maxn=cn.NumConvP_max
                     table.add_row([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         
+
+        for gen in self.Grid.Generators:
+            if gen.np_gen_opf:
+                if (gen.np_gen-gen.np_gen_b)>0.01:
+                    element= gen.name
+                    ini= gen.np_gen_b
+                    opt= gen.np_gen
+                    if gen.Max_S is not None:
+                        pr= gen.Max_S*gen.np_gen*self.Grid.S_base
+                    elif gen.Max_pow_gen !=0:
+                        pr= gen.Max_pow_gen*gen.np_gen*self.Grid.S_base
+                    else:
+                        pr=gen.Max_pow_genR*gen.np_gen*self.Grid.S_base
+                    cost= (opt-ini)*gen.base_cost
+                    tot+=cost
+                    maxn=gen.np_gen_max
+                    table.add_row([element, "Generator" ,ini,np.round(opt, decimals=2),maxn,np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
+
         table.add_row(["Total", "" ,"","", "", "",f"{tot:,.2f}".replace(',', ' ')])
         
         print('--------------')

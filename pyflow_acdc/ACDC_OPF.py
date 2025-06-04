@@ -534,7 +534,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
     P_renSource, P_know, Q_know = {}, {}, {}
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
     S_lineACrec_lim, S_lineACrec_lim_new,REC_AC_act = {}, {}, {}
-    lf,qf,c0,np_gen = {}, {}, {}, {}
+    lf,qf,fc,np_gen = {}, {}, {}, {}
 
     S_lineACct_lim,cab_types_set,allowed_types = {},{},{}
 
@@ -549,7 +549,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
         nn_gen += 1
         lf[gen.genNumber] = gen.lf
         qf[gen.genNumber] = gen.qf
-        c0[gen.genNumber] = gen.c0
+        fc[gen.genNumber] = gen.fc
         np_gen[gen.genNumber] = gen.np_gen
     
     lista_gen = list(range(0, nn_gen))
@@ -561,7 +561,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
         
     lista_rs = list(range(0, nn_rs))
 
-    gen_info = pack_variables(lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs)
+    gen_info = pack_variables(lf,qf,fc,np_gen,P_renSource,lista_gen,lista_rs)
 
     "Price zone info"
    
