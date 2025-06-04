@@ -134,20 +134,24 @@ def Generation_variables(model,grid,gen_info):
     
     def P_gen_ini(model,ngen):
         gen = grid.Generators[ngen]
-        ini=gen.Pset
-        if  gen.Min_pow_gen>ini:
-            ini=gen.Min_pow_gen
-        elif ini>gen.Max_pow_gen: 
-             ini=gen.Max_pow_gen
+        min_pow_gen = gen.Min_pow_gen * gen.np_gen
+        ini=gen.Pset * gen.np_gen
+        max_pow_gen = gen.Max_pow_gen * gen.np_gen
+        if  min_pow_gen>ini:
+            ini=min_pow_gen
+        elif ini>max_pow_gen: 
+            ini=max_pow_gen
         return (ini)
     
     def Q_gen_ini(model,ngen):
         gen = grid.Generators[ngen]
-        ini=gen.Qset
-        if gen.Min_pow_genR>ini:
-            ini=gen.Min_pow_genR
-        elif ini>gen.Max_pow_genR: 
-             ini=gen.Max_pow_genR    
+        min_pow_genR = gen.Min_pow_genR * gen.np_gen
+        ini=gen.Qset * gen.np_gen
+        max_pow_genR = gen.Max_pow_genR * gen.np_gen
+        if min_pow_genR>ini:
+            ini=min_pow_genR
+        elif ini>max_pow_genR: 
+            ini=max_pow_genR    
         return (ini)
     
     if GPR:
