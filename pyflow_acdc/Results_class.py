@@ -902,7 +902,7 @@ class Results:
             Qtot+=Qgi
             Stot+=S
             costtot+=cost
-            Ltot+=gen.Max_pow_gen
+            Ltot+=base
             
         if Ltot !=0:
             load=Stot/Ltot*100
