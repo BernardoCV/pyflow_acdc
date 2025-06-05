@@ -197,10 +197,12 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
     net_cost = 0
 
     for i in model.inv_periods:
-        inv_cost = 0
-        
+        inv_gen= 0
+        AC_Inv_lines=0
+        DC_Inv_lines=0
+        Conv_Inv=0
         if GPR:
-            inv_gen= 0
+            
             for g in model.gen_AC:
                 gen = grid.Generators[g]
                 if i == 0:
@@ -213,34 +215,34 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
 
         if ACmode:
             if TEP_AC:
-                AC_Inv_lines=0
+                
                 for l in model.lines_AC_exp:
                     line = grid.lines_AC_exp[l]
                     if i ==0:
                         AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
                     else:
                         AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1])*line.base_cost
-                inv_cost += AC_Inv_lines
+                
         if DCmode:
-            DC_Inv_lines=0
+            
             for l in model.lines_DC:
                 line = grid.lines_DC[l]
                 if i ==0:
                     DC_Inv_lines+=(model.DCLinesMP[l,i]-model.NumLinesDCP_base[l])*line.base_cost
                 else:
                     DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1])*line.base_cost
-            inv_cost += DC_Inv_lines
+            
         if ACmode and DCmode:
-            Conv_Inv=0
+            
             for l in model.conv:
                 conv = grid.Converters_ACDC[l]
                 if i ==0:
                     Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP_base[l])*conv.base_cost
                 else:
                     Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP[l,i-1])*conv.base_cost
-            inv_cost += Conv_Inv
+            
 
-
+        inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv
         instance_cost = model.inv_model[i].obj.expr + inv_cost
         net_cost += instance_cost/(1+discount_rate)**(i*n_years)
         model.inv_model[i].obj.deactivate()
