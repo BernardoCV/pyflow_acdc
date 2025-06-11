@@ -24,7 +24,7 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'transmission_expansion',
-    'transmission_expansion_TS',
+    'transmission_expansion_MS',
     'export_TEP_TS_results_to_excel'
 ]
 
@@ -236,8 +236,8 @@ def base_cost_calculation(element):
     if isinstance(element, AC_DC_converter):
         element.base_cost= element.cost_perMVA*element.MVA_max
     
-    from .Classes import Generator
-    if isinstance(element, Generator):
+    from .Classes import Gen_AC
+    if isinstance(element, Gen_AC):
         if element.Max_S is not None:
             element.base_cost= element.cost_perMVA*element.Max_S
         elif element.Max_pow_gen !=0:
@@ -343,7 +343,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -393,12 +393,12 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     return model, model_results , timing_info, solver_stats
 
 
-def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+def transmission_expansion_MS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
 
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True,False)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
 
     from .Time_series import  modify_parameters
     
@@ -438,6 +438,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     lista_AC   = list(range(0,grid.nle_AC))
     lista_AC_rec = list(range(0,grid.nlr_AC))
     lista_AC_ct = list(range(0,grid.nct_AC))
+    lista_gen = list(range(0,grid.n_gen))
     if grid.Cable_options is not None and len(grid.Cable_options) > 0:
         cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
     else:
@@ -461,7 +462,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
     if CT_AC:
         model.lines_AC_ct = pyo.Set(initialize=lista_AC_ct)
         model.ct_set = pyo.Set(initialize=cab_types_set)
-
+    model.gen_AC     = pyo.Set(initialize=lista_gen)
 
     w={}
 
@@ -481,7 +482,7 @@ def transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=87
                  if price_zone.b > 0:
                      price_zone.PGL_min -= price_zone.ImportExpand
                      price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
-        modify_parameters(grid,model.submodel[t],False,True)
+        modify_parameters(grid,model.submodel[t],ACmode,DCmode,Price_Zones)
         
         TEP_subObj(model.submodel[t],grid,weights_def)
         if clustering:
@@ -726,6 +727,7 @@ def get_price_zone_data(t, model, grid,n_clusters,clustering):
     row_data_PN = {'Time_Frame': t}
     row_data_GEN = {'Time_Frame': t}
     # Collect price_zone data
+    
     for m in grid.Price_Zones:
         nM = m.price_zone_num
         row_data_price[m.name] = np.round(np.float64(pyo.value(model.submodel[t].price_zone_price[nM])), decimals=2)
@@ -1070,26 +1072,32 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         futures = []
         
         for t in model.Time_frames:
-            futures.append(executor.submit(get_price_zone_data, t, model, grid,n_clusters,clustering))
+            
             futures.append(executor.submit(get_curtailment_data, t, model, grid,n_clusters,clustering))
             futures.append(executor.submit(get_line_data, t, model, grid))
             futures.append(executor.submit(get_converter_data, t, model, grid))
             futures.append(executor.submit(get_weight_data, model, t))
             futures.append(executor.submit(get_gen_data, t, model, grid))
-    
-        # Retrieve results
-        for i in range(0, len(futures), 6):
-            price_data, SC_data, PN_data,PZ_GEN_data = futures[i].result()
-            curt_data,curt_data_per = futures[i+1].result()
-            lines_data = futures[i+2].result()
-            conv_data = futures[i+3].result()
-            weight_data = futures[i+4].result()
-            pgen_data,qgen_data = futures[i+5].result()
-    
-            data_rows_price.append(price_data)
-            data_rows_SC.append(SC_data)
-            data_rows_PN.append(PN_data)
-            data_rows_PZGEN.append(PZ_GEN_data)
+            if Price_Zones:
+                futures.append(executor.submit(get_price_zone_data, t, model, grid,n_clusters,clustering))
+        # Calculate tasks per time frame
+        tasks_per_frame = 5 + (1 if Price_Zones else 0)
+
+        # Process results
+        for i in range(0, len(futures), tasks_per_frame):
+            curt_data, curt_data_per = futures[i].result()
+            lines_data = futures[i+1].result()
+            conv_data = futures[i+2].result()
+            weight_data = futures[i+3].result()
+            pgen_data, qgen_data = futures[i+4].result()
+            
+            if Price_Zones:
+                price_data, SC_data, PN_data, PZ_GEN_data = futures[i+5].result()
+                data_rows_price.append(price_data)
+                data_rows_SC.append(SC_data)
+                data_rows_PN.append(PN_data)
+                data_rows_PZGEN.append(PZ_GEN_data)
+            
             data_rows_curt.append(curt_data)
             data_rows_curt_per.append(curt_data_per)
             data_rows_lines.append(lines_data)
@@ -1099,49 +1107,65 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
             data_rows_qgen.append(qgen_data)
     
     # Convert to DataFrames
-    data_PN = pd.DataFrame(data_rows_PN)
-    data_PZGEN = pd.DataFrame(data_rows_PZGEN)
-    data_SC = pd.DataFrame(data_rows_SC)
+    if Price_Zones:
+        data_PN = pd.DataFrame(data_rows_PN)
+        data_PZGEN = pd.DataFrame(data_rows_PZGEN)
+        data_SC = pd.DataFrame(data_rows_SC)
+        data_price = pd.DataFrame(data_rows_price)
+        
+        # Transpose the DataFrame to flip rows and columns
+        flipped_data_PN = data_PN.set_index('Time_Frame').T 
+        flipped_data_PZGEN = data_PZGEN.set_index('Time_Frame').T 
+        flipped_data_SC = data_SC.set_index('Time_Frame').T 
+        flipped_data_price = data_price.set_index('Time_Frame').T 
+    else:
+        # Create empty DataFrames with the same structure
+        flipped_data_PN = pd.DataFrame()
+        flipped_data_PZGEN = pd.DataFrame()
+        flipped_data_SC = pd.DataFrame()
+        flipped_data_price = pd.DataFrame()
+
+    # These are always created regardless of Price_Zones
     data_curt = pd.DataFrame(data_rows_curt)
     data_curt_per = pd.DataFrame(data_rows_curt_per)
     data_lines = pd.DataFrame(data_rows_lines)
     data_conv = pd.DataFrame(data_rows_conv)
-    data_price = pd.DataFrame(data_rows_price)
     data_pgen = pd.DataFrame(data_rows_pgen)
     data_qgen = pd.DataFrame(data_rows_qgen)
-    
 
-    # Transpose the DataFrame to flip rows and columns
-    flipped_data_PN = data_PN.set_index('Time_Frame').T 
-    flipped_data_PZGEN = data_PZGEN.set_index('Time_Frame').T 
-    flipped_data_SC = data_SC.set_index('Time_Frame').T 
+    # Transpose the remaining DataFrames
     flipped_data_curt = data_curt.set_index('Time_Frame').T 
     flipped_data_curt_per = data_curt_per.set_index('Time_Frame').T 
     flipped_data_lines = data_lines.set_index('Time_Frame').T 
     flipped_data_conv = data_conv.set_index('Time_Frame').T 
-    flipped_data_price = data_price.set_index('Time_Frame').T 
     flipped_data_pgen = data_pgen.set_index('Time_Frame').T 
     flipped_data_qgen = data_qgen.set_index('Time_Frame').T 
-    # Calculate Total SC
-    total_sc = np.round(flipped_data_SC.sum(), decimals=2)
-    
-    # Calculate Weighted SC
-    weighted_sc = np.round(total_sc * weights_row, decimals=2)
-    
-    # Create additional rows DataFrame
-    additional_rows = pd.DataFrame({
-        'Total SC': total_sc,
-        '': [None] * len(total_sc),  # Blank row
-        'Weight': weights_row,
-        'Weighted SC': weighted_sc
-    }).T
-    
-    # Combine original data with additional rows
-    flipped_data_SC = pd.concat([flipped_data_SC, additional_rows])
-    
-    flipped_data_SC.loc['Weight'] = weights_row
-    weighted_SC = flipped_data_SC.loc['Total SC'] * flipped_data_SC.loc['Weight']
-    flipped_data_SC.loc['Weighted SC'] = np.round(weighted_SC, decimals=2)
+
+    # Calculate Total SC and related calculations only if Price_Zones is True
+    if Price_Zones:
+        # Calculate Total SC
+        total_sc = np.round(flipped_data_SC.sum(), decimals=2)
+        
+        # Calculate Weighted SC
+        weighted_sc = np.round(total_sc * weights_row, decimals=2)
+        
+        # Create additional rows DataFrame
+        additional_rows = pd.DataFrame({
+            'Total SC': total_sc,
+            '': [None] * len(total_sc),  # Blank row
+            'Weight': weights_row,
+            'Weighted SC': weighted_sc
+        }).T
+        
+        # Combine original data with additional rows
+        flipped_data_SC = pd.concat([flipped_data_SC, additional_rows])
+        
+        flipped_data_SC.loc['Weight'] = weights_row
+        weighted_SC = flipped_data_SC.loc['Total SC'] * flipped_data_SC.loc['Weight']
+        flipped_data_SC.loc['Weighted SC'] = np.round(weighted_SC, decimals=2)
+    else:
+        # Create empty DataFrame with the same structure for consistency
+        flipped_data_SC = pd.DataFrame()
     
     
     # Pack all variables into the final result

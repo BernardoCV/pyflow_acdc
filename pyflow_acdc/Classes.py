@@ -255,6 +255,11 @@ class Grid:
         self._droop_nodes = None
         self._slackDC_nodes = None
         self._nodes_dict_DC = None        
+    
+    @property
+    def n_gen(self):
+        return len(self.Generators) if self.Generators is not None else 0
+    
     # AC grid properties
     @property
     def nn_AC(self):
@@ -880,6 +885,9 @@ class Gen_AC:
     def name(self):
         return self._name
 
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
     
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other',installation_cost:float=0):
         self.genNumber = Gen_AC.genNumber
@@ -1466,6 +1474,10 @@ class Line_AC:
     def S_base(self):
         return self._S_base
     
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
+
     @S_base.setter
     def S_base(self, new_S_base):
         if new_S_base <= 0:
@@ -1519,8 +1531,8 @@ class Exp_Line_AC(Line_AC):
     
         self.kV_base = self.fromNode.kV_base
         self.direction = 'from'
-        self.base_cost = None
-        self.life_time = 1
+        self.base_cost = 0
+        self.life_time = 25
         self.exp_inv=1
         self.cost_perMVAkm = None
         self.phi=0
@@ -1538,6 +1550,7 @@ class Exp_Line_AC(Line_AC):
 
 class rec_Line_AC(Line_AC):
     
+
     def __init__(self,r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
@@ -1612,6 +1625,11 @@ class Line_sizing(Line_AC):
     def cable_types(self):
         return self._cable_types
 
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
+    
+
     @cable_types.setter
     def cable_types(self, value):
         """Set cable types and recalculate parameters if the list changes."""
@@ -1653,6 +1671,8 @@ class Line_sizing(Line_AC):
         self.MVA_rating_list = []
         self.base_cost = []
         self.Ybus_list = []
+
+        self.life_time = 25
 
         self.geometry = geometry
         self.fromS = 0
@@ -1950,7 +1970,11 @@ class Line_DC:
     def reset_class(cls):
         cls.lineNumber = 0
         cls.names = set()    
-
+   
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760     
+        
     @property
     def name(self):
         return self._name
@@ -2018,8 +2042,8 @@ class Line_DC:
  
         self.loss =0
         
-        self.base_cost = None
-        self.life_time = None
+        self.base_cost = 0
+        self.life_time = 25
         self.exp_inv=1
         self.cost_perMWkm = None
         self.phi=1
@@ -2160,7 +2184,9 @@ class AC_DC_converter:
         S = np.sqrt(P_s**2 + Q_s**2)
         self.Node_DC.conv_loading = max(S, abs(P_DC)) 
         
-            
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760       
             
     def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
@@ -2174,8 +2200,8 @@ class AC_DC_converter:
         self.NumConvP_max = nConvP
         
         self.NUmConvP_opf=False
-        self.base_cost = None
-        self.life_time = None
+        self.base_cost = 0
+        self.life_time = 25
         self.exp_inv=1
         self.cost_perMVA = None
         self.phi=1
