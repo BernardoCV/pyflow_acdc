@@ -93,6 +93,7 @@ def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
 def Generation_variables(model,grid,gen_info,TEP):
     lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
     GPR = False
+    
     if any(gen.np_gen_opf for gen in grid.Generators) and TEP:
         GPR = True
 

@@ -39,7 +39,7 @@ def pack_variables(*args):
            
             
 
-def obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones):
+def obj_w_rule(grid,ObjRule,OnlyGen):
     weights_def = {
        'Ext_Gen': {'w': 0},
        'Energy_cost': {'w': 0},
@@ -61,15 +61,17 @@ def obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones):
 
     if OnlyGen == False:
         grid.OnlyGen=False
+    Price_Zones = False
     if  weights_def['PZ_cost_of_generation']['w']!=0 :
         Price_Zones=True
     if  weights_def['Curtailment_Red']['w']!=0 :
         grid.CurtCost=True
 
     return weights_def, Price_Zones
+
 def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
         
     model = pyo.ConcreteModel()
     model.name="AC/DC hybrid OPF"
@@ -145,7 +147,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
     from .Time_series import update_grid_data,modify_parameters
     
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen,Price_Zones)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
         
         
     model = pyo.ConcreteModel()
@@ -544,15 +546,14 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
     AC_slack, AC_PV = [], []
 
     # Fill AC node and line information
-    nn_gen=0
+    
     for gen in grid.Generators:
-        nn_gen += 1
         lf[gen.genNumber] = gen.lf
         qf[gen.genNumber] = gen.qf
         fc[gen.genNumber] = gen.fc
         np_gen[gen.genNumber] = gen.np_gen
     
-    lista_gen = list(range(0, nn_gen))
+    lista_gen = list(range(0, grid.n_gen))
        
     nn_rs=0
     for rs in grid.RenSources:
