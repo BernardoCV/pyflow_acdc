@@ -447,10 +447,10 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     t1 = time.time()
     model = pyo.ConcreteModel()
     model.name        ="TEP TS MTDC AC/DC hybrid OPF"
-    model.Time_frames = pyo.Set(initialize=range(1, n_clusters + 1))
+    model.scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
     
-    #print(list(model.Time_frames))
-    model.submodel    = pyo.Block(model.Time_frames)
+    #print(list(model.scenario_frames))
+    model.submodel    = pyo.Block(model.scenario_frames)
     if DCmode:
         model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
     if ACmode and DCmode:
@@ -471,7 +471,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     s=1
     
-    for t in model.Time_frames:
+    for t in model.scenario_frames:
         base_model_copy = base_model.clone()
         model.submodel[t].transfer_attributes_from(base_model_copy)
         
@@ -491,8 +491,8 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
         elif any(ts.element_name == 'TEP_w' for ts in grid.Time_series):
             w[t] = next(ts.data[t-1] for ts in grid.Time_series if ts.element_name == 'TEP_w')
         else:
-            num_time_frames = len(model.Time_frames)
-            w[t]=1/num_time_frames
+            num_scenario_frames = len(model.scenario_frames)
+            w[t]=1/num_scenario_frames
     
     TEP_variables(model,grid)
     
@@ -516,12 +516,12 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
         else:
             return pyo.Constraint.Skip
     if TEP_AC:
-        model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.Time_frames, rule=NP_ACline_link)
+        model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.scenario_frames, rule=NP_ACline_link)
 
     if DCmode:
-        model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.Time_frames, rule=NP_line_link)
+        model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.scenario_frames, rule=NP_line_link)
     if ACmode and DCmode:
-        model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.Time_frames, rule=NP_conv_link)
+        model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.scenario_frames, rule=NP_conv_link)
     
     def NP_ACline_rec_link(model,line,t):
         element=grid.lines_AC_rec[line]
@@ -530,7 +530,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
         else:
             return pyo.Constraint.Skip
     if REC_AC:
-        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.Time_frames, rule=NP_ACline_rec_link) 
+        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.scenario_frames, rule=NP_ACline_rec_link) 
 
 
     def NP_ACline_ct_link(model,line,ct,t):
@@ -540,10 +540,10 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
         else:
             return pyo.Constraint.Skip
     if CT_AC:
-        model.NP_ACline_ct_link_constraint = pyo.Constraint(model.lines_AC_ct,model.ct_set,model.Time_frames, rule=NP_ACline_ct_link)
+        model.NP_ACline_ct_link_constraint = pyo.Constraint(model.lines_AC_ct,model.ct_set,model.scenario_frames, rule=NP_ACline_ct_link)
 
     
-    model.weights = pyo.Param(model.Time_frames, initialize=w)
+    model.weights = pyo.Param(model.scenario_frames, initialize=w)
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_weighted = weighted_subobj(model,NPV,n_years,discount_rate)
     
@@ -708,7 +708,7 @@ def weighted_subobj(model,NPV,n_years,discount_rate):
     weighted_subobj = 0
     present_value = (1 - (1 + discount_rate) ** -n_years) / discount_rate
         
-    for t in model.Time_frames:
+    for t in model.scenario_frames:
         # Get the objective expression directly
         submodel_obj = model.submodel[t].obj.expr
         weighted_subobj += model.weights[t] * submodel_obj
@@ -917,27 +917,27 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
 
-    SW= sum(pyo.value(model.weights[t]) for t in model.Time_frames)
+    SW= sum(pyo.value(model.weights[t]) for t in model.scenario_frames)
     def process_ren_source(renSource):
         rs = renSource.rsNumber
-        renSource.gamma =  np.float64(sum(pyo.value(model.submodel[t].gamma[rs]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        renSource.gamma =  np.float64(sum(pyo.value(model.submodel[t].gamma[rs]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
     
     def process_gen(gen):
         gn = gen.genNumber
-        gen.PGen =  np.float64(sum(pyo.value(model.submodel[t].PGi_gen[gn]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        gen.QGen =  np.float64(sum(pyo.value(model.submodel[t].QGi_gen[gn]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        gen.PGen =  np.float64(sum(pyo.value(model.submodel[t].PGi_gen[gn]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        gen.QGen =  np.float64(sum(pyo.value(model.submodel[t].QGi_gen[gn]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
     
     
     def process_ac_node(node):
         nAC = node.nodeNumber
-        node.V_AC = np.float64(sum(pyo.value(model.submodel[t].V_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        node.theta = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        node.V_AC = np.float64(sum(pyo.value(model.submodel[t].V_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        node.theta = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         if DCmode:
-            node.P_s = np.float64(sum(pyo.value(model.submodel[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-            node.Q_s = np.float64(sum(pyo.value(model.submodel[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+            node.P_s = np.float64(sum(pyo.value(model.submodel[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+            node.Q_s = np.float64(sum(pyo.value(model.submodel[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
     
-        node.PGi_opt = np.float64(sum(pyo.value(model.submodel[t].PGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        node.QGi_opt = np.float64(sum(pyo.value(model.submodel[t].QGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        node.PGi_opt = np.float64(sum(pyo.value(model.submodel[t].PGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        node.QGi_opt = np.float64(sum(pyo.value(model.submodel[t].QGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
     
         grid.V_AC[nAC] = node.V_AC
         grid.Theta_V_AC[nAC] = node.theta
@@ -945,8 +945,8 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     # Helper function for DC nodes
     def process_dc_node(node):
         nDC = node.nodeNumber
-        node.V = np.float64(sum(pyo.value(model.submodel[t].V_DC[nDC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        node.P = np.float64(sum(pyo.value(model.submodel[t].P_conv_DC[nDC]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        node.V = np.float64(sum(pyo.value(model.submodel[t].V_DC[nDC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        node.P = np.float64(sum(pyo.value(model.submodel[t].P_conv_DC[nDC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         node.P_INJ = node.PGi - node.PLi + node.P
         grid.V_DC[nDC] = node.V
     
@@ -954,37 +954,37 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     def process_converter(conv):
         nconv = conv.ConvNumber
         nconvp=np.float64(pyo.value(model.NumConvP[nconv]))
-        conv.P_DC  = np.float64(sum(pyo.value(model.submodel[t].P_conv_DC[conv.Node_DC.nodeNumber])   *nconvp* pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.P_AC  = np.float64(sum(pyo.value(model.submodel[t].P_conv_s_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.Q_AC  = np.float64(sum(pyo.value(model.submodel[t].Q_conv_s_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.Pc    = np.float64(sum(pyo.value(model.submodel[t].P_conv_c_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.Qc    = np.float64(sum(pyo.value(model.submodel[t].Q_conv_c_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.P_loss= np.float64(sum(pyo.value(model.submodel[t].P_conv_loss[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        conv.P_DC  = np.float64(sum(pyo.value(model.submodel[t].P_conv_DC[conv.Node_DC.nodeNumber])   *nconvp* pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.P_AC  = np.float64(sum(pyo.value(model.submodel[t].P_conv_s_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.Q_AC  = np.float64(sum(pyo.value(model.submodel[t].Q_conv_s_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.Pc    = np.float64(sum(pyo.value(model.submodel[t].P_conv_c_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.Qc    = np.float64(sum(pyo.value(model.submodel[t].Q_conv_c_AC[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.P_loss= np.float64(sum(pyo.value(model.submodel[t].P_conv_loss[nconv]) *nconvp* pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         conv.P_loss_tf = abs(conv.P_AC - conv.Pc)
-        conv.U_c   = np.float64(sum(pyo.value(model.submodel[t].Uc[nconv])   * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.U_f   = np.float64(sum(pyo.value(model.submodel[t].Uf[nconv])   * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.U_s   = np.float64(sum(pyo.value(model.submodel[t].V_AC[nconv]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.th_c  = np.float64(sum(pyo.value(model.submodel[t].th_c[nconv]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.th_f  = np.float64(sum(pyo.value(model.submodel[t].th_f[nconv]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-        conv.th_s  = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nconv]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        conv.U_c   = np.float64(sum(pyo.value(model.submodel[t].Uc[nconv])   * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.U_f   = np.float64(sum(pyo.value(model.submodel[t].Uf[nconv])   * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.U_s   = np.float64(sum(pyo.value(model.submodel[t].V_AC[nconv]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.th_c  = np.float64(sum(pyo.value(model.submodel[t].th_c[nconv]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.th_f  = np.float64(sum(pyo.value(model.submodel[t].th_f[nconv]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+        conv.th_s  = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nconv]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         conv.NumConvP = nconvp
     # Helper function for price_zones
     def process_price_zone(m):
         nM = m.price_zone_num
-        m.price = np.float64(sum(pyo.value(model.submodel[t].price_zone_price[nM]) * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+        m.price = np.float64(sum(pyo.value(model.submodel[t].price_zone_price[nM]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         s=1
         from .Classes import Price_Zone
         if type(m) is Price_Zone:
        
             if clustering:
-                m.a          = np.float64(sum(grid.Time_series[m.TS_dict['a_CG']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-                m.b          = np.float64(sum(grid.Time_series[m.TS_dict['b_CG']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-                m.PLi_factor = np.float64(sum(grid.Time_series[m.TS_dict['Load']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+                m.a          = np.float64(sum(grid.Time_series[m.TS_dict['a_CG']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+                m.b          = np.float64(sum(grid.Time_series[m.TS_dict['b_CG']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+                m.PLi_factor = np.float64(sum(grid.Time_series[m.TS_dict['Load']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         
             else:
-                m.a = np.float64(sum(grid.Time_series[m.TS_dict['a_CG']].data[t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-                m.b = np.float64(sum(grid.Time_series[m.TS_dict['b_CG']].data[t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
-                m.PLi_factor = np.float64(sum(grid.Time_series[m.TS_dict['Load']].data[t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+                m.a = np.float64(sum(grid.Time_series[m.TS_dict['a_CG']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+                m.b = np.float64(sum(grid.Time_series[m.TS_dict['b_CG']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
+                m.PLi_factor = np.float64(sum(grid.Time_series[m.TS_dict['Load']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         
     
     with ThreadPoolExecutor() as executor:
@@ -1050,9 +1050,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
 
     for z in grid.RenSource_zones:
         if clustering:
-            z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)      
+            z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)      
         else:
-            z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data[t-1] * pyo.value(model.weights[t]) for t in model.Time_frames) / SW)
+            z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
            
     # Multithreading the time frame processing
     data_rows_PN = []
@@ -1071,7 +1071,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     with ThreadPoolExecutor() as executor:
         futures = []
         
-        for t in model.Time_frames:
+        for t in model.scenario_frames:
             
             futures.append(executor.submit(get_curtailment_data, t, model, grid,n_clusters,clustering))
             futures.append(executor.submit(get_line_data, t, model, grid))
