@@ -1736,7 +1736,7 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
-    from .ACDC_TEP import get_TEP_variables
+    from .ACDC_Static_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
@@ -1780,7 +1780,7 @@ def TEP_variables(model,grid):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
-    from .ACDC_TEP import get_TEP_variables
+    from .ACDC_Static_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
