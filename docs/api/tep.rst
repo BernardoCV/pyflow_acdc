@@ -70,12 +70,12 @@ Running one state transmission expansion planning
 
        model, results, timing, stats = pyf.transmission_expansion(grid)
 
-Running time series based transmission expansion planning
+Running multiple scenario based transmission expansion planning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: transmission_expansion_TS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin')
+.. py:function:: multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin')
 
-   Performs a time series based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states.
+   Performs a multiple scenario based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states.
 
    .. list-table::
       :widths: 20 10 50 10
