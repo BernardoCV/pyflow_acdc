@@ -368,7 +368,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,inv_periods,MINLP=False):
     
     grid.MP_TEP_results = df  
 
-def multi_period_TEP_MS(grid, NPV=True, inv_periods=[1,2,3], n_years=10, Hy=8760, 
+def multi_period_MS_TEP(grid, NPV=True, inv_periods=[1,2,3], n_years=10, Hy=8760, 
                        discount_rate=0.02, clustering_options=None, ObjRule=None, 
                        solver='bonmin'):
     """
