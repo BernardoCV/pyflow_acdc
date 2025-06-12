@@ -173,6 +173,9 @@ class Grid:
         self.Time_series = []
         self.Time_series_dic ={}
         
+        self.inv_periods = []
+        self.inv_periods_dic ={}
+
         self.Price_Zones =[]
         self.Price_Zones_dic ={}
       
@@ -981,15 +984,21 @@ class Ren_Source:
         self.kV_base = node.kV_base
         self.PZ = node.PZ
         
-        self.PGi_ren_base=PGi_ren_base
+        
         self.PGi_ren = 0 
+        self._PGi_ren_base=PGi_ren_base
         self._PRGi_available=1
+        self._PRGi_inv_factor =1
         
         
         self.TS_dict = {
             'PRGi_available': None
         }
         
+        self.inv_dic ={
+            'PRGi_base' : None
+        }
+
         self.PGRi_linked=False
         self.Ren_source_zone=None
         
@@ -1024,6 +1033,25 @@ class Ren_Source:
         Ren_Source.names.add(self.name)
         
         self.hover_text = None
+    
+    @property
+    def PGi_ren_base(self):
+        return self._PGi_ren_base
+    
+    @PGi_ren_base.setter
+    def PGi_ren_base(self, value):
+        self._PGi_ren_base = value
+        self.update_PGi_ren()
+
+    @property
+    def PRGi_inv_factor(self):
+        return self._PRGi_inv_factor
+    
+    @PRGi_inv_factor.setter
+    def PRGi_inv_factor(self, value):
+        self._PRGi_inv_factor = value
+        self.update_PGi_ren()
+
     @property
     def PRGi_available(self):
         return self._PRGi_available
@@ -1034,7 +1062,7 @@ class Ren_Source:
         self.update_PGi_ren()
      
     def update_PGi_ren(self):
-        self.PGi_ren = self.PGi_ren_base * self._PRGi_available
+        self.PGi_ren = self._PGi_ren_base * self._PRGi_available * self._PRGi_inv_factor
    
     
 class Node_AC:  
@@ -1103,15 +1131,23 @@ class Node_AC:
         # self.PGRi_linked=False
         # self.Ren_source_zone=None
         
-        self.PLi_linked= True
+        
         self.PLi= Power_load
-        self.PLi_base = Power_load
+
+        self._PLi_base = Power_load
+
+        self.PLi_linked= True
         self._PLi_factor =1
+        self._PLi_inv_factor=1
         
         self.TS_dict = {
             'Load' : None,
             'price': None,
             }
+        
+        self.inv_dic ={
+            'Load' : None
+        }
         
         self.QGi = Reactive_Gained
         self.QGi_opt =0
@@ -1182,7 +1218,15 @@ class Node_AC:
 
         Node_AC.names.add(self.name)
   
-            
+    @property
+    def PLi_base(self):
+        return self._PLi_base
+    
+    @PLi_base.setter
+    def PLi_base(self, value):
+        self._PLi_base = value
+        self.update_PLi()
+
     @property
     def PLi_factor(self):
         return self._PLi_factor
@@ -1191,9 +1235,18 @@ class Node_AC:
     def PLi_factor(self, value):
         self._PLi_factor = value
         self.update_PLi()        
-       
+    
+    @property
+    def PLi_inv_factor(self):
+        return self._PLi_inv_factor
+    
+    @PLi_inv_factor.setter
+    def PLi_inv_factor(self, value):
+        self._PLi_inv_factor = value
+        self.update_PLi()
+
     def update_PLi(self):
-        self.PLi = self.PLi_base * self._PLi_factor
+        self.PLi = self._PLi_base * self._PLi_factor * self._PLi_inv_factor
         
 class Node_DC:
     """
@@ -1242,14 +1295,19 @@ class Node_DC:
         self.PGi = Power_Gained
         self.PLi_linked= True
         self.PLi= Power_load
-        self.PLi_base = Power_load
-        self._PLi_factor =1
+
+        self._PLi_base = Power_load
+        self._PLi_factor =1  # 0-1 value used for time series or scenario management
+        self._PLi_inv_factor=1 # value used for investment period load increase
         
         self.TS_dict = {
             'Load' : None,
             'price': None,
             }
         
+        self.inv_dic ={
+            'Load' : None
+        }
         
         self.V = np.copy(self.V_ini)
         self.P_INJ = 0
@@ -1295,6 +1353,24 @@ class Node_DC:
         Node_DC.names.add(self.name)
 
     @property
+    def PLi_base(self):
+        return self._PLi_base
+    
+    @PLi_base.setter
+    def PLi_base(self, value):
+        self._PLi_base = value
+        self.update_PLi()
+
+    @property
+    def PLi_inv_factor(self):
+        return self._PLi_inv_factor
+    
+    @PLi_inv_factor.setter
+    def PLi_inv_factor(self, value):
+        self._PLi_inv_factor = value
+        self.update_PLi()
+
+    @property
     def PLi_factor(self):
          return self._PLi_factor
 
@@ -1304,7 +1380,7 @@ class Node_DC:
          self.update_PLi()        
         
     def update_PLi(self):
-         self.PLi = self.PLi_base * self._PLi_factor
+         self.PLi = self._PLi_base * self._PLi_factor * self._PLi_inv_factor
          
 class Line_AC:
     """
@@ -2405,16 +2481,32 @@ class Ren_source_zone:
         for ren_source in self.RenSources:
                 ren_source.PRGi_available=value
                 ren_source.Ren_source_zone = self.name
-       
+
+    @property
+    def PRGi_inv_factor(self):
+        return self._PRGi_inv_factor
+    
+    @PRGi_inv_factor.setter
+    def PRGi_inv_factor(self, value):
+        self._PRGi_inv_factor = value
+        for ren_source in self.RenSources:
+            ren_source.PRGi_inv_factor=value
+
+
     def __init__(self,name=None):
            self.ren_source_num = Ren_source_zone.ren_source_num
            Ren_source_zone.ren_source_num += 1
            
            self.RenSources=[]
            self._PRGi_available=1
+           self._PRGi_inv_factor=1
            
            self.TS_dict = {
                'PRGi_available': None
+           }
+
+           self.inv_dict = {
+               'PRGi_inv_factor': None
            }
            
            if name is None:
@@ -2455,8 +2547,82 @@ class Price_Zone:
         # If this price_zone has a linked price_zone, update the linked price_zone's price
         if self.linked_price_zone is not None:
             self.linked_price_zone.price = value  # This will trigger the price setter of the offshore price_zone
-
+    @property
+    def a_base(self):
+        return self._a_base
     
+    @a_base.setter
+    def a_base(self, value):
+        self._a_base = value
+        self.update_a()
+
+    @property
+    def elasticity(self):
+        return self._elasticity
+
+    @elasticity.setter
+    def elasticity(self, value):
+        self._elasticity = value
+        self.update_a()
+
+    @property
+    def b(self):
+        return self._b
+
+    @b.setter
+    def b(self, value):
+        self._b = value
+        self.calc_import_expand()
+
+    @property
+    def PGL_min_base(self):
+        return self._PGL_min_base
+
+    @PGL_min_base.setter
+    def PGL_min_base(self, value):
+        self._PGL_min_base = value
+        self.calc_import_expand()
+
+    def update_a(self):
+        if self.expand_import:
+            self.calc_import_expand()
+        else:
+            self.a = self._a_base*self._elasticity
+
+    @property
+    def import_expand(self):
+        return self._import_expand
+
+    @import_expand.setter
+    def import_expand(self, value):
+        self._import_expand = value
+        if self.expand_import:
+            self.calc_import_expand()
+        else:
+            self.a = self._a_base*self._elasticity
+        
+    def calc_import_expand(self):
+        if self.b > 0:
+            self.PGL_min = self.PGL_min_base - self._import_expand
+            a = -self.b / (2 * self.PGL_min * self.S_base) 
+            self.a = a*self._elasticity
+        else:
+            self.a = self._a_base*self._elasticity
+
+    @property
+    def PLi_inv_factor(self):
+        return self._PLi_inv_factor
+    
+    @PLi_inv_factor.setter
+    def PLi_inv_factor(self, value):
+        self._PLi_inv_factor = value
+        for node in self.nodes_AC:
+            if node.PLi_linked:
+                node.PLi_inv_factor=value
+        for node in self.nodes_DC:
+            if node.PLi_linked:
+                node.PLi_inv_factor=value
+
     @property
     def PLi_factor(self):
         return self._PLi_factor
@@ -2471,25 +2637,35 @@ class Price_Zone:
             if node.PLi_linked:
                 node.PLi_factor=value        
 
-    def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,name=None):
+    def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,S_base:float=100,name=None):
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
         
         self.import_pu_L=import_pu_L
         self.export_pu_G=export_pu_G
+
+        self.S_base=S_base
+
         self.nodes_AC=[]
         self.nodes_DC=[]
         self.ConvACDC=[]
         
         self._price=price
         self.a=a
-        self.b=b
+        self._b=b
         self.c=c
-        self.PGL_min=-np.inf
+        self.PGL_min_base=-np.inf
+
+        self.PGL_min=self.PGL_min_base
         self.PGL_max=np.inf
         
         self.PN= 0
         
+        self.expand_import = False
+
+        self._a_base = a
+        self._elasticity = 1
+        self._import_expand = import_expand
         
         self.TS_dict = {
             'Load' : None,
@@ -2506,9 +2682,8 @@ class Price_Zone:
         self.mtdc_price_zones=[]
         
         self._PLi_factor=1
+        self._PLi_inv_factor=1
         
-        self.ImportExpand_og=import_expand
-        self.ImportExpand=import_expand
         if name is None:
             self._name = str(self.price_zone_num)
         else:
@@ -2643,6 +2818,35 @@ class TimeSeries:
 
         TimeSeries.names.add(self.name)
 
+class inv_periods:
+    inv_periods_num = 0
+    names = set()
+    
+    @classmethod
+    def reset_class(cls):
+        cls.inv_periods_num = 0
+        cls.names = set()
+    
+    @property
+    def name(self):
+        return self._name
+
+    def __init__(self, element_type: str, element_name:str, data: float, name=None):
+        self.inv_periods_num = inv_periods.inv_periods_num
+        inv_periods.inv_periods_num += 1
+        
+        
+        self.type = element_type
+        self.element_name=element_name
+        self.data = data
+        
+        s = 1
+        if name is None:
+            self._name = str(self.inv_periods_num)
+        else:
+            self._name = name
+
+        inv_periods.names.add(self.name)
 
 Line_AC.load_cable_database()
 Line_DC.load_cable_database()

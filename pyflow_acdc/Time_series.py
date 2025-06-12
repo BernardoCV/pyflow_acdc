@@ -125,13 +125,13 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
             if typ == 'a_CG':
-                price_zone.a = ts.data[idx]
+                price_zone.a_base = ts.data[idx]
             elif typ == 'b_CG':
                 price_zone.b = ts.data[idx]
             elif typ == 'c_CG':
                 price_zone.c = ts.data[idx]
             elif typ == 'PGL_min':
-                price_zone.PGL_min = ts.data[idx]
+                price_zone.PGL_min_base = ts.data[idx]
             elif typ == 'PGL_max':
                 price_zone.PGL_max = ts.data[idx]
     
@@ -499,13 +499,15 @@ def modify_parameters(grid,model,ACmode,DCmode,Price_Zones):
         for idx, val in lf.items():
             model.lf[idx].set_value(val)
     
-    
-    for idx, val in P_know.items():
-        model.P_known_AC[idx].set_value(val)
-    for idx, val in Q_know.items():
-        model.Q_known_AC[idx].set_value(val)
     for idx, val in P_renSource.items():
         model.P_renSource[idx].set_value(val)
+    
+    if ACmode:
+        for idx, val in P_know.items():
+            model.P_known_AC[idx].set_value(val)
+        for idx, val in Q_know.items():
+            model.Q_known_AC[idx].set_value(val)
+            
     if DCmode:
         for idx, val in P_known_DC.items():
             model.P_known_DC[idx].set_value(val)
@@ -586,16 +588,15 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     obj_rule= OPF_obj(model,grid,weights_def,OnlyGen=True)
     model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
 
+    if expand:
+        for price_zone in grid.Price_Zones:
+            price_zone.expand_import = True
+
+
     while idx < max_time:
         for ts in grid.Time_series:
             update_grid_data(grid,ts, idx,price_zone_restrictions)
-        if price_zone_restrictions:
-           if expand: 
-               for price_zone in grid.Price_Zones:
-                    if price_zone.b > 0:
-                        price_zone.PGL_min -= price_zone.ImportExpand
-                        price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
-                    
+       
         t1= time.time()          
         reset_to_initialize(model, initial_values)
     

@@ -169,14 +169,7 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
 
         for ts in grid.Time_series:
             update_grid_data(grid, ts, t)
-        
-        if Price_Zones:
-            for price_zone in grid.Price_Zones:
-                if price_zone.b > 0:
-                    price_zone.PGL_min -= price_zone.ImportExpand
-                    price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
                     
-            
         modify_parameters(grid,model.submodel[t],False,True) 
         subobj = OPF_obj(model.submodel[t],grid,weights_def,OnlyGen)
         model.submodel[t].obj = pyo.Objective(rule=subobj, sense=pyo.minimize)

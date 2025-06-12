@@ -792,7 +792,43 @@ def time_series_dict(grid, ts):
                 rs.TS_dict['PRGi_available'] = ts.TS_num
                 break  # Stop after assigning to the correct node
 
+def add_inv_period(Grid,inv_data,associated=None,inv_type=None,name=None):
+    if not isinstance(inv_data, pd.DataFrame):
+        inv = pd.DataFrame(inv_data, columns=[name])
+    else:
+        inv = inv_data
 
+    for col in inv.columns:
+        if associated is not None and inv_type is not None:
+            element_name = associated
+            element_type = inv_type
+            data = inv.loc[0:, col].astype(float).to_numpy()  
+            name = col
+            
+        elif associated is not None: 
+            element_name = associated
+            element_type = inv.at[0, col]
+            data = inv.loc[1:, col].astype(float).to_numpy()  
+            name = col
+        
+        elif inv_type is not None:
+            element_name = inv.at[0, col]
+            element_type = inv_type
+            data = inv.loc[1:, col].astype(float).to_numpy()   
+            name = col
+        
+        else: 
+            element_name = inv.at[0, col]
+            element_type = inv.at[1, col]
+            data = inv.loc[2:, col].astype(float).to_numpy()   
+            name = col 
+
+    inv_period = inv_periods(element_type, element_name, inv_data,name)
+    Grid.inv_periods.append(inv_period)
+    Grid.inv_periods_dic[name]=inv_period.inv_periods_num
+    
+    
+        
 def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,name=None):
     # Check if Time_Series_data is a numpy array and convert to pandas DataFrame if needed
     if not isinstance(Time_Series_data, pd.DataFrame):
@@ -810,7 +846,6 @@ def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,name=None
             data = TS.loc[0:, col].astype(float).to_numpy()  
             name = col
             
-        
         elif associated is not None: 
             element_name = associated
             element_type = TS.at[0, col]

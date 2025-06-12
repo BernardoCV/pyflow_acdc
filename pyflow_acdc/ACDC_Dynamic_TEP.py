@@ -7,7 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables
 from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC,calculate_objective
-from .ACDC_Static_TEP import get_TEP_variables
+from .ACDC_Static_TEP import get_TEP_variables,update_grid_scenario_frame,TEP_subObj
+from .Time_series import modify_parameters
 
 __all__ = [
     'multi_period_TEP',
@@ -17,9 +18,46 @@ __all__ = [
 def pack_variables(*args):
     return args
 
+def update_grid_investment_period(grid,inv,i):
+    idx = i
+    typ = inv.type
+    if typ == 'Load':
+        for price_zone in grid.Price_Zones:
+            if inv.element_name == price_zone.name:
+                price_zone.PLi_inv_factor = inv.data[idx]
+                break
+        for node in grid.nodes_AC:
+            if inv.element_name == node.name:
+                node.PLi_inv_factor=inv.data[idx]
+                break
+        for node in grid.nodes_DC:
+            if inv.element_name == node.name:
+                node.PLi_inv_factor=inv.data[idx]
+                break
 
+    if typ == 'elasticity':
+        for price_zone in grid.Price_Zones:
+            if inv.element_name == price_zone.name:
+                price_zone.elasticity = inv.data[idx]
+                break
 
-def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+    if typ == 'import_expand':
+        for price_zone in grid.Price_Zones:
+            if inv.element_name == price_zone.name:
+                price_zone.import_expand = inv.data[idx]
+                break
+
+    if typ in ['WPP', 'OWPP','SF','REN']:
+        for zone in grid.RenSource_zones:
+            if inv.element_name == zone.name:
+                zone.PRGi_inv_factor = inv.data[idx]
+                break  # Stop after assigning to the correct zone
+        for rs in grid.RenSources:
+            if inv.element_name == rs.name:
+                rs.PRGi_inv_factor = inv.data[idx]
+                break  # Stop after assigning to the correct node
+
+def multi_period_TEP(grid,NPV=True,n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
@@ -30,13 +68,13 @@ def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,disc
                 
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
-    
     t1=time.time()
 
     model = pyo.ConcreteModel()
     model.name        ="Multi-period TEP MTDC AC/DC hybrid OPF"
 
-    n_periods = len(inv_periods)
+    n_periods = len(grid.inv_periods[0].data)
+
     model.inv_periods = pyo.Set(initialize=list(range(0,n_periods)))
     if DCmode:
         model.lines_DC    = pyo.Set(initialize=list(range(0, grid.nl_DC)))
@@ -61,13 +99,10 @@ def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,disc
         base_model_copy = base_model.clone()
         model.inv_model[i].transfer_attributes_from(base_model_copy)
        
-        if ACmode:
-            for idx in model.inv_model[i].P_known_AC:
-                model.inv_model[i].P_known_AC[idx] *= inv_periods[i]
-        
-        if DCmode:
-            for idx in model.inv_model[i].P_known_DC:
-                model.inv_model[i].P_known_DC[idx] *= inv_periods[i]
+        for inv in grid.inv_periods:    
+            update_grid_investment_period(grid,inv,i)
+
+        modify_parameters(grid,model.inv_model[i],ACmode,DCmode,PZ)
 
         
         obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
@@ -419,11 +454,11 @@ def multi_period_MS_TEP(grid, NPV=True, inv_periods=[1,2,3], n_years=10, Hy=8760
     model.inv_periods = pyo.Set(initialize=list(range(0, n_periods)))
     
     # Create hierarchical model structure
-    model.period = pyo.Block(model.inv_periods)  # Level 1: Investment periods
+    model.inv_model = pyo.Block(model.inv_periods)  # Level 1: Investment periods
     for i in model.inv_periods:
         # Time frames for each investment period
-        model.period[i].Time_frames = pyo.Set(initialize=range(1, n_clusters + 1))
-        model.period[i].submodel = pyo.Block(model.period[i].Time_frames)  # Level 2: Time frames
+        model.inv_model[i].scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
+        model.inv_model[i].submodel = pyo.Block(model.inv_model[i].scenario_frames)  # Level 2: Time frames
 
     # 5. Create base model and clone for each period/time frame
     base_model = pyo.ConcreteModel()
@@ -432,37 +467,37 @@ def multi_period_MS_TEP(grid, NPV=True, inv_periods=[1,2,3], n_years=10, Hy=8760
     # 6. Initialize submodels and update time series data
     for i in model.inv_periods:
         
-        for t in model.period[i].Time_frames:
+        for t in model.inv_model[i].scenario_frames:
             base_model_copy = base_model.clone()
-            model.period[i].submodel[t].transfer_attributes_from(base_model_copy)
+            model.inv_model[i].submodel[t].transfer_attributes_from(base_model_copy)
             
             # Update time series data for this period/time frame
             for ts in grid.Time_series:
-                update_grid_price_zone_data(grid, ts, t, n_clusters, clustering)
+                update_grid_scenario_frame(grid, ts, t, n_clusters, clustering)
             
             # Modify parameters and set objectives
-            modify_parameters(grid, model.period[i].submodel[t], ACmode, DCmode, Price_Zones)
-            TEP_subObj(model.period[i].submodel[t], grid, weights_def)
+            modify_parameters(grid, model.inv_model[i].submodel[t], ACmode, DCmode, Price_Zones)
+            TEP_subObj(model.inv_model[i].submodel[t], grid, weights_def)
 
     # 7. Add investment period linking constraints
     def MP_gen_link(model, gen, i):
         if i > min(model.inv_periods):
-            return model.period[i].np_gen[gen] >= model.period[i-1].np_gen[gen]
+            return model.inv_model[i].np_gen[gen] >= model.inv_model[i-1].np_gen[gen]
         return pyo.Constraint.Skip
 
     def MP_AC_line_link(model, line, i):
         if i > min(model.inv_periods):
-            return model.period[i].NumLinesACP[line] >= model.period[i-1].NumLinesACP[line]
+            return model.inv_model[i].NumLinesACP[line] >= model.inv_model[i-1].NumLinesACP[line]
         return pyo.Constraint.Skip
 
     def MP_DC_line_link(model, line, i):
         if i > min(model.inv_periods):
-            return model.period[i].NumLinesDCP[line] >= model.period[i-1].NumLinesDCP[line]
+            return model.inv_model[i].NumLinesDCP[line] >= model.inv_model[i-1].NumLinesDCP[line]
         return pyo.Constraint.Skip
 
     def MP_Conv_link(model, conv, i):
         if i > min(model.inv_periods):
-            return model.period[i].NumConvP[conv] >= model.period[i-1].NumConvP[conv]
+            return model.inv_model[i].NumConvP[conv] >= model.inv_model[i-1].NumConvP[conv]
         return pyo.Constraint.Skip
 
     # 8. Add the linking constraints to the model
@@ -478,11 +513,11 @@ def multi_period_MS_TEP(grid, NPV=True, inv_periods=[1,2,3], n_years=10, Hy=8760
     # 9. Set up objective function
     def total_cost_rule(model):
         # Investment costs across periods
-        inv_cost = sum(MP_TEP_obj(model.period[i], grid, n_years, discount_rate) 
+        inv_cost = sum(MP_TEP_obj(model.inv_model[i], grid, n_years, discount_rate) 
                       for i in model.inv_periods)
         
         # Operational costs for each period and time frame
-        op_cost = sum(Hy * weighted_subobj(model.period[i], NPV, n_years, discount_rate)
+        op_cost = sum(Hy * weighted_subobj(model.inv_model[i], NPV, n_years, discount_rate)
                      for i in model.inv_periods)
         
         return inv_cost + op_cost

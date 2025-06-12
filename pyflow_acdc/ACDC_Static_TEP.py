@@ -17,7 +17,7 @@ from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC
 
 
 __all__ = [
-    'update_grid_price_zone_data',
+    'update_grid_scenario_frame',
     'expand_elements_from_pd',
     'repurpose_element_from_pd',
     'update_attributes',
@@ -32,7 +32,7 @@ def pack_variables(*args):
     return args
 
 
-def update_grid_price_zone_data(grid,ts,t,n_clusters,clustering):
+def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
     idx=t-1
     typ = ts.type
     
@@ -44,7 +44,7 @@ def update_grid_price_zone_data(grid,ts,t,n_clusters,clustering):
     if typ == 'a_CG':
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
-                price_zone.a = ts_data[idx]
+                price_zone.a_base = ts_data[idx]
                 break
     elif typ == 'b_CG':
         for price_zone in grid.Price_Zones:
@@ -59,7 +59,7 @@ def update_grid_price_zone_data(grid,ts,t,n_clusters,clustering):
     elif typ == 'PGL_min':
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
-                price_zone.PGL_min= ts_data[idx]
+                price_zone.PGL_min_base= ts_data[idx]
                 break
     elif typ == 'PGL_max':
         for price_zone in grid.Price_Zones:
@@ -85,6 +85,11 @@ def update_grid_price_zone_data(grid,ts,t,n_clusters,clustering):
             if ts.element_name == node.name:
                 node.PLi_factor = ts_data[idx]
                 break  # Stop after assigning to the correct node
+        for node in grid.nodes_DC:
+            if ts.element_name == node.name:
+                node.PLi_factor = ts_data[idx]
+                break  # Stop after assigning to the correct node
+
     elif typ in ['WPP', 'OWPP','SF','REN']:
         for zone in grid.RenSource_zones:
             if ts.element_name == zone.name:
@@ -476,12 +481,8 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
         model.submodel[t].transfer_attributes_from(base_model_copy)
         
         for ts in grid.Time_series:
-            update_grid_price_zone_data(grid,ts,t,n_clusters,clustering)
-        if increase_Pmin: 
-            for price_zone in grid.Price_Zones:
-                 if price_zone.b > 0:
-                     price_zone.PGL_min -= price_zone.ImportExpand
-                     price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
+            update_grid_scenario_frame(grid,ts,t,n_clusters,clustering)
+
         modify_parameters(grid,model.submodel[t],ACmode,DCmode,Price_Zones)
         
         TEP_subObj(model.submodel[t],grid,weights_def)
