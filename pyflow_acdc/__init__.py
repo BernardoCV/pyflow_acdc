@@ -23,8 +23,8 @@ from .Market_Coeff import *
 # Try to import OPF module if pyomo is available
 try:
     from .ACDC_OPF import *
-    from .ACDC_TEP import *
-    from .ACDC_MP_TEP import *
+    from .ACDC_Static_TEP import *
+    from .ACDC_Dynamic_TEP import *
     HAS_OPF = True
 except ImportError:
     HAS_OPF = False

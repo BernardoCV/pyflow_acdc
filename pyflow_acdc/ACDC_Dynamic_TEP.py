@@ -1,4 +1,3 @@
-
 import numpy as np
 import pyomo.environ as pyo
 import pandas as pd
@@ -8,10 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables
 from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC,calculate_objective
-from .ACDC_TEP import get_TEP_variables
+from .ACDC_Static_TEP import get_TEP_variables
 
 __all__ = [
-    'multi_period_TEP'
+    'multi_period_TEP',
+    'multi_period_TEP_MS'
 ]
 
 def pack_variables(*args):
@@ -50,7 +50,7 @@ def multi_period_TEP(grid,NPV=True,inv_periods = [1,2,3],n_years=10,Hy=8760,disc
         model.lines_AC_ct = pyo.Set(initialize=list(range(0,grid.nct_AC)))
         model.ct_set = pyo.Set(initialize=list(range(0,len(grid.Cable_options[0].cable_types))))
     if GPR:
-        model.gen_AC = pyo.Set(initialize=list(range(0,grid.nn_gen)))
+        model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
 
     model.inv_model = pyo.Block(model.inv_periods)
 
@@ -367,3 +367,141 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,inv_periods,MINLP=False):
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
     
     grid.MP_TEP_results = df  
+
+def multi_period_TEP_MS(grid, NPV=True, inv_periods=[1,2,3], n_years=10, Hy=8760, 
+                       discount_rate=0.02, clustering_options=None, ObjRule=None, 
+                       solver='bonmin'):
+    """
+    Multi-period Transmission Expansion Planning with time series clustering.
+    Hierarchical model structure:
+    - Level 1: Investment periods
+    - Level 2: Time frames/scenarios for each investment period
+    """
+    # 1. Initial analysis and setup
+    ACmode, DCmode, ACadd, DCadd, GPR = analyse_OPF(grid)
+    TEP_AC, TAP_tf, REC_AC, CT_AC = ACadd
+    CFC = DCadd
+    weights_def, Price_Zones = obj_w_rule(grid, ObjRule, True)
+
+    # 2. Set grid parameters
+    grid.TEP_n_years = n_years
+    grid.TEP_discount_rate = discount_rate
+
+    # 3. Handle time series clustering
+    clustering = False
+    if clustering_options is not None:
+        from .Time_series_clustering import cluster_TS
+        n = clustering_options['n_clusters']
+        time_series = clustering_options.get('time_series', [])
+        central_market = clustering_options.get('central_market', [])
+        thresholds = clustering_options.get('thresholds', [0, 0.8])
+        print_details = clustering_options.get('print_details', False)
+        corrolation_decisions = clustering_options.get('corrolation_decisions', [False, '1', False])
+        algo = clustering_options.get('cluster_algorithm', 'Kmeans')
+        
+        n_clusters, _, _, _ = cluster_TS(grid, n_clusters=n, time_series=time_series,
+                                       central_market=central_market, algorithm=algo,
+                                       cv_threshold=thresholds[0],
+                                       correlation_threshold=thresholds[1],
+                                       print_details=print_details,
+                                       corrolation_decisions=corrolation_decisions)
+        clustering = True
+    else:
+        n_clusters = len(grid.Time_series[0].data)
+
+    # 4. Create model sets
+    t1 = time.time()
+    model = pyo.ConcreteModel()
+    model.name = "MP TEP MS MTDC AC/DC hybrid OPF"
+    
+    # Investment periods
+    n_periods = len(inv_periods)
+    model.inv_periods = pyo.Set(initialize=list(range(0, n_periods)))
+    
+    # Create hierarchical model structure
+    model.period = pyo.Block(model.inv_periods)  # Level 1: Investment periods
+    for i in model.inv_periods:
+        # Time frames for each investment period
+        model.period[i].Time_frames = pyo.Set(initialize=range(1, n_clusters + 1))
+        model.period[i].submodel = pyo.Block(model.period[i].Time_frames)  # Level 2: Time frames
+
+    # 5. Create base model and clone for each period/time frame
+    base_model = pyo.ConcreteModel()
+    OPF_createModel_ACDC(base_model, grid, PV_set=False, Price_Zones=Price_Zones, TEP=True)
+
+    # 6. Initialize submodels and update time series data
+    for i in model.inv_periods:
+        
+        for t in model.period[i].Time_frames:
+            base_model_copy = base_model.clone()
+            model.period[i].submodel[t].transfer_attributes_from(base_model_copy)
+            
+            # Update time series data for this period/time frame
+            for ts in grid.Time_series:
+                update_grid_price_zone_data(grid, ts, t, n_clusters, clustering)
+            
+            # Modify parameters and set objectives
+            modify_parameters(grid, model.period[i].submodel[t], ACmode, DCmode, Price_Zones)
+            TEP_subObj(model.period[i].submodel[t], grid, weights_def)
+
+    # 7. Add investment period linking constraints
+    def MP_gen_link(model, gen, i):
+        if i > min(model.inv_periods):
+            return model.period[i].np_gen[gen] >= model.period[i-1].np_gen[gen]
+        return pyo.Constraint.Skip
+
+    def MP_AC_line_link(model, line, i):
+        if i > min(model.inv_periods):
+            return model.period[i].NumLinesACP[line] >= model.period[i-1].NumLinesACP[line]
+        return pyo.Constraint.Skip
+
+    def MP_DC_line_link(model, line, i):
+        if i > min(model.inv_periods):
+            return model.period[i].NumLinesDCP[line] >= model.period[i-1].NumLinesDCP[line]
+        return pyo.Constraint.Skip
+
+    def MP_Conv_link(model, conv, i):
+        if i > min(model.inv_periods):
+            return model.period[i].NumConvP[conv] >= model.period[i-1].NumConvP[conv]
+        return pyo.Constraint.Skip
+
+    # 8. Add the linking constraints to the model
+    if GPR:
+        model.MP_gen_link_constraint = pyo.Constraint(model.gen_AC, model.inv_periods, rule=MP_gen_link)
+    if TEP_AC:
+        model.MP_AC_line_link_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_link)
+    if DCmode:
+        model.MP_DC_line_link_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_link)
+    if ACmode and DCmode:
+        model.MP_Conv_link_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_link)
+
+    # 9. Set up objective function
+    def total_cost_rule(model):
+        # Investment costs across periods
+        inv_cost = sum(MP_TEP_obj(model.period[i], grid, n_years, discount_rate) 
+                      for i in model.inv_periods)
+        
+        # Operational costs for each period and time frame
+        op_cost = sum(Hy * weighted_subobj(model.period[i], NPV, n_years, discount_rate)
+                     for i in model.inv_periods)
+        
+        return inv_cost + op_cost
+
+    model.obj = pyo.Objective(rule=total_cost_rule, sense=pyo.minimize)
+
+    # 10. Solve the model
+    t2 = time.time()
+    model_results, solver_stats = OPF_solve(model, grid, solver)
+    t3 = time.time()
+
+    # 11. Export results
+    TEP_TS_res = export_MP_TEP_results_toPyflowACDC(model, grid, inv_periods)
+    t4 = time.time()
+
+    timing_info = {
+        "create": t2-t1,
+        "solve": solver_stats['time'],
+        "export": t4-t3,
+    }
+
+    return model, model_results, timing_info, solver_stats, TEP_TS_res  
