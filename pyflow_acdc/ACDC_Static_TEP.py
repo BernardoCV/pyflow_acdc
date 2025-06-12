@@ -24,7 +24,7 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'transmission_expansion',
-    'transmission_expansion_MS',
+    'multi_scenario_TEP',
     'export_TEP_TS_results_to_excel'
 ]
 
@@ -393,7 +393,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     return model, model_results , timing_info, solver_stats
 
 
-def transmission_expansion_MS(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd

@@ -124,7 +124,7 @@ __all__ = [
     
     # TEP
     'transmission_expansion',
-    'transmission_expansion_MS',
+    'multi_scenario_TEP',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
     'repurpose_element_from_pd',
