@@ -173,8 +173,8 @@ class Grid:
         self.Time_series = []
         self.Time_series_dic ={}
         
-        self.inv_periods = []
-        self.inv_periods_dic ={}
+        self.inv_series = []
+        self.inv_series_dic ={}
 
         self.Price_Zones =[]
         self.Price_Zones_dic ={}
@@ -2596,18 +2596,15 @@ class Price_Zone:
     @import_expand.setter
     def import_expand(self, value):
         self._import_expand = value
-        if self.expand_import:
-            self.calc_import_expand()
-        else:
-            self.a = self._a_base*self._elasticity
+        self.calc_import_expand()
+       
         
     def calc_import_expand(self):
-        if self.b > 0:
+        if self.b > 0 and self.expand_import:
             self.PGL_min = self.PGL_min_base - self._import_expand
             a = -self.b / (2 * self.PGL_min * self.S_base) 
             self.a = a*self._elasticity
-        else:
-            self.a = self._a_base*self._elasticity
+       
 
     @property
     def PLi_inv_factor(self):
@@ -2641,6 +2638,8 @@ class Price_Zone:
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
         
+        self.expand_import = False
+        
         self.import_pu_L=import_pu_L
         self.export_pu_G=export_pu_G
 
@@ -2661,11 +2660,11 @@ class Price_Zone:
         
         self.PN= 0
         
-        self.expand_import = False
-
+        
+        self._import_expand = import_expand
         self._a_base = a
         self._elasticity = 1
-        self._import_expand = import_expand
+        
         
         self.TS_dict = {
             'Load' : None,

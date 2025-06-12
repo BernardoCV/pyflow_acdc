@@ -82,6 +82,9 @@ __all__ = [
     # Add Time Series
     'add_TimeSeries',
     
+    #Add investment series
+    'add_inv_series',
+    
     # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
@@ -133,6 +136,7 @@ __all__ = [
     'Translate_pd_TEP',
     'export_TEP_TS_results_to_excel',
     'multi_period_TEP',
+    'multi_period_MS_TEP',
 
     # Time Series Analysis
     'Time_series_PF',

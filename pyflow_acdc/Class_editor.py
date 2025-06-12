@@ -42,6 +42,9 @@ __all__ = [
     # Add Time Series
     'add_TimeSeries',
     
+    #Add investment series
+    'add_inv_series',
+    
     # Line Modifications
     'change_line_AC_to_expandable',
     'change_line_AC_to_reconducting',
@@ -495,7 +498,7 @@ def add_price_zone(Grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,impor
     if b==1:
         b= price
     
-    M = Price_Zone(price,import_pu_L,export_pu_G,a,b,c,import_expand_pu,name)
+    M = Price_Zone(price,import_pu_L,export_pu_G,a,b,c,import_expand_pu,Grid.S_base,name)
     Grid.Price_Zones.append(M)
     Grid.Price_Zones_dic[name]=M.price_zone_num
     
@@ -699,7 +702,7 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
                     MTDC_price_zone= add_MTDC_price_zone(Grid,MTDC)
             
             MTDC_price_zone.add_linked_price_zone(main_price_zone)
-            main_price_zone.ImportExpand += base / Grid.S_base
+            main_price_zone.import_expand += base / Grid.S_base
             assign_nodeToPrice_Zone(Grid, node_name,MTDC, ACDC)
             # Additional logic for MTDC can be placed here
         elif Offshore:
@@ -723,7 +726,7 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
                 # Link the offshore price_zone to the main price_zone
                 main_price_zone.link_price_zone(oprice_zone)
                 # Expand the import capacity in the main price_zone
-                main_price_zone.ImportExpand += base / Grid.S_base
+                main_price_zone.import_expand += base / Grid.S_base
         else:
             # Assign the node to the main price_zone
             assign_nodeToPrice_Zone(Grid, node_name, price_zone,ACDC)
@@ -792,7 +795,7 @@ def time_series_dict(grid, ts):
                 rs.TS_dict['PRGi_available'] = ts.TS_num
                 break  # Stop after assigning to the correct node
 
-def add_inv_period(Grid,inv_data,associated=None,inv_type=None,name=None):
+def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
     if not isinstance(inv_data, pd.DataFrame):
         inv = pd.DataFrame(inv_data, columns=[name])
     else:
@@ -824,8 +827,8 @@ def add_inv_period(Grid,inv_data,associated=None,inv_type=None,name=None):
             name = col 
 
     inv_period = inv_periods(element_type, element_name, inv_data,name)
-    Grid.inv_periods.append(inv_period)
-    Grid.inv_periods_dic[name]=inv_period.inv_periods_num
+    grid.inv_series.append(inv_period)
+    grid.inv_series_dic[name]=inv_period.inv_periods_num
     
     
         

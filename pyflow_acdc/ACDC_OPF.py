@@ -284,7 +284,7 @@ def fx_conv(model,grid):
     model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
 
 
-def OPF_solve(model,grid,solver = 'ipopt'):
+def OPF_solve(model,grid,solver = 'ipopt',tee=False):
     
     solver = solver.lower()
 
@@ -336,7 +336,7 @@ def OPF_solve(model,grid,solver = 'ipopt'):
     # Print the regex match attempt
     #match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
     #num_iterations = int(match.group(1)) if match else None
-    results = opt.solve(model)
+    results = opt.solve(model,tee=tee)
     num_iterations = None
 
     solver_stats = {

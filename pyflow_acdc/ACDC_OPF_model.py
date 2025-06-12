@@ -1824,7 +1824,7 @@ def TEP_variables(model,grid):
         model.QGi_upper_bound = pyo.Constraint(model.gen_AC,rule=Q_gen_upper_bound_rule)
 
 
-    else:
+    elif hasattr(model,'gen_AC'):
         model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
         
     "TEP variables"

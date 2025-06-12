@@ -343,6 +343,59 @@ def get_TEP_variables(grid):
 
     return conv_var,DC_line_var,AC_line_var,gen_var
 
+def MS_TEP_constraints(model,grid):
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
+    
+    def NP_ACline_link(model,line,t):
+        element=grid.lines_AC_exp[line]
+        if element.np_line_opf:
+            return model.NumLinesACP[line] ==model.submodel[t].NumLinesACP[line]
+        else:
+            return pyo.Constraint.Skip
+    
+    def NP_line_link(model,line,t):
+        element=grid.lines_DC[line]
+        if element.np_line_opf:
+            return model.NumLinesDCP[line] ==model.submodel[t].NumLinesDCP[line]
+        else:
+            return pyo.Constraint.Skip
+    def NP_conv_link(model,conv,t):
+        element=grid.Converters_ACDC[conv]
+        if element.NUmConvP_opf:
+            return model.NumConvP[conv] ==model.submodel[t].NumConvP[conv]
+        else:
+            return pyo.Constraint.Skip
+    if TEP_AC:
+        model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.scenario_frames, rule=NP_ACline_link)
+
+    if DCmode:
+        model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.scenario_frames, rule=NP_line_link)
+    if ACmode and DCmode:
+        model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.scenario_frames, rule=NP_conv_link)
+    
+    def NP_ACline_rec_link(model,line,t):
+        element=grid.lines_AC_rec[line]
+        if element.rec_line_opf:
+            return model.rec_branch[line] ==model.submodel[t].rec_branch[line]
+        else:
+            return pyo.Constraint.Skip
+    if REC_AC:
+        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.scenario_frames, rule=NP_ACline_rec_link) 
+
+
+    def NP_ACline_ct_link(model,line,ct,t):
+        element=grid.lines_AC_ct[line]
+        if element.array_opf:
+            return model.ct_branch[line,ct] ==model.submodel[t].ct_branch[line,ct]
+        else:
+            return pyo.Constraint.Skip
+    if CT_AC:
+        model.NP_ACline_ct_link_constraint = pyo.Constraint(model.lines_AC_ct,model.ct_set,model.scenario_frames, rule=NP_ACline_ct_link)
+
+    
+
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
 
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
@@ -397,84 +450,38 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     }
     return model, model_results , timing_info, solver_stats
 
-
-def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+def initialize_links(model,grid):
+   
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
 
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
-
-    from .Time_series import  modify_parameters
-    
-
-    grid.TEP_n_years = n_years
-    grid.TEP_discount_rate =discount_rate
-    clustering = False
-    if clustering_options is not None:
-        from .Time_series_clustering import cluster_TS
-        """
-        clustering_options = {
-            'n_clusters': 1,
-            'time_series': [],
-            'central_market': [],
-            'thresholds': [cv_threshold,correlation_threshold],
-            'print_details': True/False,
-            'corrolation_decisions': [correlation_cleaning = True/False,method = '1/2/3',scale_groups = True/False],
-            'cluster_algorithm': 'Kmeans/Ward/DBSCAN/OPTICS/Kmedoids/Spectral/HDBSCAN/PAM_Hierarchical'
-        }
-        """
-        n        = clustering_options['n_clusters'] 
-        time_series = clustering_options['time_series'] if 'time_series' in clustering_options else []
-        central_market = clustering_options['central_market'] if 'central_market' in clustering_options else []
-        thresholds = clustering_options['thresholds'] if 'thresholds' in clustering_options else [0,0.8]
-        print_details = clustering_options['print_details'] if 'print_details' in clustering_options else False
-        corrolation_decisions = clustering_options['corrolation_decisions'] if 'corrolation_decisions' in clustering_options else [False,'1',False]
-        algo = clustering_options['cluster_algorithm'] if 'cluster_algorithm' in clustering_options else 'Kmeans'
-       
-        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[0] ,correlation_threshold=thresholds[1],print_details=print_details,corrolation_decisions=corrolation_decisions)
-                
-        clustering = True
-    else:
-        n_clusters = len(grid.Time_series[0].data)
-        
-    lista_lineas_DC = list(range(0, grid.nl_DC))
-    lista_conv = list(range(0, grid.nconv))
-    lista_AC   = list(range(0,grid.nle_AC))
-    lista_AC_rec = list(range(0,grid.nlr_AC))
-    lista_AC_ct = list(range(0,grid.nct_AC))
-    lista_gen = list(range(0,grid.n_gen))
-    if grid.Cable_options is not None and len(grid.Cable_options) > 0:
-        cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
-    else:
-        cab_types_set = []
-
-    t1 = time.time()
-    model = pyo.ConcreteModel()
-    model.name        ="TEP TS MTDC AC/DC hybrid OPF"
-    model.scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
-    
-    #print(list(model.scenario_frames))
-    model.submodel    = pyo.Block(model.scenario_frames)
     if DCmode:
-        model.lines_DC    = pyo.Set(initialize=lista_lineas_DC)
+        model.lines_DC    = pyo.Set(initialize=list(range(0, grid.nl_DC)))
     if ACmode and DCmode:
-        model.conv        = pyo.Set(initialize=lista_conv)
+        model.conv        = pyo.Set(initialize=list(range(0, grid.nconv)))
     if TEP_AC:
-        model.lines_AC_exp= pyo.Set(initialize=lista_AC)
+        model.lines_AC_exp= pyo.Set(initialize=list(range(0,grid.nle_AC)))
     if REC_AC:
-        model.lines_AC_rec= pyo.Set(initialize=lista_AC_rec)
+        model.lines_AC_rec= pyo.Set(initialize=list(range(0,grid.nlr_AC)))
     if CT_AC:
-        model.lines_AC_ct = pyo.Set(initialize=lista_AC_ct)
-        model.ct_set = pyo.Set(initialize=cab_types_set)
-    model.gen_AC     = pyo.Set(initialize=lista_gen)
+        model.lines_AC_ct = pyo.Set(initialize=list(range(0,grid.nct_AC)))
+        model.ct_set = pyo.Set(initialize=list(range(0,len(grid.Cable_options[0].cable_types))))
+    if GPR:
+        model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
 
+def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy):
+    
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
+    
+    
+    from .Time_series import  modify_parameters    
+    
     w={}
 
     base_model = pyo.ConcreteModel()
     OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
     
-    s=1
     
     for t in model.scenario_frames:
         base_model_copy = base_model.clone()
@@ -495,53 +502,10 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
             num_scenario_frames = len(model.scenario_frames)
             w[t]=1/num_scenario_frames
     
+    initialize_links(model,grid)
     TEP_variables(model,grid)
     
-    def NP_ACline_link(model,line,t):
-        element=grid.lines_AC_exp[line]
-        if element.np_line_opf:
-            return model.NumLinesACP[line] ==model.submodel[t].NumLinesACP[line]
-        else:
-            return pyo.Constraint.Skip
-    
-    def NP_line_link(model,line,t):
-        element=grid.lines_DC[line]
-        if element.np_line_opf:
-            return model.NumLinesDCP[line] ==model.submodel[t].NumLinesDCP[line]
-        else:
-            return pyo.Constraint.Skip
-    def NP_conv_link(model,conv,t):
-        element=grid.Converters_ACDC[conv]
-        if element.NUmConvP_opf:
-            return model.NumConvP[conv] ==model.submodel[t].NumConvP[conv]
-        else:
-            return pyo.Constraint.Skip
-    if TEP_AC:
-        model.NP_ACline_link_constraint = pyo.Constraint(model.lines_AC_exp,model.scenario_frames, rule=NP_ACline_link)
-
-    if DCmode:
-        model.NP_line_link_constraint = pyo.Constraint(model.lines_DC,model.scenario_frames, rule=NP_line_link)
-    if ACmode and DCmode:
-        model.NP_conv_link_constraint = pyo.Constraint(model.conv,model.scenario_frames, rule=NP_conv_link)
-    
-    def NP_ACline_rec_link(model,line,t):
-        element=grid.lines_AC_rec[line]
-        if element.rec_line_opf:
-            return model.rec_branch[line] ==model.submodel[t].rec_branch[line]
-        else:
-            return pyo.Constraint.Skip
-    if REC_AC:
-        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.scenario_frames, rule=NP_ACline_rec_link) 
-
-
-    def NP_ACline_ct_link(model,line,ct,t):
-        element=grid.lines_AC_ct[line]
-        if element.array_opf:
-            return model.ct_branch[line,ct] ==model.submodel[t].ct_branch[line,ct]
-        else:
-            return pyo.Constraint.Skip
-    if CT_AC:
-        model.NP_ACline_ct_link_constraint = pyo.Constraint(model.lines_AC_ct,model.ct_set,model.scenario_frames, rule=NP_ACline_ct_link)
+    MS_TEP_constraints(model,grid)
 
     
     model.weights = pyo.Param(model.scenario_frames, initialize=w)
@@ -550,6 +514,35 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     total_cost = obj_TEP + Hy*obj_weighted
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+
+
+
+def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
+    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
+    CFC = DCadd
+
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
+
+    grid.TEP_n_years = n_years
+    grid.TEP_discount_rate =discount_rate
+    
+    try:
+        from .Time_series_clustering import cluster_analysis
+        n_clusters,clustering = cluster_analysis(grid,clustering_options)
+    except:
+        n_clusters = len(grid.Time_series[0].data)
+        clustering = False
+
+    t1 = time.time()
+    model = pyo.ConcreteModel()
+    model.name        ="TEP TS MTDC AC/DC hybrid OPF"
+    model.scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
+    
+    #print(list(model.scenario_frames))
+    model.submodel    = pyo.Block(model.scenario_frames)
+    
+    create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy)
 
     t2 = time.time()  
     t_modelcreate = t2-t1
