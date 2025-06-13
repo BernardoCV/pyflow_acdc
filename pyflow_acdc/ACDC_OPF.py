@@ -571,7 +571,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
             price_zone_as[m.price_zone_num] = m.a
             price_zone_bs[m.price_zone_num] = m.b
             import_M = m.import_pu_L
-            export_M = m.export_pu_G * (sum(sum(rs.PGi_ren for rs in node.connected_RenSource) + sum(gen.Max_pow_gen for gen in node.connected_gen) for node in m.nodes_AC))
+            export_M = m.export_pu_G * (sum(sum(rs.PGi_ren for rs in node.connected_RenSource) + sum(gen.Max_pow_gen for gen in node.connected_gen) for node in m.nodes_AC))*grid.S_base
             PL_price_zone[m.price_zone_num] = 0
             
             if ACmode:
@@ -579,7 +579,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
                 for n in m.nodes_AC:
                     price_zone2node['AC'][m.price_zone_num].append(n.nodeNumber)
                     node2price_zone['AC'][n.nodeNumber] = m.price_zone_num
-                PL_price_zone[m.price_zone_num] += n.PLi
+                    PL_price_zone[m.price_zone_num] += n.PLi
             
             if DCmode:
                 price_zone2node['DC'][m.price_zone_num] = []
@@ -587,7 +587,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
                     price_zone2node['DC'][m.price_zone_num].append(n.nodeNumber)
                     node2price_zone['DC'][n.nodeNumber] = m.price_zone_num
                     PL_price_zone[m.price_zone_num] += n.PLi
-            PGL_min[m.price_zone_num] = max(m.PGL_min, -import_M * PL_price_zone[m.price_zone_num])
+            PGL_min[m.price_zone_num] = max(m.PGL_min, -import_M * PL_price_zone[m.price_zone_num]*grid.S_base)
             PGL_max[m.price_zone_num] = min(m.PGL_max, export_M)
         lista_M = list(range(0, nn_M))
     
