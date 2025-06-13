@@ -962,7 +962,7 @@ class Results:
     
     def TEP_ts_res(self):
        
-        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price,pgen,qgen= self.Grid.TEP_res
         
         
         table = pt()
@@ -1201,7 +1201,7 @@ class Results:
                 tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
         
 
-        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price= self.Grid.TEP_res
+        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price,pgen,qgen= self.Grid.TEP_res
         weight = SC.loc['Weight']
         table=pt()
         table.field_names = ["Price_Zone", "Normalized Cost Generation[k€/h]", "Average price [€/MWh]","Present Value Cost Gen [M€]"]
