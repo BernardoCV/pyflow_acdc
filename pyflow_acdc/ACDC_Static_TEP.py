@@ -484,6 +484,8 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
     
     
     for t in model.scenario_frames:
+        if t == 1:
+            s=1
         base_model_copy = base_model.clone()
         model.submodel[t].transfer_attributes_from(base_model_copy)
         

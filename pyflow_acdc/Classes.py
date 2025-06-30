@@ -2582,14 +2582,17 @@ class Price_Zone:
     @PGL_min_base.setter
     def PGL_min_base(self, value):
         self._PGL_min_base = value
-        self.calc_import_expand()
-
+        if self.expand_import:
+            self.calc_import_expand()
+        else:
+            self.calc_elasticity_effect()
+        
     def update_a(self):
         if self.expand_import:
             self.calc_import_expand()
         else:
-            self.a = self._a_base*self._elasticity
-
+            self.calc_elasticity_effect()
+            
     @property
     def import_expand(self):
         return self._import_expand
@@ -2599,7 +2602,13 @@ class Price_Zone:
         self._import_expand = value
         self.calc_import_expand()
        
-        
+    def calc_elasticity_effect(self):
+        self.a = self._a_base*self._elasticity
+        if self.b >0 and self.a != 0 and self._elasticity != 1:
+            self.PGL_min = -self.b/(self.a*2)
+        else:
+            self.PGL_min = self._PGL_min_base
+            
     def calc_import_expand(self):
         if self.b > 0 and self.expand_import:
             self.PGL_min = self.PGL_min_base - self._import_expand
@@ -2635,11 +2644,14 @@ class Price_Zone:
             if node.PLi_linked:
                 node.PLi_factor=value        
 
-    def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,S_base:float=100,name=None):
+    def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,elasticity=1,S_base:float=100,name=None):
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
         
         self.expand_import = False
+        self._import_expand = import_expand
+        self._a_base = a
+        self._elasticity = elasticity
         
         self.import_pu_L=import_pu_L
         self.export_pu_G=export_pu_G
@@ -2662,9 +2674,7 @@ class Price_Zone:
         self.PN= 0
         
         
-        self._import_expand = import_expand
-        self._a_base = a
-        self._elasticity = 1
+        
         
         
         self.TS_dict = {

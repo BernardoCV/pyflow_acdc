@@ -493,12 +493,12 @@ def add_RenSource_zone(Grid,name):
     return RSZ
 
 
-def add_price_zone(Grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand_pu=0):
+def add_price_zone(Grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand_pu=0,elasticity=1):
 
     if b==1:
         b= price
     
-    M = Price_Zone(price,import_pu_L,export_pu_G,a,b,c,import_expand_pu,Grid.S_base,name)
+    M = Price_Zone(price,import_pu_L,export_pu_G,a,b,c,import_expand_pu,elasticity,Grid.S_base,name)
     Grid.Price_Zones.append(M)
     Grid.Price_Zones_dic[name]=M.price_zone_num
     

@@ -1509,7 +1509,7 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
     
-    AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
+    AC_Lists,   AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
     lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
     
@@ -1709,7 +1709,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     def export_rule(model,price_zone):
         return model.PN[price_zone] <= model.PGL_max[price_zone]
     
-    model.import_constraint = pyo.Constraint(model.M,rule=import_rule)
+    # model.import_constraint = pyo.Constraint(model.M,rule=import_rule)
     model.export_constraint = pyo.Constraint(model.M,rule=export_rule)    
 
 def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
