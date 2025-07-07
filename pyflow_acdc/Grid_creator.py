@@ -878,7 +878,7 @@ def Create_grid_from_mat(matfile):
         AC_lines = {}
         for index, row in AC_line_data.iterrows():
           if AC_line_data.at[index, 'status'] !=0:    
-            var_name = index+1
+            var_name = f"L_AC_{index+1}"
             
 
             fromNode     = AC_line_data.at[index, 'fbus']
@@ -887,7 +887,6 @@ def Create_grid_from_mat(matfile):
             x    = AC_line_data.at[index, 'x']    
             g  = 0
             b  = AC_line_data.at[index, 'b']  
-            
             
             
             kV_base      = AC_nodes[toNode].kV_base 
@@ -952,19 +951,19 @@ def Create_grid_from_mat(matfile):
             MW_rating     = DC_line_data.at[index, 'rateA']    
             kV_base       = DC_nodes[toNode].kV_base 
             
-            var_name = f'{DC_nodes[fromNode].name}-{DC_nodes[toNode].name}_{MW_rating}'
+            var_name = f'L_DC_{index+1}'
             
             if dcpol == 2:
-                pol = 'b'
-            else:
                 pol = 'sm'
+            else:
+                pol = 'm'
             DC_lines[var_name] = Line_DC(DC_nodes[fromNode], DC_nodes[toNode], Resistance, MW_rating, polarity=pol, name=str(var_name),S_base=S_base)
 
             if DC_line_data.at[index, 'cost'] >= 0:
                 DC_lines[var_name].np_line_opf = True
                 DC_lines[var_name].np_line   = 0
                 DC_lines[var_name].np_line_b = 0
-                DC_lines[var_name].np_line_i = 1
+                DC_lines[var_name].np_line_i = 0
                 DC_lines[var_name].np_line_max = 3
                 DC_lines[var_name].base_cost = DC_line_data.at[index, 'cost']
 
@@ -978,7 +977,7 @@ def Create_grid_from_mat(matfile):
         Converters = {}
         for index, row in Converter_data.iterrows():
           if Converter_data.at[index, 'status'] !=0:   
-            var_name  = index+1
+            var_name  = f"Conv_{index+1}"
             
             type_ac = Converter_data.at[index, 'type_ac']   
             if type_ac == 1:
@@ -1034,7 +1033,7 @@ def Create_grid_from_mat(matfile):
                 Converters[var_name].NUmConvP_opf = True
                 Converters[var_name].NumConvP   = 0
                 Converters[var_name].NumConvP_b = 0
-                Converters[var_name].NumConvP_i = 1
+                Converters[var_name].NumConvP_i = 0
                 Converters[var_name].NumConvP_max = 1
                 Converters[var_name].base_cost = Converter_data.at[index, 'cost']
         Convertor_list = list(Converters.values())

@@ -242,7 +242,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
     
     return line
 
-def change_line_AC_to_expandable(grid, line_name):
+def change_line_AC_to_expandable(grid, line_name,update_grid=True):
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -271,7 +271,8 @@ def change_line_AC_to_expandable(grid, line_name):
         }
         expandable_line = Exp_Line_AC(**line_vars)
         grid.lines_AC_exp.append(expandable_line)
-        grid.Update_Graph_AC()
+        if update_grid:
+            grid.Update_Graph_AC()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
@@ -279,7 +280,8 @@ def change_line_AC_to_expandable(grid, line_name):
     
     for i, line in enumerate(grid.lines_AC_exp):
         line.lineNumber = i 
-    grid.create_Ybus_AC()
+    if update_grid:
+        grid.create_Ybus_AC()
     return expandable_line    
 
 def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):

@@ -192,7 +192,7 @@ def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_co
        element.exp = exp
 
 
-def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None, exp=None):
+def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_cost=None,per_unit_cost=None, exp=None,update_grid=True):
     
     if N_max is None:
         N_max= N_b+20
@@ -200,7 +200,7 @@ def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_co
     for l in grid.lines_AC:
         if name == l.name:
             from .Class_editor import change_line_AC_to_expandable
-            exp_l=change_line_AC_to_expandable(grid, name)
+            exp_l=change_line_AC_to_expandable(grid, name,update_grid)
             exp_l.np_line_opf = True
             update_attributes(exp_l, N_b,N_i, N_max,Life_time, base_cost, per_unit_cost, exp)
             continue
