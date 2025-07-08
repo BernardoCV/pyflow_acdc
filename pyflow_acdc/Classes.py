@@ -2303,7 +2303,11 @@ class AC_DC_converter:
         # if self.AC_type=='Slack':
         #     # print(name)mm
         #     self.type='PAC'
-        
+
+        self.power_loss_model = 'quadratic'
+        self.Vsum = 0
+
+
         self.type = DC_type
 
         self.R_t = Transformer_resistance/self.cn_pol

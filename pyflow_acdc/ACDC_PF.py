@@ -567,11 +567,23 @@ def flow_conv_P_AC(grid, conv):
 
     Pc = np.real(Sc)
     
-    # AC to DC
-    if conv.P_AC > 0:  # DC to AC
-        P_loss = conv.a_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic
-    else:  # AC to DC
-        P_loss = conv.a_conv+conv.b_conv*Ic+conv.c_rect*Ic*Ic
+    if conv.power_loss_model == 'MMC':
+         Vdc = conv.Node_DC.V
+         
+         if conv.P_DC < 0:  # DC to AC
+             Ra = conv.c_inver
+         else:  # AC to DC
+             Ra = conv.c_rect
+         
+         I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
+
+         P_loss = 3*I**2*Ra
+         conv.Vsum = -Ra*I + Vdc
+    else:
+        if conv.P_AC > 0:  # DC to AC
+            P_loss = conv.a_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic
+        else:  # AC to DC
+            P_loss = conv.a_conv+conv.b_conv*Ic+conv.c_rect*Ic*Ic
 
     P_DC = -Pc-P_loss
 
@@ -745,13 +757,28 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
             print(f'Warning  converter {conv.name} did not converge')
             print(f'Lowest tolerance reached: {np.round(tol,decimals=6)}')
 
-        Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
+        
+        if conv.power_loss_model == 'MMC':
+            Vdc = conv.Node_DC.V
+            
+            if conv.P_DC < 0:  # DC to AC
+                Ra = conv.c_inver
+            else:  # AC to DC
+                Ra = conv.c_rect
+            
+            I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
-        if conv.P_DC < 0:  # DC to AC
-            P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_inver*Ic*Ic
-        else:  # AC to DC
-            P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_rect*Ic*Ic
+            P_loss = 3*I**2*Ra
+            conv.Vsum = -Ra*I + Vdc
+        else:
 
+            Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
+        
+            if conv.P_DC < 0:  # DC to AC
+                P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.NumConvP
+            else:  # AC to DC
+                P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.NumConvP
+        
         Pc_new = -conv.P_DC-P_loss
 
         tol2 = abs(Pc_known-Pc_new)
@@ -847,13 +874,29 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
             print(f'Warning  converter {conv.name} did not converge')
             print(f'Lowest tolerance reached: {np.round(tol,decimals=6)}')
             print(f'Lowest tolerance reached: {np.round(tol,decimals=6)}')
+            
+        if conv.power_loss_model == 'MMC':
+            Vdc = conv.Node_DC.V
+            
+            if conv.P_DC < 0:  # DC to AC
+                Ra = conv.c_inver
+            else:  # AC to DC
+                Ra = conv.c_rect
+            
+            I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
-        Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
+            P_loss = 3*I**2*Ra
+            conv.Vsum = -Ra*I + Vdc
+        else:
 
-        if conv.P_DC < 0:  # DC to AC
-            P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.NumConvP
-        else:  # AC to DC
-            P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.NumConvP
+            Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
+        
+            if conv.P_DC < 0:  # DC to AC
+                P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.NumConvP
+            else:  # AC to DC
+                P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.NumConvP    
+            
+        
 
         Pc_new = -conv.P_DC-P_loss
 
@@ -960,13 +1003,27 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
             print(f'Warning  converter {conv.name} did not converge')
             print(f'Lowest tolerance reached: {np.round(tol,decimals=6)}')
 
-        Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
+        if conv.power_loss_model == 'MMC':
+            Vdc = conv.Node_DC.V
+            
+            if conv.P_DC < 0:  # DC to AC
+                Ra = conv.c_inver
+            else:  # AC to DC
+                Ra = conv.c_rect
+            
+            I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
-        if conv.P_DC < 0:  # DC to AC
-            P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.NumConvP
-        else:  # AC to DC
-            P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.NumConvP
+            P_loss = 3*I**2*Ra
+            conv.Vsum = -Ra*I + Vdc
+        else:
 
+            Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
+        
+            if conv.P_DC < 0:  # DC to AC
+                P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.NumConvP
+            else:  # AC to DC
+                P_loss = conv.a_conv* conv.NumConvP+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.NumConvP
+        # print(f'{conv.name} - {P_loss}')
         Pc_new = -conv.P_DC-P_loss
 
         tol2 = abs(Pc_known-Pc_new)
@@ -991,7 +1048,9 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
 
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
-    conv.Ic = Ic
+    
+
+    conv.Ic =  np.sqrt(Pc*Pc+Qc*Qc)/Uc
     
     grid.Ps_AC_new[conv.Node_AC.nodeNumber] += Ps
     s=1
