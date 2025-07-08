@@ -100,7 +100,7 @@ By running the following code, the results will be printed in the terminal.
 
    grid,res = pyf.Stagg5MATACDC()
    pyf.ACDC_sequential(grid)
-   res.All
+   res.All()
 
 
 .. _res_ac_powerflow:
@@ -173,7 +173,7 @@ By running the following code, the results will be printed in the terminal.
       Results AC Lines Currents
       Grid AC 1
       +------+----------+--------+-------------+-----------+-----------+----------------+
-      | Line | From bus | To bus | i from (kA) | i to (kA) | Loading % | Capacity [MVA] |
+      | Line | From bus | To bus | I from (kA) | I to (kA) | Loading % | Capacity [MVA] |
       +------+----------+--------+-------------+-----------+-----------+----------------+
       |  1   |    1     |   2    |    0.192    |   0.198   |   81.019  |      150       |
       |  2   |    1     |   3    |    0.059    |   0.063   |   37.561  |      100       |
@@ -283,11 +283,11 @@ DC Specific Results
       Results DC Lines current
       Grid DC 1
       +------+----------+--------+--------+-----------+---------------+------------------------------------+
-      | Line | From bus | To bus | I (kA) | Loading % | Capacity [MW] | Polarity                           |
+      | Line | From bus | To bus | I (kA) | Loading % | Capacity [kA] | Polarity                           |
       +------+----------+--------+--------+-----------+---------------+------------------------------------+
-      |  1   |    1     |   2    | -0.044 |   30.681  |      100      | Monopolar (symmetrically grounded) |
-      |  2   |    2     |   3    | -0.012 |   8.519   |      100      | Monopolar (symmetrically grounded) |
-      |  3   |    1     |   3    | -0.04  |   27.971  |      100      | Monopolar (symmetrically grounded) |
+      |  1   |    1     |   2    | 0.044  |   30.681  |     0.145     | Monopolar (symmetrically grounded) |
+      |  2   |    2     |   3    | 0.012  |   8.519   |     0.145     | Monopolar (symmetrically grounded) |
+      |  3   |    1     |   3    |  0.04  |   27.971  |     0.145     | Monopolar (symmetrically grounded) |
       +------+----------+--------+--------+-----------+---------------+------------------------------------+
 
 
@@ -304,13 +304,13 @@ DC Specific Results
 
       Results DC Lines power
       Grid DC 1
-      +------+----------+--------+-------------+-----------+-----------------+
-      | Line | From bus | To bus | P from (MW) | P to (MW) | Power loss (MW) |
-      +------+----------+--------+-------------+-----------+-----------------+
-      |  1   |    1     |   2    |    30.681   |   -30.44  |      0.241      |
-      |  2   |    2     |   3    |    8.519    |    -8.5   |      0.019      |
-      |  3   |    1     |   3    |    27.971   |   -27.69  |      0.281      |
-      +------+----------+--------+-------------+-----------+-----------------+
+      +------+----------+--------+-------------+-----------+-----------------+---------------+
+      | Line | From bus | To bus | P from (MW) | P to (MW) | Power loss (MW) | Capacity [MW] |
+      +------+----------+--------+-------------+-----------+-----------------+---------------+
+      |  1   |    1     |   2    |    30.681   |   -30.44  |      0.241      |      100      |
+      |  2   |    2     |   3    |    8.519    |    -8.5   |      0.019      |      100      |
+      |  3   |    1     |   3    |    27.971   |   -27.69  |      0.281      |      100      |
+      +------+----------+--------+-------------+-----------+-----------------+---------------+
 
 
 .. _res_dc_slack:

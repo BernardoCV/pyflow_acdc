@@ -78,8 +78,8 @@ def Stagg5MATACDC():
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 
     gen_data = [
-        {'Gen_name': '1','Node': '1', 'PsetMW': 0,'QsetMVA': 0,'MWmax': 250,'MWmin': 10,'MVARmax': 500,'MVARmin': -500},
-        {'Gen_name': '2','Node': '2', 'PsetMW': 40,'QsetMVA': 0,'MWmax': 300,'MWmin': 10,'MVARmax': 300,'MVARmin': -300}
+        {'Gen': '1','Node': '1', 'PsetMW': 0,'QsetMVA': 0,'MWmax': 250,'MWmin': 10,'MVARmax': 500,'MVARmin': -500},
+        {'Gen': '2','Node': '2', 'PsetMW': 40,'QsetMVA': 0,'MWmax': 300,'MWmin': 10,'MVARmax': 300,'MVARmin': -300}
     ]
     gen = pd.DataFrame(gen_data)
 
