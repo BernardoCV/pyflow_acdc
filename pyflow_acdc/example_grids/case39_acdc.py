@@ -78,6 +78,9 @@ Converted to PyFlowACDC format from
 %   MATPOWER
 %   $Id: case39.m 1559 2010-03-10 18:08:32Z ray $
 
+This grid has been modified to include Transmision expansion costs, as well as additional DC lines by Bernardo Castro Valerio (2025)
+
+
 """
 
 def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1):    

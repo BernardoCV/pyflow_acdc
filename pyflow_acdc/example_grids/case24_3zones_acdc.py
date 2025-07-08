@@ -40,6 +40,8 @@ Converted to PyFlowACDC format from
 generator C(0) modified to 0
 
 
+This grid has been modified to include Transmision expansion costs, as well as additional DC lines by Bernardo Castro Valerio (2025)
+
 """
 
 def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3):    
