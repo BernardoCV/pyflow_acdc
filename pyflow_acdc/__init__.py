@@ -69,6 +69,7 @@ __all__ = [
     'add_ACDC_converter',
     'add_DCDC_converter',
     'add_gen',
+    'add_gen_DC',
     'add_extGrid',
     'add_RenSource',
     'add_generators',

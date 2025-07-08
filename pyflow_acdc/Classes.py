@@ -162,7 +162,7 @@ class Grid:
         
         
         self.Generators =[]
-        
+        self.Generators_DC =[]
         
         self.RenSource_zones=[]
         self.RenSource_zones_dic={}
@@ -259,6 +259,10 @@ class Grid:
     @property
     def n_gen(self):
         return len(self.Generators) if self.Generators is not None else 0
+    
+    @property
+    def n_gen_DC(self):
+        return len(self.Generators_DC) if self.Generators_DC is not None else 0
     
     # AC grid properties
     @property
@@ -602,6 +606,7 @@ class Grid:
         self.P_DC = np.vstack([node.PGi-node.PLi
                                +node.PconvDC
                                +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                               +sum(gen.PGen for gen in node.connected_gen)
                                 for node in self.nodes_DC])
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
         
@@ -724,7 +729,7 @@ class Grid:
             
     def create_Ybus_DC(self):
         self.Ybus_DC = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
-
+        self.Ybus_DC_full = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
         # off diagonal elements
         for k in range(self.nl_DC):
             line = self.lines_DC[k]
@@ -734,10 +739,13 @@ class Grid:
                 s=1
             self.Ybus_DC[fromNode, toNode] -= line.np_line/line.R
             self.Ybus_DC[toNode, fromNode] = self.Ybus_DC[fromNode, toNode]
+            self.Ybus_DC_full[fromNode, toNode] -= line.np_line*line.pol/line.R
+            self.Ybus_DC_full[toNode, fromNode] = self.Ybus_DC_full[fromNode, toNode]
 
         # Diagonal elements
         for m in range(self.nn_DC):
             self.Ybus_DC[m, m] = -self.Ybus_DC[:,m].sum() if self.Ybus_DC[:, m].sum() != 0 else 1.0
+            self.Ybus_DC_full[m, m] = -self.Ybus_DC_full[:,m].sum() if self.Ybus_DC_full[:, m].sum() != 0 else 1.0
 
     def Check_SlacknDroop(self, change_slack2Droop):
         for conv in self.Converters_ACDC:
@@ -833,7 +841,8 @@ class Grid:
     def Line_DC_calc(self):
         V = self.V_DC
         Ybus = self.Ybus_DC
-        self.I_DC = np.matmul(Ybus, V)
+        
+        # self.I_DC = np.matmul(Ybus, V)
 
         Iij = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
         Pij_DC = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
@@ -952,6 +961,73 @@ class Gen_AC:
 
         Gen_AC.names.add(self.name)
         
+       
+class Gen_DC:
+    genNumber_DC =0
+    names = set()
+    
+    @classmethod
+    def reset_class(cls):
+        cls.genNumber_DC = 0
+        cls.names = set()
+             
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
+    
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type='Other',installation_cost:float=0):
+        self.genNumber_DC = Gen_DC.genNumber_DC
+        Gen_DC.genNumber_DC += 1
+        self.Node_DC=node.name
+        self.geometry= node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+        self.gen_type=gen_type
+        self.Max_pow_gen=Max_pow_gen
+        self.Min_pow_gen=Min_pow_gen
+      
+        self.np_gen_i = 1
+        self.np_gen_b = 1
+        self.np_gen = 1
+        self.np_gen_max=3
+        self.np_gen_opf = False
+
+        self.lf=linear_cost_factor
+        self.qf=quadratic_cost_factor
+        self.fc=fixed_cost
+
+        self.Life_time = 30
+        self.base_cost = installation_cost
+       
+        self.price_zone_link = False
+        
+        node.connected_gen.append(self)
+        
+        self.PGen=Pset
+       
+        self.Pset=Pset
+       
+        
+        if name in Gen_DC.names:
+            count = 1
+            new_name = f"{name}_{count}"
+            
+            while new_name in Gen_DC.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
+        if name is None:
+            self._name = str(node.name)
+        else:
+            self._name = name
+
+        Gen_DC.names.add(self.name)
+            
 class Ren_Source:
     rsNumber =0
     names = set()

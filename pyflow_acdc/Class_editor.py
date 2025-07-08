@@ -27,6 +27,7 @@ __all__ = [
     'add_ACDC_converter',
     'add_DCDC_converter',
     'add_gen',
+    'add_gen_DC',
     'add_extGrid',
     'add_RenSource',
     'add_generators',
@@ -603,7 +604,46 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,
     
     return gen
             
-            
+def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=99999,MWmin=0,PsetMW=0,fuel_type='Other',geometry= None,installation_cost:float=0,np_gen:int=1):
+    
+    Max_pow_gen=MWmax/Grid.S_base
+    Min_pow_gen=MWmin/Grid.S_base
+    Pset=PsetMW/Grid.S_base
+    
+    found=False    
+    for node in Grid.nodes_DC:
+   
+        if node_name == node.name:
+             gen = Gen_DC(gen_name, node,Max_pow_gen,Min_pow_gen,qf,lf,fc,Pset,installation_cost)
+             node.PGi = 0
+             if fuel_type not in [
+             "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
+             "Solid Biomass",  "Other", "Waste", "Biogas", "Geothermal"
+             ]:
+                 fuel_type = 'Other'
+             gen.gen_type = fuel_type
+             gen.np_gen = np_gen
+             if geometry is not None:
+                 if isinstance(geometry, str): 
+                      geometry = loads(geometry)  
+                 gen.geometry= geometry
+             found = True
+             break
+
+    if not found:
+            print('Node does not exist')
+            sys.exit()
+    gen.price_zone_link=price_zone_link
+    
+    if price_zone_link:
+        
+        gen.qf= 0
+        gen.lf= node.price
+    Grid.Generators_DC.append(gen)
+    
+    return gen
+
+
 def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
     
     

@@ -57,7 +57,7 @@ class Results:
 
         self.Power_loss()
         if self.Grid.OPF_run :
-            if self.Grid.Generators != []:
+            if self.Grid.Generators != [] or self.Grid.Generators_DC != []:
                 self.Ext_gen()
             if self.Grid.RenSources:
                 self.Ext_REN()
@@ -233,7 +233,9 @@ class Results:
 
         if self.Grid.nodes_DC != []:
             for node in self.Grid.nodes_DC:
-                generation+= (node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource))*self.Grid.S_base
+                generation+= (node.PGi
+                              +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                              +sum(gen.PGen for gen in node.connected_gen if gen.PGen >0))*self.Grid.S_base
                 grid_loads += node.PLi*self.Grid.S_base
 
 
@@ -903,7 +905,29 @@ class Results:
             Stot+=S
             costtot+=cost
             Ltot+=base
+
+        for gen in self.Grid.Generators_DC:
+          if gen.np_gen>0.001:  
+            Pgi=gen.PGen*self.Grid.S_base
             
+            base=gen.Max_pow_gen*self.Grid.S_base
+            base *= gen.np_gen
+            load=Pgi/base*100
+            fc=gen.fc*gen.np_gen
+            cost=(Pgi**2*gen.qf+Pgi*gen.lf+fc)/1000
+           
+                
+            table.add_row([gen.name,gen.Node_DC, np.round(Pgi, decimals=self.dec), "----",
+                           np.round(gen.qf, decimals=self.dec),  np.round(gen.lf, decimals=self.dec),np.round(fc, decimals=self.dec),
+                           np.round(load, decimals=self.dec), np.round(cost, decimals=0)])
+            Pabs+=abs(Pgi)
+            
+            Ptot+=Pgi
+            
+            Stot+=Pgi
+            costtot+=cost
+            Ltot+=base
+
         if Ltot !=0:
             load=Stot/Ltot*100
         else:
@@ -1332,13 +1356,13 @@ class Results:
         print('Results DC Lines current')
         table_all = pt()
         table_all.field_names = [
-            "Line", "From bus", "To bus", "I (kA)", "Loading %","Capacity [MW]" ,"Polarity", "Grid"]
+            "Line", "From bus", "To bus", "I (kA)", "Loading %","Capacity [kA]" ,"Polarity", "Grid"]
         for g in range(self.Grid.Num_Grids_DC):
             print(f'Grid DC {g+1}')
             tablei = pt()
 
             tablei.field_names = ["Line", "From bus",
-                                  "To bus", "I (kA)", "Loading %","Capacity [MW]", "Polarity"]
+                                  "To bus", "I (kA)", "Loading %","Capacity [kA]", "Polarity"]
             tablei.align["Polarity"] = 'l'
 
             for line in self.Grid.lines_DC:
@@ -1350,7 +1374,9 @@ class Results:
                     j = line.toNode.nodeNumber
                     I_base = self.Grid.S_base/line.kV_base
                     i_to = self.Grid.Iij_DC[j, i]*I_base
-
+                    i_from = self.Grid.Iij_DC[i, j]*I_base
+                    line_current = max(abs(i_to),abs(i_from))
+    
                     p_to = line.toP*self.Grid.S_base/line.np_line
                     p_from = line.fromP*self.Grid.S_base/line.np_line
 
@@ -1364,9 +1390,9 @@ class Results:
                         pol = "Bipolar"
 
                     tablei.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating*line.np_line) ,pol])
+                        line_current, decimals=self.dec), np.round(load, decimals=self.dec),np.round(line.MW_rating*line.np_line/(line.kV_base*line.pol),decimals=self.dec) ,pol])
                     table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        i_to, decimals=self.dec), np.round(load, decimals=self.dec),int(line.MW_rating*line.np_line), pol, g+1])
+                        line_current, decimals=self.dec), np.round(load, decimals=self.dec),np.round(line.MW_rating*line.np_line/(line.kV_base*line.pol),decimals=self.dec), pol, g+1])
 
             if len(tablei.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablei)
@@ -1384,12 +1410,12 @@ class Results:
         print('Results DC Lines power')
         table_all = pt()
         table_all.field_names = ["Line", "From bus", "To bus",
-                                 "P from (MW)", "P to (MW)", "Power loss (MW)", "Grid"]
+                                 "P from (MW)", "P to (MW)", "Power loss (MW)", "Capacity [MW]","Grid"]
         for g in range(self.Grid.Num_Grids_DC):
             print(f'Grid DC {g+1}')
             tablep = pt()
             tablep.field_names = ["Line", "From bus", "To bus",
-                                  "P from (MW)", "P to (MW)", "Power loss (MW)"]
+                                  "P from (MW)", "P to (MW)", "Power loss (MW)", "Capacity [MW]"]
 
             for line in self.Grid.lines_DC:
                 if line.np_line <= 0.01:
@@ -1404,9 +1430,9 @@ class Results:
                     Ploss = np.real(line.loss)*self.Grid.S_base
 
                     tablep.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        p_from, decimals=self.dec), np.round(p_to, decimals=self.dec), np.round(Ploss, decimals=self.dec)])
+                        p_from, decimals=self.dec), np.round(p_to, decimals=self.dec), np.round(Ploss, decimals=self.dec),int(line.MW_rating*line.np_line)])
                     table_all.add_row([line.name, line.fromNode.name, line.toNode.name, np.round(
-                        p_from, decimals=self.dec), np.round(p_to, decimals=self.dec), np.round(Ploss, decimals=self.dec), g+1])
+                        p_from, decimals=self.dec), np.round(p_to, decimals=self.dec), np.round(Ploss, decimals=self.dec),int(line.MW_rating*line.np_line),g+1])
 
             if len(tablep.rows) > 0:  # Check if the table is not None and has at least one row
                 print(tablep)
