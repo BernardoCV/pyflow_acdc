@@ -1032,6 +1032,7 @@ def mmc_loss(conv,Pc):
     I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
     P_loss = 3*I**2*Ra
+    P_loss2 = 6*I**2*Ra
     conv.Vsum = -Ra*I + Vdc
     return P_loss,I
 
