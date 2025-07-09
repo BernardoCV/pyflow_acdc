@@ -1472,10 +1472,7 @@ def Converter_constraints(model,grid,Conv_info):
         if element.power_loss_model == 'MMC':
              Vdc = model.V_DC[element.Node_DC.nodeNumber]
              Pc  = model.P_conv_c_AC[conv]
-             if element.P_DC < 0:  # DC to AC
-                 Ra = element.c_inver
-             else:  # AC to DC
-                 Ra = element.c_rect
+             Ra  = element.ra
              
              I = (-Vdc +pyo.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
