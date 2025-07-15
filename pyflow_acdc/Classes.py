@@ -144,6 +144,7 @@ class Grid:
         self.MixedBinCont = False
         self.TEP_n_years = 25
         self.TEP_discount_rate =0.02
+        self.Array_opf = False
         
         self.name = 'Grid'
         
@@ -704,19 +705,19 @@ class Grid:
             line = self.lines_AC_ct[k]
             fromNode = line.fromNode.nodeNumber
             toNode = line.toNode.nodeNumber
+            if line.active_config >=0:
+                branch_ff = line.Ybus_list[line.active_config][0, 0]
+                branch_ft = line.Ybus_list[line.active_config][0, 1]
+                branch_tf = line.Ybus_list[line.active_config][1, 0]
+                branch_tt = line.Ybus_list[line.active_config][1, 1]
 
-            branch_ff = line.Ybus_list[line.active_config][0, 0]
-            branch_ft = line.Ybus_list[line.active_config][0, 1]
-            branch_tf = line.Ybus_list[line.active_config][1, 0]
-            branch_tt = line.Ybus_list[line.active_config][1, 1]
-
-            self.Ybus_AC_full[toNode, fromNode]+=branch_tf
-            self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+                self.Ybus_AC_full[toNode, fromNode]+=branch_tf
+                self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+                
+                
+                Ybus_nn_full[fromNode] += branch_ff
+                Ybus_nn_full[toNode] += branch_tt
             
-            
-            Ybus_nn_full[fromNode] += branch_ff
-            Ybus_nn_full[toNode] += branch_tt
-        
         for m in range(self.nn_AC):
             node = self.nodes_AC[m]
 
@@ -1215,7 +1216,8 @@ class Node_AC:
         self.price = 0.0
         self.Num_conv_connected=0
         self.connected_conv=set()
-   
+    
+        self.ct_limit=2
         
         self.curtailment=1
 
@@ -1685,7 +1687,7 @@ class rec_Line_AC(Line_AC):
                                         [branch_tf_new, branch_tt_new]])
 
 
-class Line_sizing(Line_AC):
+class Size_selection(Line_AC):
     lineNumber = 0
     names = set()
 
@@ -1723,8 +1725,8 @@ class Line_sizing(Line_AC):
 
     def __init__(self, fromNode: Node_AC, toNode: Node_AC, cable_types: list = None, active_config: int = 0, Length_km:float=1.0, S_base:float=100, name=None,geometry=None):       
         # Initialize basic line parameters
-        self.lineNumber = Line_sizing.lineNumber
-        Line_sizing.lineNumber += 1
+        self.lineNumber = Size_selection.lineNumber
+        Size_selection.lineNumber += 1
         
         self.Length_km = Length_km
         self.S_base = S_base
@@ -1755,7 +1757,10 @@ class Line_sizing(Line_AC):
         self.fromS = 0
         self.toS = 0
         self.loss = 0
-        # If cablez types are provided, validate and calculate parameters
+        self.P_loss =0
+    
+        
+        # If cable types are provided, validate and calculate parameters
         if self._cable_types:
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
@@ -1764,7 +1769,9 @@ class Line_sizing(Line_AC):
             
             # Calculate parameters for all configurations
             self._calculate_all_parameters()
-
+        else:
+            # No cable types provided - set default zero parameters
+            self._set_zero_parameters()
             
         # Add array-specific attributes
         self.array_opf = True  # Flag for optimization
@@ -1784,24 +1791,37 @@ class Line_sizing(Line_AC):
     
     @active_config.setter
     def active_config(self, value):
-        if not 0 <= value < len(self._cable_types):
-            raise ValueError(f"Configuration index must be between 0 and {len(self._cable_types)-1}")
+        if not -1 <= value < len(self._cable_types):
+            raise ValueError(f"Configuration index must be between -1 and {len(self._cable_types)-1}")
         self._active_config = value
         self._update_active_parameters()
         
     def _update_active_parameters(self):
         """Update the line parameters based on the active configuration."""
-        self.R = self.R_list[self._active_config]
-        self.X = self.X_list[self._active_config]
-        self.G = self.G_list[self._active_config]
-        self.B = self.B_list[self._active_config]
-        self.MVA_rating = self.MVA_rating_list[self._active_config]
-        self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
-        self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
+        if self._active_config == -1 or not self._cable_types:
+            # No cable selected or no cable types available
+            self._set_zero_parameters()
+        else:
+            self.R = self.R_list[self._active_config]
+            self.X = self.X_list[self._active_config]
+            self.G = self.G_list[self._active_config]
+            self.B = self.B_list[self._active_config]
+            self.MVA_rating = self.MVA_rating_list[self._active_config]
+            self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
+            self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
+        
+    def _set_zero_parameters(self):
+        """Set all parameters to zero (no cable selected)."""
+        self.R = 0
+        self.X = 0
+        self.G = 0
+        self.B = 0
+        self.MVA_rating = 0
+        self.Ybus_branch = np.zeros((2, 2), dtype=complex)  # Zero Ybus matrix
         
     def _calculate_all_parameters(self):
         """Calculate and store parameters for all configurations."""
-            # Initialize parameter lists
+        # Initialize parameter lists
         self.R_list = []
         self.X_list = []
         self.G_list = []
@@ -1881,6 +1901,15 @@ class Line_sizing(Line_AC):
     def get_cost_parameter(self,cable_type):
         return self._cable_database.loc[cable_type, 'Cost_per_km'] if 'Cost_per_km' in self._cable_database.columns else 1
     
+    def set_no_cable(self):
+        """Set the line to have no cable selected (zero Ybus matrix)."""
+        self._active_config = -1
+        self._update_active_parameters()
+    
+    def has_cable_selected(self):
+        """Check if a cable is currently selected."""
+        return self._active_config >= 0 and self._cable_types
+
 class Cable_options:
     Cable_options_num = 0
     names = set()

@@ -357,6 +357,10 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     model.name        ="TEP MTDC AC/DC hybrid OPF"
 
     OPF_createModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    if solver == 'ipopt':
+        model.relaxed = True
+    else:
+        model.relaxed = False
 
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_OPF = OPF_obj(model,grid,weights_def,True)
@@ -642,6 +646,8 @@ def TEP_obj(model,grid,NPV):
                 else:
                     for ct in model.ct_set:
                         Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]/line.life_time_hours
+        if model.relaxed:
+            Inv_array += sum(model.ct_penalty[l,ct] for l in model.lines_AC_ct for ct in model.ct_set)
         return Inv_array
         
     
@@ -676,17 +682,43 @@ def TEP_obj(model,grid,NPV):
     def ct_cable_type_rule(model, line):
         return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
     
+    
     def ct_types_upper_bound(model, ct):
         return sum(model.ct_branch[l, ct] for l in model.lines_AC_ct) <= len(model.lines_AC_ct) * model.ct_types[ct]
 
     def ct_types_lower_bound(model, ct):
         return model.ct_types[ct] <= sum(model.ct_branch[l, ct] for l in model.lines_AC_ct)
         
+    def ct_Array_cable_type_rule(model, line):
+        return sum(model.ct_branch[line, ct] for ct in model.ct_set) <= 1
+    def ct_node_limit_rule(model, node):
+        nAC = grid.nodes_AC[node]
+        connections = 0
+        for line in nAC.connected_toCTLine:
+           for ct in model.ct_set:
+               connections += model.ct_branch[line.lineNumber,ct]
+        for line in nAC.connected_fromCTLine:
+           for ct in model.ct_set:
+               connections += model.ct_branch[line.lineNumber,ct]       
+        return connections <= nAC.ct_limit
+    
+    def ct_penalty_rule(model,line,ct):
+        return model.ct_penalty[line,ct] == grid.ct_lamda*model.ct_branch[line,ct]*(1-model.ct_branch[line,ct])
+    
+    
     if grid.CT_AC:
-        model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)
+        
         model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
         model.ct_types_lower_bound = pyo.Constraint(model.ct_set, rule=ct_types_lower_bound)
         model.CT_limit_constraint = pyo.Constraint(rule=CT_limit_rule)
+        if grid.Array_opf:
+            model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_Array_cable_type_rule)
+            model.ct_node_limit_constraint = pyo.Constraint(model.nodes_AC, rule=ct_node_limit_rule)
+            if model.relaxed:
+                model.ct_penalty = pyo.Var(model.lines_AC_ct, model.ct_set, within=pyo.NonNegativeReals)
+                model.ct_penalty_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=ct_penalty_rule)
+        else:
+            model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)    
         inv_array = Array_investments()
     else:
         inv_array = 0

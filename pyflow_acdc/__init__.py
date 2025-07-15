@@ -86,6 +86,7 @@ __all__ = [
     # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
+    'Create_grid_from_turbine_graph',
     'Extend_grid_from_data',
     
     # Line Modifications

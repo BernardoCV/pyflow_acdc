@@ -12,6 +12,7 @@ from .Class_editor import Cable_parameters, Converter_parameters, add_gen
 __all__ = [ # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
+    'Create_grid_from_turbine_graph',
     'Extend_grid_from_data',
     'initialize_pyflowacdc'
 ]
@@ -20,7 +21,7 @@ def initialize_pyflowacdc():
     Node_AC.reset_class()
     Node_DC.reset_class()
     Line_AC.reset_class()
-    Line_sizing.reset_class()
+    Size_selection.reset_class()
    
     Line_DC.reset_class()
     TF_Line_AC.reset_class()  # Add this
@@ -660,7 +661,49 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,ct_lamda=10^6):
+    from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
 
+    turbines_df = Data["turbine"]
+    substations_df = Data["offshore_substation"]
+    
+
+    initialize_pyflowacdc()
+    grid = Grid(S_base)
+    res = Results(grid)
+
+    cable_option = add_cable_option(grid,cable_types)
+    
+    for node, attrs in array_graph.nodes(data=True):
+        if attrs['type'] == 'turbine':
+            kV=   turbines_df.loc[attrs['original_idx']].kV_rating
+            geo = turbines_df.loc[attrs['original_idx']].geometry
+        else: 
+            kV=   substations_df.loc[attrs['original_idx']].kV_rating
+            geo = substations_df.loc[attrs['original_idx']].geometry
+
+        node = add_AC_node(grid, kV, node_type='PQ',geometry=geo,name=str(attrs['original_idx']))
+
+        if attrs['type'] == 'turbine':
+            add_RenSource(grid,node,turbines_df.loc[attrs['original_idx']].MW_rating,ren_type='Wind',min_gamma=1-curtailment_allowed,Qrel=0)
+            node.ct_limit = turbines_df.loc[attrs['original_idx']].connections
+        if attrs['type'] == 'substation':
+            add_extGrid(grid,node,MVAmax=99999,Allow_sell=True)
+            node.ct_limit = substations_df.loc[attrs['original_idx']].connections
+    for u,v, attrs in array_graph.edges(data=True):
+        tonode = str(array_graph.nodes[u]['original_idx'])
+        fromnode = str(array_graph.nodes[v]['original_idx'])
+                
+        l = attrs['weight']/1000
+        geo= attrs['geometry']
+        add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
+        
+    grid.Update_Graph_AC()
+    grid.create_Ybus_AC()
+    grid.Array_opf = True  
+    grid.cab_types_allowed = cable_types_allowed
+    grid.ct_lamda =ct_lamda 
+    return grid, res
 
 def Create_grid_from_mat(matfile):
     if not matfile.endswith('.mat'):
