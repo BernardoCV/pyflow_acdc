@@ -1789,8 +1789,10 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
             model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch)
         
         if grid.CT_AC:
-            model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
-
+            if not grid.Array_opf:
+                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
+            else:
+                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=0)
     if grid.DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         P_lineDC_limit,NP_lineDC    = DC_lines_info
@@ -2096,12 +2098,23 @@ def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             
             def process_line_AC_CT(line):
                 l = line.lineNumber
-                line.active_config = np.where([lines_AC_CT[l][ct] >= 0.99999 for ct in model.ct_set])[0][0]
-                ct = list(model.ct_set)[line.active_config]
-                Pfrom = lines_AC_CT_fromP[l][ct]
-                Pto   = lines_AC_CT_toP[l][ct]
-                Qfrom = lines_AC_CT_fromQ[l][ct]
-                Qto   = lines_AC_CT_toQ[l][ct]
+                ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
+                if any(ct_selected):
+                    line.active_config = np.where(ct_selected)[0][0]
+                    ct = list(model.ct_set)[line.active_config]
+                    Pfrom = lines_AC_CT_fromP[l][ct]
+                    Pto   = lines_AC_CT_toP[l][ct]
+                    Qfrom = lines_AC_CT_fromQ[l][ct]
+                    Qto   = lines_AC_CT_toQ[l][ct]
+                else:
+                    line.active_config = -1
+                    Pfrom = 0
+                    Pto   = 0
+                    Qfrom = 0
+                    Qto   = 0
+                
+                
+                
                 line.fromS = (Pfrom + 1j*Qfrom)
                 line.toS = (Pto + 1j*Qto)
                 line.loss = line.fromS + line.toS

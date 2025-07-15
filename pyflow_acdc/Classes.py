@@ -1741,7 +1741,7 @@ class Size_selection(Line_AC):
         self._cable_types = cable_types if cable_types is not None else []
         self.ini_active_config = active_config
         self._active_config = active_config
-     
+        self.direction = 'from'
         # Initialize parameter lists
         self.R_list = []
         self.X_list = []

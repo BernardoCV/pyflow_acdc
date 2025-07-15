@@ -871,12 +871,21 @@ def get_line_data(t, model, grid):
         for l in grid.lines_AC_ct:
             if l.array_opf:
                 ln = l.lineNumber
-                active_config = np.where([pyo.value(model.ct_branch[ln,ct]) >= 0.99999 for ct in model.ct_set])[0][0]
-                ct = list(model.ct_set)[active_config]
-                P_to = np.float64(pyo.value(model.submodel[t].ct_PAC_to[ln,ct])) * grid.S_base
-                P_from = np.float64(pyo.value(model.submodel[t].ct_PAC_from[ln,ct])) * grid.S_base
-                Q_to = np.float64(pyo.value(model.submodel[t].ct_QAC_to[ln,ct])) * grid.S_base
-                Q_from = np.float64(pyo.value(model.submodel[t].ct_QAC_from[ln,ct])) * grid.S_base
+                # Check if any conductor type is selected
+                ct_selected = [pyo.value(model.ct_branch[ln,ct]) >= 0.99999 for ct in model.ct_set]
+                if any(ct_selected):
+                    active_config = np.where(ct_selected)[0][0]
+                    P_to = np.float64(pyo.value(model.submodel[t].ct_PAC_to[ln,active_config])) * grid.S_base
+                    P_from = np.float64(pyo.value(model.submodel[t].ct_PAC_from[ln,active_config])) * grid.S_base
+                    Q_to = np.float64(pyo.value(model.submodel[t].ct_QAC_to[ln,active_config])) * grid.S_base
+                    Q_from = np.float64(pyo.value(model.submodel[t].ct_QAC_from[ln,active_config])) * grid.S_base
+                else:
+                    active_config = -1  # or None, or handle appropriately
+                    P_to = 0
+                    P_from = 0
+                    Q_to = 0
+                    Q_from = 0
+                
                 S_to = np.sqrt(P_to**2 + Q_to**2)
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating_list[active_config] * 100
@@ -1072,7 +1081,13 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         for line in grid.lines_AC_ct:
             l=line.lineNumber
-            line.active_config = np.where([lines_AC_CT[l][ct] >= 0.75 for ct in model.ct_set])[0][0]
+            # Check if any conductor type is selected
+            ct_selected = [lines_AC_CT[l][ct] >= 0.90 for ct in model.ct_set]
+            if any(ct_selected):
+                line.active_config = np.where(ct_selected)[0][0]
+            else:
+                line.active_config = -1  # or None, or handle appropriately
+                # This line has no conductor type selected
     
     if DCmode:
         NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   

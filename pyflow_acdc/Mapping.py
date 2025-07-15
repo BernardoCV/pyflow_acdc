@@ -90,7 +90,8 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 ant_v = True
             if ant_path == 'All' and VL != 'MV':
                 ant_v = True
-           
+
+            thck= getattr(line_obj, 'np_line', 1)
             if coloring == 'loss':
                 color = colormap(np.real(line_obj.loss))
                 # print(f'{np.real(line.loss)} - {color}')
@@ -120,12 +121,17 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     12: 'salmon', 
                     13: 'olive'
                 }
-                color= cable_type_colors[line.active_config]
+                if line_obj.active_config != -1:
+                    color= cable_type_colors[line_obj.active_config]
+                else:
+                    color= 'black'
+                    thck= 0
             else:
                 color=('black' if getattr(line_obj, 'isTf', False)  # Defaults to False if 'isTF' does not exist/
                         else subgraph_colors[VL].get(subgraph_idx, "black") if line_type == 'AC' 
                         else 'darkblue' if line_type_indv == 'MTDC' 
                         else 'royalblue')
+           
             if geometry and not geometry.is_empty:
                 line_data.append({
                     "geometry": geometry,
@@ -133,7 +139,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     "name": getattr(line_obj, 'name', 'Unknown'),
                     "Direction": line_obj.direction,
                     "ant_viable": ant_v, 
-                    "thck": getattr(line_obj, 'np_line', 1),
+                    "thck": thck,
                     "VL" :VL,
                     "area":area,
                     "tf": getattr(line_obj, 'isTf', False),
