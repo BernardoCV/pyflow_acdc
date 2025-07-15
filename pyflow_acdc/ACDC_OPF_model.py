@@ -343,10 +343,8 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.tf_PAC_line_loss= pyo.Var(model.lines_AC_tf, initialize=0)
 
     def state_based_bounds(model, line, state):
-            if state == 0:
-                return (-S_lineACrec_lim[line], S_lineACrec_lim[line])
-            else:
-                return (-S_lineACrec_lim_new[line], S_lineACrec_lim_new[line])
+            max_min = max(S_lineACrec_lim[line], S_lineACrec_lim_new[line])
+            return (-max_min, max_min)
             
     if grid.REC_AC:
         # Define a set for the branch states (0=old, 1=new)
@@ -360,7 +358,8 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.rec_PAC_line_loss = pyo.Var(model.lines_AC_rec,initialize=0)
     
     def set_based_bounds(model, line, cab_type):
-         return (-S_lineACct_lim[line,cab_type], S_lineACct_lim[line,cab_type])
+         max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)  # Use cab_types_set instead of model.ct_set
+         return (-max_min, max_min)
        
     
     if grid.CT_AC:
