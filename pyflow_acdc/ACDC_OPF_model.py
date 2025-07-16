@@ -1468,20 +1468,31 @@ def Converter_constraints(model,grid,Conv_info):
         a = grid.Converters_ACDC[conv].a_conv 
         b = grid.Converters_ACDC[conv].b_conv
       
+        if element.power_loss_model == 'MMC':
+             Vdc = model.V_DC[element.Node_DC.nodeNumber]
+             Pc  = model.P_conv_c_AC[conv]
+             Ra  = element.ra
+             
+             I = (-Vdc +pyo.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
-        # current = pyo.sqrt(model.P_conv_c_AC_sq[conv]+model.Q_conv_c_AC_sq[conv])/(model.Uc[conv])
-        currentsqr = (model.P_conv_c_AC[conv]**2+model.Q_conv_c_AC[conv]**2)/(model.Uc[conv]**2)
-
-        
-
-        # c_inver = (element.c_inver_og /model.NumConvP[conv])*element.basekA**2/grid.S_base
-        # c_rect = (element.c_rect_og   /model.NumConvP[conv])*element.basekA**2/grid.S_base 
-        
-        c_inver=grid.Converters_ACDC[conv].c_inver 
-        c_rect=grid.Converters_ACDC[conv].c_rect   
+             P_loss = 3*I**2*Ra
+             
+        else:
+            # current = pyo.sqrt(model.P_conv_c_AC_sq[conv]+model.Q_conv_c_AC_sq[conv])/(model.Uc[conv])
+            currentsqr = (model.P_conv_c_AC[conv]**2+model.Q_conv_c_AC[conv]**2)/(model.Uc[conv]**2)
     
-       
-        P_loss = a  +c_rect * currentsqr
+            
+    
+            # c_inver = (element.c_inver_og /model.NumConvP[conv])*element.basekA**2/grid.S_base
+            # c_rect = (element.c_rect_og   /model.NumConvP[conv])*element.basekA**2/grid.S_base 
+            
+            c_inver=grid.Converters_ACDC[conv].c_inver 
+            c_rect=grid.Converters_ACDC[conv].c_rect   
+        
+               
+        
+        
+            P_loss = a  +c_rect * currentsqr
     
         
         return model.P_conv_loss[conv] == P_loss
