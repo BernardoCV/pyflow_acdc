@@ -77,13 +77,19 @@ class Grid:
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
             if not hasattr(conv, 'basekA'):
-                conv.basekA  = self.S_base/(np.sqrt(3)*conv.AC_kV_base)
+                conv.basekA    = self.S_base/(np.sqrt(3)*conv.AC_kV_base)
+                
                 conv.a_conv = conv.a_conv_og/self.S_base
                 conv.b_conv = conv.b_conv_og*conv.basekA/self.S_base
                 conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
                 conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
                 conv.c_rect = conv.c_rect_og*conv.basekA**2/self.S_base
-
+                
+            # if not hasattr(conv, 'basekA_DC'):    
+            #     conv.basekA_DC = self.S_base/(conv.DC_kV_base)
+            #     conv.ra_rect  = conv.c_rect_og*conv.basekA_DC**2/self.S_base
+            #     conv.ra_inver = conv.c_inver_og*conv.basekA_DC**2/self.S_base
+                
         self.lines_DC = []
         if lines_DC:
             for line in lines_DC:
@@ -2265,7 +2271,7 @@ class AC_DC_converter:
     def life_time_hours(self):
         return self.life_time *8760       
             
-    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2, name=None):
+    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
         AC_DC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
@@ -2290,6 +2296,7 @@ class AC_DC_converter:
         self.AC_type = AC_type
 
         self.AC_kV_base = kV_base
+        self.DC_kV_base = DC_node.kV_base
 
         self.Node_AC = AC_node
         
@@ -2303,7 +2310,10 @@ class AC_DC_converter:
         # if self.AC_type=='Slack':
         #     # print(name)mm
         #     self.type='PAC'
+
         
+
+
         self.type = DC_type
 
         self.R_t = Transformer_resistance/self.cn_pol
@@ -2326,7 +2336,15 @@ class AC_DC_converter:
         self.c_inver_og = losscinv /self.cn_pol  # Ohm
 
         # 1.103 0.887  2.885    4.371
+        
 
+        self.ra_og = arm_res
+        self.ra = arm_res *self.cn_pol  # Ohm
+       
+        self.power_loss_model = 'quadratic'
+        self.Vsum = 0
+        
+        
         self.P_loss = 0
         self.P_loss_tf = 0
 

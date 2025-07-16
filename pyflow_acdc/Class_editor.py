@@ -421,7 +421,7 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
         grid.Update_Graph_DC()
     return line
 
-def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
+def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Arm_R=None,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
     if isinstance(DC_node, str):
         DC_node = next((node for node in grid.nodes_DC if node.name == DC_node), None)
     if isinstance(AC_node, str):
@@ -443,18 +443,27 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
     # if Filter !=0 and Phase_Reactor_R==0 and  Phase_Reactor_X!=0:
     #     print(f'Please fill out phase reactor values, converter {name} not added')
     #     return
-    conv = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_resistance, Transformer_reactance, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max,nConvP,polarity ,lossa,lossb,losscrect,losscinv,Ucmin, Ucmax, name)
+    if Arm_R is not None:
+        ra  = Arm_R*conv.basekA_DC**2/grid.S_base
+    else:
+        ra = 0.001
+
+    conv = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_resistance, Transformer_reactance, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max,nConvP,polarity ,lossa,lossb,losscrect,losscinv,Ucmin, Ucmax, ra,name)
     if geometry is not None:
         if isinstance(geometry, str): 
              geometry = loads(geometry)  
         conv.geometry = geometry    
    
     conv.basekA  = grid.S_base/(np.sqrt(3)*conv.AC_kV_base)
+    conv.basekA_DC = grid.S_base/(conv.DC_kV_base)
     conv.a_conv  = conv.a_conv_og/grid.S_base
     conv.b_conv  = conv.b_conv_og*conv.basekA/grid.S_base
     conv.c_inver = conv.c_inver_og*conv.basekA**2/grid.S_base
     conv.c_rect  = conv.c_rect_og*conv.basekA**2/grid.S_base     
-
+    
+    
+    
+    
     grid.Converters_ACDC.append(conv)
     return conv
 
