@@ -524,30 +524,40 @@ def AC_constraints(model,grid,AC_info):
         model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
         model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
     
-
+    def calc_M_rec(model,line):
+        max_pow= max(S_lineACrec_lim[line], S_lineACrec_lim_new[line])
+        return 1.1*max_pow**2
     def S_to_AC_line_rule_rec(model, line, state):
+        M = calc_M_rec(model, line)
         if state == 0:
-            return (model.rec_PAC_to[line,0]**2)*(1-model.rec_branch[line]) <= S_lineACrec_lim[line]**2
+            return model.rec_PAC_to[line, 0]**2 <= S_lineACrec_lim[line]**2 + M * model.rec_branch[line]
         else:
-            return (model.rec_PAC_to[line,1]**2)*model.rec_branch[line] <= S_lineACrec_lim_new[line]**2 
-    def S_from_AC_limit_rule_rec(model,line,state):
+            return model.rec_PAC_to[line, 1]**2 <= S_lineACrec_lim_new[line]**2 + M * (1 - model.rec_branch[line])
+    def S_from_AC_limit_rule_rec(model, line, state):
+        M = calc_M_rec(model, line)
         if state == 0:
-            return (model.rec_PAC_from[line,0]**2)*(1-model.rec_branch[line]) <= S_lineACrec_lim[line]**2
+            return model.rec_PAC_from[line, 0]**2 <= S_lineACrec_lim[line]**2 + M * model.rec_branch[line]
         else:
-            return (model.rec_PAC_from[line,1]**2)*model.rec_branch[line] <= S_lineACrec_lim_new[line]**2
+            return model.rec_PAC_from[line, 1]**2 <= S_lineACrec_lim_new[line]**2 + M * (1 - model.rec_branch[line])
+
    
     if grid.REC_AC:
         model.rec_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec)
         model.rec_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec)
    
-   
+    def calc_M(model,line):
+        max_pow=max(S_lineACct_lim[line,ct] for ct in model.ct_set)
+        return 1.1*max_pow**2
     def S_to_AC_line_rule_ct(model, line, ct):
-        return (model.ct_PAC_to[line,ct]**2)*(model.ct_branch[line,ct]) <= S_lineACct_lim[line,ct]**2
+        return (model.ct_PAC_to[line,ct]**2) <= S_lineACct_lim[line,ct]**2 +calc_M(model,line)*(1-model.ct_branch[line,ct])
+
     def S_from_AC_limit_rule_ct(model,line,ct):
-        return (model.ct_PAC_from[line,ct]**2)*(model.ct_branch[line,ct]) <= S_lineACct_lim[line,ct]**2
+        return (model.ct_PAC_from[line,ct]**2) <= S_lineACct_lim[line,ct]**2 +calc_M(model,line)*(1-model.ct_branch[line,ct])
    
 
     if grid.CT_AC:
+        
+        
         model.ct_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct)
         model.ct_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct)
        
@@ -800,7 +810,8 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
 
         with ThreadPoolExecutor() as executor:
             executor.map(process_line_AC_CT, grid.lines_AC_ct)
-
+        #for line in grid.lines_AC_ct:
+        #    process_line_AC_CT(line)
         
     # --- Step 1: Use voltage angles only ---
     Theta = grid.Theta_V_AC  # should be a 1D array with angle values in radians

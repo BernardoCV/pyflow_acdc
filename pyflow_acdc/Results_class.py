@@ -1099,7 +1099,7 @@ class Results:
                     tot+=cost
                     table.add_row([element, "AC Upgrade" ,"", "","",np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         for l in self.Grid.lines_AC_ct:
-            if l.array_opf:
+            if l.array_opf and l.active_config >=0:
                 element= l.name
                 ini= l.cable_types[l.ini_active_config]
                 max=l.cable_types[l.max_active_config]

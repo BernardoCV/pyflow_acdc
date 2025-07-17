@@ -73,6 +73,7 @@ class Grid:
         self.Cable_options=[]
         self.lines_AC_ct=[]
         self.cab_types_allowed=3
+        self.crossing_groups = []
         
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:

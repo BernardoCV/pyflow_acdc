@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 import re
 
 from  .ACDC_OPF_NL_model import *
-from  .ACDC_OPF_L_model import *
+from  .AC_OPF_L_model import *
 
 import cProfile
 import pstats
@@ -118,6 +118,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
                 
     """
     """
+    t3 = time.time()
     model_res,solver_stats = OPF_solve(model,grid,solver)
     
     t1 = time.time()
@@ -143,7 +144,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
     grid.OPF_obj=weights_def
     timing_info = {
     "create": t_modelcreate,
-    "solve": solver_stats['time'],
+    "solve": solver_stats['time'] if solver_stats['time'] is not None else t1-t3,
     "export": t_modelexport,
     }
     return model, model_res , timing_info, solver_stats

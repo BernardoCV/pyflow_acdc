@@ -682,7 +682,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
 
     turbines_df = Data["turbine"]
-    substations_df = Data["offshore_substation"]
+    substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
     
 
     initialize_pyflowacdc()
@@ -707,14 +707,34 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         if attrs['type'] == 'substation':
             add_extGrid(grid,node,MVAmax=99999,Allow_sell=True)
             node.ct_limit = substations_df.loc[attrs['original_idx']].connections
+    
+    # First pass: add all lines
+    line_objects = {}  # Dictionary to store line objects by their name
+    
     for u,v, attrs in array_graph.edges(data=True):
         tonode = str(array_graph.nodes[u]['original_idx'])
         fromnode = str(array_graph.nodes[v]['original_idx'])
                 
         l = attrs['weight']/1000
         geo= attrs['geometry']
-        add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
+        line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
         
+        # Store the line object with its name for later reference
+        edge_key = f'{tonode}_{fromnode}'
+        line_objects[edge_key] = line_obj
+    
+    # Add the complete crossing groups as line numbers to the grid
+    grid.crossing_groups = []
+    if 'crossing_paths' in Data and Data['crossing_paths']:
+        for crossing_group in Data['crossing_paths']:
+            line_numbers_group = []
+            for edge_key in crossing_group:
+                if edge_key in line_objects:
+                    line_numbers_group.append(line_objects[edge_key].lineNumber)
+            if len(line_numbers_group) > 1:  # Only add groups with more than one line
+                grid.crossing_groups.append(line_numbers_group)
+        
+       
     grid.Update_Graph_AC()
     grid.create_Ybus_AC()
     grid.Array_opf = True  

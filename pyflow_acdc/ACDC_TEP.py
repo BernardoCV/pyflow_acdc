@@ -13,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
+from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
+from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
 
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'transmission_expansion',
+    'linear_transmission_expansion',
     'multi_scenario_TEP',
     'export_TEP_TS_results_to_excel'
 ]
@@ -343,6 +345,7 @@ def get_TEP_variables(grid):
 
     return conv_var,DC_line_var,AC_line_var,gen_var
 
+
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
 
     analyse_OPF(grid)
@@ -354,13 +357,10 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
    
     t1 = time.time()
     model = pyo.ConcreteModel()
-    model.name        ="TEP MTDC AC/DC hybrid OPF"
+    model.name = "TEP MTDC AC/DC hybrid OPF"
 
     OPF_create_NLModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
-    if solver == 'ipopt':
-        model.relaxed = True
-    else:
-        model.relaxed = False
+    
 
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_OPF = OPF_obj(model,grid,weights_def,True)
@@ -400,6 +400,59 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     }
     return model, model_results , timing_info, solver_stats
 
+def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+    analyse_OPF(grid)
+    
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+
+    grid.TEP_n_years = n_years
+    grid.TEP_discount_rate =discount_rate
+   
+    t1 = time.time()
+    model = pyo.ConcreteModel()
+    model.name = "TEP MTDC linear AC OPF"
+
+    OPF_create_LModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    
+
+    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_OPF = OPF_obj_L(model,grid,weights_def)
+    
+    present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    if NPV:
+        obj_OPF *=present_value
+    
+
+    total_cost = obj_TEP + obj_OPF
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+
+    t2 = time.time()  
+    t_modelcreate = t2-t1
+    
+    # model.obj.pprint()
+    t3 = time.time()
+    model_results,solver_stats = OPF_solve(model,grid,solver)
+    
+    t1 = time.time()
+    ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ,TEP=True)
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
+    t2 = time.time() 
+
+    t_modelexport = t2-t1
+
+      
+    grid.TEP_run=True
+    grid.OPF_obj = weights_def
+
+    timing_info = {
+    "create": t_modelcreate,
+    "solve":  solver_stats['time'] if solver_stats['time'] is not None else t1-t3,
+    "export": t_modelexport,
+    }
+    return model, model_results , timing_info, solver_stats
+    
 
 def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
     analyse_OPF(grid)
@@ -646,8 +699,7 @@ def TEP_obj(model,grid,NPV):
                 else:
                     for ct in model.ct_set:
                         Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]/line.life_time_hours
-        if model.relaxed:
-            Inv_array += sum(model.ct_penalty[l,ct] for l in model.lines_AC_ct for ct in model.ct_set)
+        
         return Inv_array
         
     
@@ -702,9 +754,8 @@ def TEP_obj(model,grid,NPV):
                connections += model.ct_branch[line.lineNumber,ct]       
         return connections <= nAC.ct_limit
     
-    def ct_penalty_rule(model,line,ct):
-        return model.ct_penalty[line,ct] == grid.ct_lamda*model.ct_branch[line,ct]*(1-model.ct_branch[line,ct])
-    
+    def ct_crossings_rule(model,ct_crossing):
+        return sum(model.ct_branch[line,ct] for line in grid.crossing_groups[ct_crossing] for ct in model.ct_set) <= 1
     
     if grid.CT_AC:
         
@@ -714,9 +765,10 @@ def TEP_obj(model,grid,NPV):
         if grid.Array_opf:
             model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_Array_cable_type_rule)
             model.ct_node_limit_constraint = pyo.Constraint(model.nodes_AC, rule=ct_node_limit_rule)
-            if model.relaxed:
-                model.ct_penalty = pyo.Var(model.lines_AC_ct, model.ct_set, within=pyo.NonNegativeReals)
-                model.ct_penalty_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=ct_penalty_rule)
+            model.ct_crossings = pyo.Set(initialize=list(range(len(grid.crossing_groups))))
+            model.ct_crossings_constraint = pyo.Constraint(model.ct_crossings, rule=ct_crossings_rule)
+        
+            model.ct_crossings_constraint.pprint()
         else:
             model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)    
         inv_array = Array_investments()

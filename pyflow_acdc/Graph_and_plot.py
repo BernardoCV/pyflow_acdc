@@ -288,7 +288,10 @@ def update_lineACrec_hovertext(line,S_base,text):
 
 def update_lineACct_hovertext(line,S_base,text):
     dec=2
-    line.direction = 'from' if line.fromS >= 0 else 'to'
+    line.direction = 'from' if np.real(line.fromS) >= 0 else 'to'
+    active_config = line.active_config
+    if active_config == -1:
+        return
     if text =='data':
         name = line.name
         fromnode = line.fromNode.name
@@ -530,6 +533,7 @@ def update_hovertexts(grid,text):
             except Exception as e:
                 print(f"Error in thread: {e}")
         
+            
 def initialize_positions(Grid):
     """Initialize positions for the grid nodes."""
     return Grid.node_positions if Grid.node_positions is not None else {}
