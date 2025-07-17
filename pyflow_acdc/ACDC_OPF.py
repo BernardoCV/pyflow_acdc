@@ -10,7 +10,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import re
 
-from  .ACDC_OPF_model import *
+from  .ACDC_OPF_NL_model import *
+from  .ACDC_OPF_L_model import *
 
 import cProfile
 import pstats
@@ -23,6 +24,7 @@ from pyomo.util.infeasible import log_infeasible_constraints
 
 __all__ = [
     'Translate_pyf_OPF',
+    'Optimal_L_PF',
     'Optimal_PF',
     'TS_parallel_OPF',
     'OPF_solve',
@@ -69,6 +71,83 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
     return weights_def, Price_Zones
 
+
+
+def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt'):
+    analyse_OPF(grid)
+
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
+    
+    # Check if any other weight is non-zero while Energy_cost is zero
+    if weights_def['Energy_cost']['w'] == 0:
+        other_weights_nonzero = [key for key, value in weights_def.items() 
+                               if key != 'Energy_cost' and value['w'] != 0]
+        if other_weights_nonzero:
+            print("Linear OPF can only consider energy cost by AC Generator power")
+        
+    model = pyo.ConcreteModel()
+    model.name="""AC 'DC linear' OPF"""
+    
+    
+    t1 = time.time()
+    
+    # pr = cProfile.Profile()
+    # pr.enable()
+    # Call your function here
+    OPF_create_LModel_ACDC(model,grid,PV_set,Price_Zones)
+    # pr.disable()
+    
+    # s = StringIO()
+    # ps = pstats.Stats(pr, stream=s)
+    # ps.sort_stats('cumulative')  # Can also try 'time'
+    # ps.print_stats()
+    # print(s.getvalue())
+    
+    t2 = time.time()  
+    t_modelcreate = t2-t1
+    
+    """
+    """
+    
+    
+  
+    obj_rule= OPF_obj_L(model,grid,weights_def)
+
+    model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
+    
+                
+    """
+    """
+    model_res,solver_stats = OPF_solve(model,grid,solver)
+    
+    t1 = time.time()
+    # pr = cProfile.Profile()
+    # pr.enable()
+    # Call your function here
+    ExportACDC_Lmodel_toPyflowACDC(model, grid, Price_Zones)
+    # pr.disable()
+
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
+    
+    # s = StringIO()
+    # ps = pstats.Stats(pr, stream=s)
+    # ps.sort_stats('cumulative')  # Can also try 'time'
+    # ps.print_stats()
+    # print(s.getvalue())
+    t2 = time.time()  
+    t_modelexport = t2-t1
+   
+       
+    grid.OPF_run=True 
+    grid.OPF_obj=weights_def
+    timing_info = {
+    "create": t_modelcreate,
+    "solve": solver_stats['time'],
+    "export": t_modelexport,
+    }
+    return model, model_res , timing_info, solver_stats
+
 def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     analyse_OPF(grid)
 
@@ -83,7 +162,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    OPF_createModel_ACDC(model,grid,PV_set,Price_Zones)
+    OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones)
     # pr.disable()
     
     # s = StringIO()
@@ -120,7 +199,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    ExportACDC_model_toPyflowACDC(model, grid, Price_Zones)
+    ExportACDC_NLmodel_toPyflowACDC(model, grid, Price_Zones)
     # pr.disable()
 
     for obj in weights_def:
@@ -159,7 +238,7 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
     model.submodel = pyo.Block(model.Time_frames)
     # Run parallel iterations
     base_model = pyo.ConcreteModel()
-    base_model = OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
+    base_model = OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=True,TEP=True)
 
     for i in range(current_range):
         t = idx + i
@@ -377,6 +456,16 @@ def OPF_updateParam(model,grid):
     
 
     return model
+
+def OPF_obj_L(model,grid,ObjRule):
+    
+    if ObjRule['Energy_cost']['w']==0:
+        return 0
+
+    AC= sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+
+    return AC
+    
 
 def OPF_obj(model,grid,ObjRule,OnlyGen=True):
    

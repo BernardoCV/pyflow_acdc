@@ -26,9 +26,9 @@ __all__ = ['Time_series_PF',
 
 try:
     import pyomo.environ as pyo
-    from .ACDC_OPF_model import (analyse_OPF,
-        OPF_createModel_ACDC,
-        ExportACDC_model_toPyflowACDC)
+    from .ACDC_OPF_NL_model import (analyse_OPF,
+        OPF_create_NLModel_ACDC,
+        ExportACDC_NLmodel_toPyflowACDC)
     
     from .ACDC_OPF import (
         OPF_solve,
@@ -428,7 +428,7 @@ def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restriction
         
         
         
-    ExportACDC_model_toPyflowACDC(model.submodel[t],grid,price_zone_restrictions)
+    ExportACDC_NLmodel_toPyflowACDC(model.submodel[t],grid,price_zone_restrictions)
     
     touple = pack_variables(Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
                             Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
@@ -582,7 +582,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     analyse_OPF(grid)
        
     t1 = time.time()
-    OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)
+    OPF_create_NLModel_ACDC(model,grid,PV_set,price_zone_restrictions)
     t2 = time.time()  
     t_modelcreate = t2-t1
     
@@ -664,7 +664,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     
     
     t1 = time.time()
-    ExportACDC_model_toPyflowACDC(model, grid, price_zone_restrictions)
+    ExportACDC_NLmodel_toPyflowACDC(model, grid, price_zone_restrictions)
     t2 = time.time() 
     t_modelexport = t2-t1
     touple = pack_variables(Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,

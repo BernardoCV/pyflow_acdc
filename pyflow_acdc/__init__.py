@@ -117,6 +117,7 @@ __all__ = [
     
     # OPF
     'Optimal_PF',
+    'Optimal_L_PF',
     'OPF_solve',
     'OPF_obj',
     'OPF_line_res',

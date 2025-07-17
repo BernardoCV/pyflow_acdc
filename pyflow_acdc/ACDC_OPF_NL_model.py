@@ -11,8 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 __all__ = [
     'analyse_OPF',
-    'OPF_createModel_ACDC',
-    'ExportACDC_model_toPyflowACDC'
+    'OPF_create_NLModel_ACDC',
+    'ExportACDC_NLmodel_toPyflowACDC'
 ]
 
 def analyse_OPF(grid):
@@ -34,7 +34,7 @@ def analyse_OPF(grid):
     return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
     
 
-def OPF_createModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
+def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     from .ACDC_OPF import Translate_pyf_OPF 
     
     
@@ -1943,7 +1943,7 @@ def TEP_variables(model,grid):
         model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
 
 
-def ExportACDC_model_toPyflowACDC(model,grid,Price_Zones,TEP=False):
+def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
     
     
     

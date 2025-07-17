@@ -12,8 +12,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC,calculate_objective
+from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
+from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
 
 
 __all__ = [
@@ -356,7 +356,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     model = pyo.ConcreteModel()
     model.name        ="TEP MTDC AC/DC hybrid OPF"
 
-    OPF_createModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    OPF_create_NLModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
     if solver == 'ipopt':
         model.relaxed = True
     else:
@@ -381,7 +381,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     model_results,solver_stats = OPF_solve(model,grid,solver)
     
     t1 = time.time()
-    ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
+    ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ,TEP=True)
     for obj in weights_def:
         weights_def[obj]['v']=calculate_objective(grid,obj,True)
         weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
@@ -474,7 +474,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     w={}
 
     base_model = pyo.ConcreteModel()
-    OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
+    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
     
     s=1
     
