@@ -265,7 +265,8 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.ct_PAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
         model.ct_PAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
         model.ct_PAC_line_loss = pyo.Var(model.lines_AC_ct,initialize=0)
-        
+        model.z_to = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds)
+        model.z_from = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds)   
 
 def AC_constraints(model,grid,AC_info):
     
@@ -343,27 +344,65 @@ def AC_constraints(model,grid,AC_info):
         model.rec_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPre_rule)
         model.rec_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPre_rule)
         
-    def toCT_rule(model,node):
+    # Fix the node constraints to use auxiliary variables:
+    def toCT_rule_linear(model,node):
        nAC = grid.nodes_AC[node]
        toPre = 0
        for line in nAC.connected_toCTLine:
            for ct in model.ct_set:
-               toPre += model.ct_PAC_to[line.lineNumber,ct]*(model.ct_branch[line.lineNumber,ct])
-       return  model.Pto_CT[node] ==  toPre
-    def fromCT_rule(model,node):
+               toPre += model.z_to[line.lineNumber,ct]  # ✅ Use z_to instead of bilinear term
+       return model.Pto_CT[node] == toPre
+
+    def fromCT_rule_linear(model,node):
        nAC = grid.nodes_AC[node]
        fromPre = 0
        for line in nAC.connected_fromCTLine:
            for ct in model.ct_set:
-               fromPre += model.ct_PAC_from[line.lineNumber,ct]*(model.ct_branch[line.lineNumber,ct])
-       return  model.Pfrom_CT[node] ==   fromPre
-    
-  
+               fromPre += model.z_from[line.lineNumber,ct]  # ✅ Use z_from instead of bilinear term
+       return model.Pfrom_CT[node] == fromPre
 
+
+    def z_to_ub_rule(model, line, ct):
+        return model.z_to[line, ct] <= model.ct_PAC_to[line, ct] + (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+
+    def z_to_lb_rule(model, line, ct):
+        return model.z_to[line, ct] >= model.ct_PAC_to[line, ct] - (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+
+    def z_to_branch_ub_rule(model, line, ct):
+        return model.z_to[line, ct] <= model.ct_branch[line, ct] * S_lineACct_lim[line,ct]
+
+    def z_to_branch_lb_rule(model, line, ct):
+        return model.z_to[line, ct] >= model.ct_branch[line, ct] * (-S_lineACct_lim[line,ct])
+
+    
+    def z_from_ub_rule(model, line, ct):
+        return model.z_from[line, ct] <= model.ct_PAC_from[line, ct] + (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+
+    def z_from_lb_rule(model, line, ct):
+        return model.z_from[line, ct] >= model.ct_PAC_from[line, ct] - (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+
+    def z_from_branch_ub_rule(model, line, ct):
+        return model.z_from[line, ct] <= model.ct_branch[line, ct] * S_lineACct_lim[line,ct]
+
+    def z_from_branch_lb_rule(model, line, ct):
+        return model.z_from[line, ct] >= model.ct_branch[line, ct] * (-S_lineACct_lim[line,ct])
+
+    
     if grid.CT_AC:
-        model.ct_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toCT_rule)
-        model.ct_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromCT_rule)
+        model.ct_Pto_constraint = pyo.Constraint(model.nodes_AC, rule=toCT_rule_linear)  
+        model.ct_Pfrom_constraint = pyo.Constraint(model.nodes_AC, rule=fromCT_rule_linear)  
         
+        # McCormick envelopes for z_to
+        model.z_to_ub_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_to_ub_rule)
+        model.z_to_lb_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_to_lb_rule)
+        model.z_to_branch_ub_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_to_branch_ub_rule)
+        model.z_to_branch_lb_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_to_branch_lb_rule)
+        
+        # McCormick envelopes for z_from
+        model.z_from_ub_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_from_ub_rule)
+        model.z_from_lb_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_from_lb_rule)
+        model.z_from_branch_ub_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_from_branch_ub_rule)
+        model.z_from_branch_lb_con = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=z_from_branch_lb_rule)
 
     # AC line equality constraints
     def calculate_P(model, line, direction,idx=None):
@@ -398,14 +437,9 @@ def AC_constraints(model,grid,AC_info):
        return model.PAC_from[line] == Pfrom
     
  
-    def P_loss_AC_rule(model,line):
-        return model.PAC_line_loss[line]== model.PAC_to[line]+model.PAC_from[line]
-    
-    
     model.Pto_AC_line_constraint   = pyo.Constraint(model.lines_AC, rule=P_to_AC_line)
     model.Pfrom_AC_line_constraint = pyo.Constraint(model.lines_AC, rule=P_from_AC_line)
-    model.P_AC_loss_constraint     = pyo.Constraint(model.lines_AC, rule=P_loss_AC_rule)
-    
+ 
     def P_to_AC_line_exp(model,line):   
         l = grid.lines_AC_exp[line]
         Pto = calculate_P(model,l,'to')
@@ -416,17 +450,12 @@ def AC_constraints(model,grid,AC_info):
        Pfrom = calculate_P(model,l,'from')
        return model.exp_PAC_from[line] == Pfrom
     
-    
-    
-    def P_loss_AC_rule_exp(model,line):
-        return model.exp_PAC_line_loss[line]== model.exp_PAC_to[line]+model.exp_PAC_from[line]
-    
+ 
     
     if grid.TEP_AC:
         model.exp_Pto_AC_line_constraint   = pyo.Constraint(model.lines_AC_exp, rule=P_to_AC_line_exp)
         model.exp_Pfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=P_from_AC_line_exp)
-        model.exp_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_exp, rule=P_loss_AC_rule_exp)
-    
+ 
     def P_to_AC_line_rec(model,line,state):   
         l = grid.lines_AC_rec[line]
         if state ==  0:
@@ -443,18 +472,13 @@ def AC_constraints(model,grid,AC_info):
            Pfrom = calculate_P(model,l,'from',idx='new')
        return model.rec_PAC_from[line,state] == Pfrom
     
-   
-    def P_loss_AC_rule_rec(model,line):
-        return model.rec_PAC_line_loss[line]== (model.rec_PAC_to[line,0]+model.rec_PAC_from[line,0])*(1-model.rec_branch[line])+\
-                                               (model.rec_PAC_to[line,1]+model.rec_PAC_from[line,1])*model.rec_branch[line]  
-    
+
     
     if grid.REC_AC:
      
         model.rec_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=P_to_AC_line_rec)
         model.rec_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=P_from_AC_line_rec)
-        model.rec_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_rec, rule=P_loss_AC_rule_rec)
-    
+       
     def P_to_AC_line_ct(model,line,ct):   
         l = grid.lines_AC_ct[line]
         Pto = calculate_P(model,l,'to',idx=ct)
@@ -465,102 +489,82 @@ def AC_constraints(model,grid,AC_info):
        Pfrom = calculate_P(model,l,'from',idx=ct)
        return model.ct_PAC_from[line,ct] == Pfrom
     
-   
-    def P_loss_AC_rule_ct(model,line):
-        loss = 0
-        for ct in model.ct_set:
-            loss += (model.ct_PAC_to[line,ct]+model.ct_PAC_from[line,ct])*(model.ct_branch[line,ct])
-        return model.ct_PAC_line_loss[line]== loss
-    
-    
+ 
 
     if grid.CT_AC:   
         model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
         model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
-        model.ct_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_ct, rule=P_loss_AC_rule_ct)
-
-        
+      
     
     
     "AC inequality constraints"
     #AC gen inequality
-    def S_gen_AC_limit_rule(model,ngen):
-        gen = grid.Generators[ngen]
-        if gen.Max_S is None:
-            return pyo.Constraint.Skip
-        else:    
-            return model.PGi_gen[ngen]**2 <= (gen.Max_S*model.np_gen[ngen])**2 
-    
-    model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
-    #AC Ren sources inequality
-    
-    def S_renS_AC_limit_rule(model,rs):
-        ren_source= grid.RenSources[rs]
-        if ren_source.Max_S is None or ren_source.connected =='DC':
-            return pyo.Constraint.Skip
-        else:    
-            return (model.P_renSource[rs]*model.gamma[rs])**2<= ren_source.Max_S**2 
-    
-    model.S_renS_AC_limit_constraint   = pyo.Constraint(model.ren_sources, rule=S_renS_AC_limit_rule)
-    
-    #AC lines inequality
-    def S_to_AC_limit_rule(model,line):
-        
-        return model.PAC_to[line]**2 <= S_lineAC_limit[line]**2
-    def S_from_AC_limit_rule(model,line):
-        
-        return model.PAC_from[line]**2 <= S_lineAC_limit[line]**2
-    
-    
-    model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
-    model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
-    
-    def S_to_AC_limit_rule_exp(model,line):
-        return model.exp_PAC_to[line]**2 <= S_lineACexp_limit[line]**2
-    def S_from_AC_limit_rule_exp(model,line):
-        return model.exp_PAC_from[line]**2 <= S_lineACexp_limit[line]**2
-    
-    if grid.TEP_AC:
-        model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
-        model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
-    
-    def calc_M_rec(model,line):
-        max_pow= max(S_lineACrec_lim[line], S_lineACrec_lim_new[line])
-        return 1.1*max_pow**2
-    def S_to_AC_line_rule_rec(model, line, state):
-        M = calc_M_rec(model, line)
-        if state == 0:
-            return model.rec_PAC_to[line, 0]**2 <= S_lineACrec_lim[line]**2 + M * model.rec_branch[line]
-        else:
-            return model.rec_PAC_to[line, 1]**2 <= S_lineACrec_lim_new[line]**2 + M * (1 - model.rec_branch[line])
-    def S_from_AC_limit_rule_rec(model, line, state):
-        M = calc_M_rec(model, line)
-        if state == 0:
-            return model.rec_PAC_from[line, 0]**2 <= S_lineACrec_lim[line]**2 + M * model.rec_branch[line]
-        else:
-            return model.rec_PAC_from[line, 1]**2 <= S_lineACrec_lim_new[line]**2 + M * (1 - model.rec_branch[line])
-
    
+    
+    def calc_M_rec_linear(model, line):
+        max_pow = max(S_lineACrec_lim[line], S_lineACrec_lim_new[line])
+        return 1.1 * max_pow
+
+    def S_to_AC_line_rule_rec_linear(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        if state == 0:
+            return model.rec_PAC_to[line, 0] <= S_lineACrec_lim[line] + M * model.rec_branch[line]
+        else:
+            return model.rec_PAC_to[line, 1] <= S_lineACrec_lim_new[line] + M * (1 - model.rec_branch[line])
+
+    def S_to_AC_line_rule_rec_linear_neg(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        if state == 0:
+            return model.rec_PAC_to[line, 0] >= -S_lineACrec_lim[line] - M * model.rec_branch[line]
+        else:
+            return model.rec_PAC_to[line, 1] >= -S_lineACrec_lim_new[line] - M * (1 - model.rec_branch[line])
+
+    def S_from_AC_limit_rule_rec_linear(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        if state == 0:
+            return model.rec_PAC_from[line, 0] <= S_lineACrec_lim[line] + M * model.rec_branch[line]
+        else:
+            return model.rec_PAC_from[line, 1] <= S_lineACrec_lim_new[line] + M * (1 - model.rec_branch[line])
+
+    def S_from_AC_limit_rule_rec_linear_neg(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        if state == 0:
+            return model.rec_PAC_from[line, 0] >= -S_lineACrec_lim[line] - M * model.rec_branch[line]
+        else:
+            return model.rec_PAC_from[line, 1] >= -S_lineACrec_lim_new[line] - M * (1 - model.rec_branch[line])
+
     if grid.REC_AC:
-        model.rec_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec)
-        model.rec_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec)
-   
-    def calc_M(model,line):
-        max_pow=max(S_lineACct_lim[line,ct] for ct in model.ct_set)
-        return 1.1*max_pow**2
-    def S_to_AC_line_rule_ct(model, line, ct):
-        return (model.ct_PAC_to[line,ct]**2) <= S_lineACct_lim[line,ct]**2 +calc_M(model,line)*(1-model.ct_branch[line,ct])
+        model.rec_S_to_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec_linear)
+        model.rec_S_to_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec_linear_neg)
+        model.rec_S_from_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear)
+        model.rec_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear_neg)
+    
+    def calc_M_linear(model, line):
+        max_pow = max(S_lineACct_lim[line,ct] for ct in model.ct_set)
+        return 1.1 * max_pow
 
-    def S_from_AC_limit_rule_ct(model,line,ct):
-        return (model.ct_PAC_from[line,ct]**2) <= S_lineACct_lim[line,ct]**2 +calc_M(model,line)*(1-model.ct_branch[line,ct])
-   
+    def S_to_AC_line_rule_ct_linear(model, line, ct):
+        M = calc_M_linear(model, line)
+        return model.ct_PAC_to[line,ct] <= S_lineACct_lim[line,ct] * model.ct_branch[line,ct] + M * (1 - model.ct_branch[line,ct])
+
+    def S_to_AC_line_rule_ct_linear_neg(model, line, ct):
+        M = calc_M_linear(model, line)
+        return model.ct_PAC_to[line,ct] >= -S_lineACct_lim[line,ct] * model.ct_branch[line,ct] - M * (1 - model.ct_branch[line,ct])
+
+    def S_from_AC_limit_rule_ct_linear(model, line, ct):
+        M = calc_M_linear(model, line)
+        return model.ct_PAC_from[line,ct] <= S_lineACct_lim[line,ct] * model.ct_branch[line,ct] + M * (1 - model.ct_branch[line,ct])
+
+    def S_from_AC_limit_rule_ct_linear_neg(model, line, ct):
+        M = calc_M_linear(model, line)
+        return model.ct_PAC_from[line,ct] >= -S_lineACct_lim[line,ct] * model.ct_branch[line,ct] - M * (1 - model.ct_branch[line,ct])
 
     if grid.CT_AC:
-        
-        
-        model.ct_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct)
-        model.ct_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct)
-       
+        model.ct_S_to_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct_linear)
+        model.ct_S_to_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct_linear_neg)
+        model.ct_S_from_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct_linear)
+        model.ct_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct_linear_neg)
+
     s=1
     
 def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):

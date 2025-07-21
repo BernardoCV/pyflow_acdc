@@ -400,7 +400,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     }
     return model, model_results , timing_info, solver_stats
 
-def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',tee=False):
     analyse_OPF(grid)
     
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
@@ -428,10 +428,12 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
 
     t2 = time.time()  
     t_modelcreate = t2-t1
-    
+
+
+  
     # model.obj.pprint()
     t3 = time.time()
-    model_results,solver_stats = OPF_solve(model,grid,solver)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee)
     
     t1 = time.time()
     ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ,TEP=True)

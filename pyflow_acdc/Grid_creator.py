@@ -2,6 +2,7 @@ from scipy.io import loadmat
 import pandas as pd
 import numpy as np
 import copy
+import networkx as nx
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
 
@@ -678,18 +679,35 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,ct_lamda=10^6):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,ct_lamda=10^6,max_turbines_per_string= None):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
 
     turbines_df = Data["turbine"]
     substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
     
 
+
+    mst = nx.minimum_spanning_tree(array_graph, weight='weight')
+
+    active_edges = set()
+    for u, v in mst.edges():
+        active_edges.add((u, v))
+        active_edges.add((v, u))
+
     initialize_pyflowacdc()
     grid = Grid(S_base)
     res = Results(grid)
 
     cable_option = add_cable_option(grid,cable_types)
+    
+    if max_turbines_per_string is not None:
+        t_MW = turbines_df.iloc[0].MW_rating
+        max_power_per_string = t_MW*max_turbines_per_string 
+        first_index_to_comply = next((i for i, rating in enumerate(cable_option.MVA_ratings) if rating >= max_power_per_string), len(cable_option.MVA_ratings) - 1)
+        cable_option._cable_types = cable_option._cable_types[:first_index_to_comply + 1]
+        cable_option.MVA_ratings = cable_option.MVA_ratings[:first_index_to_comply + 1]
+
+
     
     for node, attrs in array_graph.nodes(data=True):
         if attrs['type'] == 'turbine':
@@ -717,6 +735,10 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
                 
         l = attrs['weight']/1000
         geo= attrs['geometry']
+        if (u,v) in active_edges:
+            active_config = 0
+        else:
+            active_config = -1
         line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
         
         # Store the line object with its name for later reference
@@ -740,6 +762,8 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     grid.Array_opf = True  
     grid.cab_types_allowed = cable_types_allowed
     grid.ct_lamda =ct_lamda 
+
+   
     return grid, res
 
 def Create_grid_from_mat(matfile):

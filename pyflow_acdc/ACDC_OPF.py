@@ -372,7 +372,7 @@ def fx_conv(model,grid):
     model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
 
 
-def OPF_solve(model,grid,solver = 'ipopt'):
+def OPF_solve(model,grid,solver = 'ipopt',tee=False):
     
     solver = solver.lower()
 
@@ -413,6 +413,9 @@ def OPF_solve(model,grid,solver = 'ipopt'):
     
 
     opt = pyo.SolverFactory(solver)
+    if solver == 'gurobi':
+        opt.options['Threads'] = 0
+        opt.options['TimeLimit'] = 600
     #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
     #if logging:
     #    results = opt.solve(model, logfile="ipopt_output.log")
@@ -424,7 +427,7 @@ def OPF_solve(model,grid,solver = 'ipopt'):
     # Print the regex match attempt
     #match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
     #num_iterations = int(match.group(1)) if match else None
-    results = opt.solve(model)
+    results = opt.solve(model,tee=tee)
     num_iterations = None
 
     solver_stats = {
@@ -462,8 +465,8 @@ def OPF_obj_L(model,grid,ObjRule):
     
     if ObjRule['Energy_cost']['w']==0:
         return 0
-
-    AC= sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+    #(model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+
+    AC= sum((model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
 
     return AC
     
@@ -751,7 +754,7 @@ def Translate_pyf_OPF(grid,Price_Zones=False):
             for i in range(len(l.MVA_rating_list)):
                 S_lineACct_lim[l.lineNumber,i] = l.MVA_rating_list[i] / grid.S_base
         if grid.Cable_options is not None and len(grid.Cable_options) > 0:
-            cab_types_set = list(range(0,len(grid.Cable_options[0].cable_types)))
+            cab_types_set = list(range(0,len(grid.Cable_options[0]._cable_types)))
         else:
             cab_types_set = []
         allowed_types = grid.cab_types_allowed

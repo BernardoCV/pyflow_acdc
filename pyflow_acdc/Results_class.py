@@ -1101,7 +1101,7 @@ class Results:
         for l in self.Grid.lines_AC_ct:
             if l.array_opf and l.active_config >=0:
                 element= l.name
-                ini= l.cable_types[l.ini_active_config]
+                ini= l.cable_types[l.ini_active_config] if l.ini_active_config >= 0 else ""
                 max=l.cable_types[l.max_active_config]
                 ct=l.active_config
                 type=l.cable_types[ct]

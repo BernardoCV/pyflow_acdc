@@ -1920,44 +1920,66 @@ class Size_selection(Line_AC):
 class Cable_options:
     Cable_options_num = 0
     names = set()
+    _cable_database = None  # Add this line
     
     @classmethod
-    def reset_class(cls):
-        cls.Cable_options_num = 0
-        cls.names = set()
+    def load_cable_database(cls):
+        """Load cable database from YAML files if not already loaded."""
+        if cls._cable_database is None:
+            # Get the path to the Cable_database directory
+            module_dir = Path(__file__).parent
+            cable_dir = module_dir / 'Cable_database'
+            
+            data_dict = {}
+            # Read all YAML files in the directory
+            for yaml_file in cable_dir.glob('*.yaml'):
+                with open(yaml_file, 'r', encoding='latin-1') as f:
+                    cable_data = yaml.safe_load(f)
+                    if cable_data:
+                        # Each file has one cable
+                        cable_name = list(cable_data.keys())[0]
+                        specs = cable_data[cable_name]
+                        
+                        # Only include AC cables
+                        if specs.get('Type', 'AC') == 'AC':
+                            data_dict[cable_name] = specs
+            
+            if data_dict:
+                # Convert to pandas DataFrame
+                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
     
-    @property
-    def name(self):
-        return self._name
-    
-    @property
-    def cable_types(self):
-        return self._cable_types
-
-    @cable_types.setter
-    def cable_types(self, value):
-        self._cable_types = value
-        if hasattr(self, 'lines'):
-            for line in self.lines:
-                line.cable_types = value
-        
-
-    def __init__(self,cable_types:list,name=None):
+    def __init__(self, cable_types: list, name=None):
         self.Cable_options_num = Cable_options.Cable_options_num
         Cable_options.Cable_options_num += 1
         
-        self.cable_types = cable_types
+        # Load database if not already loaded
+        if Cable_options._cable_database is None:
+            Cable_options.load_cable_database()
+        
+        self._cable_types = cable_types
         self.lines = []
+        
+        # Efficiently calculate MVA ratings in one pass
+        self.MVA_ratings = []
+        for cable_type in self._cable_types:
+            # Get MVA rating directly from database
+            if cable_type in self._cable_database.index:
+                cable_data = self._cable_database.loc[cable_type]
+                # Calculate MVA rating: A_rating * kV_base * sqrt(3) / 1000
+                A_rating = cable_data['A_rating']
+                kV_base = cable_data['Nominal_voltage_kV'] 
+                MVA_rating = A_rating * kV_base * np.sqrt(3) / 1000
+                self.MVA_ratings.append(MVA_rating)
+            else:
+                raise ValueError(f"Cable type '{cable_type}' not found in database")
+
         if name is None:
-            self._name = str(self.Cable_options_num)
+            self.name = str(self.Cable_options_num)
         else:
-            self._name = name
+            self.name = name
             
         Cable_options.names.add(self.name)
         
-    
-    
-
 
 class TF_Line_AC:
     trafNumber = 0

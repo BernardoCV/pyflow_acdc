@@ -1068,7 +1068,7 @@ def assign_lineToCable_options(Grid,line_name, new_cable_option_name):
     # Add line to the new cable_option
     if line_to_reassign not in new_cable_option.lines:
         new_cable_option.lines.append(line_to_reassign) 
-        line_to_reassign.cable_types = new_cable_option.cable_types
+        line_to_reassign.cable_types = new_cable_option._cable_types
 
 
 
