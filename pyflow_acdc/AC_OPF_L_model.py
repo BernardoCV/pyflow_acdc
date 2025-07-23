@@ -363,29 +363,36 @@ def AC_constraints(model,grid,AC_info):
 
 
     def z_to_ub_rule(model, line, ct):
-        return model.z_to[line, ct] <= model.ct_PAC_to[line, ct] + (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+        M = calc_M_linear(model, line)
+        return model.z_to[line, ct] <= model.ct_PAC_to[line, ct] + (1 - model.ct_branch[line, ct]) * (2*M)
 
     def z_to_lb_rule(model, line, ct):
-        return model.z_to[line, ct] >= model.ct_PAC_to[line, ct] - (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+        M = calc_M_linear(model, line)
+        return model.z_to[line, ct] >= model.ct_PAC_to[line, ct] - (1 - model.ct_branch[line, ct]) * (2*M)
 
     def z_to_branch_ub_rule(model, line, ct):
-        return model.z_to[line, ct] <= model.ct_branch[line, ct] * S_lineACct_lim[line,ct]
+        M_ct = S_lineACct_lim[line, ct]
+        return model.z_to[line, ct] <= M_ct * model.ct_branch[line, ct]
 
     def z_to_branch_lb_rule(model, line, ct):
-        return model.z_to[line, ct] >= model.ct_branch[line, ct] * (-S_lineACct_lim[line,ct])
+        M_ct = S_lineACct_lim[line, ct]
+        return model.z_to[line, ct] >= -M_ct * model.ct_branch[line, ct]
 
-    
     def z_from_ub_rule(model, line, ct):
-        return model.z_from[line, ct] <= model.ct_PAC_from[line, ct] + (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+        M = calc_M_linear(model, line)
+        return model.z_from[line, ct] <= model.ct_PAC_from[line, ct] + (1 - model.ct_branch[line, ct]) * (2*M)
 
     def z_from_lb_rule(model, line, ct):
-        return model.z_from[line, ct] >= model.ct_PAC_from[line, ct] - (1 - model.ct_branch[line, ct]) * (2*S_lineACct_lim[line,ct])
+        M = calc_M_linear(model, line)
+        return model.z_from[line, ct] >= model.ct_PAC_from[line, ct] - (1 - model.ct_branch[line, ct]) * (2*M)
 
     def z_from_branch_ub_rule(model, line, ct):
-        return model.z_from[line, ct] <= model.ct_branch[line, ct] * S_lineACct_lim[line,ct]
+        M_ct = S_lineACct_lim[line, ct]
+        return model.z_from[line, ct] <= M_ct * model.ct_branch[line, ct]
 
     def z_from_branch_lb_rule(model, line, ct):
-        return model.z_from[line, ct] >= model.ct_branch[line, ct] * (-S_lineACct_lim[line,ct])
+        M_ct = S_lineACct_lim[line, ct]
+        return model.z_from[line, ct] >= -M_ct * model.ct_branch[line, ct]
 
     
     if grid.CT_AC:
