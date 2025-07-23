@@ -686,6 +686,11 @@ def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
     if price_zone_link:
         gen.qf= 0
         gen.lf= node.price
+
+    # Iterate over all AC nodes to see if any is already 'Slack'
+    has_slack = any(n.type == 'Slack' for n in Grid.nodes_AC)
+    if not has_slack:
+        node.type = 'Slack'
     Grid.Generators.append(gen)
 
 def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0):

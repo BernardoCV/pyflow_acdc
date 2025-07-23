@@ -739,7 +739,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
             active_config = 0
         else:
             active_config = -1
-        line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
+        line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=active_config,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
         
         # Store the line object with its name for later reference
         edge_key = f'{tonode}_{fromnode}'
