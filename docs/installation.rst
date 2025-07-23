@@ -77,9 +77,8 @@ For OPF functionality
 ^^^^^^^^^^^^^^^^^^^^^^
 Install the following packages::
 
-    pip install numpy <2.0.0
     pip install pyomo
-    pip install ipopt
+    conda install -c conda-forge ipopt
 
 For Dash Interface
 ^^^^^^^^^^^^^^^^^^^
