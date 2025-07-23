@@ -264,7 +264,7 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.ct_set = pyo.Set(initialize=cab_types_set)
         model.ct_PAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
         model.ct_PAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
-        model.ct_PAC_line_loss = pyo.Var(model.lines_AC_ct,initialize=0)
+        
         model.z_to = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds)
         model.z_from = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds)   
 
@@ -786,7 +786,7 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_fromQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_toQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
-        lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
+       
         
         def process_line_AC_CT(line):
             l = line.lineNumber
@@ -810,7 +810,7 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             line.fromS = (Pfrom + 1j*Qfrom)
             line.toS = (Pto + 1j*Qto)
             line.loss = line.fromS + line.toS
-            line.P_loss = lines_AC_CT_loss[l]
+            line.P_loss = 0
 
         with ThreadPoolExecutor() as executor:
             executor.map(process_line_AC_CT, grid.lines_AC_ct)
