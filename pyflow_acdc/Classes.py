@@ -808,17 +808,7 @@ class Grid:
     
 
     def Line_AC_calc(self):
-        try: 
-            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
-        except: 
-            self.V_AC =np.zeros(self.nn_AC)
-            self.Theta_V_AC=np.zeros(self.nn_AC)
-            for node in self.nodes_AC: 
-                nAC=node.nodeNumber
-                self.V_AC[nAC]=node.V
-                self.Theta_V_AC[nAC]=node.theta
-            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
-            
+        V_cart = self._initialize_voltage_cartesian()
         
         self.I_AC_cart = np.matmul(self.Ybus_AC, V_cart)
         self.I_AC_m = abs(self.I_AC_cart)
@@ -826,23 +816,104 @@ class Grid:
 
   
         for line in self.lines_AC:
-            i = line.fromNode.nodeNumber
-            j = line.toNode.nodeNumber
-        
-            i_from = line.Ybus_branch[0,0]*V_cart[i]+line.Ybus_branch[0,1]*V_cart[j]
-            i_to = line.Ybus_branch[1,0]*V_cart[i]+line.Ybus_branch[1,1]*V_cart[j]
-            
-            Sfrom = V_cart[i]*np.conj(i_from)
-            Sto = V_cart[j]*np.conj(i_to)
-        
-            line.loss = Sfrom+Sto
-            line.P_loss = np.real(line.loss)
-            
-            line.fromS=Sfrom
-            line.toS=Sto
-            line.i_from,_ = cartz2pol(i_from)
-            line.i_to,_ = cartz2pol(i_to)
+            self._calculate_line_power_flow(line, V_cart)
 
+    def Line_AC_calc_exp(self):
+        """
+        Calculate power flow and losses for expansion AC lines, reconductored lines, 
+        and configurable transmission lines.
+        
+        This method processes three types of AC lines:
+        - lines_AC_exp: Expansion lines with parallel circuits
+        - lines_AC_rec: Reconductored lines with new parameters
+        - lines_AC_ct: Configurable transmission lines with multiple configurations
+        """
+        V_cart = self._initialize_voltage_cartesian()
+        
+        for line in self.lines_AC_exp:
+            self._calculate_line_power_flow(line, V_cart, use_parallel=True)
+            
+        # Process reconductored lines
+        for line in self.lines_AC_rec:
+            self._calculate_line_power_flow(line, V_cart, use_reconductored=True)
+            
+        # Process configurable transmission lines
+        for line in self.lines_AC_ct:
+            self._calculate_line_power_flow(line, V_cart, use_configurable=True)
+    
+    def _initialize_voltage_cartesian(self):
+        """
+        Initialize voltage arrays and convert to cartesian form.
+        
+        Returns
+        -------
+        ndarray
+            Complex voltage vector in cartesian form
+        """
+        try: 
+            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
+        except (ValueError, AttributeError) as e:
+            # Initialize voltage arrays if not available
+            self.V_AC = np.zeros(self.nn_AC)
+            self.Theta_V_AC = np.zeros(self.nn_AC)
+            for node in self.nodes_AC: 
+                nAC = node.nodeNumber
+                self.V_AC[nAC] = node.V
+                self.Theta_V_AC[nAC] = node.theta
+            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
+        return V_cart
+    
+    def _calculate_line_power_flow(self, line, V_cart, use_parallel=False, 
+                                 use_reconductored=False, use_configurable=False):
+        """
+        Calculate power flow and losses for a single AC line.
+        
+        Parameters
+        ----------
+        line : Line_AC
+            The line to calculate power flow for
+        V_cart : ndarray
+            Complex voltage vector in cartesian form
+        use_parallel : bool
+            Whether to use parallel circuit factor (np_line)
+        use_reconductored : bool
+            Whether to use new Ybus parameters for reconductored lines
+        use_configurable : bool
+            Whether to use active configuration Ybus for configurable lines
+        """
+        i = line.fromNode.nodeNumber
+        j = line.toNode.nodeNumber
+        
+        # Select appropriate Ybus matrix
+        if use_reconductored and line.rec_branch:
+            Ybus = line.Ybus_branch_new
+        elif use_configurable:
+            Ybus = line.Ybus_list[line.active_config]
+        else:
+            Ybus = line.Ybus_branch
+        
+        # Calculate currents
+        if use_parallel:
+            # Apply parallel circuit factor
+            i_from = line.np_line * (Ybus[0, 0] * V_cart[i] + Ybus[0, 1] * V_cart[j])
+            i_to = line.np_line * (Ybus[1, 0] * V_cart[i] + Ybus[1, 1] * V_cart[j])
+        else:
+            i_from = Ybus[0, 0] * V_cart[i] + Ybus[0, 1] * V_cart[j]
+            i_to = Ybus[1, 0] * V_cart[i] + Ybus[1, 1] * V_cart[j]
+        
+        # Calculate power flows
+        Sfrom = V_cart[i] * np.conj(i_from)
+        Sto = V_cart[j] * np.conj(i_to)
+        
+        # Calculate losses
+        line.loss = Sfrom + Sto
+        line.P_loss = np.real(line.loss)
+        
+        # Store results
+        line.fromS = Sfrom
+        line.toS = Sto
+        line.i_from, _ = cartz2pol(i_from)
+        line.i_to, _ = cartz2pol(i_to)
 
     def Line_DC_calc(self):
         V = self.V_DC
