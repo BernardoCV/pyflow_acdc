@@ -393,7 +393,10 @@ def AC_constraints(model,grid,AC_info):
     def z_from_branch_lb_rule(model, line, ct):
         M_ct = S_lineACct_lim[line, ct]
         return model.z_from[line, ct] >= -M_ct * model.ct_branch[line, ct]
-
+    
+    def calc_M_linear(model, line):
+        max_pow = max(S_lineACct_lim[line,ct] for ct in model.ct_set)
+        return 1.1 * max_pow
     
     if grid.CT_AC:
         model.ct_Pto_constraint = pyo.Constraint(model.nodes_AC, rule=toCT_rule_linear)  
@@ -546,9 +549,7 @@ def AC_constraints(model,grid,AC_info):
         model.rec_S_from_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear)
         model.rec_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear_neg)
     
-    def calc_M_linear(model, line):
-        max_pow = max(S_lineACct_lim[line,ct] for ct in model.ct_set)
-        return 1.1 * max_pow
+    
 
     def S_to_AC_line_rule_ct_linear(model, line, ct):
         M = calc_M_linear(model, line)
