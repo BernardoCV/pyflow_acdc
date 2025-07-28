@@ -65,7 +65,7 @@ def run_test():
     res = pyf.Results(grid, decimals=3)
     
     # Run power flow as shown in docs
-    pyf.ACDC_sequential(grid)
+    time,tol,ps_iterations = pyf.ACDC_sequential(grid)
     
     # Get results as shown in docs
     res.All()

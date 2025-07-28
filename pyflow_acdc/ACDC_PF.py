@@ -48,12 +48,12 @@ def Power_flow(grid,tol_lim=1e-10, maxIter=100):
     if grid.nn_DC!=0:
         DCmode = True   
     if ACmode and DCmode:
-        t,_=ACDC_sequential(grid,tol_lim, maxIter)
+        t,tol,_=ACDC_sequential(grid,tol_lim, maxIter)
     elif ACmode:
-        t=AC_PowerFlow(grid,tol_lim, maxIter)
+        t,tol=AC_PowerFlow(grid,tol_lim, maxIter)
     elif DCmode:
-        t=DC_PowerFlow(grid,tol_lim, maxIter)
-    return t
+        t,tol=DC_PowerFlow(grid,tol_lim, maxIter)
+    return t,tol
 
 
 def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
@@ -61,21 +61,21 @@ def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
     grid.Update_PQ_AC()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
-    load_flow_AC(grid, tol_lim, maxIter)
+    ac_tol =load_flow_AC(grid, tol_lim, maxIter)
     grid.Update_PQ_AC()
     grid.Line_AC_calc()
     grid.Line_AC_calc_exp()
     time_2 = time.time()
-    return time_2-time_1
+    return time_2-time_1,ac_tol
     
 def DC_PowerFlow(grid, tol_lim=1e-10, maxIter=100,Droop_PF=True):
     time_1 = time.time()
     grid.Update_P_DC()
-    load_flow_DC(grid, tol_lim, maxIter,Droop_PF)
+    dc_tol =load_flow_DC(grid, tol_lim, maxIter,Droop_PF)
     grid.Update_P_DC()
     grid.Line_DC_calc()
     time_2 = time.time()
-    return time_2-time_1
+    return time_2-time_1,dc_tol
 
 def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, internal_tol = 1e-8,change_slack2Droop=False, QLimit=False,Droop_PF=True):
     time_1 = time.time()
@@ -217,7 +217,7 @@ def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, internal_tol = 1e-8,change_
     time_2=time.time()
     t = time_2-time_1
     
-    return t, ps_iterations, tolerance_tracker
+    return t, tolerance_tracker,ps_iterations
 
 def Jacobian_DC(grid, V_DC, P,Droop_PF):
     grid.slack_bus_number_DC = []
