@@ -23,7 +23,7 @@ save_grid_to_matlab
    Exports grid to MATLAB format. It is important to note, that for MATACDC format, only one polarity can be chosen for all DC grids.
 
    .. list-table::
-      :widths: 20 10 50 10 10
+      :widths: 20 10 50 20
       :header-rows: 1
 
       * - Parameter

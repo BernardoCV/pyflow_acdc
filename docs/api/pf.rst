@@ -5,6 +5,17 @@ This module provides functions for AC, DC and AC/DC power flow analysis.
 
 functions are found in pyflow_acdc.ACDC_PF
 
+Running the Power Flow
+----------------------
+
+For a simple power flow, the function :py:func:`Power_flow` can be used. This function will automatically detect the type of power flow to run (AC, DC or AC/DC) and will run the appropriate power flow.
+
+.. py:function:: Power_flow(grid,tol_lim=1e-10, maxIter=100)
+
+   Performs power flow calculation.
+
+
+
 AC Power Flow
 -------------
 

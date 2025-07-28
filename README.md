@@ -78,7 +78,7 @@ For OPF you will need to install the following packages:
 ```bash
 
 pip install pyomo
-conda install -c conda-forge cyipopt
+conda install -c conda-forge ipopt
 
 ```
 For OPF run in Linux for the TEP:

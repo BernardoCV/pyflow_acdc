@@ -64,6 +64,7 @@ def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
     load_flow_AC(grid, tol_lim, maxIter)
     grid.Update_PQ_AC()
     grid.Line_AC_calc()
+    grid.Line_AC_calc_exp()
     time_2 = time.time()
     return time_2-time_1
     
@@ -210,6 +211,7 @@ def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, internal_tol = 1e-8,change_
             tolerance_tracker['convergence_status']['sequential_converged'] = False
     
     grid.Line_AC_calc()
+    grid.Line_AC_calc_exp()
     grid.Line_DC_calc()
     
     time_2=time.time()
