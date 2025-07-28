@@ -9,7 +9,8 @@ def case24_3zones_acdc_OPF():
     res.All()
 
 
-def run_case24_3zones_acdc_OPF():
+def run_test():
+    """Test case24 3-zones AC/DC optimal power flow."""
     try:
         import pyomo
     except ImportError:
@@ -19,4 +20,4 @@ def run_case24_3zones_acdc_OPF():
     case24_3zones_acdc_OPF()
 
 if __name__ == "__main__":
-    run_case24_3zones_acdc_OPF()    
+    run_test()    

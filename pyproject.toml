@@ -71,7 +71,7 @@ Repository     = "https://github.com/BernardoCV/pyflow_acdc"
 Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
 [tool.setuptools]
-packages = ["pyflow_acdc"]
+packages = ["pyflow_acdc","pyflow_tests"]
 
 [tool.setuptools.package-data]
 "pyflow_acdc" = [
@@ -81,4 +81,4 @@ packages = ["pyflow_acdc"]
 ]
 
 [project.scripts]
-pyflow-acdc-test = "pyflow_acdc.pyflow_tests.run_tests:main"
+pyflow-acdc-test = "pyflow_tests.run_tests:main"

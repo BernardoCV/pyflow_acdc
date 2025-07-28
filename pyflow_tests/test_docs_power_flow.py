@@ -6,8 +6,9 @@ Tests the "Running a Power Flow" section in usage.rst
 
 import pyflow_acdc as pyf
 
-def run_test_docs_power_flow():
-# Test the PEI grid example from docs
+def run_test():
+    """Test power flow example from documentation."""
+    # Test the PEI grid example from docs
     [grid, res] = pyf.PEI_grid()
 
     pyf.ACDC_sequential(grid, QLimit=False)
@@ -17,6 +18,6 @@ def run_test_docs_power_flow():
     print("✓ Power flow example test passed")
 
 if __name__ == "__main__":
-    run_test_docs_power_flow()
+    run_test()
 
 

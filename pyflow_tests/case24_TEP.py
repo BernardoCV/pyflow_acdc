@@ -166,7 +166,8 @@ def case24_TEP():
     print(timing_info)
     model.obj.display()
 
-def run_case24_TEP():
+def run_test():
+    """Test case24 transmission expansion planning."""
     try:
         import pyomo
     except ImportError:
@@ -183,4 +184,4 @@ def run_case24_TEP():
     case24_TEP()
 
 if __name__ == "__main__":
-    run_case24_TEP()
+    run_test()

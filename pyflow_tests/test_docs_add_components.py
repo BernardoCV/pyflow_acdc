@@ -6,8 +6,8 @@ Tests the "Adding Components" section in usage.rst
 
 import pyflow_acdc as pyf
 
-def run_test_docs_add_components():
-    """Test the adding components example from documentation."""
+def run_test():
+    """Test adding components example from documentation."""
 
     pyf.initialize_pyflowacdc()
 
@@ -62,4 +62,4 @@ def run_test_docs_add_components():
     print("✓ Add components test passed")
 
 if __name__ == "__main__":
-    run_test_docs_add_components()
+    run_test()

@@ -91,7 +91,8 @@ def case6_TEP_DC():
 
     print(timing_info)
 
-def run_case6_TEP_DC():
+def run_test():
+    """Test case6 DC transmission expansion planning."""
     try:
         import pyomo
     except ImportError:
@@ -109,4 +110,4 @@ def run_case6_TEP_DC():
     case6_TEP_DC()
 
 if __name__ == "__main__":
-    run_case6_TEP_DC()
+    run_test()

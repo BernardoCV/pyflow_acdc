@@ -1,6 +1,7 @@
 import pyflow_acdc as pyf
 
-def run_grid_creation():
+def run_test():
+    """Test grid creation functionality."""
 
     pyf.initialize_pyflowacdc()
 
@@ -48,4 +49,4 @@ def run_grid_creation():
     res.All()
 
 if __name__ == "__main__":
-    run_grid_creation()
+    run_test()

@@ -45,7 +45,8 @@ def DC_OPF():
     print(timing_info)
     model.obj.display()
 
-def run_DC_OPF():
+def run_test():
+    """Test DC optimal power flow."""
     try:
         import pyomo
     except ImportError:
@@ -55,6 +56,6 @@ def run_DC_OPF():
     DC_OPF()
 
 if __name__ == "__main__":
-    run_DC_OPF()
+    run_test()
        
 

@@ -20,12 +20,13 @@ def ts_dash():
 
     print('Time series OPF completed')
 
-def run_ts_dash():
+def run_test():
+    """Test time series dash functionality."""
     try:
         import dash
         
     except:
-        print("Error: Dash is not installed. Please install it using 'pip install dash'.")
+        print("dash is not installed...")
         return
     
     try:
@@ -37,4 +38,4 @@ def run_ts_dash():
     ts_dash()
 
 if __name__ == "__main__":
-    run_ts_dash()
+    run_test()

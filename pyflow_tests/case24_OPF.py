@@ -198,7 +198,8 @@ def case24_OPF():
     print(f'Total time :{t2-t1}')
 
 
-def run_case24_opf():
+def run_test():
+    """Test case24 optimal power flow."""
     try:
         import pyomo
     except ImportError:
@@ -208,6 +209,6 @@ def run_case24_opf():
     case24_OPF()
 
 if __name__ == "__main__":
-    run_case24_opf()
+    run_test()
 
        

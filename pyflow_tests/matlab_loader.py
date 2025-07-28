@@ -6,12 +6,9 @@ Created on Mon Nov 11 16:53:11 2024
 """
 
 import pyflow_acdc as pyf
-import time
-import sys
-import pyomo.environ as pyo
 from pathlib import Path
 
-def run_matlab_loader():
+def matlab_loader():
 
     current_file = Path(__file__).resolve()
     path = str(current_file.parent)
@@ -38,5 +35,15 @@ def run_matlab_loader():
     print(model_res)
     model.obj.display()
 
+def run_test():
+    """Test MATLAB file loading functionality."""
+    try:
+        import pyomo
+    except ImportError:
+        print("pyomo is not installed...")
+        return
+
+    matlab_loader()
+
 if __name__ == "__main__":
-    run_matlab_loader()
+    run_test()

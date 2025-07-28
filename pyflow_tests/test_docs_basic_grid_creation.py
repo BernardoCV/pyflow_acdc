@@ -6,7 +6,7 @@ Tests the "Creating a Grid" section in usage.rst
 
 import pyflow_acdc as pyf
 
-def test_basic_grid_creation():
+def run_test():
     """Test the basic grid creation example from documentation."""
     
     pyf.initialize_pyflowacdc()
@@ -73,4 +73,4 @@ def test_basic_grid_creation():
     print("✓ Basic grid creation test passed")
 
 if __name__ == "__main__":
-    test_basic_grid_creation() 
+    run_test() 

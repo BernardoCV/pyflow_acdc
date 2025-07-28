@@ -51,7 +51,8 @@ def test_docs_opf_detailed():
     print('------')
     print("✓ Detailed OPF example test passed")
 
-def run_test_docs_opf_detailed():
+def run_test():
+    """Test detailed OPF example from documentation."""
     try:
         import pyomo
     except ImportError:
@@ -61,4 +62,4 @@ def run_test_docs_opf_detailed():
     test_docs_opf_detailed()
 
 if __name__ == "__main__":
-    run_test_docs_opf_detailed()
+    run_test()

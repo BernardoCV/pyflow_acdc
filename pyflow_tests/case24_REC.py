@@ -151,7 +151,8 @@ def case24_REC():
     print(timing_info)
     model.obj.display()
 
-def run_case24_REC():
+def run_test():
+    """Test case24 renewable energy curtailment."""
     try:
         import pyomo
     except ImportError:
@@ -168,4 +169,4 @@ def run_case24_REC():
     case24_REC()
 
 if __name__ == "__main__":
-    run_case24_REC()
+    run_test()

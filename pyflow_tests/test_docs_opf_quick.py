@@ -20,7 +20,8 @@ def test_docs_opf_quick():
     print("✓ Quick OPF example test passed")
 
 
-def run_test_docs_opf_quick():
+def run_test():
+    """Test quick OPF example from documentation."""
     try:
         import pyomo
     except ImportError:
@@ -30,4 +31,4 @@ def run_test_docs_opf_quick():
     test_docs_opf_quick()
 
 if __name__ == "__main__":
-    run_test_docs_opf_quick()
+    run_test()

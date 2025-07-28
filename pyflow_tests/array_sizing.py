@@ -142,7 +142,8 @@ def array_sizing(combinations):
         
         print(timing_info)
 
-def run_array_sizing():
+def run_test():
+    """Test array sizing functionality."""
     try:
         import pyomo
     except ImportError:
@@ -167,4 +168,4 @@ def run_array_sizing():
     array_sizing(combinations)
 
 if __name__ == "__main__":
-    run_array_sizing()
+    run_test()

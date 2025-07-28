@@ -82,17 +82,25 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List
         if show_output:
             # Run the module directly to see all output
             spec.loader.exec_module(module)
+            # Call the standardized test function
+            module.run_test()
         else:
             # Capture stdout to check for warning messages
             stdout_capture = StringIO()
             with contextlib.redirect_stdout(stdout_capture):
                 spec.loader.exec_module(module)
+                # Call the standardized test function
+                module.run_test()
             
             # Check stdout for explicit warning messages
             for line in stdout_capture.getvalue().split('\n'):
-                if 'Warning' in line or 'warning' in line: # or 'WARNING' in line:
+                if 'Warning' in line or 'warning' in line:
                     captured_warnings.append(line.strip())
             
+            stdout_content = stdout_capture.getvalue()
+            if 'pyomo is not installed' in stdout_content or 'bonmin is not installed' in stdout_content or 'folium is not installed' in stdout_content or 'dash is not installed' in stdout_content:
+                return False, "Dependency not available", captured_warnings
+
         return True, "", captured_warnings
     except Exception as e:
         error_msg = f"Error running {case}: {str(e)}"
@@ -104,8 +112,9 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List
 
 def main():
     # Check command line arguments
-    show_output = len(sys.argv) > 1 and sys.argv[1] == "--show-output"
-    quick_mode = len(sys.argv) > 1 and sys.argv[1] == "--quick"
+    args = sys.argv[1:]
+    show_output = "--show-output" in args
+    quick_mode = "--quick" in args
     
     # Choose which tests to run
     if quick_mode:
@@ -127,6 +136,8 @@ def main():
         results[case] = (success, error_msg, warnings)
         if not show_output:
             status = "✓ Passed" if success else "✗ Failed"
+            if error_msg == "Dependency not available":
+                status = "~ Skipped"
             print(f"{status} - {case}")
             if warnings:
                 print("\nWarnings:")
@@ -144,8 +155,20 @@ def main():
     if failed_tests:
         print("\nFailed Tests:")
         for case, error, warnings in failed_tests:
+            if error == "Dependency not available":
+                continue
             print(f"\n{case}:")
             print(f"  {error}")
+            if warnings:
+                print("\nWarnings:")
+                for warning in warnings:
+                    print(f"  {warning}")
+        print('------')
+        print('Skipped tests:')
+        for case, error, warnings in failed_tests:
+            if error != "Dependency not available": 
+                continue
+            print(f"\n{case}:  {error}")
             if warnings:
                 print("\nWarnings:")
                 for warning in warnings:

@@ -62,7 +62,8 @@ def CigreB4_OPF():
     print ('------')
     print(f'Time elapsed : {elapsed_time}')
 
-def run_CigreB4_OPF():
+def run_test():
+    """Test CIGRE B4 optimal power flow."""
     try:
         import pyomo
     except ImportError:
@@ -72,4 +73,4 @@ def run_CigreB4_OPF():
     CigreB4_OPF()
 
 if __name__ == "__main__":
-    run_CigreB4_OPF()
+    run_test()

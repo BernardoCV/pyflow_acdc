@@ -10,11 +10,12 @@ def folium_test():
 
         print('folium test completed')
 
-def run_folium_test():
+def run_test():
+    """Test folium mapping functionality."""
     try:
         import folium
     except ImportError:
-        print("folium is not installed. To use these functions, please install it using 'pip install folium'.")
+        print("folium is not installed...")
         return
     try:
         import pyomo
@@ -24,5 +25,5 @@ def run_folium_test():
     
     folium_test()
 if __name__ == "__main__":
-    run_folium_test()
+    run_test()
     

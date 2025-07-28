@@ -13,7 +13,8 @@ import pyflow_acdc as pyf
 
 from pathlib import Path
 
-def run_CigreB4_PF():
+def run_test():
+    """Test CIGRE B4 power flow."""
     start_time = time.time()
 
     S_base=100 #MVAres
@@ -46,7 +47,7 @@ def run_CigreB4_PF():
         pyf.add_DCDC_converter(grid,conv.fromNode,conv.toNode,P_MW=conv.P_MW,R_Ohm=conv.R_Ohm,MW_rating=conv.MW_rating)
 
 
-    t, ps_iter = pyf.ACDC_sequential(grid, Droop_PF=True,maxIter=500)
+    t = pyf.ACDC_sequential(grid, Droop_PF=True,maxIter=500)
     #model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
 
     # res.All()
@@ -57,4 +58,4 @@ def run_CigreB4_PF():
     print(f'Time elapsed : {elapsed_time}')
 
 if __name__ == "__main__":
-    run_CigreB4_PF()
+    run_test()
