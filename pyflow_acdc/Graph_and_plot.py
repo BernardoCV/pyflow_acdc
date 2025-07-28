@@ -9,6 +9,7 @@ import base64
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import os
+from shapely.geometry import Point, LineString
 
 from .Classes import Node_AC
 
@@ -78,7 +79,7 @@ def update_DCnode_hovertext(node,S_base,text):
         if node.ConvInv and node.Nconv >= 0.00001:
             conv  = np.round(node.Pconv*S_base, decimals=0).astype(int)
             nconv = np.round(node.Nconv,decimals=2)
-            load = int(np.round(node.conv_loading * S_base / (node.conv_MW * node.Nconv) * 100))
+            load = abs(int(np.round(conv / (node.conv_MW*nconv) * 100)))
             node.hover_text = f"Node: {name}<br>Voltage: {V}kV<br>Converter:{conv}MW<br>Number Converter: {nconv}<br>Converters loading: {load}%"
         else:
             node.hover_text = f"Node: {name}<br>Voltage: {V}kV"
@@ -415,11 +416,14 @@ def update_conv_hovertext(conv,S_base,text):
 def update_gen_hovertext(gen,S_base,text):            
      if text =='data':
          name= gen.name
-         node = gen.Node_AC
+         node = gen.Node_AC 
          if gen.Max_S is None:
-             rating = gen.Max_pow_gen
+            if gen.Max_pow_gen !=0:
+                rating = gen.Max_pow_gen
+            else:
+                rating = max(gen.Max_pow_genR,abs(gen.Min_pow_genR))
          else:
-            rating = gen.Max_S*S_base
+            rating = gen.Max_S
          rating = np.round(rating,decimals=0)
          
          gen.hover_text = f"Generator: {name}<br>AC node: {node}<br>Rating: {rating}<br>Fuel: {gen.gen_type}"    
@@ -429,7 +433,10 @@ def update_gen_hovertext(gen,S_base,text):
          Pto = np.round(gen.PGen, decimals=0)
          Qto = np.round(gen.QGen, decimals=0)
          if gen.Max_S is None:
-             rating = gen.Max_pow_gen
+            if gen.Max_pow_gen !=0:
+                rating = gen.Max_pow_gen
+            else:
+                rating = max(gen.Max_pow_genR,abs(gen.Min_pow_genR))
          else:
             rating = gen.Max_S
          load = np.sqrt(Pto**2+Qto**2)/rating*100
@@ -441,9 +448,12 @@ def update_gen_hovertext(gen,S_base,text):
         Pto = np.round(gen.PGen*S_base, decimals=0)
         Qto = np.round(gen.QGen*S_base, decimals=0)
         if gen.Max_S is None:
-            rating = gen.Max_pow_gen*S_base
+            if gen.Max_pow_gen !=0:
+                rating = gen.Max_pow_gen
+            else:
+                rating = max(gen.Max_pow_genR,abs(gen.Min_pow_genR))
         else:
-           rating = gen.Max_S*S_base
+            rating = gen.Max_S
         load = np.sqrt(Pto**2+Qto**2)/rating*100
         Loading = np.round(load, decimals=0).astype(int)
         
@@ -1051,19 +1061,108 @@ def create_subgraph_color_dict(G):
 
 
 
+def create_geometries(grid):
+    """
+    Create geometries for all grid elements if they don't exist.
+    First checks if nodes have x and y coordinates, if not uses calculate_positions.
+    Then creates geometries for all elements (nodes, lines, converters).
+    """
+    # Step 1: Check if nodes have coordinates, if not create synthetic ones
+    G = grid.Graph_toPlot
+    pos = calculate_positions(G, grid)
+    
+    # Step 2: Create geometries for nodes
+    for node in grid.nodes_AC + grid.nodes_DC:
+        if not hasattr(node, 'geometry') or node.geometry is None:
+            if node in pos:
+                x, y = pos[node]
+                node.geometry = Point(x, y)
+                # Update coordinates if they were None
+                if node.x_coord is None:
+                    node.x_coord = x
+                if node.y_coord is None:
+                    node.y_coord = y
+    
+    # Step 3: Create geometries for AC lines
+    for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct + grid.lines_AC_exp:
+        if not hasattr(line, 'geometry') or line.geometry is None:
+            if hasattr(line, 'fromNode') and hasattr(line, 'toNode'):
+                from_node = line.fromNode
+                to_node = line.toNode
+                if from_node in pos and to_node in pos:
+                    x1, y1 = pos[from_node]
+                    x2, y2 = pos[to_node]
+                    line.geometry = LineString([(x1, y1), (x2, y2)])
+    
+    # Step 4: Create geometries for DC lines
+    for line in grid.lines_DC:
+        if not hasattr(line, 'geometry') or line.geometry is None:
+            if hasattr(line, 'fromNode') and hasattr(line, 'toNode'):
+                from_node = line.fromNode
+                to_node = line.toNode
+                if from_node in pos and to_node in pos:
+                    x1, y1 = pos[from_node]
+                    x2, y2 = pos[to_node]
+                    line.geometry = LineString([(x1, y1), (x2, y2)])
+    
+    # Step 5: Create geometries for converters
+    for conv in grid.Converters_ACDC:
+        if not hasattr(conv, 'geometry') or conv.geometry is None:
+            if hasattr(conv, 'Node_AC') and hasattr(conv, 'Node_DC'):
+                ac_node = conv.Node_AC
+                dc_node = conv.Node_DC
+                if ac_node in pos and dc_node in pos:
+                    x1, y1 = pos[ac_node]
+                    x2, y2 = pos[dc_node]
+                    conv.geometry = LineString([(x1, y1), (x2, y2)])
+    
+    # Step 6: Create geometries for generators and renewable sources
+    for gen in grid.Generators + grid.RenSources:
+        if not hasattr(gen, 'geometry') or gen.geometry is None:
+            if hasattr(gen, 'Node_AC'):
+                node = gen.Node_AC
+                if node in pos:
+                    x, y = pos[node]
+                    gen.geometry = Point(x, y)
 
-
-def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=True,legend=True):
+def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True):
     """Save the network as SVG file"""
     try:
         import svgwrite
+        
+        # Check if all elements have geometries, if not create them
+        elements_without_geometry = []
+        
+        # Check nodes
+        for node in grid.nodes_AC + grid.nodes_DC:
+            if not hasattr(node, 'geometry') or node.geometry is None:
+                elements_without_geometry.append(f"Node {node.name}")
+        
+        # Check lines
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC + grid.lines_AC_rec + grid.lines_AC_ct + grid.lines_AC_exp:
+            if not hasattr(line, 'geometry') or line.geometry is None:
+                elements_without_geometry.append(f"Line {line.name}")
+        
+        # Check converters
+        for conv in grid.Converters_ACDC:
+            if not hasattr(conv, 'geometry') or conv.geometry is None:
+                elements_without_geometry.append(f"Converter {conv.name}")
+        
+        # Check generators and renewable sources
+        for gen in grid.Generators + grid.RenSources:
+            if not hasattr(gen, 'geometry') or gen.geometry is None:
+                elements_without_geometry.append(f"Generator/RenSource {gen.name}")
+        
+        # If any elements are missing geometries, create them
+        if elements_without_geometry:
+            print(f"Creating geometries for {len(elements_without_geometry)} elements without geometries...")
+            create_geometries(grid)
 
         if journal:
             # Convert 88mm to pixels (assuming 96 DPI)
             width = int(88 * 96 / 25.4)  # 25.4mm = 1 inch
             # Maintain aspect ratio
             height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
-
 
         print(f"Current working directory: {os.getcwd()}")
         print(f"Will save as: {os.path.abspath(f'{name}.svg')}")
@@ -1074,7 +1173,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
         all_bounds = []
         
         # Add lines
-        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC+grid.lines_AC_rec+grid.lines_AC_ct:
+        for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_DC + grid.lines_AC_rec + grid.lines_AC_ct +grid.lines_AC_exp:
             if hasattr(line, 'geometry') and line.geometry:
                 all_bounds.append(line.geometry.bounds)
                 
@@ -1110,25 +1209,24 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
                 padding + (x - minx) * scale,
                 height - (padding + (y - miny) * scale)  # Flip Y axis
             )
+        
         cable_type_colors = {
-        0: 'red', 
-        1: 'purple', 
-        2: 'orange', 
-        3: 'cyan', 
-        4: 'magenta', 
-        5: 'brown', 
-        6: 'gray', 
-        7: 'lime', 
-        8: 'navy', 
-        9: 'teal', 
-        10: 'violet', 
-        11: 'indigo', 
-        12: 'turquoise', 
-        13: 'beige', 
-        14: 'coral', 
-        15: 'salmon', 
-        16: 'olive'
+            0: 'cyan', 
+            1: 'magenta', 
+            2: 'brown', 
+            3: 'gray', 
+            4: 'lime', 
+            5: 'navy', 
+            6: 'teal', 
+            7: 'violet', 
+            8: 'indigo', 
+            9: 'turquoise', 
+            10: 'beige', 
+            11: 'coral', 
+            12: 'salmon', 
+            13: 'olive'
         }
+        
         # Draw AC lines
         for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
@@ -1139,17 +1237,32 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]  # Remove last "L "
                 
-
-                
                 if line in grid.lines_AC_rec and line.rec_branch:
                     color = "green"
                 elif line in grid.lines_AC_ct:
-                     color = cable_type_colors.get(line.active_config, "red")  
+                     color = cable_type_colors.get(line.active_config, "black")  
                 else:
-                    color = "black" if getattr(line, 'isTf', False) else "red"  # Original logic for other lines
+                    color = "red" if getattr(line, 'isTf', False) else "black"  # Original logic for other lines
                 
                 dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2, fill='none'))
         
+
+        for line in grid.lines_AC_exp:
+            if hasattr(line, 'geometry') and line.geometry:
+                coords = list(line.geometry.coords)
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]
+                if line.np_line - line.np_line_b > 0.001:
+                    color = "orange"
+                else:
+                    color = "black"
+
+                dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2*line.np_line, fill='none'))
+
+
         # Draw DC lines
         for line in grid.lines_DC:
             if hasattr(line, 'geometry') and line.geometry:
@@ -1159,7 +1272,18 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
                     svg_x, svg_y = transform_coords(x, y)
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]
-                dwg.add(dwg.path(d=path_data, stroke='blue', stroke_width=2, fill='none'))
+                dwg.add(dwg.path(d=path_data, stroke='blue', stroke_width=2*line.np_line, fill='none'))
+        
+        # Draw converters
+        for conv in grid.Converters_ACDC:
+            if hasattr(conv, 'geometry') and conv.geometry:
+                coords = list(conv.geometry.coords)
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]
+                dwg.add(dwg.path(d=path_data, stroke='purple', stroke_width=2*conv.NumConvP, fill='none'))
         
         # Draw nodes
         for node in grid.nodes_AC + grid.nodes_DC:
@@ -1196,6 +1320,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
                                     font_size=12,
                                     font_family="NewComputerModernSans",
                                     fill=color))
+        
         # Save the SVG file
         dwg.save()
         print(f"Network saved as {name}.svg")
@@ -1203,8 +1328,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800,journal=T
     except ImportError as e:
         print(f"Could not save SVG: {e}. Please install svgwrite package.")
 
-
-    return 
+    return
 
 
     

@@ -247,10 +247,26 @@ Example Usage:
 
 
 
+Transmission Expansion Planning Modelling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In transmision expansion planning, each branch subject to modification is modeled independently in their power flow equations. The standard :math:`\pi`-model is used to represent branch through its corresponding branch admittance :math:`Y_{\text{bus-branch}}`.
+
+.. math::
+    :label: eq:PQ_branch
+
+    \begin{align}
+        S_{ik}& = P_{ik} + \text{j} Q_{ik} \\
+        P_{ik} &= |V_i|^2 G_{ff} + |V_i||V_k| \left[ G_{ft} \cos(\theta_i - \theta_k) + B_{ft} \sin(\theta_i - \theta_k) \right] \\
+        Q_{ik}&=-|V_i|^2 B_{ff}+|V_i||V_k|[G_{ft} \sin(\theta_i-\theta_k)-B_{ft} \cos(\theta_i-\theta_{k}) 
+    \end{align}
+
+
+
 
 
 AC expandable branch
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~
 
 .. figure:: ../images/AC_ybusbranch.svg
    :width: 400
@@ -261,30 +277,24 @@ AC expandable branch
 
 The AC expandable branch :math:`h` is modeled with in admittance matrix model from [4]_:
 
-.. math::
-    :label: eq:PQ_expandable
-
-    \begin{align}
-        P_{flow}^{ac} +=  \sum n_{h} P_{hf_i} + \sum n_{h} P_{ht_i} \\
-        Q_{flow}^{ac} +=  \sum n_{h} Q_{hf_i} + \sum n_{h} Q_{ht_i}
-    \end{align}
-
-.. math::
-    :label: eq:exp_case
-
-    \text{Expandable}\qquad & 
-        \begin{cases}
-            n_{h}S_{h{\text{ from}}}, &  \text{if } i \text{ is } \textit{from node} \text{ of } h \\
-            n_{h}S_{h{\text{ to}}}, &  \text{if } i \text{ is } \textit{to node} \text{ of } h
-        \end{cases} 
 
 .. math::
     :label: eq:Seqexpbranch
 
-    \begin{align} 
-        S_{from_h-eq} &= n_h \cdot S_{from_h} \\
-        S_{to_h-eq} &= n_h \cdot S_{to_h}
+    \begin{align}
+        S_{h_\text{ik}\text{-eq}} &= n_h \cdot S_{h_\text{ik}} \\
+        S_{h_\text{ki}\text{-eq}} &= n_h \cdot S_{h_\text{ki}}
     \end{align}
+    
+.. math::
+    :label: eq:PQ_expandable
+
+    \begin{align}
+        P_{flow}^{ac} +=  \sum n_{h} P_{h_\text{ik}} \\
+        Q_{flow}^{ac} +=  \sum n_{h} Q_{h_\text{ik}}
+    \end{align}
+
+
 
 
 Class Reference: :class:`pyflow_acdc.Classes.Exp_Line_AC`
@@ -317,7 +327,7 @@ Inherits from :class:`Line_AC` with the following additional attributes:
 Where :math:`n_b \leq n_i \leq n_{max}` 
 
 AC reconducting branch
-^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. figure:: ../images/AC_reconducting.svg
    :width: 400
@@ -330,28 +340,22 @@ The AC reconducting branch :math:`u` is modeled with in admittance matrix model 
 
 
 .. math::
-    :label: eq:PQ_reconducting
+    :label: eq:Seqrepbranch
 
     \begin{align}
-        P_{flow}^{ac} += \sum P_{uf_i\text{-eq}} + \sum P_{ut_i\text{-eq}} \\
-        Q_{flow}^{ac} += \sum  Q_{uf_i\text{-eq}} + \sum  Q_{ut_i\text{-eq}}
+        S_{u_\text{ik}\text{-eq}} &= (1-\xi_u)\cdot S_{u_\text{ik}} + \xi_u \cdot S_{u_\text{ik}}'  \\
+        S_{u_\text{ki}\text{-eq}} &=(1-\xi_u)\cdot S_{u_\text{ki}} + \xi_u \cdot S_{u_\text{ki}}'
     \end{align}
 
 .. math::
-    :label: eq:rec_case
+    :label: eq:PQ_reconducting
 
-    \text{reconductable}\qquad & 
-        \begin{cases}
-            S_{u{\text{ from-eq}}}, &  \text{if } i \text{ is } \textit{from node} \text{ of } u \\
-           S_{u{\text{ to-eq}}}, &  \text{if } i \text{ is } \textit{to node} \text{ of } u
-        \end{cases} 
+    \begin{align}
+        P_{flow}^{ac} += \sum P_{u_\text{ik}\text{-eq}} \\
+        Q_{flow}^{ac} += \sum  Q_{u_\text{ik}\text{-eq}}
+    \end{align}
 
 
-.. math::
-    :label: eq:Seqrepbranch
-
-    S_{from_u-eq} = (1-\xi_u) \cdot S_{from_u} + \xi_u \cdot S_{from_h}^{'} \\
-    S_{to_u-eq}   = (1-\xi_u) \cdot S_{to_u} + \xi_u \cdot S_{to_h}^{'}
 
 Class Reference: :class:`pyflow_acdc.Classes.Rep_Line_AC`
 
@@ -386,8 +390,8 @@ Inherits from :class:`Line_AC` with the following additional attributes:
      - float
      - Base cost of the conductor
 
-AC branch selection
-^^^^^^^^^^^^^^^^^^^
+AC conductor size selection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 .. figure:: ../images/AC_array.svg
@@ -395,27 +399,28 @@ AC branch selection
    :alt: AC expandable branch model
    :align: center
 
-   AC branch selection model
+   AC conductor size selection model
 
-The AC branch selection :math:`a` is modeled with in admittance matrix model from [4]_:
+The AC conductor size selection :math:`a` is modeled with in admittance matrix model from [4]_:
 
-
-.. math::
-    :label: eq:PQ_array
-
-    \begin{align}
-        P_{flow}^{ac} += \sum P_{af_i\text{-eq}} + \sum P_{at_i\text{-eq}} \\
-        Q_{flow}^{ac} += \sum Q_{af_i\text{-eq}} + \sum  Q_{at_i\text{-eq}}
-    \end{align}
 
 .. math::
     :label: eq:array_case
 
-    \text{type selection}\qquad & 
-        \begin{cases}
-            S_{a{\text{ from-eq}}}, &  \text{if } i \text{ is } \textit{from node} \text{ of } a \\
-           S_{a{\text{ to-eq}}}, &  \text{if } i \text{ is } \textit{to node} \text{ of } a
-        \end{cases} 
+    \begin{align}
+        S_{a_\text{ik}\text{-eq}} &= \sum_{ \iota \in \mathcal{CT}} \left(\xi_{a,\iota}\cdot S_{a,\iota_\text{ik}} \right)  \\
+        S_{a_\text{ki}\text{-eq}} &=\sum_{ \iota \in \mathcal{CT}}  \left( \xi_{a,\iota}\cdot S_{a,\iota_\text{ki}} \right) 
+    \end{align}
+
+.. math::
+    :label: eq:PQ_array 
+
+    \begin{align}
+        P_{flow}^{ac} += \sum P_{a_\text{ik}\text{-eq}} \\
+        Q_{flow}^{ac} += \sum Q_{a_\text{ik}\text{-eq}}
+    \end{align}
+
+
         
 For the branches $a$ an additional equality constraint is introduced to keep one type of branch per connection, such that :
 

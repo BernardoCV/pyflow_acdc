@@ -70,7 +70,8 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
     return weights_def, Price_Zones
 
 def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
-    
+    analyse_OPF(grid)
+
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
         
     model = pyo.ConcreteModel()
@@ -170,7 +171,7 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
         for ts in grid.Time_series:
             update_grid_data(grid, ts, t)
                     
-        modify_parameters(grid,model.submodel[t],False,True) 
+        modify_parameters(grid,model.submodel[t],Price_Zones) 
         subobj = OPF_obj(model.submodel[t],grid,weights_def,OnlyGen)
         model.submodel[t].obj = pyo.Objective(rule=subobj, sense=pyo.minimize)
 
@@ -371,9 +372,7 @@ def OPF_updateParam(model,grid):
     return model
 
 def OPF_obj(model,grid,ObjRule,OnlyGen=True):
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC,CDC = DCadd
+   
     # for node in  model.nodes_AC:
     #     nAC=grid.nodes_AC[node]
     #     if nAC.Num_conv_connected >= 2:
@@ -388,25 +387,34 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
     def formula_Energy_cost():
         if ObjRule['Energy_cost']['w']==0:
             return 0
-        elif OnlyGen:
-            return sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+        
+        AC= 0
+        DC= 0
+        if grid.ACmode:
+            AC= sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+        if grid.DCmode:
+            DC= sum(((model.PGi_gen_DC[gen.genNumber_DC]*grid.S_base)**2*gen.qf+model.PGi_gen_DC[gen.genNumber_DC]*grid.S_base*model.lf_dc[gen.genNumber_DC]+model.np_gen_DC[gen.genNumber_DC]*gen.fc) for gen in grid.Generators_DC)
+        
+        if OnlyGen:
+            return AC+DC
+        
         else :
             nodes_with_RenSource = [node for node in model.nodes_AC if grid.nodes_AC[node].RenSource]
             nodes_with_conv= [node for node in model.nodes_AC if grid.nodes_AC[node].Num_conv_connected != 0]
-            return sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)  \
-                    + sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base \
-                    + sum(model.P_conv_AC[node]*model.price[node] for node in nodes_with_conv)*grid.S_base
+            return AC+DC  \
+                   + sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base \
+                   + sum(model.P_conv_AC[node]*model.price[node] for node in nodes_with_conv)*grid.S_base
     def formula_AC_losses():
         if ObjRule['AC_losses']['w']==0:
             return 0
         loss = sum(model.PAC_line_loss[line] for line in model.lines_AC)
-        if TAP_tf:
+        if grid.TAP_tf:
             loss += sum(model.tf_PAC_line_loss[tf] for tf in model.lines_AC_tf)
-        if TEP_AC:
+        if grid.TEP_AC:
             loss += sum(model.exp_PAC_line_loss[exp] for exp in model.lines_AC_exp)   
-        if REC_AC:
+        if grid.REC_AC:
             loss += sum(model.rec_PAC_line_loss[rec] for rec in model.lines_AC_rec)
-        if CT_AC:
+        if grid.CT_AC:
             loss += sum(model.ct_PAC_line_loss[ct] for ct in model.lines_AC_ct)
         return loss
 
@@ -414,7 +422,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         if ObjRule['DC_losses']['w']==0:
             return 0
         loss = sum(model.PDC_line_loss[line] for line in model.lines_DC)
-        if CDC:
+        if grid.CDC:
             loss += sum(model.CDC_loss[conv] for conv in model.DCDC_conv)
         return loss
 
@@ -443,9 +451,9 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
             return 0
         ac_curt=0
         dc_curt=0
-        if ACmode:
+        if grid.ACmode:
             ac_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price[grid.rs2node['AC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
-        if DCmode:
+        if grid.DCmode:
             dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
         return ac_curt+dc_curt
     def formula_CG():
@@ -513,10 +521,11 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
 
 
 
-def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
+def Translate_pyf_OPF(grid,Price_Zones=False):
     """Translation of element wise to internal numbering"""
     AC_info, DC_info, Conv_info,DCDC_info = None, None, None,None
-
+    ACmode= grid.ACmode
+    DCmode = grid.DCmode
     "AC system info"
     lista_nodos_AC = list(range(0, grid.nn_AC))
     lista_lineas_AC = list(range(0, grid.nl_AC))
@@ -530,6 +539,7 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
     S_lineACrec_lim, S_lineACrec_lim_new,REC_AC_act = {}, {}, {}
     lf,qf,fc,np_gen = {}, {}, {}, {}
+    lf_DC,qf_DC,fc_DC,np_gen_DC = {}, {}, {}, {}
 
     S_lineACct_lim,cab_types_set,allowed_types = {},{},{}
 
@@ -547,6 +557,14 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
         np_gen[gen.genNumber] = gen.np_gen
     
     lista_gen = list(range(0, grid.n_gen))
+    
+    for gen in grid.Generators_DC:
+        lf_DC[gen.genNumber_DC] = gen.lf
+        qf_DC[gen.genNumber_DC] = gen.qf
+        fc_DC[gen.genNumber_DC] = gen.fc
+        np_gen_DC[gen.genNumber_DC] = gen.np_gen
+    
+    lista_gen_DC = list(range(0, grid.n_gen_DC))
        
     nn_rs=0
     for rs in grid.RenSources:
@@ -555,7 +573,9 @@ def Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=False):
         
     lista_rs = list(range(0, nn_rs))
 
-    gen_info = pack_variables(lf,qf,fc,np_gen,P_renSource,lista_gen,lista_rs)
+    gen_AC_info = pack_variables(lf,qf,fc,np_gen,lista_gen)
+    gen_DC_info = pack_variables(lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC)
+    gen_info = pack_variables(gen_AC_info,gen_DC_info,P_renSource,lista_rs)
 
     "Price zone info"
    
@@ -886,14 +906,18 @@ def OPF_conv_results(model,grid):
       
 
 def calculate_objective(grid,obj,OnlyGen=True):
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC,CDC = DCadd
+   
     if obj =='Ext_Gen':
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
 
     if obj =='Energy_cost':
-        return sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
+        AC= 0
+        DC= 0
+        if grid.ACmode:
+            AC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
+        if grid.DCmode:
+            DC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators_DC)
+        return AC+DC
 
         
     if obj =='PZ_cost_of_generation':
@@ -923,9 +947,9 @@ def calculate_objective(grid,obj,OnlyGen=True):
     if obj =='Curtailment_Red':
         ac_curt=0
         dc_curt=0
-        if ACmode:
+        if grid.ACmode:
             ac_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_AC[grid.rs2node['AC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
-        if  DCmode:
+        if  grid.DCmode:
             dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
         return ac_curt+dc_curt
     

@@ -27,6 +27,7 @@ __all__ = [
     'add_ACDC_converter',
     'add_DCDC_converter',
     'add_gen',
+    'add_gen_DC',
     'add_extGrid',
     'add_RenSource',
     'add_generators',
@@ -245,7 +246,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
     
     return line
 
-def change_line_AC_to_expandable(grid, line_name):
+def change_line_AC_to_expandable(grid, line_name,update_grid=True):
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -274,7 +275,8 @@ def change_line_AC_to_expandable(grid, line_name):
         }
         expandable_line = Exp_Line_AC(**line_vars)
         grid.lines_AC_exp.append(expandable_line)
-        grid.Update_Graph_AC()
+        if update_grid:
+            grid.Update_Graph_AC()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
@@ -282,7 +284,8 @@ def change_line_AC_to_expandable(grid, line_name):
     
     for i, line in enumerate(grid.lines_AC_exp):
         line.lineNumber = i 
-    grid.create_Ybus_AC()
+    if update_grid:
+        grid.create_Ybus_AC()
     return expandable_line    
 
 def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
@@ -421,7 +424,7 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
         grid.Update_Graph_DC()
     return line
 
-def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
+def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Arm_R=None,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
     if isinstance(DC_node, str):
         DC_node = next((node for node in grid.nodes_DC if node.name == DC_node), None)
     if isinstance(AC_node, str):
@@ -443,18 +446,27 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
     # if Filter !=0 and Phase_Reactor_R==0 and  Phase_Reactor_X!=0:
     #     print(f'Please fill out phase reactor values, converter {name} not added')
     #     return
-    conv = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_resistance, Transformer_reactance, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max,nConvP,polarity ,lossa,lossb,losscrect,losscinv,Ucmin, Ucmax, name)
+    if Arm_R is not None:
+        ra  = Arm_R*conv.basekA_DC**2/grid.S_base
+    else:
+        ra = 0.001
+
+    conv = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_resistance, Transformer_reactance, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max,nConvP,polarity ,lossa,lossb,losscrect,losscinv,Ucmin, Ucmax, ra,name)
     if geometry is not None:
         if isinstance(geometry, str): 
              geometry = loads(geometry)  
         conv.geometry = geometry    
    
     conv.basekA  = grid.S_base/(np.sqrt(3)*conv.AC_kV_base)
+    conv.basekA_DC = grid.S_base/(conv.DC_kV_base)
     conv.a_conv  = conv.a_conv_og/grid.S_base
     conv.b_conv  = conv.b_conv_og*conv.basekA/grid.S_base
     conv.c_inver = conv.c_inver_og*conv.basekA**2/grid.S_base
     conv.c_rect  = conv.c_rect_og*conv.basekA**2/grid.S_base     
-
+    
+    
+    
+    
     grid.Converters_ACDC.append(conv)
     return conv
 
@@ -604,7 +616,46 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,
     
     return gen
             
-            
+def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=99999,MWmin=0,PsetMW=0,fuel_type='Other',geometry= None,installation_cost:float=0,np_gen:int=1):
+    
+    Max_pow_gen=MWmax/Grid.S_base
+    Min_pow_gen=MWmin/Grid.S_base
+    Pset=PsetMW/Grid.S_base
+    
+    found=False    
+    for node in Grid.nodes_DC:
+   
+        if node_name == node.name:
+             gen = Gen_DC(gen_name, node,Max_pow_gen,Min_pow_gen,qf,lf,fc,Pset,installation_cost)
+             node.PGi = 0
+             if fuel_type not in [
+             "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
+             "Solid Biomass",  "Other", "Waste", "Biogas", "Geothermal"
+             ]:
+                 fuel_type = 'Other'
+             gen.gen_type = fuel_type
+             gen.np_gen = np_gen
+             if geometry is not None:
+                 if isinstance(geometry, str): 
+                      geometry = loads(geometry)  
+                 gen.geometry= geometry
+             found = True
+             break
+
+    if not found:
+            print('Node does not exist')
+            sys.exit()
+    gen.price_zone_link=price_zone_link
+    
+    if price_zone_link:
+        
+        gen.qf= 0
+        gen.lf= node.price
+    Grid.Generators_DC.append(gen)
+    
+    return gen
+
+
 def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
     
     

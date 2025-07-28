@@ -535,11 +535,11 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             LossB           = Converter_data.at[index, 'lossb']          if 'lossb'          in Converter_data.columns else 0.887
             LossCrec        = Converter_data.at[index, 'losscrect']      if 'losscrect'      in Converter_data.columns else 2.885
             LossCinv        = Converter_data.at[index, 'losscinv']       if 'losscinv'       in Converter_data.columns else 4.371
-
+            arm_res         = Converter_data.at[index, 'A_r']            if 'A_r'            in Converter_data.columns else 0.001
 
             geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
                      
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv , name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,arm_res=arm_res, name=str(var_name))
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -579,12 +579,19 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             LossCrec        = Converter_data.at[index, 'losscrect']      if 'losscrect'      in Converter_data.columns else 2.885
             LossCinv        = Converter_data.at[index, 'losscinv']       if 'losscinv'       in Converter_data.columns else 4.371
 
+            arm_res_Ohm         = Converter_data.at[index, 'A_R']            if 'A_R'            in Converter_data.columns else None
 
             geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
 
             P_AC = P_AC/S_base
             Q_AC = Q_AC/S_base
             P_DC = P_DC/S_base
+
+            if arm_res_Ohm is not None:
+                basekA_DC = S_base/(DC_node.kV_base)
+                arm_res = arm_res_Ohm*basekA_DC**2/S_base
+            else:
+                arm_res = 0.001
 
 
             Z_base = kV_base**2/S_base
@@ -594,7 +601,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             PR_X_pu = Phase_Reactor_X/Z_base
             Filter_pu = Filter*Z_base
 
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv , name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name))
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -633,6 +640,14 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             LossB           = Converter_data.at[index, 'lossb']          if 'lossb'          in Converter_data.columns else 0.887
             LossCrec        = Converter_data.at[index, 'losscrect']      if 'losscrect'      in Converter_data.columns else 2.885
             LossCinv        = Converter_data.at[index, 'losscinv']       if 'losscinv'       in Converter_data.columns else 4.371
+            arm_res_Ohm         = Converter_data.at[index, 'A_R']            if 'A_R'            in Converter_data.columns else 0
+
+            if arm_res_Ohm is not None:
+                basekA_DC = S_base/(DC_node.kV_base)
+                arm_res = arm_res_Ohm*basekA_DC**2/S_base
+            else:
+                arm_res = 0.001
+
 
             [T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu] = Converter_parameters(S_base, kV_base, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter)
 
@@ -645,7 +660,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             
            
             Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC,
-                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax ,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,name=str(var_name))
+                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax ,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name))
         
             if geometry is not None:
                 if isinstance(geometry, str): 
@@ -660,7 +675,9 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
         conv.c_inver = conv.c_inver_og*conv.basekA**2/S_base
         conv.c_rect  = conv.c_rect_og*conv.basekA**2/S_base            
     
-    
+
+       
+        
     return    Converters
 
 
@@ -882,7 +899,7 @@ def Create_grid_from_mat(matfile):
         AC_lines = {}
         for index, row in AC_line_data.iterrows():
           if AC_line_data.at[index, 'status'] !=0:    
-            var_name = index+1
+            var_name = f"L_AC_{index+1}"
             
 
             fromNode     = AC_line_data.at[index, 'fbus']
@@ -891,7 +908,6 @@ def Create_grid_from_mat(matfile):
             x    = AC_line_data.at[index, 'x']    
             g  = 0
             b  = AC_line_data.at[index, 'b']  
-            
             
             
             kV_base      = AC_nodes[toNode].kV_base 
@@ -956,19 +972,19 @@ def Create_grid_from_mat(matfile):
             MW_rating     = DC_line_data.at[index, 'rateA']    
             kV_base       = DC_nodes[toNode].kV_base 
             
-            var_name = f'{DC_nodes[fromNode].name}-{DC_nodes[toNode].name}_{MW_rating}'
+            var_name = f'L_DC_{index+1}'
             
             if dcpol == 2:
-                pol = 'b'
-            else:
                 pol = 'sm'
+            else:
+                pol = 'm'
             DC_lines[var_name] = Line_DC(DC_nodes[fromNode], DC_nodes[toNode], Resistance, MW_rating, polarity=pol, name=str(var_name),S_base=S_base)
 
             if DC_line_data.at[index, 'cost'] >= 0:
                 DC_lines[var_name].np_line_opf = True
                 DC_lines[var_name].np_line   = 0
                 DC_lines[var_name].np_line_b = 0
-                DC_lines[var_name].np_line_i = 1
+                DC_lines[var_name].np_line_i = 0
                 DC_lines[var_name].np_line_max = 3
                 DC_lines[var_name].base_cost = DC_line_data.at[index, 'cost']
 
@@ -982,7 +998,7 @@ def Create_grid_from_mat(matfile):
         Converters = {}
         for index, row in Converter_data.iterrows():
           if Converter_data.at[index, 'status'] !=0:   
-            var_name  = index+1
+            var_name  = f"Conv_{index+1}"
             
             type_ac = Converter_data.at[index, 'type_ac']   
             if type_ac == 1:
@@ -1038,7 +1054,7 @@ def Create_grid_from_mat(matfile):
                 Converters[var_name].NUmConvP_opf = True
                 Converters[var_name].NumConvP   = 0
                 Converters[var_name].NumConvP_b = 0
-                Converters[var_name].NumConvP_i = 1
+                Converters[var_name].NumConvP_i = 0
                 Converters[var_name].NumConvP_max = 1
                 Converters[var_name].base_cost = Converter_data.at[index, 'cost']
         Convertor_list = list(Converters.values())

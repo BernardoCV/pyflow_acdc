@@ -77,13 +77,19 @@ class Grid:
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
             if not hasattr(conv, 'basekA'):
-                conv.basekA  = self.S_base/(np.sqrt(3)*conv.AC_kV_base)
+                conv.basekA    = self.S_base/(np.sqrt(3)*conv.AC_kV_base)
+                
                 conv.a_conv = conv.a_conv_og/self.S_base
                 conv.b_conv = conv.b_conv_og*conv.basekA/self.S_base
                 conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
                 conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
                 conv.c_rect = conv.c_rect_og*conv.basekA**2/self.S_base
-
+                
+            # if not hasattr(conv, 'basekA_DC'):    
+            #     conv.basekA_DC = self.S_base/(conv.DC_kV_base)
+            #     conv.ra_rect  = conv.c_rect_og*conv.basekA_DC**2/self.S_base
+            #     conv.ra_inver = conv.c_inver_og*conv.basekA_DC**2/self.S_base
+                
         self.lines_DC = []
         if lines_DC:
             for line in lines_DC:
@@ -162,7 +168,7 @@ class Grid:
         
         
         self.Generators =[]
-        
+        self.Generators_DC =[]
         
         self.RenSource_zones=[]
         self.RenSource_zones_dic={}
@@ -262,6 +268,10 @@ class Grid:
     @property
     def n_gen(self):
         return len(self.Generators) if self.Generators is not None else 0
+    
+    @property
+    def n_gen_DC(self):
+        return len(self.Generators_DC) if self.Generators_DC is not None else 0
     
     # AC grid properties
     @property
@@ -605,6 +615,7 @@ class Grid:
         self.P_DC = np.vstack([node.PGi-node.PLi
                                +node.PconvDC
                                +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
+                               +sum(gen.PGen for gen in node.connected_gen)
                                 for node in self.nodes_DC])
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
         
@@ -727,7 +738,7 @@ class Grid:
             
     def create_Ybus_DC(self):
         self.Ybus_DC = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
-
+        self.Ybus_DC_full = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
         # off diagonal elements
         for k in range(self.nl_DC):
             line = self.lines_DC[k]
@@ -737,10 +748,13 @@ class Grid:
                 s=1
             self.Ybus_DC[fromNode, toNode] -= line.np_line/line.R
             self.Ybus_DC[toNode, fromNode] = self.Ybus_DC[fromNode, toNode]
+            self.Ybus_DC_full[fromNode, toNode] -= line.np_line*line.pol/line.R
+            self.Ybus_DC_full[toNode, fromNode] = self.Ybus_DC_full[fromNode, toNode]
 
         # Diagonal elements
         for m in range(self.nn_DC):
             self.Ybus_DC[m, m] = -self.Ybus_DC[:,m].sum() if self.Ybus_DC[:, m].sum() != 0 else 1.0
+            self.Ybus_DC_full[m, m] = -self.Ybus_DC_full[:,m].sum() if self.Ybus_DC_full[:, m].sum() != 0 else 1.0
 
     def Check_SlacknDroop(self, change_slack2Droop):
         for conv in self.Converters_ACDC:
@@ -797,17 +811,7 @@ class Grid:
     
 
     def Line_AC_calc(self):
-        try: 
-            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
-        except: 
-            self.V_AC =np.zeros(self.nn_AC)
-            self.Theta_V_AC=np.zeros(self.nn_AC)
-            for node in self.nodes_AC: 
-                nAC=node.nodeNumber
-                self.V_AC[nAC]=node.V
-                self.Theta_V_AC[nAC]=node.theta
-            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
-            
+        V_cart = self._initialize_voltage_cartesian()
         
         self.I_AC_cart = np.matmul(self.Ybus_AC, V_cart)
         self.I_AC_m = abs(self.I_AC_cart)
@@ -815,28 +819,110 @@ class Grid:
 
   
         for line in self.lines_AC:
-            i = line.fromNode.nodeNumber
-            j = line.toNode.nodeNumber
-        
-            i_from = line.Ybus_branch[0,0]*V_cart[i]+line.Ybus_branch[0,1]*V_cart[j]
-            i_to = line.Ybus_branch[1,0]*V_cart[i]+line.Ybus_branch[1,1]*V_cart[j]
-            
-            Sfrom = V_cart[i]*np.conj(i_from)
-            Sto = V_cart[j]*np.conj(i_to)
-        
-            line.loss = Sfrom+Sto
-            line.P_loss = np.real(line.loss)
-            
-            line.fromS=Sfrom
-            line.toS=Sto
-            line.i_from,_ = cartz2pol(i_from)
-            line.i_to,_ = cartz2pol(i_to)
+            self._calculate_line_power_flow(line, V_cart)
 
+    def Line_AC_calc_exp(self):
+        """
+        Calculate power flow and losses for expansion AC lines, reconductored lines, 
+        and configurable transmission lines.
+        
+        This method processes three types of AC lines:
+        - lines_AC_exp: Expansion lines with parallel circuits
+        - lines_AC_rec: Reconductored lines with new parameters
+        - lines_AC_ct: Configurable transmission lines with multiple configurations
+        """
+        V_cart = self._initialize_voltage_cartesian()
+        
+        for line in self.lines_AC_exp:
+            self._calculate_line_power_flow(line, V_cart, use_parallel=True)
+            
+        # Process reconductored lines
+        for line in self.lines_AC_rec:
+            self._calculate_line_power_flow(line, V_cart, use_reconductored=True)
+            
+        # Process configurable transmission lines
+        for line in self.lines_AC_ct:
+            self._calculate_line_power_flow(line, V_cart, use_configurable=True)
+    
+    def _initialize_voltage_cartesian(self):
+        """
+        Initialize voltage arrays and convert to cartesian form.
+        
+        Returns
+        -------
+        ndarray
+            Complex voltage vector in cartesian form
+        """
+        try: 
+            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
+        except (ValueError, AttributeError) as e:
+            # Initialize voltage arrays if not available
+            self.V_AC = np.zeros(self.nn_AC)
+            self.Theta_V_AC = np.zeros(self.nn_AC)
+            for node in self.nodes_AC: 
+                nAC = node.nodeNumber
+                self.V_AC[nAC] = node.V
+                self.Theta_V_AC[nAC] = node.theta
+            V_cart = pol2cartz(self.V_AC, self.Theta_V_AC)
+        return V_cart
+    
+    def _calculate_line_power_flow(self, line, V_cart, use_parallel=False, 
+                                 use_reconductored=False, use_configurable=False):
+        """
+        Calculate power flow and losses for a single AC line.
+        
+        Parameters
+        ----------
+        line : Line_AC
+            The line to calculate power flow for
+        V_cart : ndarray
+            Complex voltage vector in cartesian form
+        use_parallel : bool
+            Whether to use parallel circuit factor (np_line)
+        use_reconductored : bool
+            Whether to use new Ybus parameters for reconductored lines
+        use_configurable : bool
+            Whether to use active configuration Ybus for configurable lines
+        """
+        i = line.fromNode.nodeNumber
+        j = line.toNode.nodeNumber
+        
+        # Select appropriate Ybus matrix
+        if use_reconductored and line.rec_branch:
+            Ybus = line.Ybus_branch_new
+        elif use_configurable:
+            Ybus = line.Ybus_list[line.active_config]
+        else:
+            Ybus = line.Ybus_branch
+        
+        # Calculate currents
+        if use_parallel:
+            # Apply parallel circuit factor
+            i_from = line.np_line * (Ybus[0, 0] * V_cart[i] + Ybus[0, 1] * V_cart[j])
+            i_to = line.np_line * (Ybus[1, 0] * V_cart[i] + Ybus[1, 1] * V_cart[j])
+        else:
+            i_from = Ybus[0, 0] * V_cart[i] + Ybus[0, 1] * V_cart[j]
+            i_to = Ybus[1, 0] * V_cart[i] + Ybus[1, 1] * V_cart[j]
+        
+        # Calculate power flows
+        Sfrom = V_cart[i] * np.conj(i_from)
+        Sto = V_cart[j] * np.conj(i_to)
+        
+        # Calculate losses
+        line.loss = Sfrom + Sto
+        line.P_loss = np.real(line.loss)
+        
+        # Store results
+        line.fromS = Sfrom
+        line.toS = Sto
+        line.i_from, _ = cartz2pol(i_from)
+        line.i_to, _ = cartz2pol(i_to)
 
     def Line_DC_calc(self):
         V = self.V_DC
         Ybus = self.Ybus_DC
-        self.I_DC = np.matmul(Ybus, V)
+        
+        # self.I_DC = np.matmul(Ybus, V)
 
         Iij = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
         Pij_DC = np.zeros((self.nn_DC, self.nn_DC), dtype=float)
@@ -955,6 +1041,73 @@ class Gen_AC:
 
         Gen_AC.names.add(self.name)
         
+       
+class Gen_DC:
+    genNumber_DC =0
+    names = set()
+    
+    @classmethod
+    def reset_class(cls):
+        cls.genNumber_DC = 0
+        cls.names = set()
+             
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
+    
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type='Other',installation_cost:float=0):
+        self.genNumber_DC = Gen_DC.genNumber_DC
+        Gen_DC.genNumber_DC += 1
+        self.Node_DC=node.name
+        self.geometry= node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+        self.gen_type=gen_type
+        self.Max_pow_gen=Max_pow_gen
+        self.Min_pow_gen=Min_pow_gen
+      
+        self.np_gen_i = 1
+        self.np_gen_b = 1
+        self.np_gen = 1
+        self.np_gen_max=3
+        self.np_gen_opf = False
+
+        self.lf=linear_cost_factor
+        self.qf=quadratic_cost_factor
+        self.fc=fixed_cost
+
+        self.Life_time = 30
+        self.base_cost = installation_cost
+       
+        self.price_zone_link = False
+        
+        node.connected_gen.append(self)
+        
+        self.PGen=Pset
+       
+        self.Pset=Pset
+       
+        
+        if name in Gen_DC.names:
+            count = 1
+            new_name = f"{name}_{count}"
+            
+            while new_name in Gen_DC.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
+        if name is None:
+            self._name = str(node.name)
+        else:
+            self._name = name
+
+        Gen_DC.names.add(self.name)
+            
 class Ren_Source:
     rsNumber =0
     names = set()
@@ -2265,7 +2418,7 @@ class AC_DC_converter:
     def life_time_hours(self):
         return self.life_time *8760       
             
-    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2, name=None):
+    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
         AC_DC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
@@ -2290,6 +2443,7 @@ class AC_DC_converter:
         self.AC_type = AC_type
 
         self.AC_kV_base = kV_base
+        self.DC_kV_base = DC_node.kV_base
 
         self.Node_AC = AC_node
         
@@ -2303,7 +2457,10 @@ class AC_DC_converter:
         # if self.AC_type=='Slack':
         #     # print(name)mm
         #     self.type='PAC'
+
         
+
+
         self.type = DC_type
 
         self.R_t = Transformer_resistance/self.cn_pol
@@ -2326,7 +2483,15 @@ class AC_DC_converter:
         self.c_inver_og = losscinv /self.cn_pol  # Ohm
 
         # 1.103 0.887  2.885    4.371
+        
 
+        self.ra_og = arm_res
+        self.ra = arm_res *self.cn_pol  # Ohm
+       
+        self.power_loss_model = 'quadratic'
+        self.Vsum = 0
+        
+        
         self.P_loss = 0
         self.P_loss_tf = 0
 

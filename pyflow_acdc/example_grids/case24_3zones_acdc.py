@@ -39,185 +39,209 @@ Converted to PyFlowACDC format from
 
 generator C(0) modified to 0
 
+
+This grid has been modified to include Transmision expansion costs, as well as additional DC lines by Bernardo Castro Valerio (2025)
+
 """
 
-def case24_3zones_acdc():    
+def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3):    
     
     S_base=100
     
     # DataFrame Code:
     nodes_AC_data = [
-        {'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.08, 'Reactive_load': 0.22, 'Node_id': '101.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.97, 'Reactive_load': 0.2, 'Node_id': '102.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.8, 'Reactive_load': 0.37, 'Node_id': '103.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.74, 'Reactive_load': 0.15, 'Node_id': '104.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.71, 'Reactive_load': 0.14, 'Node_id': '105.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.36, 'Reactive_load': 0.28, 'Node_id': '106.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.01, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.025, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.25, 'Reactive_load': 0.25, 'Node_id': '107.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.71, 'Reactive_load': 0.35, 'Node_id': '108.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.75, 'Reactive_load': 0.36, 'Node_id': '109.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.95, 'Reactive_load': 0.4, 'Node_id': '110.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '111.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '112.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'Slack', 'Voltage_0': 1.02, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 2.65, 'Reactive_load': 0.54, 'Node_id': '113.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 0.98, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.94, 'Reactive_load': 0.39, 'Node_id': '114.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.014, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 3.17, 'Reactive_load': 0.64, 'Node_id': '115.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.017, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.0, 'Reactive_load': 0.2, 'Node_id': '116.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '117.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 3.33, 'Reactive_load': 0.68, 'Node_id': '118.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.81, 'Reactive_load': 0.37, 'Node_id': '119.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.28, 'Reactive_load': 0.26, 'Node_id': '120.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '121.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '122.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '123.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '124.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.08, 'Reactive_load': 0.22, 'Node_id': '201.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.97, 'Reactive_load': 0.2, 'Node_id': '202.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.8, 'Reactive_load': 0.37, 'Node_id': '203.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.74, 'Reactive_load': 0.15, 'Node_id': '204.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.71, 'Reactive_load': 0.14, 'Node_id': '205.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.36, 'Reactive_load': 0.28, 'Node_id': '206.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.01, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.025, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.25, 'Reactive_load': 0.25, 'Node_id': '207.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.71, 'Reactive_load': 0.35, 'Node_id': '208.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.75, 'Reactive_load': 0.36, 'Node_id': '209.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.95, 'Reactive_load': 0.4, 'Node_id': '210.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '211.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '212.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'Slack', 'Voltage_0': 1.02, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 2.65, 'Reactive_load': 0.54, 'Node_id': '213.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 0.98, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.94, 'Reactive_load': 0.39, 'Node_id': '214.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.014, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 3.17, 'Reactive_load': 0.64, 'Node_id': '215.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.017, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.0, 'Reactive_load': 0.2, 'Node_id': '216.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '217.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 3.33, 'Reactive_load': 0.68, 'Node_id': '218.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.81, 'Reactive_load': 0.37, 'Node_id': '219.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 1.28, 'Reactive_load': 0.26, 'Node_id': '220.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '221.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '222.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '223.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '224.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'PQ', 'Voltage_0': 1.0, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '301.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'Slack', 'Voltage_0': 1.025, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_Gained': 0, 'Reactive_Gained': 0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Node_id': '302.0', 'Umin': 0.95, 'Umax': 1.05, 'Gs': 0.0, 'Bs': 0.0, 'x_coord': None, 'y_coord': None, 'PZ': None}
+    {'Node_id': '101', 'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.08, 'Reactive_load': 0.22, 'Bs': 0.0, 'x_coord': 26.194, 'y_coord': 0.869, 'PZ': '100'},
+    {'Node_id': '102', 'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 0.97, 'Reactive_load': 0.2, 'Bs': 0.0, 'x_coord': 52.652, 'y_coord': 0.869, 'PZ': '100'},
+    {'Node_id': '103', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.8, 'Reactive_load': 0.37, 'Bs': 0.0, 'x_coord': 18.256, 'y_coord': 28.65, 'PZ': '100'},
+    {'Node_id': '104', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 0.74, 'Reactive_load': 0.15, 'Bs': 0.0, 'x_coord': 36.777, 'y_coord': 10.999, 'PZ': '100'},
+    {'Node_id': '105', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 0.71, 'Reactive_load': 0.14, 'Bs': 0.0, 'x_coord': 50.271, 'y_coord': 10.999, 'PZ': '100'},
+    {'Node_id': '106', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.36, 'Reactive_load': 0.28, 'Bs': 0.01, 'x_coord': 76.906, 'y_coord': 29.092, 'PZ': '100'},
+    {'Node_id': '107', 'type': 'PV', 'Voltage_0': 1.025, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.25, 'Reactive_load': 0.25, 'Bs': 0.0, 'x_coord': 69.321, 'y_coord': 0.869, 'PZ': '100'},
+    {'Node_id': '108', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.71, 'Reactive_load': 0.35, 'Bs': 0.0, 'x_coord': 76.906, 'y_coord': 10.999, 'PZ': '100'},
+    {'Node_id': '109', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.75, 'Reactive_load': 0.36, 'Bs': 0.0, 'x_coord': 40.847, 'y_coord': 28.65, 'PZ': '100'},
+    {'Node_id': '110', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.95, 'Reactive_load': 0.4, 'Bs': 0.0, 'x_coord': 62.808, 'y_coord': 28.65, 'PZ': '100'},
+    {'Node_id': '111', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 40.847, 'y_coord': 39.035, 'PZ': '100'},
+    {'Node_id': '112', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 62.808, 'y_coord': 39.035, 'PZ': '100'},
+    {'Node_id': '113', 'type': 'Slack', 'Voltage_0': 1.02, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 2.65, 'Reactive_load': 0.54, 'Bs': 0.0, 'x_coord': 69.857, 'y_coord': 58.555, 'PZ': '100'},
+    {'Node_id': '114', 'type': 'PV', 'Voltage_0': 0.98, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.94, 'Reactive_load': 0.39, 'Bs': 0.0, 'x_coord': 34.497, 'y_coord': 59.519, 'PZ': '100'},
+    {'Node_id': '115', 'type': 'PV', 'Voltage_0': 1.014, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 3.17, 'Reactive_load': 0.64, 'Bs': 0.0, 'x_coord': 15.027, 'y_coord': 59.076, 'PZ': '100'},
+    {'Node_id': '116', 'type': 'PV', 'Voltage_0': 1.017, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.0, 'Reactive_load': 0.2, 'Bs': 0.0, 'x_coord': 15.027, 'y_coord': 68.791, 'PZ': '100'},
+    {'Node_id': '117', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 3.81, 'y_coord': 87.209, 'PZ': '100'},
+    {'Node_id': '118', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 3.33, 'Reactive_load': 0.68, 'Bs': 0.0, 'x_coord': 15.027, 'y_coord': 91.75, 'PZ': '100'},
+    {'Node_id': '119', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.81, 'Reactive_load': 0.37, 'Bs': 0.0, 'x_coord': 34.497, 'y_coord': 68.791, 'PZ': '100'},
+    {'Node_id': '120', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.28, 'Reactive_load': 0.26, 'Bs': 0.0, 'x_coord': 51.126, 'y_coord': 68.791, 'PZ': '100'},
+    {'Node_id': '121', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 34.497, 'y_coord': 91.75, 'PZ': '100'},
+    {'Node_id': '122', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 62.808, 'y_coord': 91.75, 'PZ': '100'},
+    {'Node_id': '123', 'type': 'PQ', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 62.484, 'y_coord': 78.201, 'PZ': '100'},
+    {'Node_id': '124', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 18.256, 'y_coord': 39.035, 'PZ': '100'},
+    {'Node_id': '201', 'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.08, 'Reactive_load': 0.22, 'Bs': 0.0, 'x_coord': 116.194, 'y_coord': 0.869, 'PZ': '200'},
+    {'Node_id': '202', 'type': 'PV', 'Voltage_0': 1.035, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 0.97, 'Reactive_load': 0.2, 'Bs': 0.0, 'x_coord': 142.652, 'y_coord': 0.869, 'PZ': '200'},
+    {'Node_id': '203', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.8, 'Reactive_load': 0.37, 'Bs': 0.0, 'x_coord': 108.256, 'y_coord': 28.65, 'PZ': '200'},
+    {'Node_id': '204', 'type': 'PV', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 0.74, 'Reactive_load': 0.15, 'Bs': 0.0, 'x_coord': 126.777, 'y_coord': 10.999, 'PZ': '200'},
+    {'Node_id': '205', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 0.71, 'Reactive_load': 0.14, 'Bs': 0.0, 'x_coord': 140.271, 'y_coord': 10.999, 'PZ': '200'},
+    {'Node_id': '206', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.36, 'Reactive_load': 0.28, 'Bs': 0.01, 'x_coord': 166.906, 'y_coord': 29.092, 'PZ': '200'},
+    {'Node_id': '207', 'type': 'PV', 'Voltage_0': 1.025, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.25, 'Reactive_load': 0.25, 'Bs': 0.0, 'x_coord': 159.321, 'y_coord': 0.869, 'PZ': '200'},
+    {'Node_id': '208', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.71, 'Reactive_load': 0.35, 'Bs': 0.0, 'x_coord': 166.906, 'y_coord': 10.999, 'PZ': '200'},
+    {'Node_id': '209', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.75, 'Reactive_load': 0.36, 'Bs': 0.0, 'x_coord': 130.847, 'y_coord': 28.65, 'PZ': '200'},
+    {'Node_id': '210', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 138.0, 'Power_load': 1.95, 'Reactive_load': 0.4, 'Bs': 0.0, 'x_coord': 152.808, 'y_coord': 28.65, 'PZ': '200'},
+    {'Node_id': '211', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 130.847, 'y_coord': 39.035, 'PZ': '200'},
+    {'Node_id': '212', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 152.808, 'y_coord': 39.035, 'PZ': '200'},
+    {'Node_id': '213', 'type': 'Slack', 'Voltage_0': 1.02, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 2.65, 'Reactive_load': 0.54, 'Bs': 0.0, 'x_coord': 159.857, 'y_coord': 58.555, 'PZ': '200'},
+    {'Node_id': '214', 'type': 'PV', 'Voltage_0': 0.98, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.94, 'Reactive_load': 0.39, 'Bs': 0.0, 'x_coord': 124.497, 'y_coord': 59.519, 'PZ': '200'},
+    {'Node_id': '215', 'type': 'PV', 'Voltage_0': 1.014, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 3.17, 'Reactive_load': 0.64, 'Bs': 0.0, 'x_coord': 105.027, 'y_coord': 59.076, 'PZ': '200'},
+    {'Node_id': '216', 'type': 'PV', 'Voltage_0': 1.017, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.0, 'Reactive_load': 0.2, 'Bs': 0.0, 'x_coord': 105.027, 'y_coord': 68.791, 'PZ': '200'},
+    {'Node_id': '217', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 93.81, 'y_coord': 87.209, 'PZ': '200'},
+    {'Node_id': '218', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 3.33, 'Reactive_load': 0.68, 'Bs': 0.0, 'x_coord': 105.027, 'y_coord': 91.75, 'PZ': '200'},
+    {'Node_id': '219', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.81, 'Reactive_load': 0.37, 'Bs': 0.0, 'x_coord': 124.497, 'y_coord': 68.791, 'PZ': '200'},
+    {'Node_id': '220', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 1.28, 'Reactive_load': 0.26, 'Bs': 0.0, 'x_coord': 141.126, 'y_coord': 68.791, 'PZ': '200'},
+    {'Node_id': '221', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 124.497, 'y_coord': 91.75, 'PZ': '200'},
+    {'Node_id': '222', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 152.808, 'y_coord': 91.75, 'PZ': '200'},
+    {'Node_id': '223', 'type': 'PV', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 152.484, 'y_coord': 78.201, 'PZ': '200'},
+    {'Node_id': '224', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 108.256, 'y_coord': 39.035, 'PZ': '200'},
+    {'Node_id': '301', 'type': 'PQ', 'Voltage_0': 1.01, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 93.81, 'y_coord': 27.092, 'PZ': '300'},
+    {'Node_id': '302', 'type': 'Slack', 'Voltage_0': 1.05, 'theta_0': 0.0, 'kV_base': 230.0, 'Power_load': 0.0, 'Reactive_load': 0.0, 'Bs': 0.0, 'x_coord': 93.81, 'y_coord': 22.092, 'PZ': '300'}
     ]
     nodes_AC = pd.DataFrame(nodes_AC_data)
 
     lines_AC_data = [
-        {'fromNode': '101.0', 'toNode': '102.0', 'r': 0.003, 'x': 0.014, 'g': 0, 'b': 0.461, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '1'},
-        {'fromNode': '101.0', 'toNode': '103.0', 'r': 0.055, 'x': 0.211, 'g': 0, 'b': 0.057, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '2'},
-        {'fromNode': '101.0', 'toNode': '105.0', 'r': 0.022, 'x': 0.085, 'g': 0, 'b': 0.023, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '3'},
-        {'fromNode': '102.0', 'toNode': '104.0', 'r': 0.033, 'x': 0.127, 'g': 0, 'b': 0.034, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '4'},
-        {'fromNode': '102.0', 'toNode': '106.0', 'r': 0.05, 'x': 0.192, 'g': 0, 'b': 0.052, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '5'},
-        {'fromNode': '103.0', 'toNode': '109.0', 'r': 0.031, 'x': 0.119, 'g': 0, 'b': 0.032, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '6'},
-        {'fromNode': '103.0', 'toNode': '124.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.015, 'shift': 0.0, 'Line_id': '7'},
-        {'fromNode': '104.0', 'toNode': '109.0', 'r': 0.027, 'x': 0.104, 'g': 0, 'b': 0.028, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '8'},
-        {'fromNode': '105.0', 'toNode': '110.0', 'r': 0.022, 'x': 0.088, 'g': 0, 'b': 0.024, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '9'},
-        {'fromNode': '106.0', 'toNode': '110.0', 'r': 0.014, 'x': 0.061, 'g': 0, 'b': 2.459, 'MVA_rating': 400.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '10'},
-        {'fromNode': '107.0', 'toNode': '108.0', 'r': 0.016, 'x': 0.061, 'g': 0, 'b': 0.017, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '11'},
-        {'fromNode': '108.0', 'toNode': '109.0', 'r': 0.043, 'x': 0.165, 'g': 0, 'b': 0.045, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '12'},
-        {'fromNode': '108.0', 'toNode': '110.0', 'r': 0.043, 'x': 0.165, 'g': 0, 'b': 0.045, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '13'},
-        {'fromNode': '109.0', 'toNode': '111.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.03, 'shift': 0.0, 'Line_id': '14'},
-        {'fromNode': '109.0', 'toNode': '112.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.03, 'shift': 0.0, 'Line_id': '15'},
-        {'fromNode': '110.0', 'toNode': '111.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.015, 'shift': 0.0, 'Line_id': '16'},
-        {'fromNode': '110.0', 'toNode': '112.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.015, 'shift': 0.0, 'Line_id': '17'},
-        {'fromNode': '111.0', 'toNode': '113.0', 'r': 0.006, 'x': 0.048, 'g': 0, 'b': 0.1, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '18'},
-        {'fromNode': '111.0', 'toNode': '114.0', 'r': 0.005, 'x': 0.042, 'g': 0, 'b': 0.088, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '19'},
-        {'fromNode': '112.0', 'toNode': '113.0', 'r': 0.006, 'x': 0.048, 'g': 0, 'b': 0.1, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '20'},
-        {'fromNode': '112.0', 'toNode': '123.0', 'r': 0.012, 'x': 0.097, 'g': 0, 'b': 0.203, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '21'},
-        {'fromNode': '113.0', 'toNode': '123.0', 'r': 0.011, 'x': 0.087, 'g': 0, 'b': 0.182, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '22'},
-        {'fromNode': '114.0', 'toNode': '116.0', 'r': 0.005, 'x': 0.059, 'g': 0, 'b': 0.082, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '23'},
-        {'fromNode': '115.0', 'toNode': '116.0', 'r': 0.002, 'x': 0.017, 'g': 0, 'b': 0.036, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '24'},
-        {'fromNode': '115.0', 'toNode': '121.0', 'r': 0.006, 'x': 0.049, 'g': 0, 'b': 0.103, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '25'},
-        {'fromNode': '115.0', 'toNode': '121.0', 'r': 0.006, 'x': 0.049, 'g': 0, 'b': 0.103, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '26'},
-        {'fromNode': '115.0', 'toNode': '124.0', 'r': 0.007, 'x': 0.052, 'g': 0, 'b': 0.109, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '27'},
-        {'fromNode': '116.0', 'toNode': '117.0', 'r': 0.003, 'x': 0.026, 'g': 0, 'b': 0.055, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '28'},
-        {'fromNode': '116.0', 'toNode': '119.0', 'r': 0.003, 'x': 0.023, 'g': 0, 'b': 0.049, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '29'},
-        {'fromNode': '117.0', 'toNode': '118.0', 'r': 0.002, 'x': 0.014, 'g': 0, 'b': 0.03, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '30'},
-        {'fromNode': '117.0', 'toNode': '122.0', 'r': 0.014, 'x': 0.105, 'g': 0, 'b': 0.221, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '31'},
-        {'fromNode': '118.0', 'toNode': '121.0', 'r': 0.003, 'x': 0.026, 'g': 0, 'b': 0.055, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '32'},
-        {'fromNode': '118.0', 'toNode': '121.0', 'r': 0.003, 'x': 0.026, 'g': 0, 'b': 0.055, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '33'},
-        {'fromNode': '119.0', 'toNode': '120.0', 'r': 0.005, 'x': 0.04, 'g': 0, 'b': 0.083, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '34'},
-        {'fromNode': '119.0', 'toNode': '120.0', 'r': 0.005, 'x': 0.04, 'g': 0, 'b': 0.083, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '35'},
-        {'fromNode': '120.0', 'toNode': '123.0', 'r': 0.003, 'x': 0.022, 'g': 0, 'b': 0.046, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '36'},
-        {'fromNode': '120.0', 'toNode': '123.0', 'r': 0.003, 'x': 0.022, 'g': 0, 'b': 0.046, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '37'},
-        {'fromNode': '121.0', 'toNode': '122.0', 'r': 0.009, 'x': 0.068, 'g': 0, 'b': 0.142, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '38'},
-        {'fromNode': '201.0', 'toNode': '202.0', 'r': 0.003, 'x': 0.014, 'g': 0, 'b': 0.461, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '39'},
-        {'fromNode': '201.0', 'toNode': '203.0', 'r': 0.055, 'x': 0.211, 'g': 0, 'b': 0.057, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '40'},
-        {'fromNode': '201.0', 'toNode': '205.0', 'r': 0.022, 'x': 0.085, 'g': 0, 'b': 0.023, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '41'},
-        {'fromNode': '202.0', 'toNode': '204.0', 'r': 0.033, 'x': 0.127, 'g': 0, 'b': 0.034, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '42'},
-        {'fromNode': '202.0', 'toNode': '206.0', 'r': 0.05, 'x': 0.192, 'g': 0, 'b': 0.052, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '43'},
-        {'fromNode': '203.0', 'toNode': '209.0', 'r': 0.031, 'x': 0.119, 'g': 0, 'b': 0.032, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '44'},
-        {'fromNode': '203.0', 'toNode': '224.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.015, 'shift': 0.0, 'Line_id': '45'},
-        {'fromNode': '204.0', 'toNode': '209.0', 'r': 0.027, 'x': 0.104, 'g': 0, 'b': 0.028, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '46'},
-        {'fromNode': '205.0', 'toNode': '210.0', 'r': 0.022, 'x': 0.088, 'g': 0, 'b': 0.024, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '47'},
-        {'fromNode': '206.0', 'toNode': '210.0', 'r': 0.014, 'x': 0.061, 'g': 0, 'b': 2.459, 'MVA_rating': 400.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '48'},
-        {'fromNode': '207.0', 'toNode': '208.0', 'r': 0.016, 'x': 0.061, 'g': 0, 'b': 0.017, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '49'},
-        {'fromNode': '208.0', 'toNode': '209.0', 'r': 0.043, 'x': 0.165, 'g': 0, 'b': 0.045, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '50'},
-        {'fromNode': '208.0', 'toNode': '210.0', 'r': 0.043, 'x': 0.165, 'g': 0, 'b': 0.045, 'MVA_rating': 175.0, 'kV_base': 138.0, 'm': 1, 'shift': 0, 'Line_id': '51'},
-        {'fromNode': '209.0', 'toNode': '211.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.03, 'shift': 0.0, 'Line_id': '52'},
-        {'fromNode': '209.0', 'toNode': '212.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.03, 'shift': 0.0, 'Line_id': '53'},
-        {'fromNode': '210.0', 'toNode': '211.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.015, 'shift': 0.0, 'Line_id': '54'},
-        {'fromNode': '210.0', 'toNode': '212.0', 'r': 0.002, 'x': 0.084, 'g': 0, 'b': 0.0, 'MVA_rating': 400.0, 'kV_base': 230.0, 'm': 1.015, 'shift': 0.0, 'Line_id': '55'},
-        {'fromNode': '211.0', 'toNode': '213.0', 'r': 0.006, 'x': 0.048, 'g': 0, 'b': 0.1, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '56'},
-        {'fromNode': '211.0', 'toNode': '214.0', 'r': 0.005, 'x': 0.042, 'g': 0, 'b': 0.088, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '57'},
-        {'fromNode': '212.0', 'toNode': '213.0', 'r': 0.006, 'x': 0.048, 'g': 0, 'b': 0.1, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '58'},
-        {'fromNode': '212.0', 'toNode': '223.0', 'r': 0.012, 'x': 0.097, 'g': 0, 'b': 0.203, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '59'},
-        {'fromNode': '213.0', 'toNode': '223.0', 'r': 0.011, 'x': 0.087, 'g': 0, 'b': 0.182, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '60'},
-        {'fromNode': '214.0', 'toNode': '216.0', 'r': 0.005, 'x': 0.059, 'g': 0, 'b': 0.082, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '61'},
-        {'fromNode': '215.0', 'toNode': '216.0', 'r': 0.002, 'x': 0.017, 'g': 0, 'b': 0.036, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '62'},
-        {'fromNode': '215.0', 'toNode': '221.0', 'r': 0.006, 'x': 0.049, 'g': 0, 'b': 0.103, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '63'},
-        {'fromNode': '215.0', 'toNode': '221.0', 'r': 0.006, 'x': 0.049, 'g': 0, 'b': 0.103, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '64'},
-        {'fromNode': '215.0', 'toNode': '224.0', 'r': 0.007, 'x': 0.052, 'g': 0, 'b': 0.109, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '65'},
-        {'fromNode': '216.0', 'toNode': '217.0', 'r': 0.003, 'x': 0.026, 'g': 0, 'b': 0.055, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '66'},
-        {'fromNode': '216.0', 'toNode': '219.0', 'r': 0.003, 'x': 0.023, 'g': 0, 'b': 0.049, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '67'},
-        {'fromNode': '217.0', 'toNode': '218.0', 'r': 0.002, 'x': 0.014, 'g': 0, 'b': 0.03, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '68'},
-        {'fromNode': '217.0', 'toNode': '222.0', 'r': 0.014, 'x': 0.105, 'g': 0, 'b': 0.221, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '69'},
-        {'fromNode': '218.0', 'toNode': '221.0', 'r': 0.003, 'x': 0.026, 'g': 0, 'b': 0.055, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '70'},
-        {'fromNode': '218.0', 'toNode': '221.0', 'r': 0.003, 'x': 0.026, 'g': 0, 'b': 0.055, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '71'},
-        {'fromNode': '219.0', 'toNode': '220.0', 'r': 0.005, 'x': 0.04, 'g': 0, 'b': 0.083, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '72'},
-        {'fromNode': '219.0', 'toNode': '220.0', 'r': 0.005, 'x': 0.04, 'g': 0, 'b': 0.083, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '73'},
-        {'fromNode': '220.0', 'toNode': '223.0', 'r': 0.003, 'x': 0.022, 'g': 0, 'b': 0.046, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '74'},
-        {'fromNode': '220.0', 'toNode': '223.0', 'r': 0.003, 'x': 0.022, 'g': 0, 'b': 0.046, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '75'},
-        {'fromNode': '221.0', 'toNode': '222.0', 'r': 0.009, 'x': 0.068, 'g': 0, 'b': 0.142, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '76'},
-        {'fromNode': '301.0', 'toNode': '302.0', 'r': 0.0, 'x': 0.001, 'g': 0, 'b': 0.0, 'MVA_rating': 500.0, 'kV_base': 230.0, 'm': 1, 'shift': 0, 'Line_id': '77'}
+        {'Line_id': 'L_AC_1', 'fromNode': '101', 'toNode': '102', 'r': 0.003, 'x': 0.014, 'b': 0.461, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_2', 'fromNode': '101', 'toNode': '103', 'r': 0.055, 'x': 0.211, 'b': 0.057, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_3', 'fromNode': '101', 'toNode': '105', 'r': 0.022, 'x': 0.085, 'b': 0.023, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_4', 'fromNode': '102', 'toNode': '104', 'r': 0.033, 'x': 0.127, 'b': 0.034, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_5', 'fromNode': '102', 'toNode': '106', 'r': 0.05, 'x': 0.192, 'b': 0.052, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_6', 'fromNode': '103', 'toNode': '109', 'r': 0.031, 'x': 0.119, 'b': 0.032, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_7', 'fromNode': '103', 'toNode': '124', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.015},
+        {'Line_id': 'L_AC_8', 'fromNode': '104', 'toNode': '109', 'r': 0.027, 'x': 0.104, 'b': 0.028, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_9', 'fromNode': '105', 'toNode': '110', 'r': 0.022, 'x': 0.088, 'b': 0.024, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_10', 'fromNode': '106', 'toNode': '110', 'r': 0.014, 'x': 0.061, 'b': 2.459, 'MVA_rating': 400.0, 'm': 1.0},
+        {'Line_id': 'L_AC_11', 'fromNode': '107', 'toNode': '108', 'r': 0.016, 'x': 0.061, 'b': 0.017, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_12', 'fromNode': '108', 'toNode': '109', 'r': 0.043, 'x': 0.165, 'b': 0.045, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_13', 'fromNode': '108', 'toNode': '110', 'r': 0.043, 'x': 0.165, 'b': 0.045, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_14', 'fromNode': '109', 'toNode': '111', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.03},
+        {'Line_id': 'L_AC_15', 'fromNode': '109', 'toNode': '112', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.03},
+        {'Line_id': 'L_AC_16', 'fromNode': '110', 'toNode': '111', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.015},
+        {'Line_id': 'L_AC_17', 'fromNode': '110', 'toNode': '112', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.015},
+        {'Line_id': 'L_AC_18', 'fromNode': '111', 'toNode': '113', 'r': 0.006, 'x': 0.048, 'b': 0.1, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_19', 'fromNode': '111', 'toNode': '114', 'r': 0.005, 'x': 0.042, 'b': 0.088, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_20', 'fromNode': '112', 'toNode': '113', 'r': 0.006, 'x': 0.048, 'b': 0.1, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_21', 'fromNode': '112', 'toNode': '123', 'r': 0.012, 'x': 0.097, 'b': 0.203, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_22', 'fromNode': '113', 'toNode': '123', 'r': 0.011, 'x': 0.087, 'b': 0.182, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_23', 'fromNode': '114', 'toNode': '116', 'r': 0.005, 'x': 0.059, 'b': 0.082, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_24', 'fromNode': '115', 'toNode': '116', 'r': 0.002, 'x': 0.017, 'b': 0.036, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_25', 'fromNode': '115', 'toNode': '121', 'r': 0.006, 'x': 0.049, 'b': 0.103, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_26', 'fromNode': '115', 'toNode': '121', 'r': 0.006, 'x': 0.049, 'b': 0.103, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_27', 'fromNode': '115', 'toNode': '124', 'r': 0.007, 'x': 0.052, 'b': 0.109, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_28', 'fromNode': '116', 'toNode': '117', 'r': 0.003, 'x': 0.026, 'b': 0.055, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_29', 'fromNode': '116', 'toNode': '119', 'r': 0.003, 'x': 0.023, 'b': 0.049, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_30', 'fromNode': '117', 'toNode': '118', 'r': 0.002, 'x': 0.014, 'b': 0.03, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_31', 'fromNode': '117', 'toNode': '122', 'r': 0.014, 'x': 0.105, 'b': 0.221, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_32', 'fromNode': '118', 'toNode': '121', 'r': 0.003, 'x': 0.026, 'b': 0.055, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_33', 'fromNode': '118', 'toNode': '121', 'r': 0.003, 'x': 0.026, 'b': 0.055, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_34', 'fromNode': '119', 'toNode': '120', 'r': 0.005, 'x': 0.04, 'b': 0.083, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_35', 'fromNode': '119', 'toNode': '120', 'r': 0.005, 'x': 0.04, 'b': 0.083, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_36', 'fromNode': '120', 'toNode': '123', 'r': 0.003, 'x': 0.022, 'b': 0.046, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_37', 'fromNode': '120', 'toNode': '123', 'r': 0.003, 'x': 0.022, 'b': 0.046, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_38', 'fromNode': '121', 'toNode': '122', 'r': 0.009, 'x': 0.068, 'b': 0.142, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_39', 'fromNode': '201', 'toNode': '202', 'r': 0.003, 'x': 0.014, 'b': 0.461, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_40', 'fromNode': '201', 'toNode': '203', 'r': 0.055, 'x': 0.211, 'b': 0.057, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_41', 'fromNode': '201', 'toNode': '205', 'r': 0.022, 'x': 0.085, 'b': 0.023, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_42', 'fromNode': '202', 'toNode': '204', 'r': 0.033, 'x': 0.127, 'b': 0.034, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_43', 'fromNode': '202', 'toNode': '206', 'r': 0.05, 'x': 0.192, 'b': 0.052, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_44', 'fromNode': '203', 'toNode': '209', 'r': 0.031, 'x': 0.119, 'b': 0.032, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_45', 'fromNode': '203', 'toNode': '224', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.015},
+        {'Line_id': 'L_AC_46', 'fromNode': '204', 'toNode': '209', 'r': 0.027, 'x': 0.104, 'b': 0.028, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_47', 'fromNode': '205', 'toNode': '210', 'r': 0.022, 'x': 0.088, 'b': 0.024, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_48', 'fromNode': '206', 'toNode': '210', 'r': 0.014, 'x': 0.061, 'b': 2.459, 'MVA_rating': 400.0, 'm': 1.0},
+        {'Line_id': 'L_AC_49', 'fromNode': '207', 'toNode': '208', 'r': 0.016, 'x': 0.061, 'b': 0.017, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_50', 'fromNode': '208', 'toNode': '209', 'r': 0.043, 'x': 0.165, 'b': 0.045, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_51', 'fromNode': '208', 'toNode': '210', 'r': 0.043, 'x': 0.165, 'b': 0.045, 'MVA_rating': 175.0, 'm': 1.0},
+        {'Line_id': 'L_AC_52', 'fromNode': '209', 'toNode': '211', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.03},
+        {'Line_id': 'L_AC_53', 'fromNode': '209', 'toNode': '212', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.03},
+        {'Line_id': 'L_AC_54', 'fromNode': '210', 'toNode': '211', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.015},
+        {'Line_id': 'L_AC_55', 'fromNode': '210', 'toNode': '212', 'r': 0.002, 'x': 0.084, 'b': 0.0, 'MVA_rating': 400.0, 'm': 1.015},
+        {'Line_id': 'L_AC_56', 'fromNode': '211', 'toNode': '213', 'r': 0.006, 'x': 0.048, 'b': 0.1, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_57', 'fromNode': '211', 'toNode': '214', 'r': 0.005, 'x': 0.042, 'b': 0.088, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_58', 'fromNode': '212', 'toNode': '213', 'r': 0.006, 'x': 0.048, 'b': 0.1, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_59', 'fromNode': '212', 'toNode': '223', 'r': 0.012, 'x': 0.097, 'b': 0.203, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_60', 'fromNode': '213', 'toNode': '223', 'r': 0.011, 'x': 0.087, 'b': 0.182, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_61', 'fromNode': '214', 'toNode': '216', 'r': 0.005, 'x': 0.059, 'b': 0.082, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_62', 'fromNode': '215', 'toNode': '216', 'r': 0.002, 'x': 0.017, 'b': 0.036, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_63', 'fromNode': '215', 'toNode': '221', 'r': 0.006, 'x': 0.049, 'b': 0.103, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_64', 'fromNode': '215', 'toNode': '221', 'r': 0.006, 'x': 0.049, 'b': 0.103, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_65', 'fromNode': '215', 'toNode': '224', 'r': 0.007, 'x': 0.052, 'b': 0.109, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_66', 'fromNode': '216', 'toNode': '217', 'r': 0.003, 'x': 0.026, 'b': 0.055, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_67', 'fromNode': '216', 'toNode': '219', 'r': 0.003, 'x': 0.023, 'b': 0.049, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_68', 'fromNode': '217', 'toNode': '218', 'r': 0.002, 'x': 0.014, 'b': 0.03, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_69', 'fromNode': '217', 'toNode': '222', 'r': 0.014, 'x': 0.105, 'b': 0.221, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_70', 'fromNode': '218', 'toNode': '221', 'r': 0.003, 'x': 0.026, 'b': 0.055, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_71', 'fromNode': '218', 'toNode': '221', 'r': 0.003, 'x': 0.026, 'b': 0.055, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_72', 'fromNode': '219', 'toNode': '220', 'r': 0.005, 'x': 0.04, 'b': 0.083, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_73', 'fromNode': '219', 'toNode': '220', 'r': 0.005, 'x': 0.04, 'b': 0.083, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_74', 'fromNode': '220', 'toNode': '223', 'r': 0.003, 'x': 0.022, 'b': 0.046, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_75', 'fromNode': '220', 'toNode': '223', 'r': 0.003, 'x': 0.022, 'b': 0.046, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_76', 'fromNode': '221', 'toNode': '222', 'r': 0.009, 'x': 0.068, 'b': 0.142, 'MVA_rating': 500.0, 'm': 1.0},
+        {'Line_id': 'L_AC_77', 'fromNode': '301', 'toNode': '302', 'r': 0.0, 'x': 0.001, 'b': 0.0, 'MVA_rating': 500.0, 'm': 1.0}
     ]
-    lines_AC = pd.DataFrame(lines_AC_data)
+    
 
+    
     nodes_DC_data = [
-        {'type': 'Slack', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 150.0, 'Node_id': '1.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 150.0, 'Node_id': '2.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 150.0, 'Node_id': '3.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'Slack', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '4.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '5.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '6.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None},
-        {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '7.0', 'Umin': 0.9, 'Umax': 1.1, 'x_coord': None, 'y_coord': None, 'PZ': None}
+    {'type': 'Slack', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 150.0, 'Node_id': '1'},
+    {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 150.0, 'Node_id': '2'},
+    {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 150.0, 'Node_id': '3'},
+    {'type': 'Slack', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '4'},
+    {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '5'},
+    {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '6'},
+    {'type': 'P', 'Voltage_0': 1.0, 'Power_Gained': 0, 'Power_load': 0.0, 'kV_base': 300.0, 'Node_id': '7'}
     ]
-    nodes_DC = pd.DataFrame(nodes_DC_data)
-
-    lines_DC_data = [
-        {'fromNode': '1.0', 'toNode': '3.0', 'r': 0.0352, 'MW_rating': 100.0, 'kV_base': 150.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '1'},
-        {'fromNode': '2.0', 'toNode': '3.0', 'r': 0.0352, 'MW_rating': 100.0, 'kV_base': 150.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '2'},
-        {'fromNode': '4.0', 'toNode': '5.0', 'r': 0.0828, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '3'},
-        {'fromNode': '4.0', 'toNode': '7.0', 'r': 0.0704, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '4'},
-        {'fromNode': '4.0', 'toNode': '6.0', 'r': 0.0718, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '5'},
-        {'fromNode': '5.0', 'toNode': '7.0', 'r': 0.076, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '6'},
-        {'fromNode': '6.0', 'toNode': '7.0', 'r': 0.0248, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'b', 'Line_id': '7'}
-    ]
-    lines_DC = pd.DataFrame(lines_DC_data)
 
     Converters_ACDC_data = [
-        {'AC_type': 'PQ', 'DC_type': 'Slack', 'AC_node': '107.0', 'DC_node': '1.0', 'P_AC': 0.0, 'Q_AC': 0.5, 'P_DC': 0.0, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.09, 'Droop': 0.0, 'AC_kV_base': 138.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2},
-        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': '204.0', 'DC_node': '2.0', 'P_AC': 0.753, 'Q_AC': -0.5, 'P_DC': 0.0, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.09, 'Droop': 0.0, 'AC_kV_base': 138.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '2', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2},
-        {'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '301.0', 'DC_node': '3.0', 'P_AC': -1.419, 'Q_AC': 1.3, 'P_DC': 0.0, 'T_r': 0.001, 'T_x': 0.05, 'PR_r': 0.0001, 'PR_x': 0.08, 'Filter_b': 0.045, 'Droop': 0.0, 'AC_kV_base': 138.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '3', 'lossa': 2.206, 'lossb': 0.887, 'losscrect': 1.442, 'losscinv': 2.185, 'Ucmin': 0.9, 'Ucmax': 1.2},
-        {'AC_type': 'PQ', 'DC_type': 'Slack', 'AC_node': '113.0', 'DC_node': '4.0', 'P_AC': 1.315, 'Q_AC': 0.759, 'P_DC': 0.0, 'T_r': 0.0005, 'T_x': 0.05, 'PR_r': 0.0001, 'PR_x': 0.08, 'Filter_b': 0.0, 'Droop': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '4', 'lossa': 2.206, 'lossb': 1.8, 'losscrect': 5.94, 'losscinv': 9.0, 'Ucmin': 0.5, 'Ucmax': 1.2},
-        {'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '123.0', 'DC_node': '5.0', 'P_AC': -0.617, 'Q_AC': 0.0, 'P_DC': 0.0, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.0, 'Droop': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '5', 'lossa': 1.103, 'lossb': 1.8, 'losscrect': 11.88, 'losscinv': 18.0, 'Ucmin': 0.5, 'Ucmax': 1.2},
-        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': '215.0', 'DC_node': '6.0', 'P_AC': -1.234, 'Q_AC': -0.1, 'P_DC': 0.0, 'T_r': 0.0005, 'T_x': 0.05, 'PR_r': 0.0001, 'PR_x': 0.08, 'Filter_b': 0.0, 'Droop': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '6', 'lossa': 2.206, 'lossb': 1.8, 'losscrect': 5.94, 'losscinv': 9.0, 'Ucmin': 0.5, 'Ucmax': 1.2},
-        {'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '217.0', 'DC_node': '7.0', 'P_AC': 0.5, 'Q_AC': 0.2, 'P_DC': 0.0, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.0, 'Droop': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 1, 'pol': 1, 'Conv_id': '7', 'lossa': 1.103, 'lossb': 1.8, 'losscrect': 11.88, 'losscinv': 18.0, 'Ucmin': 0.5, 'Ucmax': 1.2}
+    {'Conv_id': 'Conv_1', 'AC_type': 'PQ', 'DC_type': 'Slack', 'AC_node': '107', 'DC_node': '1', 'P_AC': 0.0, 'Q_AC': 0.5, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.09, 'AC_kV_base': 138.0, 'MVA_rating': 200.0, 'Nconverter': 1.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2, 'Cost MEUR': 26.0},
+    {'Conv_id': 'Conv_2', 'AC_type': 'PV', 'DC_type': 'P', 'AC_node': '204', 'DC_node': '2', 'P_AC': 0.753, 'Q_AC': -0.5, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.09, 'AC_kV_base': 138.0, 'MVA_rating': 200.0, 'Nconverter': 1.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2, 'Cost MEUR': 26.0},
+    {'Conv_id': 'Conv_3', 'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '301', 'DC_node': '3', 'P_AC': -1.419, 'Q_AC': 1.3, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.09, 'AC_kV_base': 138.0, 'MVA_rating': 200.0, 'Nconverter': 2.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.9, 'Ucmax': 1.2, 'Cost MEUR': 26.0},
+    {'Conv_id': 'Conv_4', 'AC_type': 'PQ', 'DC_type': 'Slack', 'AC_node': '113', 'DC_node': '4', 'P_AC': 1.315, 'Q_AC': 0.759, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 2.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 1.8, 'losscrect': 11.88, 'losscinv': 18.0, 'Ucmin': 0.5, 'Ucmax': 1.2, 'Cost MEUR': 26.0},
+    {'Conv_id': 'Conv_5', 'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '123', 'DC_node': '5', 'P_AC': -0.617, 'Q_AC': 0.0, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 1.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 1.8, 'losscrect': 11.88, 'losscinv': 18.0, 'Ucmin': 0.5, 'Ucmax': 1.2, 'Cost MEUR': 26.0},
+    {'Conv_id': 'Conv_6', 'AC_type': 'PV', 'DC_type': 'P', 'AC_node': '215', 'DC_node': '6', 'P_AC': -1.234, 'Q_AC': -0.1, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 2.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 1.8, 'losscrect': 11.88, 'losscinv': 18.0, 'Ucmin': 0.5, 'Ucmax': 1.2, 'Cost MEUR': 26.0},
+    {'Conv_id': 'Conv_7', 'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '217', 'DC_node': '7', 'P_AC': 0.5, 'Q_AC': 0.2, 'T_r': 0.001, 'T_x': 0.1, 'PR_r': 0.0001, 'PR_x': 0.16, 'Filter_b': 0.0, 'AC_kV_base': 345.0, 'MVA_rating': 200.0, 'Nconverter': 1.0, 'pol': 1.0, 'lossa': 1.103, 'lossb': 1.8, 'losscrect': 11.88, 'losscinv': 18.0, 'Ucmin': 0.5, 'Ucmax': 1.2, 'Cost MEUR': 26.0}
     ]
+    
+    lines_DC_data = [
+    {'Line_id': 'L_DC_1', 'fromNode': '1', 'toNode': '3', 'r': 0.0352, 'MW_rating': 100, 'kV_base': 150.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 1.76},
+    {'Line_id': 'L_DC_2', 'fromNode': '2', 'toNode': '3', 'r': 0.0352, 'MW_rating': 100, 'kV_base': 150.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 1.76},
+    {'Line_id': 'L_DC_3', 'fromNode': '4', 'toNode': '5', 'r': 0.0828, 'MW_rating': 100, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 4.14},
+    {'Line_id': 'L_DC_4', 'fromNode': '4', 'toNode': '7', 'r': 0.0704, 'MW_rating': 100, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 3.52},
+    {'Line_id': 'L_DC_5', 'fromNode': '4', 'toNode': '6', 'r': 0.0718, 'MW_rating': 100, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 3.59},
+    {'Line_id': 'L_DC_6', 'fromNode': '5', 'toNode': '7', 'r': 0.076, 'MW_rating': 100, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 3.8},
+    {'Line_id': 'L_DC_7', 'fromNode': '6', 'toNode': '7', 'r': 0.0248, 'MW_rating': 100, 'kV_base': 300.0, 'Length_km': 1, 'Mono_Bi_polar': 'sm', 'Cost MEUR': 1.24}
+    ]
+    
+    if TEP:
+        nodes_DC_data[3]['type']= 'P'
+        Converters_ACDC_data[3]['DC_type']= 'P'
+        # Update MVA rating for line 301-302 (index 76)
+        lines_AC_data[76]['MVA_rating']= 800
+        lines_DC_data_extra =   [
+        {'Line_id': 'L_DC_8', 'fromNode': '3', 'toNode': '6', 'r': 0.0684, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': '1', 'Mono_Bi_polar': 'sm', 'Cost MEUR': 3.42},
+        {'Line_id': 'L_DC_9', 'fromNode': '3', 'toNode': '4', 'r': 0.0684, 'MW_rating': 100.0, 'kV_base': 300.0, 'Length_km': '1', 'Mono_Bi_polar': 'sm', 'Cost MEUR': 3.42}
+        ]
+        
+        lines_DC_data.extend(lines_DC_data_extra)
+        
+    lines_AC = pd.DataFrame(lines_AC_data)    
+    nodes_DC = pd.DataFrame(nodes_DC_data)
+    lines_DC = pd.DataFrame(lines_DC_data)
+    
+    
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
-    grid.name = 'case24_3zones_acdc'
+    grid.name = 'case24_3zones_acdc_TEP'
+
+    pyf.add_price_zone(grid, '100', 1)
+    pyf.add_price_zone(grid, '200', 1)
+    pyf.add_price_zone(grid, '300', 1)
 
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():
@@ -226,87 +250,104 @@ def case24_3zones_acdc():
         ACDC = 'AC'
         if price_zone is not None:
             pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
-    
-    for index, row in nodes_DC.iterrows():
-        node_name = nodes_DC.at[index, 'Node_id']
-        price_zone = nodes_DC.at[index, 'PZ']
-        ACDC = 'DC'
-        if price_zone is not None:
-            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
-    
+            
     # Add Generators
-    pyf.add_gen(grid, '101.0', '1', price_zone_link=False, lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '101.0', '2', price_zone_link=False, lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '101.0', '3', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=14.099999999999998)
-    pyf.add_gen(grid, '101.0', '4', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=14.099999999999998)
-    pyf.add_gen(grid, '102.0', '5', price_zone_link=False, lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '102.0', '6', price_zone_link=False, lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '102.0', '7', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
-    pyf.add_gen(grid, '102.0', '8', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
-    pyf.add_gen(grid, '107.0', '9', price_zone_link=False, lf=43.6615, qf=0.052672, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
-    pyf.add_gen(grid, '107.0', '10', price_zone_link=False, lf=43.6615, qf=0.052672, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
-    pyf.add_gen(grid, '113.0', '11', price_zone_link=False, lf=43.6615, qf=0.052672, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
-    pyf.add_gen(grid, '113.0', '12', price_zone_link=False, lf=48.5804, qf=0.00717, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
-    pyf.add_gen(grid, '113.0', '13', price_zone_link=False, lf=48.5804, qf=0.00717, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
-    pyf.add_gen(grid, '114.0', '14', price_zone_link=False, lf=48.5804, qf=0.00717, MWmax=0.0, MWmin=0.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=0.0, QsetMVA=13.699999999999998)
-    pyf.add_gen(grid, '115.0', '15', price_zone_link=False, lf=0.0, qf=0.0, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '115.0', '16', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '115.0', '17', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '115.0', '18', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '115.0', '19', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '115.0', '20', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=0.05)
-    pyf.add_gen(grid, '116.0', '21', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=25.22)
-    pyf.add_gen(grid, '118.0', '22', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=137.4)
-    pyf.add_gen(grid, '121.0', '23', price_zone_link=False, lf=4.4231, qf=0.000213, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=108.2)
-    pyf.add_gen(grid, '122.0', '24', price_zone_link=False, lf=4.4231, qf=0.000213, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '122.0', '25', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '122.0', '26', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '122.0', '27', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '122.0', '28', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '122.0', '29', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '123.0', '30', price_zone_link=False, lf=0.001, qf=0.0, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
-    pyf.add_gen(grid, '123.0', '31', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
-    pyf.add_gen(grid, '123.0', '32', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=350.0, QsetMVA=71.78)
-    pyf.add_gen(grid, '201.0', '33', price_zone_link=False, lf=11.8495, qf=0.004895, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '201.0', '34', price_zone_link=False, lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '201.0', '35', price_zone_link=False, lf=130.0, qf=0.0, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=14.099999999999998)
-    pyf.add_gen(grid, '202.0', '36', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '202.0', '37', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '202.0', '38', price_zone_link=False, lf=130.0, qf=0.0, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
-    pyf.add_gen(grid, '202.0', '39', price_zone_link=False, lf=130.0, qf=0.0, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
-    pyf.add_gen(grid, '207.0', '40', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
-    pyf.add_gen(grid, '207.0', '41', price_zone_link=False, lf=16.0811, qf=0.014142, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
-    pyf.add_gen(grid, '207.0', '42', price_zone_link=False, lf=43.6615, qf=0.052672, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
-    pyf.add_gen(grid, '213.0', '43', price_zone_link=False, lf=43.6615, qf=0.052672, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
-    pyf.add_gen(grid, '213.0', '44', price_zone_link=False, lf=43.6615, qf=0.052672, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
-    pyf.add_gen(grid, '213.0', '45', price_zone_link=False, lf=48.5804, qf=0.00717, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
-    pyf.add_gen(grid, '214.0', '46', price_zone_link=False, lf=48.5804, qf=0.00717, MWmax=0.0, MWmin=0.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=0.0, QsetMVA=13.68)
-    pyf.add_gen(grid, '215.0', '47', price_zone_link=False, lf=48.5804, qf=0.00717, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '215.0', '48', price_zone_link=False, lf=0.0, qf=0.0, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '215.0', '49', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '215.0', '50', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '215.0', '51', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
-    pyf.add_gen(grid, '215.0', '52', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=0.048)
-    pyf.add_gen(grid, '216.0', '53', price_zone_link=False, lf=56.564, qf=0.328412, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=25.22)
-    pyf.add_gen(grid, '218.0', '54', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=137.4)
-    pyf.add_gen(grid, '221.0', '55', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=108.2)
-    pyf.add_gen(grid, '222.0', '56', price_zone_link=False, lf=4.4231, qf=0.000213, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '222.0', '57', price_zone_link=False, lf=4.4231, qf=0.000213, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '222.0', '58', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '222.0', '59', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '222.0', '60', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '222.0', '61', price_zone_link=False, lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
-    pyf.add_gen(grid, '223.0', '62', price_zone_link=False, lf=0.001, qf=0.0, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
-    pyf.add_gen(grid, '223.0', '63', price_zone_link=False, lf=0.001, qf=0.0, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
-    pyf.add_gen(grid, '223.0', '64', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=350.0, QsetMVA=71.78)
-    pyf.add_gen(grid, '302.0', '65', price_zone_link=False, lf=12.3883, qf=0.008342, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=150.0, QsetMVA=10.0)
+    pyf.add_gen(grid, '101', '1', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '101', '2', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '101', '3', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=14.099999999999998)
+    pyf.add_gen(grid, '101', '4', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=14.099999999999998)
+    pyf.add_gen(grid, '102', '5', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '102', '6', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '102', '7', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
+    pyf.add_gen(grid, '102', '8', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
+    pyf.add_gen(grid, '107', '9', np_gen=1, fc=781.521,lf=43.6615, qf=0.052672, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
+    pyf.add_gen(grid, '107', '10', np_gen=1, fc=781.521,lf=43.6615, qf=0.052672, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
+    pyf.add_gen(grid, '113', '11', np_gen=1, fc=781.521,lf=43.6615, qf=0.052672, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
+    pyf.add_gen(grid, '113', '12', np_gen=1, fc=832.7575,lf=48.5804, qf=0.00717, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
+    pyf.add_gen(grid, '113', '13', np_gen=1, fc=832.7575,lf=48.5804, qf=0.00717, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
+    pyf.add_gen(grid, '114', '14', np_gen=1, fc=832.7575,lf=48.5804, qf=0.00717, MWmax=0.0, MWmin=0.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=0.0, QsetMVA=13.699999999999998)
+    pyf.add_gen(grid, '115', '15', np_gen=1, fc=0.0,lf=0.0, qf=0.0, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '115', '16', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '115', '17', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '115', '18', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '115', '19', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '115', '20', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=0.05)
+    pyf.add_gen(grid, '116', '21', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=25.22)
+    pyf.add_gen(grid, '118', '22', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=137.4)
+    pyf.add_gen(grid, '121', '23', np_gen=1, fc=395.3749,lf=4.4231, qf=0.000213, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=108.2)
+    pyf.add_gen(grid, '122', '24', np_gen=1, fc=395.3749,lf=4.4231, qf=0.000213, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '122', '25', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '122', '26', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '122', '27', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '122', '28', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '122', '29', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '123', '30', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
+    pyf.add_gen(grid, '123', '31', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
+    pyf.add_gen(grid, '123', '32', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=350.0, QsetMVA=71.78)
+    pyf.add_gen(grid, '201', '33', np_gen=1, fc=665.1094,lf=11.8495, qf=0.004895, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '201', '34', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '201', '35', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=14.099999999999998)
+    pyf.add_gen(grid, '202', '36', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '202', '37', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=20.0, MWmin=16.0, MVArmax=10.0, MVArmin=0.0, PsetMW=10.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '202', '38', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
+    pyf.add_gen(grid, '202', '39', np_gen=1, fc=400.6849,lf=130.0, qf=0.0, MWmax=76.0, MWmin=15.2, MVArmax=30.0, MVArmin=-25.0, PsetMW=76.0, QsetMVA=7.000000000000001)
+    pyf.add_gen(grid, '207', '40', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
+    pyf.add_gen(grid, '207', '41', np_gen=1, fc=212.3076,lf=16.0811, qf=0.014142, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
+    pyf.add_gen(grid, '207', '42', np_gen=1, fc=781.521,lf=43.6615, qf=0.052672, MWmax=100.0, MWmin=25.0, MVArmax=60.0, MVArmin=0.0, PsetMW=80.0, QsetMVA=17.2)
+    pyf.add_gen(grid, '213', '43', np_gen=1, fc=781.521,lf=43.6615, qf=0.052672, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
+    pyf.add_gen(grid, '213', '44', np_gen=1, fc=781.521,lf=43.6615, qf=0.052672, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
+    pyf.add_gen(grid, '213', '45', np_gen=1, fc=832.7575,lf=48.5804, qf=0.00717, MWmax=197.0, MWmin=69.0, MVArmax=80.0, MVArmin=0.0, PsetMW=95.1, QsetMVA=40.7)
+    pyf.add_gen(grid, '214', '46', np_gen=1, fc=832.7575,lf=48.5804, qf=0.00717, MWmax=0.0, MWmin=0.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=0.0, QsetMVA=13.68)
+    pyf.add_gen(grid, '215', '47', np_gen=1, fc=832.7575,lf=48.5804, qf=0.00717, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '215', '48', np_gen=1, fc=0.0,lf=0.0, qf=0.0, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '215', '49', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '215', '50', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '215', '51', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=12.0, MWmin=2.4, MVArmax=6.0, MVArmin=0.0, PsetMW=12.0, QsetMVA=0.0)
+    pyf.add_gen(grid, '215', '52', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=0.048)
+    pyf.add_gen(grid, '216', '53', np_gen=1, fc=86.3852,lf=56.564, qf=0.328412, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=25.22)
+    pyf.add_gen(grid, '218', '54', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=137.4)
+    pyf.add_gen(grid, '221', '55', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=400.0, MWmin=100.0, MVArmax=200.0, MVArmin=-50.0, PsetMW=400.0, QsetMVA=108.2)
+    pyf.add_gen(grid, '222', '56', np_gen=1, fc=395.3749,lf=4.4231, qf=0.000213, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '222', '57', np_gen=1, fc=395.3749,lf=4.4231, qf=0.000213, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '222', '58', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '222', '59', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '222', '60', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '222', '61', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=50.0, MWmin=10.0, MVArmax=16.0, MVArmin=-10.0, PsetMW=50.0, QsetMVA=-4.96)
+    pyf.add_gen(grid, '223', '62', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
+    pyf.add_gen(grid, '223', '63', np_gen=1, fc=0.001,lf=0.001, qf=0.0, MWmax=155.0, MWmin=54.29999999999999, MVArmax=80.0, MVArmin=-50.0, PsetMW=155.0, QsetMVA=31.790000000000003)
+    pyf.add_gen(grid, '223', '64', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=350.0, QsetMVA=71.78)
+    if TEP:
+        pyf.add_gen(grid, '302', '65', np_gen=1, fc=382.2391,lf=0, qf=0, MWmax=700.0, MWmin=100.0, MVArmax=300.0, MVArmin=-50.0, PsetMW=300.0, QsetMVA=20.0)
+    else:
+        pyf.add_gen(grid, '302', '65', np_gen=1, fc=382.2391,lf=12.3883, qf=0.008342, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=150.0, QsetMVA=10.0)
     
     
-    # Add Renewable Source Zones
-
-    
-    # Add Renewable Sources
-
-    
-    # Return the grid
+    if TEP==True:
+        lines_DC.set_index('Line_id', inplace=True)
+        Converters_ACDC.set_index('Conv_id', inplace=True)
+        if exp == 'All':
+            for line in list(grid.lines_DC):  # Create a copy of the list
+                name = line.name
+                line_cost = lines_DC.loc[name,'Cost MEUR']*10**6
+                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+            for conv in list(grid.Converters_ACDC):  # Create a copy of the list
+                name = conv.name
+                conv_cost = Converters_ACDC.loc[name,'Cost MEUR']*10**6
+                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
+        else:
+            for line in list(grid.lines_DC):  
+                name = line.name
+                if name not in exp:
+                    continue
+                line_cost = lines_DC.loc[name,'Cost MEUR']*10**6
+                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+            for conv in list(grid.Converters_ACDC):  
+                name = conv.name
+                if name not in exp:
+                    continue
+                conv_cost = Converters_ACDC.loc[name,'Cost MEUR']*10**6
+                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=conv_cost)
+                
+                
+                
     return grid,res

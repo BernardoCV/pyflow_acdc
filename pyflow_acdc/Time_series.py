@@ -455,18 +455,22 @@ def reset_to_initialize(model, initial_values):
             for index in var_obj:
                 var_obj[index].set_value(initial_values[var_obj.name].get(index, 0))
                 
-def modify_parameters(grid,model,ACmode,DCmode,Price_Zones):
-    [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,ACmode,DCmode,Price_Zones=Price_Zones)    
-
+def modify_parameters(grid,model,Price_Zones):
+    [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)    
+    ACmode = grid.ACmode
+    DCmode = grid.DCmode
     AC_Lists, AC_nodes_info, AC_lines_info,EXP_info,REP_info,CT_info = AC_info
-    lf,qf,c0,np_gen,P_renSource,lista_gen,lista_rs = gen_info
+    
+    gen_AC_info,gen_DC_info,P_renSource,lista_rs = gen_info
+    lf,qf,fc,np_gen,lista_gen = gen_AC_info
+    
     
     # lista_nodos_AC, lista_lineas_AC,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists
     _,_,_,_, P_know,Q_know,price = AC_nodes_info
     #S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC = AC_lines_info
     if DCmode:
         DC_Lists,DC_nodes_info,_,_ = DC_info
-    
+        lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC = gen_DC_info
         # lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
         _, _ ,_,P_known_DC,price_dc  = DC_nodes_info
         # P_lineDC_limit,NP_lineDC    = DC_lines_info
@@ -492,12 +496,16 @@ def modify_parameters(grid,model,ACmode,DCmode,Price_Zones):
         for idx, val in PGL_max.items():
             model.PGL_max[idx].set_value(val)
     else:
-        for idx, val in price.items():
-            model.price[idx].set_value(val)
-        for idx, val in price_dc.items():
-            model.price_dc[idx].set_value(val)
-        for idx, val in lf.items():
-            model.lf[idx].set_value(val)
+        if ACmode:
+            for idx, val in price.items():
+                model.price[idx].set_value(val)
+            for idx, val in lf.items():
+                model.lf[idx].set_value(val)
+        if DCmode:
+            for idx, val in price_dc.items():
+                 model.price_dc[idx].set_value(val)    
+            for idx, val in lf_DC.items():
+                model.lf_dc[idx].set_value(val)
     
     for idx, val in P_renSource.items():
         model.P_renSource[idx].set_value(val)
@@ -511,6 +519,9 @@ def modify_parameters(grid,model,ACmode,DCmode,Price_Zones):
     if DCmode:
         for idx, val in P_known_DC.items():
             model.P_known_DC[idx].set_value(val)
+    for idx, val in P_renSource.items():
+        model.P_renSource[idx].set_value(val)
+
     
     
                 
@@ -572,10 +583,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     model = pyo.ConcreteModel()
     model.name="TS AC/DC hybrid OPF"
     
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
-    
+    analyse_OPF(grid)
+       
     t1 = time.time()
     OPF_createModel_ACDC(model,grid,PV_set,price_zone_restrictions)
     t2 = time.time()  
@@ -600,7 +609,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t1= time.time()          
         reset_to_initialize(model, initial_values)
     
-        modify_parameters(grid,model,ACmode,DCmode,price_zone_restrictions)
+        modify_parameters(grid,model,price_zone_restrictions)
         t2= time.time()  
         t_modelupdate = t2-t1
         
