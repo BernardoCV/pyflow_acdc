@@ -1,5 +1,5 @@
 Installation
-===========
+============
 
 Requirements
 ------------
@@ -14,6 +14,10 @@ Requirements
     * plotly
     * geopandas
     * pyyaml
+    * shapely
+    * svgwrite
+    * kmedoids
+    * scikit-learn
 
 * Optional dependencies:
     * Mapping:
@@ -25,15 +29,16 @@ Requirements
         * dash
 
 
+
 Install from PyPI
-----------------
+-----------------
 ::
 
     pip install pyflow-acdc
 
 
 Install from source
-------------------
+-------------------
 ::
 
     git clone https://github.com/adored-project/pyflow_acdc.git
@@ -43,7 +48,7 @@ Install from source
 
 
 Making Changes
--------------
+--------------
 
 1. Create a new branch for your changes::
 
@@ -79,6 +84,20 @@ Install the following packages::
 
     pip install pyomo
     conda install -c conda-forge ipopt
+
+For TEP functionality
+^^^^^^^^^^^^^^^^^^^^^^
+pyflow_acdc has to be installed and run in a Linux environment.
+
+**System Requirements:**
+bonmin needs to be installed on the Linux system first, then Python can use it.
+
+Install bonmin on Linux::
+
+    conda install -c conda-forge bonmin
+
+**Note:** bonmin is only available through conda-forge, not pip. Make sure you have conda installed on your Linux system.
+
 
 For Dash Interface
 ^^^^^^^^^^^^^^^^^^^
