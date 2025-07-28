@@ -58,11 +58,7 @@ dependencies = ["numpy",
 
 mapping = ["folium"]
 
-OPF = [  "pyomo",
-         "ipopt"]
-OPF_linux = ["pyomo",
-             "ipopt",
-             "coin-or-bonmin"]
+OPF = ["pyomo"]
 
 Dash = ["dash"]
 

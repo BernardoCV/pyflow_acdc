@@ -75,12 +75,16 @@ pip install pyomo
 conda install -c conda-forge ipopt
 
 ```
+
+**Note:** `ipopt` is not available on PyPI and must be installed via conda-forge.
+
 For OPF run in Linux for the TEP:
 ```bash
 
 sudo apt update
 sudo apt install coinor-libbonmin-dev
-conda install -c conda-forge bonmin
+conda install -c conda-forge ipopt
+conda install -c conda-forge coin-or-bonmin
 
 ```
 
