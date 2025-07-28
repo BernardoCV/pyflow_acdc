@@ -93,10 +93,16 @@ pip install dash
 ## Test
 
 ```bash
-pyflow-acdc-test              # All tests
-pyflow-acdc-test --quick      # Quick tests only
-pyflow-acdc-test --show-output # All tests with output
-pyflow-acdc-test --quick --show-output # Quick tests with output
+pyflow-acdc-test       
+```
+Flags
+```bash      
+--quick      # Quick tests only
+--tep        #TEP tests only
+
+
+--show-output # All tests with output
+
 
 ```
 ## Documentation

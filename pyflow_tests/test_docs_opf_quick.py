@@ -13,9 +13,12 @@ def test_docs_opf_quick():
 
     [grid, res] = pyf.case39_acdc()
 
-    model, timing_info, [model_res, solver_stats] = pyf.OPF_ACDC(grid, ObjRule={'obj': {'w': 1}})
+    model, timing_info, model_res,solver_stats= pyf.Optimal_PF(grid, ObjRule=obj)
 
     res.All()
+    print(model_res)
+    print(timing_info)
+    model.obj.display()
     print('------')
     print("✓ Quick OPF example test passed")
 

@@ -45,9 +45,12 @@ def test_docs_opf_detailed():
 
     obj = {'Energy_cost': 1}
 
-    model, timing_info, [model_res, solver_stats] = pyf.OPF_ACDC(grid, ObjRule={'obj': {'w': 1}})
+    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid, ObjRule=obj)
 
     res.All()
+    print(model_res)
+    print(timing_info)
+    model.obj.display()
     print('------')
     print("✓ Detailed OPF example test passed")
 

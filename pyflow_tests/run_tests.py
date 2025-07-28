@@ -6,6 +6,7 @@ import contextlib
 from typing import Dict, List
 import warnings
 import re
+import time
 
 # Configuration
 TEST_DIR = Path(__file__).parent
@@ -29,13 +30,13 @@ ALL_CASES = [
     'case39ac_OPF.py',
     'case39acdc_OPF.py',
     'case24_3zones_acdc_OPF.py',
+   
     #loading matlab files
     'matlab_loader.py',
     #folium
     'folium_test.py',
     
     #Transmission Expansion
-    #make sure OPF still works
     'case24_OPF.py',
     #DC
     'case6_TEP_DC.py',
@@ -59,7 +60,16 @@ QUICK_CASES = [
     'matlab_loader.py',
 ]
 
+TEP_CASES = [
+    'case24_OPF.py',
+    'case6_TEP_DC.py',
+    'case24_TEP.py',
+    'case24_REC.py',
+    'array_sizing.py',
+]
+
 def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List[str]]:
+    
     """Run a test case and return (success, error_message, warnings)."""
     if show_output:
         print(f"\nRunning test case: {case}")
@@ -83,14 +93,18 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List
             # Run the module directly to see all output
             spec.loader.exec_module(module)
             # Call the standardized test function
+            start_time = time.time()
             module.run_test()
+            elapsed_time = time.time() - start_time
         else:
             # Capture stdout to check for warning messages
             stdout_capture = StringIO()
             with contextlib.redirect_stdout(stdout_capture):
                 spec.loader.exec_module(module)
                 # Call the standardized test function
+                start_time = time.time()
                 module.run_test()
+                elapsed_time = time.time() - start_time
             
             # Check stdout for explicit warning messages
             for line in stdout_capture.getvalue().split('\n'):
@@ -98,14 +112,14 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List
                     captured_warnings.append(line.strip())
             
             stdout_content = stdout_capture.getvalue()
-            if 'pyomo is not installed' in stdout_content or 'bonmin is not installed' in stdout_content or 'folium is not installed' in stdout_content or 'dash is not installed' in stdout_content:
-                return False, "Dependency not available", captured_warnings
+            if 'is not installed' in stdout_content or 'not available' in stdout_content:
+                return False, "Dependency not available", captured_warnings, 0
 
-        return True, "", captured_warnings
+        return True, "", captured_warnings, elapsed_time
     except Exception as e:
         error_msg = f"Error running {case}: {str(e)}"
         print(error_msg)
-        return False, error_msg, captured_warnings
+        return False, error_msg, captured_warnings, 0
     finally:
         if show_output:
             print("-" * 70)
@@ -115,11 +129,16 @@ def main():
     args = sys.argv[1:]
     show_output = "--show-output" in args
     quick_mode = "--quick" in args
+    tep_mode = "--tep" in args
     
     # Choose which tests to run
     if quick_mode:
         CASES = QUICK_CASES
         print("Running quick tests (basic functionality only)")
+    
+    elif tep_mode:
+        CASES = TEP_CASES
+        print("Running TEP tests")
     else:
         CASES = ALL_CASES
         print("Running all tests")
@@ -132,13 +151,13 @@ def main():
     results: Dict[str, tuple[bool, str, List[str]]] = {}
     
     for case in CASES:
-        success, error_msg, warnings = run_test_case(case, show_output)
-        results[case] = (success, error_msg, warnings)
+        success, error_msg, warnings, elapsed_time = run_test_case(case, show_output)
+        results[case] = (success, error_msg, warnings, elapsed_time)
         if not show_output:
             status = "✓ Passed" if success else "✗ Failed"
             if error_msg == "Dependency not available":
                 status = "~ Skipped"
-            print(f"{status} - {case}")
+            print(f"{status} - {case} - {elapsed_time:.2f}s")
             if warnings:
                 print("\nWarnings:")
                 for warning in warnings:
@@ -151,10 +170,10 @@ def main():
     print(f"Summary: {success_count}/{len(CASES)} tests passed")
     
     # Print detailed error report if any tests failed
-    failed_tests = [(case, error, warnings) for case, (success, error, warnings) in results.items() if not success]
+    failed_tests = [(case, error, warnings, elapsed_time) for case, (success, error, warnings, elapsed_time) in results.items() if not success]
     if failed_tests:
         print("\nFailed Tests:")
-        for case, error, warnings in failed_tests:
+        for case, error, warnings, elapsed_time in failed_tests:
             if error == "Dependency not available":
                 continue
             print(f"\n{case}:")
@@ -165,7 +184,7 @@ def main():
                     print(f"  {warning}")
         print('------')
         print('Skipped tests:')
-        for case, error, warnings in failed_tests:
+        for case, error, warnings, elapsed_time in failed_tests:
             if error != "Dependency not available": 
                 continue
             print(f"\n{case}:  {error}")
