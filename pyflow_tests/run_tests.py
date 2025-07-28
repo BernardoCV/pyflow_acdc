@@ -11,7 +11,14 @@ import re
 TEST_DIR = Path(__file__).parent
 
 # List of test cases to run (in order)
-CASES = [
+ALL_CASES = [
+    # Documentation tests
+    'test_docs_basic_grid_creation.py',
+    'test_docs_add_components.py',
+    'test_docs_power_flow.py',
+    'test_docs_opf_quick.py',
+    'test_docs_opf_detailed.py',
+    
     #Power Flow
     'grid_creation.py',
     'CigreB4_PF.py',
@@ -40,6 +47,16 @@ CASES = [
     'array_sizing.py',
     #time series and dash
     'ts_dash.py'
+]
+
+# Quick tests (basic functionality only)
+QUICK_CASES = [
+    'test_docs_basic_grid_creation.py',
+    'test_docs_add_components.py',
+    'test_docs_power_flow.py',
+    'grid_creation.py',
+    'CigreB4_PF.py',
+    'matlab_loader.py',
 ]
 
 def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List[str]]:
@@ -88,6 +105,15 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List
 def main():
     # Check command line arguments
     show_output = len(sys.argv) > 1 and sys.argv[1] == "--show-output"
+    quick_mode = len(sys.argv) > 1 and sys.argv[1] == "--quick"
+    
+    # Choose which tests to run
+    if quick_mode:
+        CASES = QUICK_CASES
+        print("Running quick tests (basic functionality only)")
+    else:
+        CASES = ALL_CASES
+        print("Running all tests")
     
     print(f"Running {len(CASES)} test cases")
     if show_output:

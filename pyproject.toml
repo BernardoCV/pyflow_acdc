@@ -80,3 +80,5 @@ packages = ["pyflow_acdc"]
     "example_grids/*.py"
 ]
 
+[project.scripts]
+pyflow-acdc-test = "pyflow_acdc.pyflow_tests.run_tests:main"

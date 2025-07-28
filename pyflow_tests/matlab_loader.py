@@ -11,28 +11,32 @@ import sys
 import pyomo.environ as pyo
 from pathlib import Path
 
-current_file = Path(__file__).resolve()
-path = str(current_file.parent)
+def run_matlab_loader():
 
-data = f'{path}/case39_var.mat'
+    current_file = Path(__file__).resolve()
+    path = str(current_file.parent)
 
-[grid,res]=pyf.Create_grid_from_mat(data)
+    data = f'{path}/case39_var.mat'
 
-pyf.save_grid_to_file(grid, 'case39',folder_name='example_grids')
+    [grid,res]=pyf.Create_grid_from_mat(data)
+
+    pyf.save_grid_to_file(grid, 'case39',folder_name='example_grids')
 
 
-obj = {'Energy_cost'  : 1}
-nac=grid.nn_AC
+    obj = {'Energy_cost'  : 1}
+    nac=grid.nn_AC
 
-print(nac)
+    print(nac)
 
-JustOne = True
-    
-model, model_res,timing_info, solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
+    JustOne = True
+        
+    model, model_res,timing_info, solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
 
-res.All()
+    res.All()
 
-print(timing_info)
-print(model_res)
-model.obj.display()
-    
+    print(timing_info)
+    print(model_res)
+    model.obj.display()
+
+if __name__ == "__main__":
+    run_matlab_loader()
