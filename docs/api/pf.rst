@@ -152,7 +152,7 @@ Running the AC Power Flow
 
    .. code-block:: python
 
-       time = pyf.AC_PowerFlow(grid)
+       time,tol = pyf.AC_PowerFlow(grid)
 
 DC Power Flow
 -------------
@@ -259,7 +259,7 @@ Running the DC Power Flow
 
    .. code-block:: python
 
-       time = pyf.DC_PowerFlow(grid)
+       time,tol = pyf.DC_PowerFlow(grid)
 
 Sequential AC/DC Power Flow
 ---------------------------
@@ -322,7 +322,7 @@ Running the Sequential AC/DC Power Flow
 
    .. code-block:: python
 
-       time = pyf.ACDC_sequential(grid)
+       time,tol,ps_iterations = pyf.ACDC_sequential(grid)
 
 **References**
 

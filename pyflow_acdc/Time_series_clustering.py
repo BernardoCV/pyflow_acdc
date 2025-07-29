@@ -7,8 +7,6 @@ if 'MPLBACKEND' not in os.environ:
     os.environ['MPLBACKEND'] = 'Agg'
 import matplotlib.pyplot as plt
 import pandas as pd
-pd.options.compute.use_numexpr = False
-pd.options.compute.use_bottleneck = False
 import numpy as np
 import time as time
 from pathlib import Path

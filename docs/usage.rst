@@ -147,7 +147,7 @@ To run this, you need to have the OPF optional installed. This includes the foll
 
     [grid,res]=pyf.case39_acdc()
 
-    model, timing_info, [model_res,solver_stats] = pyf.OPF_ACDC(grid,ObjRule={'obj':{'w':1}})
+    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid,ObjRule=obj)
 
     res.All()
     print ('------')
@@ -197,7 +197,7 @@ Taking the Case 5 from the IEEE PES Power Grid Library [2]_.
 
     obj = {'Energy_cost'  : 1}
 
-    model, timing_info, [model_res,solver_stats] = pyf.OPF_ACDC(grid,ObjRule={'obj':{'w':1}})
+    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid,ObjRule=obj)
 
     res.All()
     print ('------')

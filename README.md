@@ -63,12 +63,6 @@ git pull origin main
 
 To merge your changes into the main branch please contact the repository owner.
 
-For Clustering you will need to install the following packages:
-```bash
-pip install "numpy <2.0.0"
-pip install scikit-learn-extra
-pip install scikit-learn
-```
 For mapping you will need to install the following packages:
 ```bash
 pip install folium
@@ -81,12 +75,16 @@ pip install pyomo
 conda install -c conda-forge ipopt
 
 ```
+
+**Note:** `ipopt` is not available on PyPI and must be installed via conda-forge.
+
 For OPF run in Linux for the TEP:
 ```bash
 
 sudo apt update
 sudo apt install coinor-libbonmin-dev
-conda install -c conda-forge bonmin
+conda install -c conda-forge ipopt
+conda install -c conda-forge coin-or-bonmin
 
 ```
 
@@ -96,8 +94,21 @@ For Dash you will need to install the following packages:
 pip install dash
 
 ```
+## Test
+
+```bash
+pyflow-acdc-test       
+```
+Flags
+```bash      
+--quick      # Quick tests only
+--tep        #TEP tests only
 
 
+--show-output # All tests with output
+
+
+```
 ## Documentation
 Online documentation can be found at:
 

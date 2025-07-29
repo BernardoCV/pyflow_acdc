@@ -92,6 +92,10 @@ pyflow_acdc has to be installed and run in a Linux environment.
 **System Requirements:**
 bonmin needs to be installed on the Linux system first, then Python can use it.
 
+    sudo apt update
+    sudo apt install coinor-libbonmin-dev
+   
+
 Install bonmin on Linux::
 
     conda install -c conda-forge bonmin
