@@ -51,18 +51,8 @@ def Generation_variables(model,grid,gen_info,TEP):
         else:
             return (1,1)
     model.gamma = pyo.Var(model.ren_sources, bounds=gamma_bounds, initialize=1)
-    
-    def Qren_bounds(model,rs):
-        ren_source= grid.RenSources[rs]
-        if ren_source.connected == 'AC':
-            return (ren_source.Qmin,ren_source.Qmax)
-        else:
-            return (0,0)
-    
-    
-    model.Q_renSource = pyo.Var(model.ren_sources,bounds=Qren_bounds, initialize=0)
-    
-    
+
+
     grid.GPR = False
     
     if any(gen.np_gen_opf for gen in grid.Generators) and TEP:
@@ -87,51 +77,16 @@ def Generation_variables(model,grid,gen_info,TEP):
             ini=max_pow_gen
         return (ini)
     
-    def Q_gen_ini(model,ngen):
-        gen = grid.Generators[ngen]
-        min_pow_genR = gen.Min_pow_genR * gen.np_gen
-        ini=gen.Qset * gen.np_gen
-        max_pow_genR = gen.Max_pow_genR * gen.np_gen
-        if min_pow_genR>ini:
-            ini=min_pow_genR
-        elif ini>max_pow_genR: 
-            ini=max_pow_genR    
-        return (ini)
-    
 
-    if grid.ACmode:
-        model.gen_AC     = pyo.Set(initialize=lista_gen)
- 
-        if grid.GPR:
-            model.PGi_gen = pyo.Var(model.gen_AC, initialize=P_gen_ini)
-            model.QGi_gen = pyo.Var(model.gen_AC, initialize=Q_gen_ini) 
-        else:
-            model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
-            model.QGi_gen = pyo.Var(model.gen_AC,bounds=Q_Gen_bounds, initialize=Q_gen_ini) 
-    
-    def P_Gen_bounds_DC(model, g):
-        gen = grid.Generators_DC[g]
-        return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
+
+    model.gen_AC     = pyo.Set(initialize=lista_gen)
+
+    if grid.GPR:
+        model.PGi_gen = pyo.Var(model.gen_AC, initialize=P_gen_ini)
         
-    def P_gen_ini_DC(model,ngen):
-        gen = grid.Generators_DC[ngen]
-        min_pow_gen = gen.Min_pow_gen * gen.np_gen
-        ini=gen.Pset * gen.np_gen
-        max_pow_gen = gen.Max_pow_gen * gen.np_gen
-        if  min_pow_gen>ini:
-            ini=min_pow_gen
-        elif ini>max_pow_gen: 
-            ini=max_pow_gen
-        return (ini)
-    
-    if grid.DCmode:
-        model.gen_DC     = pyo.Set(initialize=lista_gen_DC)    
-    
-        if grid.GPR:
-            model.PGi_gen_DC = pyo.Var(model.gen_DC, initialize=P_gen_ini_DC)
-
-        else:
-            model.PGi_gen_DC = pyo.Var(model.gen_DC,bounds=P_Gen_bounds_DC, initialize=P_gen_ini_DC)
+    else:
+        model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
+          
     
     model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)       
     s=1
@@ -727,21 +682,17 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         executor.map(process_node_AC, grid.nodes_AC)
     
     
-    Pf = np.zeros((grid.nn_AC, 1))
-    Qf = np.zeros((grid.nn_AC, 1))
-    
     B = np.imag(grid.Ybus_AC)
     Theta = grid.Theta_V_AC
 
     Theta_diff = Theta[:, None] - Theta
     Pf_DC = (-B * Theta_diff).sum(axis=1)
-    # Reactive power is not modeled in DC approximation
-    Qf_DC = np.zeros_like(Pf_DC)  
+    
 
     for node in grid.nodes_AC:
         i = node.nodeNumber
         node.P_INJ = Pf_DC[i]
-        node.Q_INJ = Qf_DC[i]
+        node.Q_INJ = 0.0
         
     if grid.GPR:
         np_gen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_gen.items()}
@@ -792,8 +743,7 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-        lines_AC_CT_fromQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
-        lines_AC_CT_toQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
+       
        
         
         def process_line_AC_CT(line):
@@ -804,8 +754,8 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
                 ct = list(model.ct_set)[line.active_config]
                 Pfrom = lines_AC_CT_fromP[l][ct]
                 Pto   = lines_AC_CT_toP[l][ct]
-                Qfrom = lines_AC_CT_fromQ[l][ct]
-                Qto   = lines_AC_CT_toQ[l][ct]
+                Qfrom = 0.0
+                Qto   = 0.0
             else:
                 line.active_config = -1
                 Pfrom = 0
@@ -817,7 +767,7 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             
             line.fromS = (Pfrom + 1j*Qfrom)
             line.toS = (Pto + 1j*Qto)
-            line.loss = line.fromS + line.toS
+            line.loss = 0
             line.P_loss = 0
 
         with ThreadPoolExecutor() as executor:

@@ -36,6 +36,11 @@ try:
 except ImportError:
     HAS_DASH = False
     
+try:
+    from .AC_L_CSS_gurobi import *
+    HAS_AC_L_CSS_GUROBI = True
+except ImportError:
+    HAS_AC_L_CSS_GUROBI = False
 
 try:
     from .Mapping import *
@@ -136,6 +141,9 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'export_TEP_TS_results_to_excel',
+
+    # AC_L_CSS_GUROBI
+    'Optimal_L_CSS_gurobi',
 
     # Time Series Analysis
     'Time_series_PF',

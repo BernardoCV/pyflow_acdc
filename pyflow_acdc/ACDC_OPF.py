@@ -416,6 +416,7 @@ def OPF_solve(model,grid,solver = 'ipopt',tee=False):
     if solver == 'gurobi':
         opt.options['Threads'] = 0
         opt.options['TimeLimit'] = 600
+        
     #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
     #if logging:
     #    results = opt.solve(model, logfile="ipopt_output.log")
@@ -755,6 +756,7 @@ def Translate_pyf_OPF(grid,Price_Zones=False):
                 S_lineACct_lim[l.lineNumber,i] = l.MVA_rating_list[i] / grid.S_base
         if grid.Cable_options is not None and len(grid.Cable_options) > 0:
             cab_types_set = list(range(0,len(grid.Cable_options[0]._cable_types)))
+    
         else:
             cab_types_set = []
         allowed_types = grid.cab_types_allowed

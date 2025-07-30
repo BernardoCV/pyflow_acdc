@@ -1991,7 +1991,7 @@ class Size_selection(Line_AC):
 class Cable_options:
     Cable_options_num = 0
     names = set()
-    _cable_database = None  # Add this line
+    _cable_database = None  
     
     @classmethod
     def load_cable_database(cls):

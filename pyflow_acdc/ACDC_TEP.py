@@ -429,8 +429,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     t2 = time.time()  
     t_modelcreate = t2-t1
 
-
-  
+   
     # model.obj.pprint()
     t3 = time.time()
     model_results,solver_stats = OPF_solve(model,grid,solver,tee)

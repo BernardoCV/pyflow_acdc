@@ -679,7 +679,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,ct_lamda=10^6,max_turbines_per_string= None):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,ct_lamda=10^6,max_turbines_per_string= None,LCoE=1):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
 
     turbines_df = Data["turbine"]
@@ -723,7 +723,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
             add_RenSource(grid,node,turbines_df.loc[attrs['original_idx']].MW_rating,ren_type='Wind',min_gamma=1-curtailment_allowed,Qrel=0)
             node.ct_limit = turbines_df.loc[attrs['original_idx']].connections
         if attrs['type'] == 'substation':
-            add_extGrid(grid,node,MVAmax=99999,Allow_sell=True)
+            add_extGrid(grid,node,MVAmax=99999,Allow_sell=True,lf=LCoE)
             node.ct_limit = substations_df.loc[attrs['original_idx']].connections
     
     # First pass: add all lines

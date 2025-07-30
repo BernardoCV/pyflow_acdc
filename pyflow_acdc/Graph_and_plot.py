@@ -1244,6 +1244,8 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 if line in grid.lines_AC_rec and line.rec_branch:
                     color = "green"
                 elif line in grid.lines_AC_ct:
+                     if line.active_config <0:
+                         continue
                      color = cable_type_colors.get(line.active_config, "black")  
                 else:
                     color = "red" if getattr(line, 'isTf', False) else "black"  # Original logic for other lines
