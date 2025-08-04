@@ -757,7 +757,8 @@ def TEP_obj(model,grid,NPV):
     
     def ct_crossings_rule(model,ct_crossing):
         return sum(model.ct_branch[line,ct] for line in grid.crossing_groups[ct_crossing] for ct in model.ct_set) <= 1
-    
+    def ct_tree_rule(model):
+        return sum(model.ct_branch[line,ct] for line in model.lines_AC_ct for ct in model.ct_set) == len(grid.nodes_AC) - 1
     if grid.CT_AC:
         
         model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
@@ -768,7 +769,7 @@ def TEP_obj(model,grid,NPV):
             model.ct_node_limit_constraint = pyo.Constraint(model.nodes_AC, rule=ct_node_limit_rule)
             model.ct_crossings = pyo.Set(initialize=list(range(len(grid.crossing_groups))))
             model.ct_crossings_constraint = pyo.Constraint(model.ct_crossings, rule=ct_crossings_rule)
-        
+            model.ct_tree_constraint = pyo.Constraint(rule=ct_tree_rule)
             model.ct_crossings_constraint.pprint()
         else:
             model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)    

@@ -413,10 +413,7 @@ def OPF_solve(model,grid,solver = 'ipopt',tee=False):
     
 
     opt = pyo.SolverFactory(solver)
-    if solver == 'gurobi':
-        opt.options['Threads'] = 0
-        opt.options['TimeLimit'] = 600
-        
+    
     #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
     #if logging:
     #    results = opt.solve(model, logfile="ipopt_output.log")

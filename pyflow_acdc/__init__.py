@@ -38,6 +38,7 @@ except ImportError:
     
 try:
     from .AC_L_CSS_gurobi import *
+    from .MIP_graph_array import *
     HAS_AC_L_CSS_GUROBI = True
 except ImportError:
     HAS_AC_L_CSS_GUROBI = False
@@ -144,6 +145,7 @@ __all__ = [
 
     # AC_L_CSS_GUROBI
     'Optimal_L_CSS_gurobi',
+    'test_master_problem',
 
     # Time Series Analysis
     'Time_series_PF',

@@ -556,6 +556,7 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
             model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
         else:
             model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=0)
+            
 
 
 

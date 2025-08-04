@@ -195,22 +195,7 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
     # Create model
     model = gp.Model("ACDC_OPF")
     
-    # Enable automatic Benders decomposition - CORRECT PARAMETER NAMES
-    try:
-        model.setParam('BendersStrategy', 2)  # 2 = automatic Benders
-        model.setParam('BendersCuts', 2)      # 2 = automatic cut generation
-        print("✓ Benders decomposition enabled")
-    except Exception as e:
-        print(f"⚠ Benders parameters not available: {e}")
-        # Fallback to general decomposition
-        try:
-            model.setParam('DecompositionStrategy', 1)
-            print("✓ General decomposition enabled")
-        except:
-            print("⚠ Using default solver settings")
-    
-    # Set basic Gurobi parameters
-    model.setParam('OutputFlag', 1 if tee else 0)        
+          
     t1 = time.time()
     model, gen_vars, ac_vars = OPF_create_LModel_ACDC_gurobi(model,grid)
     t2 = time.time()  
@@ -222,6 +207,8 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
     # Set objective function for Gurobi model
     set_objective(model, grid,gen_vars,ac_vars,OPEX,NPV, n_years, Hy, discount_rate)
     
+    model.setParam('OutputFlag', 1 if tee else 0)  
+
     t3 = time.time()
     model_res, solver_stats = solve_gurobi_model(model, grid)
     t4 = time.time()
@@ -313,21 +300,18 @@ def solve_gurobi_model(model, grid):
 def OPF_create_LModel_ACDC_gurobi(model,grid):
     """Create Gurobi model for AC DC OPF"""
     from .ACDC_OPF import Translate_pyf_OPF 
-    from .ACDC_TEP import get_TEP_variables  # Add this import
+   
     
-    
-    
+    # Get problem data
     [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,False)
     
-    # Get TEP variables for initialization
-    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
     
+    # Create variables
     gen_vars = Generation_variables_gurobi(model, grid, gen_info)
-    ac_vars = AC_variables_gurobi(model, grid, AC_info, ct_ini)  # Pass ct_ini
-
+    ac_vars = AC_variables_gurobi(model, grid, AC_info)
+     # Suppress output during constraint building
     AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars)
-    
+  
     return model, gen_vars, ac_vars
 
 
@@ -352,7 +336,7 @@ def Generation_variables_gurobi(model, grid, gen_info):
             lb, ub = 1.0, 1.0
         variables['gamma'][rs] = model.addVar(lb=lb, ub=ub, name=f"gamma_{rs}")
         # Set initial value to 1 to match Pyomo
-        variables['gamma'][rs].Start = 1
+        variables['gamma'][rs].start = 1
     
 
     # AC Generators
@@ -370,7 +354,7 @@ def Generation_variables_gurobi(model, grid, gen_info):
     return variables
 
 
-def AC_variables_gurobi(model, grid, AC_info, ct_ini):
+def AC_variables_gurobi(model, grid, AC_info):
     """Convert AC variables to Gurobi"""
     AC_Lists, AC_nodes_info, AC_lines_info, EXP_info, REC_info, CT_info = AC_info
     
@@ -381,186 +365,186 @@ def AC_variables_gurobi(model, grid, AC_info, ct_ini):
     lista_lineas_AC_exp, S_lineACexp_limit, NP_lineAC = EXP_info
     lista_lineas_AC_rec, S_lineACrec_lim, S_lineACrec_lim_new, grid.REC_AC_act = REC_info
     lista_lineas_AC_ct, S_lineACct_lim, cab_types_set, allowed_types = CT_info
-
-    # Create a dictionary to store variables
-    variables = {}
-
-    # Node variables
-    variables['thetha_AC'] = {}
-    variables['PGi_ren'] = {}
-    variables['PGi_opt'] = {}
+    ct_ini = {}
+    for l in grid.lines_AC_ct:
+        for ct in range(len(l._cable_types)):
+            ct_ini[l.lineNumber, ct] = 1 if ct == l.active_config else 0  
+    ac_vars = {}
     
-    for node in lista_nodos_AC:
-        nAC = grid.nodes_AC[node]
-        
-        # Voltage angle
-        variables['thetha_AC'][node] = model.addVar(lb=-1.6, ub=1.6, name=f"thetha_AC_{node}")
-        
-        # Renewable power injection
-        if nAC.connected_RenSource == []:
-            variables['PGi_ren'][node] = model.addVar(lb=0, ub=0, name=f"PGi_ren_{node}")
-        else:
-            variables['PGi_ren'][node] = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name=f"PGi_ren_{node}")
-        
-        # Generator power injection
-        if nAC.connected_gen == []:
-            variables['PGi_opt'][node] = model.addVar(lb=0, ub=0, name=f"PGi_opt_{node}")
-        else:
-            variables['PGi_opt'][node] = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name=f"PGi_opt_{node}")
+    ac_vars['ct_types'] = {}
+    for ct in cab_types_set:
+        ac_vars['ct_types'][ct] = model.addVar(
+            vtype=GRB.BINARY,
+            name=f"ct_types_{ct}"
+        )
+        ac_vars['ct_types'][ct].start = 0
     
-    # CT variables (Investment decisions - Master problem)
-    variables['Pto_CT'] = {}
-    variables['Pfrom_CT'] = {}
-    variables['ct_branch'] = {}
-    variables['ct_PAC_to'] = {}
-    variables['ct_PAC_from'] = {}
-    variables['z_to'] = {}
-    variables['z_from'] = {}
-    variables['ct_types'] = {}  
-    
-    for node in lista_nodos_AC:
-        nAC = grid.nodes_AC[node]
-        
-        if nAC.connected_toCTLine:
-            variables['Pto_CT'][node] = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name=f"Pto_CT_{node}")
-        else:
-            variables['Pto_CT'][node] = model.addVar(lb=0, ub=0, name=f"Pto_CT_{node}")
-        
-        if nAC.connected_fromCTLine:
-            variables['Pfrom_CT'][node] = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name=f"Pfrom_CT_{node}")
-        else:
-            variables['Pfrom_CT'][node] = model.addVar(lb=0, ub=0, name=f"Pfrom_CT_{node}")
-    
+    ac_vars['ct_branch'] = {}
     for line in lista_lineas_AC_ct:
         for ct in cab_types_set:
-            
-            init_val = ct_ini[line, ct]
-            
-            variables['ct_branch'][line, ct] = model.addVar(
-                vtype=GRB.BINARY, name=f"ct_branch_{line}_{ct}"
+            ac_vars['ct_branch'][line, ct] = model.addVar(
+                vtype=GRB.BINARY,
+                name=f"ct_branch_{line}_{ct}",
             )
-            variables['ct_branch'][line, ct].Start = init_val
-            
-            # Power flow variables should allow negative values (bidirectional flow)
-            max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)
-            variables['ct_PAC_to'][line, ct] = model.addVar(
-                lb=-max_min, ub=max_min, name=f"ct_PAC_to_{line}_{ct}"
-            )
-            variables['ct_PAC_from'][line, ct] = model.addVar(
-                lb=-max_min, ub=max_min, name=f"ct_PAC_from_{line}_{ct}"
-            )
-            variables['z_to'][line, ct] = model.addVar(
-                lb=-max_min, ub=max_min, name=f"z_to_{line}_{ct}"
-            )
-            variables['z_from'][line, ct] = model.addVar(
-                lb=-max_min, ub=max_min, name=f"z_from_{line}_{ct}"
-            )
+            ac_vars['ct_branch'][line, ct].start = ct_ini[line, ct]
     
-    # Add ct_types variables
-    for ct in cab_types_set:
-        variables['ct_types'][ct] = model.addVar(
-            vtype=GRB.BINARY, name=f"ct_types_{ct}"
+    # Voltage angles with tighter bounds
+    ac_vars['thetha_AC'] = {}
+    for node in lista_nodos_AC:
+        ac_vars['thetha_AC'][node] = model.addVar(
+            lb=-np.pi/2, ub=np.pi/2,  
+            name=f"thetha_AC_{node}",
+        )
+        ac_vars['thetha_AC'][node].start = Theta_ini[node] if Theta_ini[node] is not None else 0.0
+
+    
+    # Power generation variables with better bounds
+    ac_vars['PGi_opt'] = {}
+    for node in lista_nodos_AC:
+        min_gen = sum(gen.Min_pow_gen for gen in grid.nodes_AC[node].connected_gen if gen.Min_pow_gen < 0)
+        max_gen = sum(gen.Max_pow_gen for gen in grid.nodes_AC[node].connected_gen)
+        ac_vars['PGi_opt'][node] = model.addVar(
+            lb=min_gen, ub=max_gen,
+            name=f"PGi_opt_{node}"
+        )
+
+    
+    # Renewable power variables
+    ac_vars['PGi_ren'] = {}
+    for node in lista_nodos_AC:
+        max_ren = sum(rs.PGi_ren for rs in grid.nodes_AC[node].connected_RenSource)
+        ac_vars['PGi_ren'][node] = model.addVar(
+            lb=0, ub=max_ren,
+            name=f"PGi_ren_{node}"
         )
     
-    # Line variables (Operational decisions - Subproblems)
-    variables['PAC_to'] = {}
-    variables['PAC_from'] = {}
-    variables['PAC_line_loss'] = {}
+    # Power injection variables
+    ac_vars['Pto_CT'] = {}
+    ac_vars['Pfrom_CT'] = {}
+    for node in lista_nodos_AC:
+        nAC = grid.nodes_AC[node]
+        max_ct_power = sum(max(S_lineACct_lim[line.lineNumber, ct] for ct in cab_types_set) 
+                          for line in nAC.connected_toCTLine + nAC.connected_fromCTLine)
+        
+        ac_vars['Pto_CT'][node] = model.addVar(
+            lb=-max_ct_power, ub=max_ct_power,
+            name=f"Pto_CT_{node}"
+        )
+        
+        ac_vars['Pfrom_CT'][node] = model.addVar(
+            lb=-max_ct_power, ub=max_ct_power,
+            name=f"Pfrom_CT_{node}"
+        )
     
+    # Standard AC line power flows
+    ac_vars['PAC_to'] = {}
+    ac_vars['PAC_from'] = {}
     for line in lista_lineas_AC:
-        variables['PAC_to'][line] = model.addVar(
+       
+        ac_vars['PAC_to'][line] = model.addVar(
             lb=-S_lineAC_limit[line], ub=S_lineAC_limit[line],
             name=f"PAC_to_{line}"
         )
-        variables['PAC_from'][line] = model.addVar(
+        
+        ac_vars['PAC_from'][line] = model.addVar(
             lb=-S_lineAC_limit[line], ub=S_lineAC_limit[line],
             name=f"PAC_from_{line}"
         )
-        variables['PAC_line_loss'][line] = model.addVar(name=f"PAC_line_loss_{line}")
     
-    # Slack bus constraints
-    for node in AC_slack:
-        model.addConstr(
-            variables['thetha_AC'][node] == 0,
-            name=f"slack_theta_{node}"
-        )
-
-    return variables
+    # Cable type variables
+    
+    ac_vars['ct_PAC_to'] = {}
+    ac_vars['ct_PAC_from'] = {}
+    ac_vars['z_to'] = {}
+    ac_vars['z_from'] = {}
+    
+    for line in lista_lineas_AC_ct:
+        max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)
+        for ct in cab_types_set:
+            
+            
+            ac_vars['ct_PAC_to'][line, ct] = model.addVar(
+                lb=-max_min, ub=max_min,
+                name=f"ct_PAC_to_{line}_{ct}"
+            )
+            
+            ac_vars['ct_PAC_from'][line, ct] = model.addVar(
+                lb=-max_min, ub=max_min,
+                name=f"ct_PAC_from_{line}_{ct}"
+            )
+            
+            ac_vars['z_to'][line, ct] = model.addVar(
+                lb=-max_min, ub=max_min,
+                name=f"z_to_{line}_{ct}"
+            )
+            
+            ac_vars['z_from'][line, ct] = model.addVar(
+                lb=-max_min, ub=max_min,
+                name=f"z_from_{line}_{ct}"
+            )
+    
+    return ac_vars
 
 
 def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
     """Convert AC constraints to Gurobi"""
     AC_Lists, AC_nodes_info, AC_lines_info, EXP_info, REC_info, CT_info = AC_info
     lista_nodos_AC, lista_lineas_AC, lista_lineas_AC_tf, AC_slack, AC_PV = AC_Lists
-    u_min_ac, u_max_ac, V_ini_AC, Theta_ini, P_know, Q_know, price = AC_nodes_info
-    S_lineAC_limit, S_lineACtf_limit, m_tf_og = AC_lines_info
-
-    lista_lineas_AC_exp, S_lineACexp_limit, NP_lineAC = EXP_info
-    lista_lineas_AC_rec, S_lineACrec_lim, S_lineACrec_lim_new, grid.REC_AC_act = REC_info
+    
     lista_lineas_AC_ct, S_lineACct_lim, cab_types_set, allowed_types = CT_info
 
     gen_AC_info,gen_DC_info,P_renSource,lista_rs = gen_info
 
-    # Power balance constraints
+    
+    max_cable_limits = {line: max(S_lineACct_lim[line, ct] for ct in cab_types_set) 
+                       for line in lista_lineas_AC_ct}
+
     for node in lista_nodos_AC:
         nAC = grid.nodes_AC[node]
         
-        # Power balance equation
-        power_sum = 0
-        for k in lista_nodos_AC:
-            if grid.Ybus_AC[node, k] != 0:
-                power_sum += -np.imag(grid.Ybus_AC[node, k]) * (
-                    ac_vars['thetha_AC'][node] - ac_vars['thetha_AC'][k]
-                )
-        
         # Add investment-related power flows
-        power_sum += ac_vars['Pto_CT'][node] + ac_vars['Pfrom_CT'][node]
+        power_sum = ac_vars['Pto_CT'][node] + ac_vars['Pfrom_CT'][node]
         
         # Power balance constraint
         model.addConstr(
-            power_sum == P_know[node] + ac_vars['PGi_ren'][node] + ac_vars['PGi_opt'][node],
+            power_sum == ac_vars['PGi_ren'][node] + ac_vars['PGi_opt'][node],
             name=f"power_balance_{node}"
         )
     
-        # Generator power injection
-        gen_power = 0
-        for gen in nAC.connected_gen:
-            gen_power += gen_vars['PGi_gen'][gen.genNumber]
+        gen_power = sum(gen_vars['PGi_gen'][gen.genNumber] for gen in nAC.connected_gen)
         model.addConstr(
             ac_vars['PGi_opt'][node] == gen_power,
             name=f"gen_power_{node}"
         )
         
-        # Renewable power injection
-        ren_power = 0
-        for rs in nAC.connected_RenSource:
-            ren_power += P_renSource[rs.rsNumber] * gen_vars['gamma'][rs.rsNumber]
+
+        ren_power = sum(P_renSource[rs.rsNumber] * gen_vars['gamma'][rs.rsNumber] 
+                       for rs in nAC.connected_RenSource)
         model.addConstr(
             ac_vars['PGi_ren'][node] == ren_power,
             name=f"ren_power_{node}"
         )
     
-        # CT power flows
-        to_ct_sum = 0
-        for line in nAC.connected_toCTLine:
-            for ct in cab_types_set:
-                to_ct_sum += ac_vars['z_to'][line.lineNumber, ct]
-        
+        to_ct_sum = sum(ac_vars['z_to'][line.lineNumber, ct] 
+                       for line in nAC.connected_toCTLine for ct in cab_types_set)
         model.addConstr(
             ac_vars['Pto_CT'][node] == to_ct_sum,
             name=f"to_ct_{node}"
         )
         
-        # From cable type lines
-        from_ct_sum = 0
-        for line in nAC.connected_fromCTLine:
-            for ct in cab_types_set:
-                from_ct_sum += ac_vars['z_from'][line.lineNumber, ct]
+        from_ct_sum = sum(ac_vars['z_from'][line.lineNumber, ct] 
+                         for line in nAC.connected_fromCTLine for ct in cab_types_set)
         model.addConstr(
             ac_vars['Pfrom_CT'][node] == from_ct_sum,
             name=f"from_ct_{node}"
         )
 
+    total_connections = sum(ac_vars['ct_branch'][line, ct] for line in lista_lineas_AC_ct for ct in cab_types_set)
+    
+    model.addConstr(
+        total_connections == len(lista_nodos_AC) - 1,
+        name="spanning_tree_connections"
+    )
     # Line flow constraints
     for line in lista_lineas_AC:
         l = grid.lines_AC[line]
@@ -611,13 +595,14 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
     for node in lista_nodos_AC:
         nAC = grid.nodes_AC[node]
         if hasattr(nAC, 'ct_limit'):
-            connections = 0
-            for line in nAC.connected_toCTLine:
-                for ct in cab_types_set:
-                    connections += ac_vars['ct_branch'][line.lineNumber, ct]
-            for line in nAC.connected_fromCTLine:
-                for ct in cab_types_set:
-                    connections += ac_vars['ct_branch'][line.lineNumber, ct]
+            connections = sum(ac_vars['ct_branch'][line.lineNumber, ct] 
+                            for line in nAC.connected_toCTLine + nAC.connected_fromCTLine 
+                            for ct in cab_types_set)
+            model.addConstr(
+                connections >= 1,
+                name=f"ct_node_min_rule_{node}"
+            )
+            
             model.addConstr(
                 connections <= nAC.ct_limit,
                 name=f"ct_node_limit_rule_{node}"
@@ -633,12 +618,9 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
     # McCormick envelope constraints for z variables
     for line in lista_lineas_AC_ct:
         l = grid.lines_AC_ct[line]
-        
-        # Calculate M once per line (outside the ct loop)
-        M = max(S_lineACct_lim[line, ct] for ct in cab_types_set) * 1.1
+        M = max_cable_limits[line] * 1.1  # Pre-calculated
         
         for ct in cab_types_set:
-            # Power flow for this cable type
             f = l.fromNode.nodeNumber
             t = l.toNode.nodeNumber
             B = np.imag(l.Ybus_list[ct][0, 1])
