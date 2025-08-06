@@ -10,6 +10,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 import time
+from .Graph_and_plot import save_network_svg
 
 __all__ = ['Optimal_L_CSS_gurobi']
 
@@ -185,7 +186,7 @@ def debug_infeasibility(model, gen_vars=None, ac_vars=None):
     print("=" * 80)
 
 
-def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02,tee=False):
+def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02,tee=False,time_limit=300):
     """Main function to create and solve Gurobi model"""
     
     analyse_OPF(grid)
@@ -208,13 +209,19 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
     set_objective(model, grid,gen_vars,ac_vars,OPEX,NPV, n_years, Hy, discount_rate)
     
     model.setParam('OutputFlag', 1 if tee else 0)  
-
+     # Use more primal heuristics
+    model.setParam("TimeLimit", time_limit)        # Cap at 10 mins
+    #model.setParam("MIPGap", 0.01)          # Stop if within 1% of best
+    #model.setParam("MIPFocus", 1)           # Bias toward feasibility
+   # model.setParam("Heuristics", 0.9)       # Find feasible layouts fast
+ 
+    #model.setParam("DisplayInterval", 5)    # Optional: watch progress closely
     t3 = time.time()
     model_res, solver_stats = solve_gurobi_model(model, grid)
     t4 = time.time()
     
     # Export results
-    ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars)
+    ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=tee)
     
     if OPEX:
         obj = {'Energy_cost': 1}
@@ -223,15 +230,16 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
 
     weights_def, _ = obj_w_rule(grid, obj, True)
     # Calculate objective values
+    present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     for obj in weights_def:
-        weights_def[obj]['v'] = calculate_objective(grid, obj, True)
-    
+        weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
     t5 = time.time()  
     t_modelexport = t5 - t4
     
     grid.OPF_run = True 
     grid.OPF_obj = weights_def
-    
+    grid.TEP_run = True
     timing_info = {
         "create": t_modelcreate,
         "solve": solver_stats['time'] if solver_stats['time'] is not None else t4 - t3,
@@ -245,6 +253,7 @@ def solve_gurobi_model(model, grid):
     """Solve Gurobi model and return results"""
     
     try:
+      
         model.optimize()
         
         if model.status == GRB.OPTIMAL:
@@ -372,12 +381,19 @@ def AC_variables_gurobi(model, grid, AC_info):
     ac_vars = {}
     
     ac_vars['ct_types'] = {}
+    # Find which cable types are used in the initial guess
+    used_cable_types = set()
+    for l in grid.lines_AC_ct:
+        if l.active_config >= 0:  # If line has an active configuration
+            used_cable_types.add(l.active_config)
+    
     for ct in cab_types_set:
         ac_vars['ct_types'][ct] = model.addVar(
             vtype=GRB.BINARY,
             name=f"ct_types_{ct}"
         )
-        ac_vars['ct_types'][ct].start = 0
+        # Set start value to 1 if this cable type is used in the initial guess
+        #ac_vars['ct_types'][ct].start = 1 if ct in used_cable_types else 0
     
     ac_vars['ct_branch'] = {}
     for line in lista_lineas_AC_ct:
@@ -386,7 +402,8 @@ def AC_variables_gurobi(model, grid, AC_info):
                 vtype=GRB.BINARY,
                 name=f"ct_branch_{line}_{ct}",
             )
-            ac_vars['ct_branch'][line, ct].start = ct_ini[line, ct]
+            # Don't set start values - let Gurobi find its own feasible starting point
+            #ac_vars['ct_branch'][line, ct].start = ct_ini[line, ct]
     
     # Voltage angles with tighter bounds
     ac_vars['thetha_AC'] = {}
@@ -395,7 +412,8 @@ def AC_variables_gurobi(model, grid, AC_info):
             lb=-np.pi/2, ub=np.pi/2,  
             name=f"thetha_AC_{node}",
         )
-        ac_vars['thetha_AC'][node].start = Theta_ini[node] if Theta_ini[node] is not None else 0.0
+        # Don't set start values for voltage angles - let Gurobi find its own feasible starting point
+        # ac_vars['thetha_AC'][node].start = Theta_ini[node] if Theta_ini[node] is not None else 0.0
 
     
     # Power generation variables with better bounds
@@ -449,6 +467,24 @@ def AC_variables_gurobi(model, grid, AC_info):
         ac_vars['PAC_from'][line] = model.addVar(
             lb=-S_lineAC_limit[line], ub=S_lineAC_limit[line],
             name=f"PAC_from_{line}"
+        )
+    
+    # Network flow variables for MIP integration
+    ac_vars['network_flow'] = {}
+    ac_vars['node_net_flow'] = {}
+    
+    # Calculate max flow for bounds
+    max_flow = grid.max_turbines_per_string
+    for line in lista_lineas_AC_ct:
+        ac_vars['network_flow'][line] = model.addVar(
+            lb=-max_flow, ub=max_flow,
+            name=f"network_flow_{line}"
+        )
+    
+    for node in lista_nodos_AC:
+        ac_vars['node_net_flow'][node] = model.addVar(
+            lb=-len(lista_nodos_AC), ub=1,  # Allow negative values for sink nodes
+            name=f"node_net_flow_{node}"
         )
     
     # Cable type variables
@@ -539,12 +575,7 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
             name=f"from_ct_{node}"
         )
 
-    total_connections = sum(ac_vars['ct_branch'][line, ct] for line in lista_lineas_AC_ct for ct in cab_types_set)
     
-    model.addConstr(
-        total_connections == len(lista_nodos_AC) - 1,
-        name="spanning_tree_connections"
-    )
     # Line flow constraints
     for line in lista_lineas_AC:
         l = grid.lines_AC[line]
@@ -563,6 +594,13 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
             ac_vars['PAC_from'][line] == -B * (ac_vars['thetha_AC'][f] - ac_vars['thetha_AC'][t]),
             name=f"power_flow_from_{line}"
         )
+    
+    # Slack node angle constraint - fix slack node angle to 0
+    #for slack_node in AC_slack:
+    #    model.addConstr(
+    #        ac_vars['thetha_AC'][slack_node] == 0,
+    #        name=f"slack_angle_{slack_node}"
+    #    )
     
     # Cable type constraints
     model.addConstr(
@@ -624,18 +662,27 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
             f = l.fromNode.nodeNumber
             t = l.toNode.nodeNumber
             B = np.imag(l.Ybus_list[ct][0, 1])
-            
+            M_angle= B*3.1416
             # Power flow constraints
             model.addConstr(
-                ac_vars['ct_PAC_to'][line, ct] + B * (ac_vars['thetha_AC'][t] - ac_vars['thetha_AC'][f]) == 0,
-                name=f"ct_power_flow_to_{line}_{ct}"
+                ac_vars['ct_PAC_to'][line, ct] + B * (ac_vars['thetha_AC'][t] - ac_vars['thetha_AC'][f]) <= M_angle*(1-ac_vars['ct_branch'][line, ct]),
+                name=f"ct_power_flow_to_lower_{line}_{ct}"
+            )
+
+            model.addConstr(
+                ac_vars['ct_PAC_to'][line, ct] + B * (ac_vars['thetha_AC'][t] - ac_vars['thetha_AC'][f]) >= -M_angle*(1-ac_vars['ct_branch'][line, ct]),
+                name=f"ct_power_flow_to_upper_{line}_{ct}"
             )
             
             model.addConstr(
-                ac_vars['ct_PAC_from'][line, ct] + B * (ac_vars['thetha_AC'][f] - ac_vars['thetha_AC'][t]) == 0,
-                name=f"ct_power_flow_from_{line}_{ct}"
+                ac_vars['ct_PAC_from'][line, ct] + B * (ac_vars['thetha_AC'][f] - ac_vars['thetha_AC'][t]) <= M_angle*(1-ac_vars['ct_branch'][line, ct]),
+                name=f"ct_power_flow_from_lower_{line}_{ct}"
             )
             
+            model.addConstr(
+                ac_vars['ct_PAC_from'][line, ct] + B * (ac_vars['thetha_AC'][f] - ac_vars['thetha_AC'][t]) >= -M_angle*(1-ac_vars['ct_branch'][line, ct]),
+                name=f"ct_power_flow_from_upper_{line}_{ct}"
+            )
             # McCormick envelopes for z_to
             model.addConstr(
                 ac_vars['z_to'][line, ct] <= ac_vars['ct_PAC_to'][line, ct] + (1 - ac_vars['ct_branch'][line, ct]) * (2*M),
@@ -677,27 +724,94 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
                 ac_vars['z_from'][line, ct] >= -S_lineACct_lim[line, ct] * ac_vars['ct_branch'][line, ct],
                 name=f"z_from_branch_lb_{line}_{ct}"
             )
+         
+    # Network flow constraints for MIP integration
+    add_network_flow_constraints(model, grid, ac_vars, lista_nodos_AC, lista_lineas_AC_ct, cab_types_set            )
+
+
+def add_network_flow_constraints(model, grid, ac_vars, lista_nodos_AC, lista_lineas_AC_ct, cab_types_set):
+    """Add network flow constraints from MIP problem to ensure flow feasibility"""
+    max_flow = grid.max_turbines_per_string
+    # Find source and sink nodes
+    source_nodes = []
+    sink_nodes = []
+    
+    
+    for node in lista_nodos_AC:
+        nAC = grid.nodes_AC[node]
+        if nAC.connected_RenSource:  # Node has renewable resources (source)
+            source_nodes.append(node)
+        if nAC.connected_gen:  # Node has generator (sink)
+            sink_nodes.append(node)
             
-            # Power flow limits for ct_PAC variables
-            model.addConstr(
-                ac_vars['ct_PAC_to'][line, ct] <= S_lineACct_lim[line, ct] * ac_vars['ct_branch'][line, ct] + M * (1 - ac_vars['ct_branch'][line, ct]),
-                name=f"ct_S_to_AC_limit_upper_{line}_{ct}"
-            )
+    total_connections = sum(ac_vars['ct_branch'][line, ct] for line in lista_lineas_AC_ct for ct in cab_types_set)
+    
+
+    model.addConstr(
+        total_connections == len(lista_nodos_AC) - len(sink_nodes),
+        name="spanning_tree_connections")
+    if not source_nodes:
+        raise ValueError("No renewable source nodes found!")
+    if not sink_nodes:
+        raise ValueError("No generator nodes found!")
+    
+    # Flow conservation for all nodes
+    for node in lista_nodos_AC:
+        # Calculate net flow out of this node
+        net_flow = 0
+        
+        for line in lista_lineas_AC_ct:
+            line_obj = grid.lines_AC_ct[line]
+            from_node = line_obj.fromNode.nodeNumber
+            to_node = line_obj.toNode.nodeNumber
             
+            if from_node == node:
+                # Flow leaving this node (positive)
+                net_flow += ac_vars['network_flow'][line]
+            elif to_node == node:
+                # Flow entering this node (negative, so we add it to net_flow)
+                net_flow -= ac_vars['network_flow'][line]
+        
+        # Set the net flow out of this node
+        model.addConstr(
+            ac_vars['node_net_flow'][node] == net_flow,
+            name=f"flow_conservation_{node}"
+        )
+    
+    # Source nodes: net flow out = 1 (supply)
+    for node in source_nodes:
+        model.addConstr(
+            ac_vars['node_net_flow'][node] == 1,
+            name=f"source_node_{node}"
+        )
+    
+    # Sink nodes: total net flow out = -num_sources (demand)
+    model.addConstr(
+        sum(ac_vars['node_net_flow'][node] for node in sink_nodes) == -len(source_nodes),
+        name="total_sink_absorption"
+    )
+    
+    # Intermediate nodes: net flow = 0 (conservation)
+    for node in lista_nodos_AC:
+        if node not in source_nodes and node not in sink_nodes:
             model.addConstr(
-                ac_vars['ct_PAC_to'][line, ct] >= -S_lineACct_lim[line, ct] * ac_vars['ct_branch'][line, ct] - M * (1 - ac_vars['ct_branch'][line, ct]),
-                name=f"ct_S_to_AC_limit_lower_{line}_{ct}"
+                ac_vars['node_net_flow'][node] == 0,
+                name=f"intermediate_node_{node}"
             )
-            
-            model.addConstr(
-                ac_vars['ct_PAC_from'][line, ct] <= S_lineACct_lim[line, ct] * ac_vars['ct_branch'][line, ct] + M * (1 - ac_vars['ct_branch'][line, ct]),
-                name=f"ct_S_from_AC_limit_upper_{line}_{ct}"
-            )
-            
-            model.addConstr(
-                ac_vars['ct_PAC_from'][line, ct] >= -S_lineACct_lim[line, ct] * ac_vars['ct_branch'][line, ct] - M * (1 - ac_vars['ct_branch'][line, ct]),
-                name=f"ct_S_from_AC_limit_lower_{line}_{ct}"
-            )
+    
+    # Link flow to investment: can only use lines we invest in
+    
+    for line in lista_lineas_AC_ct:
+        # Flow must be zero if line not invested
+        model.addConstr(
+            ac_vars['network_flow'][line] <= max_flow * sum(ac_vars['ct_branch'][line, ct] for ct in cab_types_set),
+            name=f"flow_investment_link_upper_{line}"
+        )
+        model.addConstr(
+            ac_vars['network_flow'][line] >= -max_flow * sum(ac_vars['ct_branch'][line, ct] for ct in cab_types_set),
+            name=f"flow_investment_link_lower_{line}"
+        )
+
 
 def set_objective(model, grid, gen_vars, ac_vars, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02):
     """Set objective function for Gurobi model"""
@@ -732,14 +846,19 @@ def set_objective(model, grid, gen_vars, ac_vars, OPEX=True, NPV=True, n_years=2
     model.setObjective(total_cost, GRB.MINIMIZE)
 
 
-def ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars):
+def ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=True):
     """Export Gurobi results back to grid object"""
     
-    if model.status != GRB.OPTIMAL:
+    if model.status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL, GRB.TIME_LIMIT] or model.SolCount == 0:
         # Print model information to help debug infeasibility
-        print_gurobi_model(model, gen_vars, ac_vars, detailed=True)
+        #print_gurobi_model(model, gen_vars, ac_vars, detailed=True)
         debug_infeasibility(model, gen_vars, ac_vars)
-        raise RuntimeError(f"Cannot export results: model status is {model.status}")
+        raise RuntimeError(f"Cannot export results: status {model.status}, solutions: {model.SolCount}")
+    
+    if model.status == GRB.TIME_LIMIT:
+        if tee:
+            print("Time limit reached. Exporting results anyway. Cleaning intermidate results")
+    
     cab_types_set = list(range(0,len(grid.Cable_options[0]._cable_types)))
     grid.OPF_run = True
 
@@ -793,6 +912,9 @@ def ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars):
             line.toS = 0 + 1j*0
         line.loss = 0
         line.P_loss = 0
+        
+        # Export network flow value to grid
+        line.network_flow = abs(ac_vars['network_flow'][line.lineNumber].X)
 
     # Standard AC lines
     Theta = grid.Theta_V_AC
@@ -813,3 +935,226 @@ def ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars):
         line.i_from = abs(P_ij)
         line.i_to = abs(P_ji)
     
+    # After export is complete, analyze and fix oversizing issues if time limit was reached
+    if model.status == GRB.TIME_LIMIT:  # or check for time limit in Pyomo
+        from .AC_OPF_L_model import analyze_oversizing_issues_grid, apply_oversizing_fixes_grid
+        oversizing_type1, oversizing_type2 = analyze_oversizing_issues_grid(grid, tee=tee)
+        apply_oversizing_fixes_grid(grid, oversizing_type1, oversizing_type2, tee=tee)
+
+
+
+def create_master_problem_gurobi(grid, max_flow=None):
+    master = gp.Model("Master")
+    if max_flow is None:
+        max_flow = len(grid.nodes_AC) - 1
+    lista_lineas_AC_ct = list(range(0, len(grid.lines_AC_ct)))
+    lista_nodos_AC = list(range(0, len(grid.nodes_AC)))
+    
+    # Binary variables: one per line (used or not)
+    line_vars = {}
+    
+    for line in lista_lineas_AC_ct:
+        line_vars[line] = master.addVar(
+            vtype=GRB.BINARY,
+            name=f"line_used_{line}"
+        )
+
+    
+    # Objective: minimize total cable length
+    investment_cost = 0
+    for line in grid.lines_AC_ct:
+        l = line.lineNumber
+        line_cost = line.Length_km
+        investment_cost += line_vars[l] * line_cost
+          
+    
+    # Spanning tree constraint: exactly numNodes-numSinkNodes connections (multiple trees for multiple substations)
+    total_connections = sum(line_vars[line] for line in lista_lineas_AC_ct)
+    master.addConstr(
+        total_connections == len(lista_nodos_AC) - len(sink_nodes),
+        name="spanning_tree_connections"
+    )
+    
+  
+    # Find sink nodes (nodes with generators) and source nodes (nodes with renewable resources)
+    sink_nodes = []
+    source_nodes = []
+    
+    for node in lista_nodos_AC:
+        nAC = grid.nodes_AC[node]
+        if nAC.connected_gen:  # Node has generator (sink)
+            sink_nodes.append(node)
+        if nAC.connected_RenSource:  # Node has renewable resources (source)
+            source_nodes.append(node)
+    
+    if not sink_nodes:
+        raise ValueError("No generator nodes found!")
+      # Constrain connections for source nodes (renewable nodes)
+    for node in source_nodes:
+        # Count how many lines are connected to this source node
+        node_connections = sum(line_vars[line] 
+                              for line in lista_lineas_AC_ct
+                              if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or 
+                                  grid.lines_AC_ct[line].toNode.nodeNumber == node))
+        
+        # Limit to node.ct_limit
+        nAC = grid.nodes_AC[node]
+        master.addConstr(
+            node_connections <= nAC.ct_limit,
+            name=f"source_connections_limit_{node}"
+        )
+ 
+    # Flow variables (integer - can carry flow in either direction)
+    flow_vars = {}
+    node_flow_vars = {}
+    
+    for line in lista_lineas_AC_ct:
+        # Signed flow variable: positive = flow from fromNode to toNode, negative = reverse
+        flow_vars[line] = master.addVar(
+            vtype=GRB.INTEGER,
+            lb=-max_flow,
+            ub=max_flow,
+            name=f"flow_{line}"
+        )
+    
+    for node in lista_nodos_AC:
+        # Net flow out of each node
+        node_flow_vars[node] = master.addVar(
+            vtype=GRB.INTEGER,
+            name=f"node_flow_{node}"
+        )
+        
+        # Calculate net flow out of this node
+        net_flow = 0
+        
+        for line in lista_lineas_AC_ct:
+            line_obj = grid.lines_AC_ct[line]
+            from_node = line_obj.fromNode.nodeNumber
+            to_node = line_obj.toNode.nodeNumber
+            
+            if from_node == node:
+                # Flow leaving this node (positive)
+                net_flow += flow_vars[line]
+            elif to_node == node:
+                # Flow entering this node (negative, so we add it to flow_out)
+                net_flow -= flow_vars[line]
+        
+        # Set the net flow out of this node
+        master.addConstr(
+            node_flow_vars[node] == net_flow,
+            name=f"flow_conservation_{node}"
+        )
+    
+    # Source nodes: net flow out = 1 (supply)
+    for node in source_nodes:
+        master.addConstr(
+            node_flow_vars[node] == 1,
+            name=f"source_node_{node}"
+        )
+    
+    # Sink nodes: total net flow out = -num_sources (demand)
+    master.addConstr(
+        sum(node_flow_vars[node] for node in sink_nodes) == -len(source_nodes),
+        name="total_sink_absorption"
+    )
+    
+    # Intermediate nodes: net flow = 0 (conservation)
+    for node in lista_nodos_AC:
+        if node not in source_nodes and node not in sink_nodes:
+            master.addConstr(
+                node_flow_vars[node] == 0,
+                name=f"intermediate_node_{node}"
+            )
+    
+    # Link flow to investment: can only use lines we invest in
+    for line in lista_lineas_AC_ct:
+        # Flow must be zero if line not invested
+        master.addConstr(
+            flow_vars[line] <= max_flow * line_vars[line],
+            name=f"flow_investment_link_upper_{line}"
+        )
+        master.addConstr(
+            flow_vars[line] >= -max_flow * line_vars[line],
+            name=f"flow_investment_link_lower_{line}"
+        )
+    
+
+
+
+
+
+    master.setObjective(investment_cost, GRB.MINIMIZE)
+    master.update()
+    return master, line_vars, flow_vars, node_flow_vars
+
+
+def test_master_problem_gurobi(grid, max_flow=None):
+    """Simple test for master problem"""
+    print("Testing Master Problem...")
+    
+    # Create and solve master problem
+    master, line_vars, flow_vars,node_flow_vars = create_master_problem_gurobi(grid, max_flow)
+    
+    # Try to solve (should be feasible)
+    master.setParam('OutputFlag', 1)  # Show output for debugging
+    master.optimize()
+    
+    if master.status == GRB.OPTIMAL:
+        print(f"✓ Master problem is feasible!")
+        print(f"  Objective: {master.objVal:.2f}")
+        print(f"  Variables: {master.NumVars}")
+        print(f"  Constraints: {master.NumConstrs}")
+        
+        # Count and display investments
+        investments = 0
+        print("\n=== NETWORK FLOW ANALYSIS ===")
+        print("Invested lines and their flows:")
+        for line in range(len(grid.lines_AC_ct)):
+            if line_vars[line].X > 0.8:
+                investments += 1
+                line_obj = grid.lines_AC_ct[line]
+                flow_value = flow_vars[line].X
+                print(f"  Line {line}: {line_obj.fromNode.nodeNumber} -> {line_obj.toNode.nodeNumber}, Flow: {flow_value}")
+        
+        print("\nNode flows:")
+        for node in range(len(grid.nodes_AC)):
+            node_flow = node_flow_vars[node].X
+            node_type = ""
+            if node in [n for n in range(len(grid.nodes_AC)) if grid.nodes_AC[n].connected_RenSource]:
+                node_type = " (SOURCE)"
+            elif node in [n for n in range(len(grid.nodes_AC)) if grid.nodes_AC[n].connected_gen]:
+                node_type = " (SINK)"
+            else:
+                node_type = " (INTERMEDIATE)"
+            print(f"  Node {node}: Net flow = {node_flow}{node_type}")
+        
+        # Set active configurations
+        # Get the last available cable type index
+        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+        for line in range(len(grid.lines_AC_ct)):
+            ct_line = grid.lines_AC_ct[line]
+            if line_vars[line].X > 0.5:
+                ct_line.active_config = last_cable_type_index
+            else:
+                ct_line.active_config = -1
+        
+        print(f"\n=== SUMMARY ===")
+        print(f"  Total investments: {investments}")
+        print(f"  Expected (numNodes-1): {len(grid.nodes_AC) - 1}")
+        
+        # Verify flow conservation
+        source_nodes = [n for n in range(len(grid.nodes_AC)) if grid.nodes_AC[n].connected_RenSource]
+        sink_nodes = [n for n in range(len(grid.nodes_AC)) if grid.nodes_AC[n].connected_gen]
+        total_source_flow = sum(node_flow_vars[node].X for node in source_nodes)
+        total_sink_flow = sum(node_flow_vars[node].X for node in sink_nodes)
+        print(f"  Total source flow: {total_source_flow}")
+        print(f"  Total sink flow: {total_sink_flow}")
+        print(f"  Flow conservation check: {total_source_flow + total_sink_flow == 0}")
+        
+        save_network_svg(grid, name='grid_network_investments')
+        return True
+    
+        
+    else:
+        print(f"✗ Master problem failed: status {master.status}")
+        return False

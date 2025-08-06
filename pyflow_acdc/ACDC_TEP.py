@@ -27,6 +27,7 @@ __all__ = [
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
+    'sequential_CSS',
     'export_TEP_TS_results_to_excel'
 ]
 
@@ -346,7 +347,7 @@ def get_TEP_variables(grid):
     return conv_var,DC_line_var,AC_line_var,gen_var
 
 
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=300,tee=False):
 
     analyse_OPF(grid)
     
@@ -400,7 +401,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     }
     return model, model_results , timing_info, solver_stats
 
-def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',tee=False):
+def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False):
     analyse_OPF(grid)
     
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
@@ -432,10 +433,10 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
    
     # model.obj.pprint()
     t3 = time.time()
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
     
     t1 = time.time()
-    ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ,TEP=True)
+    ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
     for obj in weights_def:
         weights_def[obj]['v']=calculate_objective(grid,obj,True)
         weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
@@ -635,7 +636,22 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False):
+    from .AC_OPF_L_model import test_master_problem_pyomo
+    max_flow = grid.max_turbines_per_string
 
+    #test, high_flow = test_master_problem_pyomo(grid, max_flow, MIP_solver, tee)
+    #identify higest array_config for highest flow
+    
+    #if not test:
+    #    raise ValueError("MIP model did not find a tree array")
+    grid.Array_opf = False
+    if NL:
+        model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee)
+    else:
+        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,time_limit,tee)
+
+    return model, model_results , timing_info, solver_stats
 def TEP_subObj(submodel,grid,ObjRule):
     OnlyGen=True
 
@@ -733,7 +749,11 @@ def TEP_obj(model,grid,NPV):
     def CT_limit_rule(model):
             return sum(model.ct_types[ct] for ct in model.ct_set) <= grid.cab_types_allowed
     def ct_cable_type_rule(model, line):
-        return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
+        l = grid.lines_AC_ct[line]
+        if l.active_config >=0:
+            return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
+        else:
+            return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 0
     
     
     def ct_types_upper_bound(model, ct):

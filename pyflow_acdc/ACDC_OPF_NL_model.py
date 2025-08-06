@@ -365,10 +365,10 @@ def AC_variables(model,grid,AC_info,PV_set):
     if grid.CT_AC:
 
         model.ct_set = pyo.Set(initialize=cab_types_set)
-        model.ct_PAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
-        model.ct_PAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
-        model.ct_QAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
-        model.ct_QAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
+        model.ct_PAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
+        model.ct_PAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
+        model.ct_QAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
+        model.ct_QAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
         model.ct_PAC_line_loss = pyo.Var(model.lines_AC_ct,initialize=0)
         
 
@@ -1890,7 +1890,12 @@ def TEP_variables(model,grid):
 
         if grid.CT_AC:
             model.ct_branch = pyo.Var(model.lines_AC_ct,model.ct_set,domain=pyo.Binary,initialize=ct_ini)
-            model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=0)
+            used_cable_types = set()
+            for l in grid.lines_AC_ct:
+                if l.active_config >= 0:  # If line has an active configuration
+                    used_cable_types.add(l.active_config)
+            ct_types_ini = {ct: 1 if ct in used_cable_types else 0 for ct in model.ct_set}
+            model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=ct_types_ini)
 
     if grid.DCmode:
         def np_gen_bounds_DC(model,gen):

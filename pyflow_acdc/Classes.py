@@ -264,6 +264,11 @@ class Grid:
         self._slackDC_nodes = None
         self._nodes_dict_DC = None        
     
+
+    @property
+    def n_ren(self):
+        return len(self.RenSources) if self.RenSources is not None else 0
+    
     @property
     def n_gen(self):
         return len(self.Generators) if self.Generators is not None else 0
@@ -841,7 +846,8 @@ class Grid:
             
         # Process configurable transmission lines
         for line in self.lines_AC_ct:
-            self._calculate_line_power_flow(line, V_cart, use_configurable=True)
+            if line.active_config >=0:
+              self._calculate_line_power_flow(line, V_cart, use_configurable=True)
     
     def _initialize_voltage_cartesian(self):
         """
@@ -1296,7 +1302,7 @@ class Node_AC:
         self.connected_conv=set()
     
         self.ct_limit=2
-        
+        self.max_turbines_per_string=99
         self.curtailment=1
 
         # self.Max_pow_gen=0
@@ -1836,7 +1842,8 @@ class Size_selection(Line_AC):
         self.toS = 0
         self.loss = 0
         self.P_loss =0
-    
+        self.network_flow = None    
+
         
         # If cable types are provided, validate and calculate parameters
         if self._cable_types:
@@ -1880,6 +1887,8 @@ class Size_selection(Line_AC):
             # No cable selected or no cable types available
             self._set_zero_parameters()
         else:
+            if self._active_config >= len(self.R_list):
+                self._active_config = len(self.R_list) - 1
             self.R = self.R_list[self._active_config]
             self.X = self.X_list[self._active_config]
             self.G = self.G_list[self._active_config]
@@ -1992,7 +2001,21 @@ class Cable_options:
     Cable_options_num = 0
     names = set()
     _cable_database = None  
-    
+    def _calculate_MVA_ratings(self,cable_types):
+        mva_ratings = []
+        for cable_type in cable_types:
+            # Get MVA rating directly from database
+            if cable_type in self._cable_database.index:
+                cable_data = self._cable_database.loc[cable_type]
+                # Calculate MVA rating: A_rating * kV_base * sqrt(3) / 1000
+                A_rating = cable_data['A_rating']
+                kV_base = cable_data['Nominal_voltage_kV'] 
+                MVA_rating = A_rating * kV_base * np.sqrt(3) / 1000
+                mva_ratings.append(MVA_rating)
+            else:
+                raise ValueError(f"Cable type '{cable_type}' not found in database")
+        return mva_ratings    
+
     @classmethod
     def load_cable_database(cls):
         """Load cable database from YAML files if not already loaded."""
@@ -2031,19 +2054,8 @@ class Cable_options:
         self.lines = []
         
         # Efficiently calculate MVA ratings in one pass
-        self.MVA_ratings = []
-        for cable_type in self._cable_types:
-            # Get MVA rating directly from database
-            if cable_type in self._cable_database.index:
-                cable_data = self._cable_database.loc[cable_type]
-                # Calculate MVA rating: A_rating * kV_base * sqrt(3) / 1000
-                A_rating = cable_data['A_rating']
-                kV_base = cable_data['Nominal_voltage_kV'] 
-                MVA_rating = A_rating * kV_base * np.sqrt(3) / 1000
-                self.MVA_ratings.append(MVA_rating)
-            else:
-                raise ValueError(f"Cable type '{cable_type}' not found in database")
-
+        self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+    
         if name is None:
             self.name = str(self.Cable_options_num)
         else:
@@ -2051,6 +2063,23 @@ class Cable_options:
             
         Cable_options.names.add(self.name)
         
+
+    @property
+    def cable_types(self):
+        return self._cable_types
+    
+    @cable_types.setter
+    def cable_types(self, new_cable_types):
+        """Set cable types and update all linked lines"""
+        self._cable_types = new_cable_types
+        
+        # Recalculate MVA ratings
+        self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+
+        
+        # Update all linked lines
+        for line in self.lines:
+            line.cable_types = self._cable_types
 
 class TF_Line_AC:
     trafNumber = 0

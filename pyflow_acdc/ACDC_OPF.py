@@ -73,7 +73,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 
-def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt'):
+def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False):
     analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -119,7 +119,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
     """
     """
     t3 = time.time()
-    model_res,solver_stats = OPF_solve(model,grid,solver)
+    model_res,solver_stats = OPF_solve(model,grid,solver,tee)
     
     t1 = time.time()
     # pr = cProfile.Profile()
@@ -149,7 +149,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
     }
     return model, model_res , timing_info, solver_stats
 
-def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
+def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False):
     analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -194,7 +194,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False):
                 
     """
     """
-    model_res,solver_stats = OPF_solve(model,grid)
+    model_res,solver_stats = OPF_solve(model,grid,solver,tee)
     
     t1 = time.time()
     # pr = cProfile.Profile()
@@ -372,7 +372,103 @@ def fx_conv(model,grid):
     model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
 
 
-def OPF_solve(model,grid,solver = 'ipopt',tee=False):
+def log_infeasible_constraints_limited(model, max_per_type=5):
+    """
+    Custom function to check and display infeasible constraints with limited output.
+    """
+    import logging
+    from pyomo.core import Constraint
+    from collections import defaultdict
+    import numpy as np
+    
+    print("=" * 80)
+    print("INFEASIBLE CONSTRAINTS SUMMARY")
+    print("=" * 80)
+    
+    # Group constraints by their type/name pattern
+    constraint_groups = defaultdict(list)
+    
+    # Check all constraints in the model
+    for constraint in model.component_objects(Constraint, active=True):
+        constraint_name = constraint.name
+        
+        # Check if constraint is violated
+        for index in constraint:
+            try:
+                # Get the constraint expression
+                expr = constraint[index]
+                
+                # Evaluate the constraint
+                if hasattr(expr, 'expr'):
+                    # For inequality constraints
+                    if hasattr(expr, 'lower') and expr.lower is not None:
+                        lower_val = expr.lower
+                        upper_val = expr.upper if hasattr(expr, 'upper') and expr.upper is not None else None
+                        
+                        # Evaluate the expression
+                        try:
+                            expr_val = pyo.value(expr.expr)
+                            
+                            # Check for violations
+                            if lower_val is not None and expr_val < lower_val - 1e-6:
+                                constraint_groups[constraint_name].append(
+                                    f"{constraint_name}[{index}]: {expr_val:.6f} < {lower_val:.6f} (lower bound violation)"
+                                )
+                            elif upper_val is not None and expr_val > upper_val + 1e-6:
+                                constraint_groups[constraint_name].append(
+                                    f"{constraint_name}[{index}]: {expr_val:.6f} > {upper_val:.6f} (upper bound violation)"
+                                )
+                        except:
+                            # If we can't evaluate, just note the constraint
+                            constraint_groups[constraint_name].append(
+                                f"{constraint_name}[{index}]: Unable to evaluate"
+                            )
+                else:
+                    # For equality constraints
+                    try:
+                        expr_val = pyo.value(expr)
+                        if abs(expr_val) > 1e-6:
+                            constraint_groups[constraint_name].append(
+                                f"{constraint_name}[{index}]: {expr_val:.6f} != 0 (equality violation)"
+                            )
+                    except:
+                        constraint_groups[constraint_name].append(
+                            f"{constraint_name}[{index}]: Unable to evaluate"
+                        )
+                        
+            except Exception as e:
+                constraint_groups[constraint_name].append(
+                    f"{constraint_name}[{index}]: Error evaluating - {str(e)}"
+                )
+    
+    # Display results with limits
+    total_violations = 0
+    for group_name, violations in constraint_groups.items():
+        if violations:  # Only show groups with violations
+            print(f"\n{group_name}")
+            print("-" * len(group_name))
+            
+            # Show first max_per_type violations
+            for i, violation in enumerate(violations[:max_per_type]):
+                print(f"  {violation}")
+            
+            # Show summary if there are more
+            if len(violations) > max_per_type:
+                remaining = len(violations) - max_per_type
+                print(f"  ... and {remaining} other violations")
+            
+            print(f"  Total: {len(violations)} violations")
+            total_violations += len(violations)
+    
+    if total_violations == 0:
+        print("\nNo constraint violations detected.")
+    else:
+        print(f"\nTotal violations across all constraint types: {total_violations}")
+    
+    print("=" * 80)
+
+
+def OPF_solve(model,grid,solver = 'ipopt',tee=False,time_limit=None):
     
     solver = solver.lower()
 
@@ -413,7 +509,8 @@ def OPF_solve(model,grid,solver = 'ipopt',tee=False):
     
 
     opt = pyo.SolverFactory(solver)
-    
+    if solver == 'gurobi' and time_limit is not None:
+        opt.options['TimeLimit'] = time_limit
     #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
     #if logging:
     #    results = opt.solve(model, logfile="ipopt_output.log")
@@ -439,8 +536,9 @@ def OPF_solve(model,grid,solver = 'ipopt',tee=False):
         # Set the logging level to INFO
         logging.getLogger('pyomo').setLevel(logging.INFO)
 
-        # Now call log_infeasible_constraints
+        # Now call the limited version instead
         log_infeasible_constraints(model)
+        #log_infeasible_constraints_limited(model, max_per_type=5)
     
         
     return  results, solver_stats

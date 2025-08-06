@@ -679,35 +679,34 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,ct_lamda=10^6,max_turbines_per_string= None,LCoE=1):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,MIP_tee=False,svg=True):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
-
+    from .Graph_and_plot import save_network_svg
+    from .AC_OPF_L_model import test_master_problem_pyomo
     turbines_df = Data["turbine"]
     substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
     
-
-
-    mst = nx.minimum_spanning_tree(array_graph, weight='weight')
-
-    active_edges = set()
-    for u, v in mst.edges():
-        active_edges.add((u, v))
-        active_edges.add((v, u))
 
     initialize_pyflowacdc()
     grid = Grid(S_base)
     res = Results(grid)
 
     cable_option = add_cable_option(grid,cable_types)
-    
+    t_MW = turbines_df.iloc[0].MW_rating
     if max_turbines_per_string is not None:
-        t_MW = turbines_df.iloc[0].MW_rating
+        
         max_power_per_string = t_MW*max_turbines_per_string 
         first_index_to_comply = next((i for i, rating in enumerate(cable_option.MVA_ratings) if rating >= max_power_per_string), len(cable_option.MVA_ratings) - 1)
         cable_option._cable_types = cable_option._cable_types[:first_index_to_comply + 1]
         cable_option.MVA_ratings = cable_option.MVA_ratings[:first_index_to_comply + 1]
 
-
+    else:
+    
+        max_cable_capacity = max(cable_option.MVA_ratings)
+        max_turbines_per_string = int(max_cable_capacity / t_MW)
+        # Store it in the grid for later use
+        grid.max_turbines_per_string = max_turbines_per_string
+        
     
     for node, attrs in array_graph.nodes(data=True):
         if attrs['type'] == 'turbine':
@@ -725,6 +724,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         if attrs['type'] == 'substation':
             add_extGrid(grid,node,MVAmax=99999,Allow_sell=True,lf=LCoE)
             node.ct_limit = substations_df.loc[attrs['original_idx']].connections
+            node.type = 'Slack'
     
     # First pass: add all lines
     line_objects = {}  # Dictionary to store line objects by their name
@@ -735,11 +735,8 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
                 
         l = attrs['weight']/1000
         geo= attrs['geometry']
-        if (u,v) in active_edges:
-            active_config = 0
-        else:
-            active_config = -1
-        line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=active_config,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
+        
+        line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
         
         # Store the line object with its name for later reference
         edge_key = f'{tonode}_{fromnode}'
@@ -756,14 +753,32 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
             if len(line_numbers_group) > 1:  # Only add groups with more than one line
                 grid.crossing_groups.append(line_numbers_group)
         
+    
        
     grid.Update_Graph_AC()
     grid.create_Ybus_AC()
     grid.Array_opf = True  
     grid.cab_types_allowed = cable_types_allowed
-    grid.ct_lamda =ct_lamda 
+    grid.max_turbines_per_string = max_turbines_per_string
+    print(max_turbines_per_string)
+    flag,high_flow = test_master_problem_pyomo(grid,max_flow=max_turbines_per_string,solver_name='glpk',tee=MIP_tee)
+    if flag and high_flow < max_turbines_per_string:
+        
+        t_MW = turbines_df.iloc[0].MW_rating
+        max_power_per_string = t_MW*high_flow 
+        first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
+        for line in grid.lines_AC_ct:
+            if line.active_config > 0:
+                line.active_config = first_index_to_comply
 
-   
+        grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
+       
+        
+        grid.max_turbines_per_string = high_flow
+
+     
+    if svg:
+        save_network_svg(grid, name='MIP_solve')
     return grid, res
 
 def Create_grid_from_mat(matfile):

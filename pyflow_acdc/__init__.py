@@ -38,7 +38,7 @@ except ImportError:
     
 try:
     from .AC_L_CSS_gurobi import *
-    from .MIP_graph_array import *
+    from ...my_tests.MIP_graph_array import *
     HAS_AC_L_CSS_GUROBI = True
 except ImportError:
     HAS_AC_L_CSS_GUROBI = False
@@ -135,6 +135,7 @@ __all__ = [
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
+    'sequential_CSS',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
     'repurpose_element_from_pd',

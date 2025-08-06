@@ -174,7 +174,7 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.Pfrom_CT = pyo.Var(model.nodes_AC,bounds=fromCT_opt_bounds ,initialize=0)
             
     def AC_theta_slack_rule(model, node):
-        return model.thetha_AC[node] == Theta_ini[node]
+        return model.thetha_AC[node] == 0
 
     model.AC_theta_slack_constraint = pyo.Constraint(model.AC_slacks, rule=AC_theta_slack_rule)
     
@@ -210,18 +210,31 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.rec_PAC_line_loss = pyo.Var(model.lines_AC_rec,initialize=0)
     
     def set_based_bounds(model, line, cab_type):
-         max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)  # Use cab_types_set instead of model.ct_set
-         return (-max_min, max_min)
+        # Check if this is a fixed route with no cable selected
+        if not grid.Array_opf and grid.lines_AC_ct[line].active_config < 0:
+            return (0, 0)  # Force z variables to zero
+        
+        # Original logic for variable bounds
+        max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)
+        return (-max_min, max_min)
        
     
     if grid.CT_AC:
 
         model.ct_set = pyo.Set(initialize=cab_types_set)
-        model.ct_PAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
-        model.ct_PAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,bounds=set_based_bounds,initialize=0)
+        model.ct_PAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
+        model.ct_PAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
         
-        model.z_to = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds)
-        model.z_from = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds)   
+        model.z_to = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds,initialize=0)
+        model.z_from = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds,initialize=0)   
+    
+        # Network flow variables for MIP integration (only for Array_opf)
+        if grid.Array_opf:
+            # Calculate max flow for bounds
+            max_flow = grid.max_turbines_per_string if hasattr(grid, 'max_turbines_per_string') else len(lista_nodos_AC)
+            
+            model.network_flow = pyo.Var(model.lines_AC_ct, bounds=(-max_flow, max_flow), initialize=0)
+            model.node_net_flow = pyo.Var(model.nodes_AC, bounds=(-len(lista_nodos_AC), 1), initialize=0)
 
 def AC_constraints(model,grid,AC_info):
     
@@ -388,17 +401,17 @@ def AC_constraints(model,grid,AC_info):
         else:  # 'from'
             B = np.imag(Ybus[0,1])  # Bft
             P = -B * (thf - tht)
-        return P
+        return P ,B
 
 
     def P_to_AC_line(model,line):   
         l = grid.lines_AC[line]
-        Pto = calculate_P(model,l,'to')
+        Pto,B = calculate_P(model,l,'to')
         return model.PAC_to[line] == Pto
     
     def P_from_AC_line(model,line):       
        l = grid.lines_AC[line]
-       Pfrom = calculate_P(model,l,'from')
+       Pfrom,B = calculate_P(model,l,'from')
        return model.PAC_from[line] == Pfrom
     
  
@@ -407,12 +420,12 @@ def AC_constraints(model,grid,AC_info):
  
     def P_to_AC_line_exp(model,line):   
         l = grid.lines_AC_exp[line]
-        Pto = calculate_P(model,l,'to')
+        Pto,B = calculate_P(model,l,'to')
         return model.exp_PAC_to[line] == Pto
     
     def P_from_AC_line_exp(model,line):       
        l = grid.lines_AC_exp[line]
-       Pfrom = calculate_P(model,l,'from')
+       Pfrom,B = calculate_P(model,l,'from')
        return model.exp_PAC_from[line] == Pfrom
     
  
@@ -424,17 +437,17 @@ def AC_constraints(model,grid,AC_info):
     def P_to_AC_line_rec(model,line,state):   
         l = grid.lines_AC_rec[line]
         if state ==  0:
-            Pto = calculate_P(model,l,'to')
+            Pto,B = calculate_P(model,l,'to')
         else:
-            Pto = calculate_P(model,l,'to',idx='new')
+            Pto,B = calculate_P(model,l,'to',idx='new')
         return model.rec_PAC_to[line,state] == Pto
     
     def P_from_AC_line_rec(model,line,state):       
        l = grid.lines_AC_rec[line]
        if state == 0:
-           Pfrom = calculate_P(model,l,'from')
+           Pfrom,B = calculate_P(model,l,'from')
        else:
-           Pfrom = calculate_P(model,l,'from',idx='new')
+           Pfrom,B = calculate_P(model,l,'from',idx='new')
        return model.rec_PAC_from[line,state] == Pfrom
     
 
@@ -446,20 +459,58 @@ def AC_constraints(model,grid,AC_info):
        
     def P_to_AC_line_ct(model,line,ct):   
         l = grid.lines_AC_ct[line]
-        Pto = calculate_P(model,l,'to',idx=ct)
+        Pto,B = calculate_P(model,l,'to',idx=ct)
+        if l.active_config < 0 and not grid.Array_opf:
+            return model.ct_PAC_to[line,ct] == 0
         return model.ct_PAC_to[line,ct] == Pto
     
     def P_from_AC_line_ct(model,line,ct):       
        l = grid.lines_AC_ct[line]
-       Pfrom = calculate_P(model,l,'from',idx=ct)
+       Pfrom,B = calculate_P(model,l,'from',idx=ct)
+       if l.active_config < 0 and not grid.Array_opf:
+            return model.ct_PAC_from[line,ct] == 0
        return model.ct_PAC_from[line,ct] == Pfrom
     
- 
+    def P_to_AC_line_ct_upper(model, line, ct):
+        l = grid.lines_AC_ct[line]
+        if l.active_config < 0 and not grid.Array_opf:
+            return model.ct_PAC_from[line,ct] == 0
+        Pto,B = calculate_P(model, l, 'to', idx=ct)
+        M = B * 3.1416
+        return model.ct_PAC_to[line, ct] - Pto <= M * (1 - model.ct_branch[line, ct])
 
+    def P_to_AC_line_ct_lower(model, line, ct):
+        l = grid.lines_AC_ct[line]
+        if l.active_config < 0 and not grid.Array_opf:
+            return model.ct_PAC_from[line,ct] == 0
+        Pto,B = calculate_P(model, l, 'to', idx=ct)
+        M = B * 3.1416
+        return model.ct_PAC_to[line, ct] - Pto >= -M * (1 - model.ct_branch[line, ct])
+
+    def P_from_AC_line_ct_upper(model, line, ct):
+        l = grid.lines_AC_ct[line]
+        if l.active_config < 0 and not grid.Array_opf:
+            return model.ct_PAC_from[line,ct] == 0
+        Pfrom,B = calculate_P(model, l, 'from', idx=ct)
+        M = B * 3.1416
+        return model.ct_PAC_from[line, ct] - Pfrom <= M * (1 - model.ct_branch[line, ct])
+
+    def P_from_AC_line_ct_lower(model, line, ct):
+        l = grid.lines_AC_ct[line]
+        if l.active_config < 0 and not grid.Array_opf:
+            return model.ct_PAC_from[line,ct] == 0
+        Pfrom,B = calculate_P(model, l, 'from', idx=ct)
+        M = B * 3.1416
+        return model.ct_PAC_from[line, ct] - Pfrom >= -M * (1 - model.ct_branch[line, ct])
+
+    
     if grid.CT_AC:   
-        model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
-        model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
-      
+        #model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
+        #model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
+        model.ct_Pto_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_upper)
+        model.ct_Pto_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_lower)
+        model.ct_Pfrom_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_upper)
+        model.ct_Pfrom_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_lower)
     
     
     "AC inequality constraints"
@@ -504,29 +555,77 @@ def AC_constraints(model,grid,AC_info):
         model.rec_S_from_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear)
         model.rec_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear_neg)
     
-    
-
-    def S_to_AC_line_rule_ct_linear(model, line, ct):
-        M = calc_M_linear(model, line)
-        return model.ct_PAC_to[line,ct] <= S_lineACct_lim[line,ct] * model.ct_branch[line,ct] + M * (1 - model.ct_branch[line,ct])
-
-    def S_to_AC_line_rule_ct_linear_neg(model, line, ct):
-        M = calc_M_linear(model, line)
-        return model.ct_PAC_to[line,ct] >= -S_lineACct_lim[line,ct] * model.ct_branch[line,ct] - M * (1 - model.ct_branch[line,ct])
-
-    def S_from_AC_limit_rule_ct_linear(model, line, ct):
-        M = calc_M_linear(model, line)
-        return model.ct_PAC_from[line,ct] <= S_lineACct_lim[line,ct] * model.ct_branch[line,ct] + M * (1 - model.ct_branch[line,ct])
-
-    def S_from_AC_limit_rule_ct_linear_neg(model, line, ct):
-        M = calc_M_linear(model, line)
-        return model.ct_PAC_from[line,ct] >= -S_lineACct_lim[line,ct] * model.ct_branch[line,ct] - M * (1 - model.ct_branch[line,ct])
-
-    if grid.CT_AC:
-        model.ct_S_to_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct_linear)
-        model.ct_S_to_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct_linear_neg)
-        model.ct_S_from_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct_linear)
-        model.ct_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct_linear_neg)
+   
+    if grid.CT_AC and grid.Array_opf:
+            # Find source and sink nodes
+            source_nodes = []
+            sink_nodes = []
+            
+            for node in model.nodes_AC:
+                nAC = grid.nodes_AC[node]
+                if nAC.connected_RenSource:  # Node has renewable resources (source)
+                    source_nodes.append(node)
+                if nAC.connected_gen:  # Node has generator (sink)
+                    sink_nodes.append(node)
+            
+            if not source_nodes:
+                raise ValueError("No renewable source nodes found!")
+            if not sink_nodes:
+                raise ValueError("No generator nodes found!")
+            
+            # Flow conservation for all nodes
+            def flow_conservation_rule(model, node):
+                # Calculate net flow out of this node
+                net_flow = 0
+                
+                for line in model.lines_AC_ct:
+                    line_obj = grid.lines_AC_ct[line]
+                    from_node = line_obj.fromNode.nodeNumber
+                    to_node = line_obj.toNode.nodeNumber
+                    
+                    if from_node == node:
+                        # Flow leaving this node (positive)
+                        net_flow += model.network_flow[line]
+                    elif to_node == node:
+                        # Flow entering this node (negative, so we add it to net_flow)
+                        net_flow -= model.network_flow[line]
+                
+                return model.node_net_flow[node] == net_flow
+            
+            model.flow_conservation = pyo.Constraint(model.nodes_AC, rule=flow_conservation_rule)
+            
+            # Source nodes: net flow out = 1 (supply)
+            def source_node_rule(model, node):
+                return model.node_net_flow[node] == 1
+            
+            model.source_node = pyo.Constraint(source_nodes, rule=source_node_rule)
+            
+            # Sink nodes: total net flow out = -num_sources (demand)
+            def total_sink_absorption_rule(model):
+                return sum(model.node_net_flow[node] for node in sink_nodes) == -len(source_nodes)
+            
+            model.total_sink_absorption = pyo.Constraint(rule=total_sink_absorption_rule)
+            
+            # Intermediate nodes: net flow = 0 (conservation)
+            def intermediate_node_rule(model, node):
+                if node not in source_nodes and node not in sink_nodes:
+                    return model.node_net_flow[node] == 0
+                else:
+                    return pyo.Constraint.Skip
+            
+            model.intermediate_node = pyo.Constraint(model.nodes_AC, rule=intermediate_node_rule)
+            
+            
+            max_flow = grid.max_turbines_per_string 
+            
+            def flow_investment_link_upper_rule(model, line):
+                return model.network_flow[line] <= max_flow * sum(model.ct_branch[line, ct] for ct in model.ct_set)
+            
+            def flow_investment_link_lower_rule(model, line):
+                return model.network_flow[line] >= -max_flow * sum(model.ct_branch[line, ct] for ct in model.ct_set)
+            
+            model.flow_investment_link_upper = pyo.Constraint(model.lines_AC_ct, rule=flow_investment_link_upper_rule)
+            model.flow_investment_link_lower = pyo.Constraint(model.lines_AC_ct, rule=flow_investment_link_lower_rule)
 
     s=1
     
@@ -619,12 +718,28 @@ def TEP_variables(model,grid):
         model.rec_branch = pyo.Var(model.lines_AC_rec,domain=pyo.Binary,initialize=REC_branch)
 
     if grid.CT_AC:
+        used_cable_types = set()
+        for l in grid.lines_AC_ct:
+            if l.active_config >= 0:  # If line has an active configuration
+                used_cable_types.add(l.active_config)
         model.ct_branch = pyo.Var(model.lines_AC_ct,model.ct_set,domain=pyo.Binary,initialize=ct_ini)
-        model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=0)
+        # Initialize ct_types with 1 for used cable types, 0 otherwise
+        ct_types_ini = {ct: 1 if ct in used_cable_types else 0 for ct in model.ct_set}
+        model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=ct_types_ini)
 
 
-def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
-
+def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False, solver_results=None, tee=False):
+    """
+    Export Pyomo results back to grid object
+    
+    Args:
+        model: Pyomo model
+        grid: Grid object
+        Price_Zones: Price zone information
+        TEP: Transmission expansion planning flag
+        solver_results: Solver results object (optional, for checking termination condition)
+        tee: Boolean to control printing output
+    """
     
     grid.OPF_run=True
 
@@ -745,7 +860,15 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
        
-       
+        # Export network flow values to grid if available
+        if hasattr(model, 'network_flow'):
+            for line in grid.lines_AC_ct:
+                if hasattr(line, 'lineNumber'):
+                    try:
+                        line.network_flow = abs(pyo.value(model.network_flow[line.lineNumber]))
+                    except:
+                        line.network_flow = 0.0
+        
         
         def process_line_AC_CT(line):
             l = line.lineNumber
@@ -764,8 +887,6 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
                 Qfrom = 0
                 Qto   = 0
             
-            
-            
             line.fromS = (Pfrom + 1j*Qfrom)
             line.toS = (Pto + 1j*Qto)
             line.loss = 0
@@ -773,9 +894,18 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
 
         with ThreadPoolExecutor() as executor:
             executor.map(process_line_AC_CT, grid.lines_AC_ct)
-        #for line in grid.lines_AC_ct:
-        #    process_line_AC_CT(line)
+     # After export is complete, analyze and fix oversizing issues if time limit was reached
+    if solver_results is not None:
+        # Check for time limit termination in Pyomo
+        termination_condition = str(solver_results.solver.termination_condition).lower()
         
+        if 'timelimit' in termination_condition:
+            if tee:
+                print("Time limit reached. Analyzing potential oversizing issues...")
+            
+            # Apply oversizing analysis and fixes
+            oversizing_type1, oversizing_type2 = analyze_oversizing_issues_grid(grid, tee=tee)
+            apply_oversizing_fixes_grid(grid, oversizing_type1, oversizing_type2, tee=tee)
     # --- Step 1: Use voltage angles only ---
     Theta = grid.Theta_V_AC  # should be a 1D array with angle values in radians
 
@@ -803,4 +933,432 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         # Approximate current magnitude (linearized)
         line.i_from = abs(P_ij)  # or just set = P_ij if signed current
         line.i_to = abs(P_ji)
+    
+
+def analyze_oversizing_issues_grid(grid, tee=True):
+    """
+    Analyze potential oversizing issues due to time limits by comparing
+    active configurations with network flow values.
+    
+    Args:
+        grid: Grid object with exported results
+        tee: Boolean to control printing output (default: True)
+    
+    Returns two types of oversizing issues:
+    1. Lines with lower flow but higher active config than other lines
+    2. Lines with same flow but different active configs
+    """
+    
+    if tee:
+        print("\n=== OVERSIZING ANALYSIS DUE TO TIME LIMIT ===")
+    
+    # Get active lines and their data
+    active_lines_data = []
+    
+    for line in grid.lines_AC_ct:
+        # Check if line is active (has a selected cable type)
+        if  line.active_config >= 0:
+            # Get network flow value from grid
+            network_flow = getattr(line, 'network_flow', 0.0)
+            
+            active_lines_data.append({
+                'line_number': line.lineNumber,
+                'from_node': line.fromNode.nodeNumber,
+                'to_node': line.toNode.nodeNumber,
+                'active_config': line.active_config,
+                'network_flow': network_flow,
+                'cable_type': f"Config_{line.active_config}"
+            })
+    
+    if not active_lines_data:
+        if tee:
+            print("No active lines found for analysis")
+        return [], []
+    
+    # Sort by network flow for easier analysis
+    active_lines_data.sort(key=lambda x: x['network_flow'])
+    
+    if tee:
+        print(f"\nActive lines summary:")
+        print(f"{'Line':<6} {'From':<6} {'To':<6} {'Flow':<8} {'Config':<8} {'Cable Type':<12}")
+        print("-" * 50)
+        for line_data in active_lines_data:
+            print(f"{line_data['line_number']:<6} {line_data['from_node']:<6} {line_data['to_node']:<6} "
+                  f"{line_data['network_flow']:<8.2f} {line_data['active_config']:<8} {line_data['cable_type']:<12}")
+    
+    # Analysis 1: Check for lines with lower flow but higher config than others
+    if tee:
+        print(f"\n=== ANALYSIS 1: Lower flow with higher config ===")
+    oversizing_type1 = []
+    oversized_lines_type1 = set()  # Track lines already identified as oversized
+    
+    for i, line1 in enumerate(active_lines_data):
+        if line1['line_number'] in oversized_lines_type1:
+            continue  # Skip if already identified
+            
+        best_reference = None
+        max_config_difference = 0
+        
+        for j, line2 in enumerate(active_lines_data):
+            if i != j:
+                # Check if line1 has lower flow but higher config than line2
+                if (line1['network_flow'] < line2['network_flow'] and 
+                    line1['active_config'] > line2['active_config']):
+                    
+                    config_difference = line1['active_config'] - line2['active_config']
+                    if config_difference > max_config_difference:
+                        max_config_difference = config_difference
+                        best_reference = line2
+        
+        # Add the biggest oversizing issue for this line
+        if best_reference is not None:
+            oversizing_type1.append({
+                'oversized_line': line1,
+                'reference_line': best_reference,
+                'flow_difference': best_reference['network_flow'] - line1['network_flow'],
+                'config_difference': max_config_difference
+            })
+            oversized_lines_type1.add(line1['line_number'])
+    
+    if oversizing_type1 and tee:
+        print("Found potential oversizing issues (Type 1):")
+        for issue in oversizing_type1:
+            print(f"  Line {issue['oversized_line']['line_number']} (flow: {issue['oversized_line']['network_flow']:.2f}, "
+                  f"config: {issue['oversized_line']['active_config']}) may be oversized compared to "
+                  f"Line {issue['reference_line']['line_number']} (flow: {issue['reference_line']['network_flow']:.2f}, "
+                  f"config: {issue['reference_line']['active_config']})")
+            print(f"    → Line {issue['oversized_line']['line_number']} could use config {issue['reference_line']['active_config']} "
+                  f"to handle flow {issue['oversized_line']['network_flow']:.2f}")
+    elif tee:
+        print("No Type 1 oversizing issues found")
+    
+    # Analysis 2: Check for lines with same flow but different configs
+    if tee:
+        print(f"\n=== ANALYSIS 2: Same flow with different configs ===")
+    oversizing_type2 = []
+    oversized_lines_type2 = set()  # Track lines already identified as oversized
+    
+    for i, line1 in enumerate(active_lines_data):
+        if line1['line_number'] in oversized_lines_type2:
+            continue  # Skip if already identified
+            
+        best_reference = None
+        max_config_difference = 0
+        
+        for j, line2 in enumerate(active_lines_data):
+            if i != j:
+                # Check if lines have similar flow but different configs
+                flow_tolerance = 0.1  # Allow small differences in flow
+                if (abs(line1['network_flow'] - line2['network_flow']) <= flow_tolerance and 
+                    line1['active_config'] != line2['active_config']):
+                    
+                    # Determine which line might be oversized (higher config = oversized)
+                    if line1['active_config'] > line2['active_config']:
+                        config_difference = line1['active_config'] - line2['active_config']
+                        if config_difference > max_config_difference:
+                            max_config_difference = config_difference
+                            best_reference = line2
+        
+        # Add the biggest oversizing issue for this line
+        if best_reference is not None:
+            oversizing_type2.append({
+                'oversized_line': line1,
+                'reference_line': best_reference,
+                'flow_value': (line1['network_flow'] + best_reference['network_flow']) / 2
+            })
+            oversized_lines_type2.add(line1['line_number'])
+    
+    if oversizing_type2 and tee:
+        print("Found potential oversizing issues (Type 2):")
+        for issue in oversizing_type2:
+            print(f"  Line {issue['oversized_line']['line_number']} (flow: {issue['oversized_line']['network_flow']:.2f}, "
+                  f"config: {issue['oversized_line']['active_config']}) may be oversized compared to "
+                  f"Line {issue['reference_line']['line_number']} (flow: {issue['reference_line']['network_flow']:.2f}, "
+                  f"config: {issue['reference_line']['active_config']})")
+            print(f"    → Both lines handle similar flow ({issue['flow_value']:.2f}) but line {issue['oversized_line']['line_number']} "
+                  f"uses higher config {issue['oversized_line']['active_config']} vs {issue['reference_line']['active_config']}")
+    elif tee:
+        print("No Type 2 oversizing issues found")
+    
+    # Summary
+    total_issues = len(oversizing_type1) + len(oversizing_type2)
+    if total_issues > 0 and tee:
+        print(f"\n=== SUMMARY ===")
+        print(f"Total potential oversizing issues found: {total_issues}")
+        print(f"  - Type 1 (lower flow, higher config): {len(oversizing_type1)}")
+        print(f"  - Type 2 (same flow, different configs): {len(oversizing_type2)}")
+        print(f"\nRecommendation: Consider increasing time limit or adjusting cable type constraints")
+    elif tee:
+        print(f"\nNo oversizing issues detected. Solution appears consistent.")
+    
+    return oversizing_type1, oversizing_type2
+
+
+def apply_oversizing_fixes_grid(grid, oversizing_type1, oversizing_type2, tee=True):
+    """
+    Apply fixes to the grid results based on oversizing analysis.
+    Changes the active configurations of oversized lines to use lower configs.
+    """
+    if not oversizing_type1 and not oversizing_type2:
+        if tee:
+            print("No oversizing issues to fix.")
+        return
+    
+    if tee:
+        print("\n=== APPLYING OVERSIZING FIXES ===")
+    
+    fixes_applied = []
+    fixed_lines = set()  # Track which lines have already been fixed
+    
+    # Apply Type 1 fixes (lower flow, higher config) - these take priority
+    for issue in oversizing_type1:
+        oversized_line_num = issue['oversized_line']['line_number']
+        target_config = issue['reference_line']['active_config']
+        
+        # Find the line object
+        for line in grid.lines_AC_ct:
+            if line.lineNumber == oversized_line_num:
+                old_config = line.active_config
+                line.active_config = target_config
+                
+         
+                fixes_applied.append({
+                    'line_number': oversized_line_num,
+                    'old_config': old_config,
+                    'new_config': target_config,
+                    'type': 'Type 1',
+                    'flow': issue['oversized_line']['network_flow']
+                })
+                fixed_lines.add(oversized_line_num)  # Mark as fixed
+                break
+    
+    # Apply Type 2 fixes (same flow, different configs) - only for lines not already fixed
+    for issue in oversizing_type2:
+        oversized_line_num = issue['oversized_line']['line_number']
+        
+        # Skip if this line was already fixed in Type 1
+        if oversized_line_num in fixed_lines:
+            continue
+            
+        target_config = issue['reference_line']['active_config']
+        
+        # Find the line object
+        for line in grid.lines_AC_ct:
+            if line.lineNumber == oversized_line_num:
+                old_config = line.active_config
+                line.active_config = target_config
+                
+                fixes_applied.append({
+                    'line_number': oversized_line_num,
+                    'old_config': old_config,
+                    'new_config': target_config,
+                    'type': 'Type 2',
+                    'flow': issue['oversized_line']['network_flow']
+                })
+                fixed_lines.add(oversized_line_num)  # Mark as fixed
+                break
+    
+    if fixes_applied and tee:
+        print("Applied the following fixes:")
+        print(f"{'Line':<6} {'Old Config':<12} {'New Config':<12} {'Type':<8} {'Flow':<8}")
+        print("-" * 50)
+        for fix in fixes_applied:
+            print(f"{fix['line_number']:<6} {fix['old_config']:<12} {fix['new_config']:<12} "
+                  f"{fix['type']:<8} {fix['flow']:<8.2f}")
+        
+        print(f"\nTotal fixes applied: {len(fixes_applied)}")
+        print("Note: These changes may affect the objective value and solution optimality.")
+        print("Note: Power flow values may need recalculation after config changes.")
+    
+    return fixes_applied
+    
+def create_master_problem_pyomo(grid, max_flow=None):
+        """Create master problem using Pyomo"""
+        
+        if max_flow is None:
+            max_flow = len(grid.nodes_AC) - 1
+        
+        # Create model
+        model = pyo.ConcreteModel()
+        
+        # Sets
+        model.lines = pyo.Set(initialize=range(len(grid.lines_AC_ct)))
+        model.nodes = pyo.Set(initialize=range(len(grid.nodes_AC)))
+        
+        # Find sink nodes (nodes with generators) and source nodes (nodes with renewable resources)
+        sink_nodes = []
+        source_nodes = []
+        
+        for node in model.nodes:
+            nAC = grid.nodes_AC[node]
+            if nAC.connected_gen:  # Node has generator (sink)
+                sink_nodes.append(node)
+            if nAC.connected_RenSource:  # Node has renewable resources (source)
+                source_nodes.append(node)
+        
+        if not sink_nodes:
+            raise ValueError("No generator nodes found!")
+        
+        model.source_nodes = pyo.Set(initialize=source_nodes)
+        model.sink_nodes = pyo.Set(initialize=sink_nodes)
+        
+
+        
+        # Variables
+        # Binary variables: one per line (used or not)
+        model.line_used = pyo.Var(model.lines, domain=pyo.Binary)
+        
+        # Flow variables (integer - can carry flow in either direction)
+        model.line_flow = pyo.Var(model.lines, domain=pyo.Integers, bounds=(-max_flow, max_flow))
+        model.node_flow = pyo.Var(model.nodes, domain=pyo.Integers)
+
+        # Objective: minimize total cable length
+        def objective_rule(model):
+            return sum(model.line_used[line] * grid.lines_AC_ct[line].Length_km 
+                      for line in model.lines)
+        
+        model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
+        
+        # Spanning tree constraint: exactly numNodes-1 connections
+        def spanning_tree_rule(model):
+            return sum(model.line_used[line] for line in model.lines) == len(model.nodes) - len(model.sink_nodes)
+     
+        
+        model.spanning_tree = pyo.Constraint(rule=spanning_tree_rule)
+        
+        # Constrain connections for source nodes (renewable nodes)
+        def source_connections_rule(model, node):
+            if node in model.source_nodes:
+                node_connections = sum(model.line_used[line] 
+                                     for line in model.lines
+                                     if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or 
+                                         grid.lines_AC_ct[line].toNode.nodeNumber == node))
+                return node_connections <= grid.nodes_AC[node].ct_limit
+            else:
+                return pyo.Constraint.Skip
+        
+        model.source_connections_limit = pyo.Constraint(model.nodes, rule=source_connections_rule)
+        
+        # Flow conservation for all nodes
+        def flow_conservation_rule(model, node):
+            node_flow = 0
+            
+            for line in model.lines:
+                line_obj = grid.lines_AC_ct[line]
+                from_node = line_obj.fromNode.nodeNumber
+                to_node = line_obj.toNode.nodeNumber
+            
+                if from_node == node:
+                    # This node is fromNode, so positive flow leaves this node
+                    node_flow += model.line_flow[line]
+    
+                elif to_node == node:
+                    # This node is toNode, so negative flow leaves this node
+                    node_flow -= model.line_flow[line]
+                    
+            return model.node_flow[node] == node_flow
+        
+        model.flow_conservation = pyo.Constraint(model.nodes, rule=flow_conservation_rule)
+        
+        def source_node_rule(model, node):
+            return model.node_flow[node] == 1
+            
+        model.source_node = pyo.Constraint(model.source_nodes, rule=source_node_rule)
+
+     
+        def sink_absorption_rule(model):
+            return sum(model.node_flow[n] for n in model.sink_nodes) == -len(model.source_nodes)
+        model.total_sink_absorption = pyo.Constraint(rule=sink_absorption_rule)
+        
+        # Intermediate nodes: net flow = 0 (conservation)
+        def intermediate_node_rule(model, node):
+            if node not in model.source_nodes and node not in model.sink_nodes:
+                return model.node_flow[node] == 0
+            else:
+                return pyo.Constraint.Skip
+        
+        model.intermediate_node = pyo.Constraint(model.nodes, rule=intermediate_node_rule)
+        
+        # Link flow to investment: can only use lines we invest in
+        def flow_investment_rule(model, line):
+            return model.line_flow[line] <= max_flow * model.line_used[line]
+        def flow_investment_rule_2(model, line):
+            return model.line_flow[line] >= -max_flow * model.line_used[line]
+       
+        model.flow_investment_link = pyo.Constraint(model.lines, rule=flow_investment_rule)
+        model.flow_investment_link_2 = pyo.Constraint(model.lines, rule=flow_investment_rule_2)
+        
+        return model
+    
+    
+def test_master_problem_pyomo(grid, max_flow=None, solver_name='glpk',tee=False):
+    """Test master problem using Pyomo with open-source solver"""
+    
+    # Create model
+    model = create_master_problem_pyomo(grid, max_flow)
+    
+    # Create solver
+    solver = pyo.SolverFactory(solver_name)
+    
+    # Solve
+    results = solver.solve(model, tee=tee)
+    print('DEBUG: obj results', model.objective.display())
+    # Check results
+    if results.solver.termination_condition == pyo.TerminationCondition.optimal:
+        
+        # Set active configurations
+        # Get the last available cable type index
+        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+        high_flow = max(abs(pyo.value(model.line_flow[line])) for line in model.lines)
+        for line in model.lines:
+            ct_line = grid.lines_AC_ct[line]
+            if pyo.value(model.line_used[line]) > 0.5:
+                ct_line.active_config = last_cable_type_index
+            else:
+                ct_line.active_config = -1
+        if tee:
+            print(f"✓ Master problem is optimal!")
+            print(f"  Objective: {pyo.value(model.objective):.2f}")
+        
+            # Count and display investments
+            investments = 0
+            print("\n=== NETWORK FLOW ANALYSIS ===")
+            print("Invested lines and their flows:")
+            for line in model.lines:
+                if pyo.value(model.line_used[line]) > 0.8:
+                    investments += 1
+                    line_obj = grid.lines_AC_ct[line]
+                    flow_value = pyo.value(model.line_flow[line])
+                    print(f"  Line {line}: {line_obj.fromNode.nodeNumber} -> {line_obj.toNode.nodeNumber}, Flow: {flow_value}")
+            
+            print("\nNode flows:")
+            for node in model.nodes:
+                node_flow = pyo.value(model.node_flow[node])
+                node_type = ""
+                if node in model.source_nodes:
+                    node_type = " (SOURCE)"
+                elif node in model.sink_nodes:
+                    node_type = " (SINK)"
+                else:
+                    node_type = " (INTERMEDIATE)"
+                print(f"  Node {node}: Net flow = {node_flow}{node_type}")
+    
+            
+            print(f"\n=== SUMMARY ===")
+            print(f"  Total investments: {investments}")
+            print(f"  Expected (numNodes-1): {len(grid.nodes_AC) - 1}")
+            
+            # Verify flow conservation
+            total_source_flow = sum(pyo.value(model.node_flow[node]) for node in model.source_nodes)
+            total_sink_flow = sum(pyo.value(model.node_flow[node]) for node in model.sink_nodes)
+            print(f"  Total source flow: {total_source_flow}")
+            print(f"  Total sink flow: {total_sink_flow}")
+            print(f"  Flow conservation check: {total_source_flow + total_sink_flow == 0}")
+            
+        return True , high_flow
+    
+    else:
+        print(f"✗ MIP model failed: {results.solver.termination_condition}")
+        return False , None
+
     
