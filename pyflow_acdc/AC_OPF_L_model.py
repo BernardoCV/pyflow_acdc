@@ -461,56 +461,51 @@ def AC_constraints(model,grid,AC_info):
         l = grid.lines_AC_ct[line]
         Pto,B = calculate_P(model,l,'to',idx=ct)
         if l.active_config < 0 and not grid.Array_opf:
-            return model.ct_PAC_to[line,ct] == 0
+            pyo.Constraint.Skip
         return model.ct_PAC_to[line,ct] == Pto
     
     def P_from_AC_line_ct(model,line,ct):       
        l = grid.lines_AC_ct[line]
        Pfrom,B = calculate_P(model,l,'from',idx=ct)
        if l.active_config < 0 and not grid.Array_opf:
-            return model.ct_PAC_from[line,ct] == 0
+            pyo.Constraint.Skip
        return model.ct_PAC_from[line,ct] == Pfrom
     
     def P_to_AC_line_ct_upper(model, line, ct):
         l = grid.lines_AC_ct[line]
-        if l.active_config < 0 and not grid.Array_opf:
-            return model.ct_PAC_from[line,ct] == 0
+
         Pto,B = calculate_P(model, l, 'to', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_to[line, ct] - Pto <= M * (1 - model.ct_branch[line, ct])
 
     def P_to_AC_line_ct_lower(model, line, ct):
         l = grid.lines_AC_ct[line]
-        if l.active_config < 0 and not grid.Array_opf:
-            return model.ct_PAC_from[line,ct] == 0
         Pto,B = calculate_P(model, l, 'to', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_to[line, ct] - Pto >= -M * (1 - model.ct_branch[line, ct])
 
     def P_from_AC_line_ct_upper(model, line, ct):
         l = grid.lines_AC_ct[line]
-        if l.active_config < 0 and not grid.Array_opf:
-            return model.ct_PAC_from[line,ct] == 0
         Pfrom,B = calculate_P(model, l, 'from', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_from[line, ct] - Pfrom <= M * (1 - model.ct_branch[line, ct])
 
     def P_from_AC_line_ct_lower(model, line, ct):
         l = grid.lines_AC_ct[line]
-        if l.active_config < 0 and not grid.Array_opf:
-            return model.ct_PAC_from[line,ct] == 0
         Pfrom,B = calculate_P(model, l, 'from', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_from[line, ct] - Pfrom >= -M * (1 - model.ct_branch[line, ct])
 
     
     if grid.CT_AC:   
-        #model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
-        #model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
-        model.ct_Pto_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_upper)
-        model.ct_Pto_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_lower)
-        model.ct_Pfrom_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_upper)
-        model.ct_Pfrom_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_lower)
+        if not grid.Array_opf:
+            model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
+            model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
+        else:
+            model.ct_Pto_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_upper)
+            model.ct_Pto_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_lower)
+            model.ct_Pfrom_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_upper)
+            model.ct_Pfrom_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_lower)
     
     
     "AC inequality constraints"
