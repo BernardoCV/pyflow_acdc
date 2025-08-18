@@ -135,6 +135,7 @@ __all__ = [
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
+    'simple_CSS',
     'sequential_CSS',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',

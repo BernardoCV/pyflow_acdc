@@ -943,7 +943,7 @@ def ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=True
 
 
 
-def create_master_problem_gurobi(grid, max_flow=None):
+def create_master_problem_gurobi(grid, crossings=False, max_flow=None):
     master = gp.Model("Master")
     if max_flow is None:
         max_flow = len(grid.nodes_AC) - 1
@@ -1078,22 +1078,29 @@ def create_master_problem_gurobi(grid, max_flow=None):
             name=f"flow_investment_link_lower_{line}"
         )
     
-
-
-
-
+    # Add crossing constraints if grid has crossing groups
+    if hasattr(grid, 'crossing_groups') and grid.crossing_groups:
+        for group_idx, group in enumerate(grid.crossing_groups):
+            # Constraint: for each crossing group, only one line can be active
+            # Sum of all line_vars in this crossing group must be <= 1
+            crossing_sum = sum(line_vars[line] for line in lista_lineas_AC_ct 
+                              if grid.lines_AC_ct[line].lineNumber in group)
+            master.addConstr(
+                crossing_sum <= 1,
+                name=f"crossing_constraint_{group_idx}"
+            )
 
     master.setObjective(investment_cost, GRB.MINIMIZE)
     master.update()
     return master, line_vars, flow_vars, node_flow_vars
 
 
-def test_master_problem_gurobi(grid, max_flow=None):
+def test_master_problem_gurobi(grid, crossings=False, max_flow=None):
     """Simple test for master problem"""
     print("Testing Master Problem...")
     
     # Create and solve master problem
-    master, line_vars, flow_vars,node_flow_vars = create_master_problem_gurobi(grid, max_flow)
+    master, line_vars, flow_vars,node_flow_vars = create_master_problem_gurobi(grid, crossings, max_flow)
     
     # Try to solve (should be feasible)
     master.setParam('OutputFlag', 1)  # Show output for debugging

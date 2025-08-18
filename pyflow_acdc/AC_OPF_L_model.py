@@ -461,37 +461,40 @@ def AC_constraints(model,grid,AC_info):
         l = grid.lines_AC_ct[line]
         Pto,B = calculate_P(model,l,'to',idx=ct)
         if l.active_config < 0 and not grid.Array_opf:
-            pyo.Constraint.Skip
+            return model.ct_PAC_to[line,ct] == 0
         return model.ct_PAC_to[line,ct] == Pto
     
     def P_from_AC_line_ct(model,line,ct):       
        l = grid.lines_AC_ct[line]
        Pfrom,B = calculate_P(model,l,'from',idx=ct)
        if l.active_config < 0 and not grid.Array_opf:
-            pyo.Constraint.Skip
+            return model.ct_PAC_from[line,ct] == 0
        return model.ct_PAC_from[line,ct] == Pfrom
     
     def P_to_AC_line_ct_upper(model, line, ct):
         l = grid.lines_AC_ct[line]
-
+        
         Pto,B = calculate_P(model, l, 'to', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_to[line, ct] - Pto <= M * (1 - model.ct_branch[line, ct])
 
     def P_to_AC_line_ct_lower(model, line, ct):
         l = grid.lines_AC_ct[line]
+       
         Pto,B = calculate_P(model, l, 'to', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_to[line, ct] - Pto >= -M * (1 - model.ct_branch[line, ct])
 
     def P_from_AC_line_ct_upper(model, line, ct):
         l = grid.lines_AC_ct[line]
+        
         Pfrom,B = calculate_P(model, l, 'from', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_from[line, ct] - Pfrom <= M * (1 - model.ct_branch[line, ct])
 
     def P_from_AC_line_ct_lower(model, line, ct):
         l = grid.lines_AC_ct[line]
+        
         Pfrom,B = calculate_P(model, l, 'from', idx=ct)
         M = B * 3.1416
         return model.ct_PAC_from[line, ct] - Pfrom >= -M * (1 - model.ct_branch[line, ct])
@@ -1167,7 +1170,7 @@ def apply_oversizing_fixes_grid(grid, oversizing_type1, oversizing_type2, tee=Tr
     
     return fixes_applied
     
-def create_master_problem_pyomo(grid, max_flow=None):
+def create_master_problem_pyomo(grid,crossings=False, max_flow=None):
         """Create master problem using Pyomo"""
         
         if max_flow is None:
@@ -1283,24 +1286,39 @@ def create_master_problem_pyomo(grid, max_flow=None):
         model.flow_investment_link = pyo.Constraint(model.lines, rule=flow_investment_rule)
         model.flow_investment_link_2 = pyo.Constraint(model.lines, rule=flow_investment_rule_2)
         
+        # Add crossing constraints if crossings=True
+        if crossings and hasattr(grid, 'crossing_groups') and grid.crossing_groups:
+            # Create a set for crossing groups
+            model.crossing_groups = pyo.Set(initialize=range(len(grid.crossing_groups)))
+            
+            # Constraint: for each crossing group, only one line can be active
+            def crossing_constraint_rule(model, group_idx):
+                group = grid.crossing_groups[group_idx]
+                # Sum of all line_used variables in this crossing group must be <= 1
+                return sum(model.line_used[line] for line in model.lines 
+                          if grid.lines_AC_ct[line].lineNumber in group) <= 1
+            
+            model.crossing_constraints = pyo.Constraint(model.crossing_groups, rule=crossing_constraint_rule)
+        
         return model
     
     
-def test_master_problem_pyomo(grid, max_flow=None, solver_name='glpk',tee=False):
+def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=False):
     """Test master problem using Pyomo with open-source solver"""
     
     # Create model
-    model = create_master_problem_pyomo(grid, max_flow)
+    model = create_master_problem_pyomo(grid,crossings, max_flow)
     
     # Create solver
     solver = pyo.SolverFactory(solver_name)
     
     # Solve
     results = solver.solve(model, tee=tee)
-    print('DEBUG: obj results', model.objective.display())
+    
     # Check results
     if results.solver.termination_condition == pyo.TerminationCondition.optimal:
-        
+        print('DEBUG: MIP problem solved')
+        print('DEBUG: obj results', pyo.value(model.objective))
         # Set active configurations
         # Get the last available cable type index
         last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1

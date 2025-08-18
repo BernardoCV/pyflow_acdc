@@ -679,10 +679,10 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,MIP_tee=False,svg=True):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,limit_crossings= True,max_turbines_per_string= None,LCoE=1,MIP_tee=False,svg=True):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
     from .Graph_and_plot import save_network_svg
-    from .AC_OPF_L_model import test_master_problem_pyomo
+    from .AC_OPF_L_model import MIP_path_graph
     turbines_df = Data["turbine"]
     substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
     
@@ -761,7 +761,11 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     grid.cab_types_allowed = cable_types_allowed
     grid.max_turbines_per_string = max_turbines_per_string
     print(max_turbines_per_string)
-    flag,high_flow = test_master_problem_pyomo(grid,max_flow=max_turbines_per_string,solver_name='glpk',tee=MIP_tee)
+    
+    # Enable crossings if there are crossing groups
+    
+    
+    flag,high_flow = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name='glpk',crossings=limit_crossings,tee=MIP_tee)
     if flag and high_flow < max_turbines_per_string:
         
         t_MW = turbines_df.iloc[0].MW_rating
@@ -775,8 +779,8 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
        
         
         grid.max_turbines_per_string = high_flow
-
-     
+    if not flag:
+        raise ValueError('MIP problem not solved grid graph is not feasible')
     if svg:
         save_network_svg(grid, name='MIP_solve')
     return grid, res

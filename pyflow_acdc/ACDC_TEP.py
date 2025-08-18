@@ -27,6 +27,7 @@ __all__ = [
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
+    'simple_CSS',
     'sequential_CSS',
     'export_TEP_TS_results_to_excel'
 ]
@@ -636,15 +637,130 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False):
-    from .AC_OPF_L_model import test_master_problem_pyomo
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False):
+    from .AC_OPF_L_model import MIP_path_graph
     max_flow = grid.max_turbines_per_string
 
-    #test, high_flow = test_master_problem_pyomo(grid, max_flow, MIP_solver, tee)
-    #identify higest array_config for highest flow
+    staring_cables = grid.Cable_options[0].cable_types
+    new_cables = staring_cables.copy()
+    test = True
+    results = []
+    i = 0
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    t0 = time.time()
+    t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
+    print(f'DEBUG: t_MW {t_MW}')
+    print(f'DEBUG: starting max flow {max_flow}')
+    while test:
+        
+        print(f'DEBUG: Iteration {i}')
+        model, model_results, timing_info, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee)
+        from .Mapping import plot_folium
+        plot_folium(grid,name=f'{i}_{CSS_L_solver}')
+        if model_results['Solver'][0]['Status'] == 'ok':
+            obj_value = pyo.value(model.obj)
+        else:
+            obj_value = None  # or some default value
+
+        # Create a dictionary for this iteration's results
+        iteration_result = {
+            'model_obj': obj_value,  # Save the objective value
+            'cables_used': new_cables.copy(),  # Save a copy of the cable list
+            'model_results': model_results,
+            'solver_stats': solver_stats,
+            'timing_info': timing_info,
+            'model': model,
+            'i': i,
+        }
+        
+        results.append(iteration_result)  # Add to the results list
+        
+        # Analyze which cable types were used in the optimization
+        if model_results['Solver'][0]['Status'] == 'ok':
+            # Get the cable types that were actually used
+            used_cable_types = []
+            for ct in model.ct_set:
+                if pyo.value(model.ct_types[ct]) > 0.5:  # Binary variable > 0.5 means it was selected
+                    used_cable_types.append(ct)
+            
+            print(f'DEBUG: Used cable types: {used_cable_types}')
+            
+            if used_cable_types:
+                # Find the largest cable type that was used
+                largest_used_index = max(used_cable_types)
+                print(f'DEBUG: Largest used cable type index: {largest_used_index}')
+                
+                # Remove the largest used cable type and all larger ones
+                # Since cable types are sorted by capacity (smallest to largest),
+                # we remove from the largest_used_index onwards
+                new_cables = new_cables[:largest_used_index]
+                print(f'DEBUG: Removed cable types >= {largest_used_index}, remaining: {new_cables}')
+            else:
+                # No cable types were used, remove the largest one
+                new_cables.pop()
+                print(f'DEBUG: No cable types used, removed largest, remaining: {new_cables}')
+        else:
+            # Optimization failed, remove the largest cable type
+            new_cables.pop()
+            print(f'DEBUG: Optimization failed, removed largest, remaining: {new_cables}')
+        
+        # Update grid with new cable set
+        if len(new_cables) > 0:
+            grid.Cable_options[0].cable_types = new_cables
+            
+            # Recalculate max_flow based on current cable set
+            max_cable_capacity = max(grid.Cable_options[0].MVA_ratings)
+            max_flow = int(max_cable_capacity / t_MW)
+        else:
+            print("DEBUG: No more cable types available")
+            break
+
+        i += 1
+        test, high_flow = MIP_path_graph(grid, max_flow, MIP_solver, crossings=limit_crossings, tee=tee)
+        print(f'DEBUG: Test {test}, max_flow: {max_flow}')
     
-    #if not test:
-    #    raise ValueError("MIP model did not find a tree array")
+    # After the while loop ends, create summary from all iterations
+    summary_results = {
+        'model_obj':   [result['model_obj'] for result in results],
+        'cables_used': [result['cables_used'] for result in results],
+        'timing_info': [result['timing_info'] for result in results],
+        'solver_status':    [result['model_results']['Solver'][0]['Status']  for result in results],
+        'iteration':   [result['i'] for result in results]
+    }
+
+    # Find best result
+    best_result = min(results, key=lambda x: x['model_obj'])
+    i = best_result['i']
+
+    grid.Cable_options[0].cable_types = best_result['cables_used']
+
+    model = best_result['model']
+    model_results = best_result['model_results']
+    timing_info = best_result['timing_info']
+    solver_stats = best_result['solver_stats']
+
+    t1 = time.time()
+    if NL:
+        ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
+    else:
+        ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
+
+    present_value = Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
+
+    grid.TEP_run=True
+    grid.OPF_obj = weights_def
+
+    t_modelexport = time.time() - t1
+    timing_info['export'] = t_modelexport
+    timing_info['sequential'] = t1 - t0
+
+    return model, model_results , timing_info, solver_stats
+
+def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False):
+
     grid.Array_opf = False
     if NL:
         model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee)
@@ -652,6 +768,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clusterin
         model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,time_limit,tee)
 
     return model, model_results , timing_info, solver_stats
+
+
 def TEP_subObj(submodel,grid,ObjRule):
     OnlyGen=True
 

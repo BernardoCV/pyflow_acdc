@@ -2001,6 +2001,7 @@ class Cable_options:
     Cable_options_num = 0
     names = set()
     _cable_database = None  
+    
     def _calculate_MVA_ratings(self,cable_types):
         mva_ratings = []
         for cable_type in cable_types:
@@ -2014,7 +2015,24 @@ class Cable_options:
                 mva_ratings.append(MVA_rating)
             else:
                 raise ValueError(f"Cable type '{cable_type}' not found in database")
-        return mva_ratings    
+        return mva_ratings
+
+    
+    def sort_cable_types_by_capacity(self):
+        """Sort cable types by MVA rating (smallest to largest)"""
+        # Create list of tuples (cable_type, mva_rating)
+        cable_ratings = list(zip(self._cable_types, self.MVA_ratings))
+        
+        # Sort by MVA rating (ascending order)
+        cable_ratings.sort(key=lambda x: x[1])
+        
+        # Update cable types and ratings
+        self._cable_types = [cable for cable, _ in cable_ratings]
+        self.MVA_ratings = [rating for _, rating in cable_ratings]
+        
+        # Update all linked lines
+        for line in self.lines:
+            line.cable_types = self._cable_types
 
     @classmethod
     def load_cable_database(cls):
@@ -2055,6 +2073,9 @@ class Cable_options:
         
         # Efficiently calculate MVA ratings in one pass
         self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+        
+        # Sort by capacity (smallest to largest)
+        self.sort_cable_types_by_capacity()
     
         if name is None:
             self.name = str(self.Cable_options_num)
@@ -2063,7 +2084,6 @@ class Cable_options:
             
         Cable_options.names.add(self.name)
         
-
     @property
     def cable_types(self):
         return self._cable_types
