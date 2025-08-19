@@ -1303,7 +1303,7 @@ def create_master_problem_pyomo(grid,crossings=False, max_flow=None):
         return model
     
     
-def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=False):
+def MIP_path_graph(grid, max_flow=None, solver_time=None, solver_name='glpk',crossings=False,tee=False):
     """Test master problem using Pyomo with open-source solver"""
     
     # Create model
@@ -1312,12 +1312,19 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=F
     # Create solver
     solver = pyo.SolverFactory(solver_name)
     
+    if solver_time is not None:
+        solver.options['TimeLimit']=solver_time
+
     # Solve
     results = solver.solve(model, tee=tee)
     
     # Check results
-    if results.solver.termination_condition == pyo.TerminationCondition.optimal:
-        print('DEBUG: MIP problem solved')
+    if results.solver.termination_condition in [
+        pyo.TerminationCondition.optimal, 
+        pyo.TerminationCondition.maxTimeLimit,
+        pyo.TerminationCondition.feasible
+    ]:
+        print(f'DEBUG: MIP problem solved with termination condition: {results.solver.termination_condition}')
         print('DEBUG: obj results', pyo.value(model.objective))
         # Set active configurations
         # Get the last available cable type index
@@ -1372,6 +1379,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=F
     
     else:
         print(f"✗ MIP model failed: {results.solver.termination_condition}")
+        
         return False , None
 
     

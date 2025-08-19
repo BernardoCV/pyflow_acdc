@@ -679,7 +679,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,limit_crossings= True,max_turbines_per_string= None,LCoE=1,MIP_tee=False,svg=True):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,limit_crossings= True,max_turbines_per_string= None,LCoE=1,MIP_solver='glpk',MIP_time=500,MIP_tee=False,svg=True):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
     from .Graph_and_plot import save_network_svg
     from .AC_OPF_L_model import MIP_path_graph
@@ -765,7 +765,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     # Enable crossings if there are crossing groups
     
     
-    flag,high_flow = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name='glpk',crossings=limit_crossings,tee=MIP_tee)
+    flag,high_flow = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_time=MIP_time,solver_name=MIP_solver,crossings=limit_crossings,tee=MIP_tee)
     if flag and high_flow < max_turbines_per_string:
         
         t_MW = turbines_df.iloc[0].MW_rating

@@ -637,7 +637,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False):
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False):
     from .AC_OPF_L_model import MIP_path_graph
     max_flow = grid.max_turbines_per_string
 
@@ -651,12 +651,19 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
     print(f'DEBUG: t_MW {t_MW}')
     print(f'DEBUG: starting max flow {max_flow}')
+
+    if max_iter is None:
+        max_iter = len(grid.Cable_options[0].cable_types)
+
     while test:
         
         print(f'DEBUG: Iteration {i}')
         model, model_results, timing_info, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee)
-        from .Mapping import plot_folium
-        plot_folium(grid,name=f'{i}_{CSS_L_solver}')
+        
+        if svg is not None:
+            from .Graph_and_plot import save_network_svg
+            save_network_svg(grid, name=f'{svg}_{i}_{CSS_L_solver}', width=1000, height=1000, journal=True, legend=True)
+
         if model_results['Solver'][0]['Status'] == 'ok':
             obj_value = pyo.value(model.obj)
         else:
@@ -673,6 +680,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             'i': i,
         }
         
+   
+
         results.append(iteration_result)  # Add to the results list
         
         # Analyze which cable types were used in the optimization
@@ -716,6 +725,9 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             break
 
         i += 1
+        if i >= max_iter:
+            break
+        
         test, high_flow = MIP_path_graph(grid, max_flow, MIP_solver, crossings=limit_crossings, tee=tee)
         print(f'DEBUG: Test {test}, max_flow: {max_flow}')
     
