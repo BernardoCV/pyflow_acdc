@@ -203,6 +203,6 @@ Export Results
 
 **References**
 
-.. [1] B. C. Valerio, M. Cheah-Mane, V. A. Lacerda, P. Gebraad and O. Gomis-Bellmunt,
-       "Transmission expansion planning for hybrid AC/DC grids using a
-       Mixed-Integer Non-linear Programming approach"
+.. [1] Castro Valerio, Bernardo and Cheah-Mane, Marc and Albernaz, Vinícius and Gebraad, Pieter 
+       and Gomis-Bellmunt, Oriol, Transmission Expansion Planning for Hybrid Ac/Dc Grids Using a 
+       Mixed-Integer Non-Linear Programming Approach. Available at SSRN: https://ssrn.com/abstract=5385596
