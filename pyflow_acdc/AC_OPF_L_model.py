@@ -62,10 +62,6 @@ def Generation_variables(model,grid,gen_info,TEP):
         gen = grid.Generators[g]
         return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
         
-    def Q_Gen_bounds(model, g):
-        gen = grid.Generators[g]
-        return (gen.Min_pow_genR*gen.np_gen,gen.Max_pow_genR*gen.np_gen)
-    
     def P_gen_ini(model,ngen):
         gen = grid.Generators[ngen]
         min_pow_gen = gen.Min_pow_gen * gen.np_gen
@@ -76,7 +72,6 @@ def Generation_variables(model,grid,gen_info,TEP):
         elif ini>max_pow_gen: 
             ini=max_pow_gen
         return (ini)
-    
 
 
     model.gen_AC     = pyo.Set(initialize=lista_gen)
@@ -87,7 +82,6 @@ def Generation_variables(model,grid,gen_info,TEP):
     else:
         model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
           
-    
     model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)       
     s=1
 def AC_variables(model,grid,AC_info,PV_set):
@@ -154,8 +148,7 @@ def AC_variables(model,grid,AC_info,PV_set):
     # Create bounds functions dynamically
     toExp_opt_bounds    = make_opt_bounds('connected_toExpLine')
     fromExp_opt_bounds  = make_opt_bounds('connected_fromExpLine')
-    toTF_opt_bounds     = make_opt_bounds('connected_toTFLine')
-    fromTF_opt_bounds   = make_opt_bounds('connected_fromTFLine')
+    
     toREC_opt_bounds    = make_opt_bounds('connected_toRepLine')
     fromREC_opt_bounds  = make_opt_bounds('connected_fromRepLine')
     toCT_opt_bounds     = make_opt_bounds('connected_toCTLine')
@@ -1303,7 +1296,7 @@ def create_master_problem_pyomo(grid,crossings=False, max_flow=None):
         return model
     
     
-def MIP_path_graph(grid, max_flow=None, solver_time=None, solver_name='glpk',crossings=False,tee=False):
+def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=False):
     """Test master problem using Pyomo with open-source solver"""
     
     # Create model
@@ -1312,20 +1305,29 @@ def MIP_path_graph(grid, max_flow=None, solver_time=None, solver_name='glpk',cro
     # Create solver
     solver = pyo.SolverFactory(solver_name)
     
-    if solver_time is not None:
-        solver.options['TimeLimit']=solver_time
+    if grid.MIP_time is not None:
+        if solver_name == 'gurobi': 
+            solver.options['TimeLimit']=grid.MIP_time
+        elif solver_name == 'glpk':
+            solver.options['tmlim'] = 300
+    
 
     # Solve
-    results = solver.solve(model, tee=tee)
+    
+    
     
     # Check results
-    if results.solver.termination_condition in [
-        pyo.TerminationCondition.optimal, 
-        pyo.TerminationCondition.maxTimeLimit,
-        pyo.TerminationCondition.feasible
-    ]:
-        print(f'DEBUG: MIP problem solved with termination condition: {results.solver.termination_condition}')
-        print('DEBUG: obj results', pyo.value(model.objective))
+    try:
+        results = solver.solve(model, tee=tee)
+        _ = pyo.value(model.objective)
+        feasible_solution_found = True
+    except (ValueError, AttributeError):
+        feasible_solution_found = False
+
+    if feasible_solution_found:
+        
+        #print(f'DEBUG: MIP problem solved with termination condition: {results.solver.termination_condition}')
+        #print('DEBUG: obj results', pyo.value(model.objective))
         # Set active configurations
         # Get the last available cable type index
         last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
@@ -1378,7 +1380,7 @@ def MIP_path_graph(grid, max_flow=None, solver_time=None, solver_name='glpk',cro
         return True , high_flow
     
     else:
-        print(f"✗ MIP model failed: {results.solver.termination_condition}")
+        print(f"✗ MIP model failed")
         
         return False , None
 

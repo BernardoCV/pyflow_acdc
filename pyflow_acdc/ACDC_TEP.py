@@ -649,20 +649,20 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
     t0 = time.time()
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
-    print(f'DEBUG: t_MW {t_MW}')
-    print(f'DEBUG: starting max flow {max_flow}')
+    #print(f'DEBUG: t_MW {t_MW}')
+    #print(f'DEBUG: starting max flow {max_flow}')
 
     if max_iter is None:
         max_iter = len(grid.Cable_options[0].cable_types)
 
     while test:
         
-        print(f'DEBUG: Iteration {i}')
+        #print(f'DEBUG: Iteration {i}')
         model, model_results, timing_info, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee)
         
         if svg is not None:
             from .Graph_and_plot import save_network_svg
-            save_network_svg(grid, name=f'{svg}_{i}_{CSS_L_solver}', width=1000, height=1000, journal=True, legend=True)
+            save_network_svg(grid, name=f'{svg}_{i}_{CSS_L_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
 
         if model_results['Solver'][0]['Status'] == 'ok':
             obj_value = pyo.value(model.obj)
@@ -680,7 +680,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             'i': i,
         }
         
-   
+        #print('DEBUG: Iteration',i)
 
         results.append(iteration_result)  # Add to the results list
         
@@ -692,26 +692,26 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
                 if pyo.value(model.ct_types[ct]) > 0.5:  # Binary variable > 0.5 means it was selected
                     used_cable_types.append(ct)
             
-            print(f'DEBUG: Used cable types: {used_cable_types}')
+            #print(f'DEBUG: Used cable types: {used_cable_types}')
             
             if used_cable_types:
                 # Find the largest cable type that was used
                 largest_used_index = max(used_cable_types)
-                print(f'DEBUG: Largest used cable type index: {largest_used_index}')
+                #print(f'DEBUG: Largest used cable type index: {largest_used_index}')
                 
                 # Remove the largest used cable type and all larger ones
                 # Since cable types are sorted by capacity (smallest to largest),
                 # we remove from the largest_used_index onwards
                 new_cables = new_cables[:largest_used_index]
-                print(f'DEBUG: Removed cable types >= {largest_used_index}, remaining: {new_cables}')
+                #print(f'DEBUG: Removed cable types >= {largest_used_index}, remaining: {new_cables}')
             else:
                 # No cable types were used, remove the largest one
                 new_cables.pop()
-                print(f'DEBUG: No cable types used, removed largest, remaining: {new_cables}')
+                #print(f'DEBUG: No cable types used, removed largest, remaining: {new_cables}')
         else:
             # Optimization failed, remove the largest cable type
             new_cables.pop()
-            print(f'DEBUG: Optimization failed, removed largest, remaining: {new_cables}')
+            #print(f'DEBUG: Optimization failed, removed largest, remaining: {new_cables}')
         
         # Update grid with new cable set
         if len(new_cables) > 0:
@@ -729,7 +729,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             break
         
         test, high_flow = MIP_path_graph(grid, max_flow, MIP_solver, crossings=limit_crossings, tee=tee)
-        print(f'DEBUG: Test {test}, max_flow: {max_flow}')
+        #print(f'DEBUG: Test {test}, max_flow: {max_flow}')
     
     # After the while loop ends, create summary from all iterations
     summary_results = {
@@ -742,7 +742,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
 
     # Find best result
     best_result = min(results, key=lambda x: x['model_obj'])
-    i = best_result['i']
+    
 
     grid.Cable_options[0].cable_types = best_result['cables_used']
 
@@ -769,7 +769,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     timing_info['export'] = t_modelexport
     timing_info['sequential'] = t1 - t0
 
-    return model, model_results , timing_info, solver_stats
+    return model, summary_results , timing_info, solver_stats
 
 def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False):
 
@@ -920,7 +920,7 @@ def TEP_obj(model,grid,NPV):
             model.ct_crossings = pyo.Set(initialize=list(range(len(grid.crossing_groups))))
             model.ct_crossings_constraint = pyo.Constraint(model.ct_crossings, rule=ct_crossings_rule)
             model.ct_tree_constraint = pyo.Constraint(rule=ct_tree_rule)
-            model.ct_crossings_constraint.pprint()
+            
         else:
             model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)    
         inv_array = Array_investments()

@@ -1129,8 +1129,15 @@ def create_geometries(grid):
                     x, y = pos[node]
                     gen.geometry = Point(x, y)
 
-def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True):
-    """Save the network as SVG file"""
+def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False):
+    """Save the network as SVG file
+    
+    Parameters:
+    -----------
+    square_ratio : bool
+        If True, forces both x and y axes to have the same range (uses the largest range needed)
+        so that one step in x equals one step in y in the coordinate space.
+    """
     try:
         import svgwrite
         
@@ -1166,7 +1173,10 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             # Convert 88mm to pixels (assuming 96 DPI)
             width = int(88 * 96 / 25.4)  # 25.4mm = 1 inch
             # Maintain aspect ratio
-            height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
+            if square_ratio:
+                height = width 
+            else:
+                height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
 
         print(f"Current working directory: {os.getcwd()}")
         print(f"Will save as: {os.path.abspath(f'{name}.svg')}")
@@ -1202,10 +1212,36 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             return
 
         # Calculate scaling factors
-        padding = 50  # pixels of padding
-        scale_x = (width - 2*padding) / (maxx - minx)
-        scale_y = (height - 2*padding) / (maxy - miny)
-        scale = min(scale_x, scale_y)
+        
+        
+        if square_ratio:
+            padding = 10
+            # For square ratio: make both axes have the same range
+            x_range = maxx - minx
+            y_range = maxy - miny
+            max_range = max(x_range, y_range)
+            
+            # Expand the smaller dimension to match the larger one
+            if x_range < max_range:
+                center_x = (minx + maxx) / 2
+                minx = center_x - max_range / 2
+                maxx = center_x + max_range / 2
+            
+            if y_range < max_range:
+                center_y = (miny + maxy) / 2
+                miny = center_y - max_range / 2
+                maxy = center_y + max_range / 2
+            
+            # Now both ranges are equal, so scale_x and scale_y will be the same
+            scale_x = (width - 2*padding) / (maxx - minx)
+            scale_y = (height - 2*padding) / (maxy - miny)
+            scale = min(scale_x, scale_y)  # Will be the same for both, but keeping min for safety
+        else:
+            padding = 25  # pixels of padding
+            # Original scaling logic
+            scale_x = (width - 2*padding) / (maxx - minx)
+            scale_y = (height - 2*padding) / (maxy - miny)
+            scale = min(scale_x, scale_y)
         
         def transform_coords(x, y):
             """Transform coordinates to SVG space"""
@@ -1297,7 +1333,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 x, y = node.geometry.x, node.geometry.y
                 svg_x, svg_y = transform_coords(x, y)
                 color = "black" if isinstance(node, Node_AC) else "purple"
-                dwg.add(dwg.circle(center=(svg_x, svg_y), r=3, 
+                dwg.add(dwg.circle(center=(svg_x, svg_y), r=1, 
                                  fill=color, stroke=color))
                 
         if grid.nct_AC != 0 and hasattr(grid.lines_AC_ct[0], 'cable_types'):

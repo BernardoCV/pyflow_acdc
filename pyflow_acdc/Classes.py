@@ -74,6 +74,7 @@ class Grid:
         self.lines_AC_ct=[]
         self.cab_types_allowed=3
         self.crossing_groups = []
+        self.MIP_time = None
         
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
