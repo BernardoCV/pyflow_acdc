@@ -1074,12 +1074,15 @@ def mmc_loss(conv,Pc):
     Vdc = conv.Node_DC.V
     Ra = conv.ra
     
-    I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
-
+    #I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
+    I = (-Vdc +np.sqrt(Vdc**2-8*Ra*Pc/3))/(-4*Ra)
+    
     P_loss = 3*I**2*Ra
+    
+    
     P_loss2 = 6*I**2*Ra
     conv.Vsum = -Ra*I + Vdc
-    return P_loss,I
+    return P_loss2,I
 
 def Converter_Qlimit(grid, conv):
 

@@ -31,7 +31,8 @@ class Results:
             print(method_name)
     # def export(self):
 
-    def All(self):
+    def All(self,decimals=2):
+        self.dec = decimals
         if self.Grid.nodes_AC != []:
             self.AC_Powerflow()
             self.AC_voltage()
