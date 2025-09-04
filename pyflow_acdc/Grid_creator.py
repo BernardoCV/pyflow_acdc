@@ -679,7 +679,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,limit_crossings= True,max_turbines_per_string= None,LCoE=1,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
     from .Graph_and_plot import save_network_svg
     from .AC_OPF_L_model import MIP_path_graph
@@ -730,59 +730,70 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     line_objects = {}  # Dictionary to store line objects by their name
     
     for u,v, attrs in array_graph.edges(data=True):
-        tonode = str(array_graph.nodes[u]['original_idx'])
-        fromnode = str(array_graph.nodes[v]['original_idx'])
-                
+        
+        fromnode = str(array_graph.nodes[u]['original_idx'])
+        tonode = str(array_graph.nodes[v]['original_idx'])
+
+
         l = attrs['weight']/1000
         geo= attrs['geometry']
         
-        line_obj = add_line_sizing(grid,tonode,fromnode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{tonode}_{fromnode}',geometry=geo,update_grid=False)
+        line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{fromnode}_{tonode}',geometry=geo,update_grid=False)
         
         # Store the line object with its name for later reference
-        edge_key = f'{tonode}_{fromnode}'
+        edge_key = f'{fromnode}_{tonode}'
         line_objects[edge_key] = line_obj
     
     # Add the complete crossing groups as line numbers to the grid
     grid.crossing_groups = []
-    if 'crossing_paths' in Data and Data['crossing_paths']:
-        for crossing_group in Data['crossing_paths']:
+
+    
+    if 'crossing_pairs' in Data and Data['crossing_pairs']:
+        limit_crossings=True
+        for crossing_group in Data['crossing_pairs']:
             line_numbers_group = []
             for edge_key in crossing_group:
                 if edge_key in line_objects:
                     line_numbers_group.append(line_objects[edge_key].lineNumber)
             if len(line_numbers_group) > 1:  # Only add groups with more than one line
                 grid.crossing_groups.append(line_numbers_group)
-        
-    
-       
+      
     grid.Update_Graph_AC()
     grid.create_Ybus_AC()
     grid.Array_opf = True  
     grid.cab_types_allowed = cable_types_allowed
     grid.max_turbines_per_string = max_turbines_per_string
     
+    grid.MIP_time = MIP_time
     
     # Enable crossings if there are crossing groups
     
-    grid.MIP_time=MIP_time
-    flag,high_flow = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name=MIP_solver,crossings=limit_crossings,tee=MIP_tee)
-    if flag and high_flow < max_turbines_per_string:
+    
+    if MIP_check:
+        grid.MIP_time=MIP_time
+        flag,high_flow,_ = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name=MIP_solver,crossings=limit_crossings,tee=MIP_tee)
         
-        t_MW = turbines_df.iloc[0].MW_rating
-        max_power_per_string = t_MW*high_flow 
-        first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
-        for line in grid.lines_AC_ct:
-            if line.active_config > 0:
-                line.active_config = first_index_to_comply
 
-        grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
-       
+        if not flag:
+            return None, None
+        if  high_flow < max_turbines_per_string:
+            
+            t_MW = turbines_df.iloc[0].MW_rating
+            max_power_per_string = t_MW*high_flow 
+            first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
+            for line in grid.lines_AC_ct:
+                if line.active_config > 0:
+                    line.active_config = first_index_to_comply
+
+            #grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
         
-        grid.max_turbines_per_string = high_flow
-    if not flag:
-        raise ValueError('MIP problem not solved grid graph is not feasible')
-    if svg:
-        save_network_svg(grid, name='MIP_solve')
+            
+            grid.max_turbines_per_string = high_flow
+  
+        if svg:
+            save_network_svg(grid, name='MIP_solve')
+
+        grid.MIP_check = True
     return grid, res
 
 def Create_grid_from_mat(matfile):

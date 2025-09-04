@@ -75,6 +75,7 @@ class Grid:
         self.cab_types_allowed=3
         self.crossing_groups = []
         self.MIP_time = None
+        self.MIP_check = False
         
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
@@ -2071,7 +2072,7 @@ class Cable_options:
         
         self._cable_types = cable_types
         self.lines = []
-        
+        self.active_config = None
         # Efficiently calculate MVA ratings in one pass
         self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
         

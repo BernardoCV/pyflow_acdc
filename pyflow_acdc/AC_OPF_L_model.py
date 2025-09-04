@@ -850,7 +850,7 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False, solver_resu
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-       
+        gen_active_config = {k: np.float64(pyo.value(model.ct_types[k])) for k in model.ct_set}
         # Export network flow values to grid if available
         if hasattr(model, 'network_flow'):
             for line in grid.lines_AC_ct:
@@ -860,7 +860,9 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False, solver_resu
                     except:
                         line.network_flow = 0.0
         
-        
+        grid.Cable_options[0].active_config = gen_active_config
+        print(f'DEBUG: gen_active_config {gen_active_config}')
+
         def process_line_AC_CT(line):
             l = line.lineNumber
             ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
@@ -1163,7 +1165,7 @@ def apply_oversizing_fixes_grid(grid, oversizing_type1, oversizing_type2, tee=Tr
     
     return fixes_applied
     
-def create_master_problem_pyomo(grid,crossings=False, max_flow=None):
+def create_master_problem_pyomo(grid,crossings=True, max_flow=None):
         """Create master problem using Pyomo"""
         
         if max_flow is None:
@@ -1292,7 +1294,7 @@ def create_master_problem_pyomo(grid,crossings=False, max_flow=None):
                           if grid.lines_AC_ct[line].lineNumber in group) <= 1
             
             model.crossing_constraints = pyo.Constraint(model.crossing_groups, rule=crossing_constraint_rule)
-        
+            
         return model
     
     
@@ -1377,11 +1379,11 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=F
             print(f"  Total sink flow: {total_sink_flow}")
             print(f"  Flow conservation check: {total_source_flow + total_sink_flow == 0}")
             
-        return True , high_flow
+        return True , high_flow ,model
     
     else:
         print(f"✗ MIP model failed")
         
-        return False , None
+        return False , None,model
 
     

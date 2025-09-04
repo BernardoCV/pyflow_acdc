@@ -1349,19 +1349,41 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             
             # Add legend items
             if legend:
-                for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
-                    color = cable_type_colors.get(i, "black")
-                    # Add colored line
-                    dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
-                                end=(legend_x + 30, legend_y + i * legend_spacing),
-                                stroke=color,
-                                stroke_width=2))
-                    # Add text
-                    dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
-                                    insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
-                                    font_size=12,
-                                    font_family="NewComputerModernSans",
-                                    fill=color))
+
+                if grid.Cable_options[0].active_config is not None:
+                # Only show cable types that are active (>0.9)
+                    space = 0
+                    for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                        if grid.Cable_options[0].active_config[i] > 0.9:
+                            space += 1
+                            color = cable_type_colors.get(i, "black")
+                            # Add colored line
+                            dwg.add(dwg.line(start=(legend_x, legend_y + space * legend_spacing),
+                                        end=(legend_x + 30, legend_y + space * legend_spacing),
+                                        stroke=color,
+                                        stroke_width=2))
+                            # Add text
+                            dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                            insert=(legend_x + 40, legend_y + space * legend_spacing + 5),
+                                            font_size=12,
+                                            font_family="NewComputerModernSans",
+                                            fill=color))
+                
+                else:
+                    
+                    for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                        color = cable_type_colors.get(i, "black")
+                        # Add colored line
+                        dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
+                                    end=(legend_x + 30, legend_y + i * legend_spacing),
+                                    stroke=color,
+                                    stroke_width=2))
+                        # Add text
+                        dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                        insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
+                                        font_size=12,
+                                        font_family="NewComputerModernSans",
+                                        fill=color))
         
         # Save the SVG file
         dwg.save()

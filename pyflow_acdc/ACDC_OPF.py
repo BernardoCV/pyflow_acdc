@@ -522,7 +522,26 @@ def OPF_solve(model,grid,solver = 'ipopt',tee=False,time_limit=None):
     # Print the regex match attempt
     #match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
     #num_iterations = int(match.group(1)) if match else None
-    results = opt.solve(model,tee=tee)
+    
+    
+   
+    try:
+        results = opt.solve(model, tee=tee)
+        # Try both possible objective attribute names
+        try:
+            _ = pyo.value(model.obj)
+        except AttributeError:
+            try:
+                _ = pyo.value(model.objective)
+            except AttributeError:
+                print("Warning: No objective function found in model")
+        feasible_solution_found = True
+    except (ValueError, AttributeError):
+        feasible_solution_found = False
+
+    if not feasible_solution_found:
+        return None, None
+    
     num_iterations = None
 
     solver_stats = {

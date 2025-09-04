@@ -1,0 +1,25 @@
+# Cable specifications
+# These cables are meerly for academic and testing purposes    
+# Units:
+#   - Resistance: ohm/km
+#   - Inductance: mH/km
+#   - Capacitance: µF/km
+#   - Conductance: µS/km
+#   - Current rating: A
+#   - Power rating: MVA
+#   - Nominal voltage: kV
+#   - conductor_size: mm^2
+#   - Cost_per_km: EUR/km
+#   - Type: AC or DC
+400kV_630mm2_ground_flat_Cu_ABB_XLPE:
+  R_Ohm_km: 0.04690000246408756
+  L_mH_km: 0.6
+  C_uF_km: 0.13
+  G_uS_km: 0
+  A_rating: 748.75
+  MVA_rating: 518.7492168668788
+  Nominal_voltage_kV: 400.0
+  conductor_size: 630
+  Cost_per_km: 402687.0
+  Type: AC
+  Reference: ABB
