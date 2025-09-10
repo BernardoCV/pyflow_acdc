@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 45kV_630mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.04690000471253831
+  R_Ohm_km: 0.04690000361392126
   L_mH_km: 0.33
   C_uF_km: 0.35
   G_uS_km: 0
-  A_rating: 790.0
-  MVA_rating: 61.57440620907358
+  A_rating: 640.0
+  MVA_rating: 49.88306325798366
   Nominal_voltage_kV: 45.0
   conductor_size: 630
   Cost_per_km: 402687.0

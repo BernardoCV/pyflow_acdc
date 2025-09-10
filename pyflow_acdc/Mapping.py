@@ -12,7 +12,7 @@ import webbrowser
 from .Graph_and_plot import update_hovertexts, create_subgraph_color_dict
 from .Classes import Node_AC
 
-def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None):
+def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None,show=True):
     # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter" 
     if name is None:
         name = grid.name
@@ -468,5 +468,6 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     abs_map_filename = os.path.abspath(map_filename)
     
     # Automatically open the map in the default web browser
-    webbrowser.open(f"file://{abs_map_filename}")
+    if show:
+        webbrowser.open(f"file://{abs_map_filename}")
     return m

@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 500kV_1600mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.018600007980605848
+  R_Ohm_km: 0.018600007022423266
   L_mH_km: 0.52
   C_uF_km: 0.18
   G_uS_km: 0
-  A_rating: 1121.25
-  MVA_rating: 971.0309839933018
+  A_rating: 898.75
+  MVA_rating: 778.3403316512643
   Nominal_voltage_kV: 500.0
   conductor_size: 1600
   Cost_per_km: 870033.0

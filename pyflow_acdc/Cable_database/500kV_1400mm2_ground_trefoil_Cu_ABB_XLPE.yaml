@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 500kV_1400mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.019800007229551993
+  R_Ohm_km: 0.019800006389398103
   L_mH_km: 0.4
   C_uF_km: 0.18
   G_uS_km: 0
-  A_rating: 1133.75
-  MVA_rating: 981.8563015406072
+  A_rating: 888.75
+  MVA_rating: 769.6800776134198
   Nominal_voltage_kV: 500.0
   conductor_size: 1400
   Cost_per_km: 773673.0

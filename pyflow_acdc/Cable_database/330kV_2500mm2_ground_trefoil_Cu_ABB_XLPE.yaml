@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 330kV_2500mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.012000015433867492
+  R_Ohm_km: 0.012000013115368066
   L_mH_km: 0.35
   C_uF_km: 0.25
   G_uS_km: 0
-  A_rating: 1377.5
-  MVA_rating: 787.3469958506223
+  A_rating: 1075.1219512195123
+  MVA_rating: 614.5147284687786
   Nominal_voltage_kV: 330.0
   conductor_size: 2500
   Cost_per_km: 1303653.0

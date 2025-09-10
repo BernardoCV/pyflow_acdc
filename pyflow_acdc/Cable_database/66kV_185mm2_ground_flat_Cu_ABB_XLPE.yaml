@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 66kV_185mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.16400000092471484
+  R_Ohm_km: 0.16400000074284224
   L_mH_km: 0.64
-  C_uF_km: 2.1
+  C_uF_km: 0.2
   G_uS_km: 0
-  A_rating: 432.5
-  MVA_rating: 49.4413903020536
+  A_rating: 341.25
+  MVA_rating: 39.01011431347004
   Nominal_voltage_kV: 66.0
   conductor_size: 185
   Cost_per_km: 188286.0

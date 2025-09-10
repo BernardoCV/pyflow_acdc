@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 275kV_1400mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.01980000817120998
+  R_Ohm_km: 0.019800007001613065
   L_mH_km: 0.37
   C_uF_km: 0.21
   G_uS_km: 0
-  A_rating: 1133.75
-  MVA_rating: 540.020965847334
+  A_rating: 888.75
+  MVA_rating: 423.32404268738094
   Nominal_voltage_kV: 275.0
   conductor_size: 1400
   Cost_per_km: 773673.0

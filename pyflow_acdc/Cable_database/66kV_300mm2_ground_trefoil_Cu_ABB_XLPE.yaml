@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 66kV_300mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.10000000173712649
+  R_Ohm_km: 0.10000000136475871
   L_mH_km: 0.38
-  C_uF_km: 2.6
+  C_uF_km: 0.24
   G_uS_km: 0
-  A_rating: 552.5
-  MVA_rating: 63.1592326979991
+  A_rating: 432.5
+  MVA_rating: 49.4413903020536
   Nominal_voltage_kV: 66.0
   conductor_size: 300
   Cost_per_km: 243692.99999999997

@@ -758,7 +758,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
 
         
         
-        print('DEBUG: Iteration',i)
+        #print('DEBUG: Iteration',i)
 
         used_cable_types = []
         used_cable_names = []
@@ -807,6 +807,10 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             'i': i,
         }
         results.append(iteration_result)  # Add to the results list   
+        
+        if i > 0 and obj_value is not None and results[i-1]['model_obj'] is not None:
+            if obj_value > results[i-1]['model_obj']:
+                break
         i += 1
         if i > max_iter:
             break

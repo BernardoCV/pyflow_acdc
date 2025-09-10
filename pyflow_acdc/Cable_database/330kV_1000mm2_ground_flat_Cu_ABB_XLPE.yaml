@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 330kV_1000mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.029100004888613824
+  R_Ohm_km: 0.02910000427049576
   L_mH_km: 0.55
   C_uF_km: 0.17
   G_uS_km: 0
-  A_rating: 892.5
-  MVA_rating: 510.13226409922356
+  A_rating: 760.0
+  MVA_rating: 434.3983425382744
   Nominal_voltage_kV: 330.0
   conductor_size: 1000
   Cost_per_km: 580953.0

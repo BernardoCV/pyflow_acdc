@@ -9,7 +9,7 @@ import base64
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import os
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString,Polygon,MultiPolygon
 
 from .Classes import Node_AC
 
@@ -1129,7 +1129,7 @@ def create_geometries(grid):
                     x, y = pos[node]
                     gen.geometry = Point(x, y)
 
-def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False):
+def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False,poly=None,linestrings=None):
     """Save the network as SVG file
     
     Parameters:
@@ -1201,6 +1201,24 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             if hasattr(gen, 'geometry') and gen.geometry:
                 all_bounds.append(gen.geometry.bounds)
         
+        # Add polygon bounds if provided
+        def _iter_polys(obj):
+            if obj is None:
+                return
+            if isinstance(obj, Polygon):
+                yield obj
+            elif isinstance(obj, MultiPolygon):
+                for poly in obj.geoms:
+                    yield poly
+            elif isinstance(obj, (list, tuple)):
+                for o in obj:
+                    yield from _iter_polys(o)  # Recursively handle nested structures
+
+        if poly is not None:
+            for geom in _iter_polys(poly):
+                all_bounds.append(geom.bounds)
+        
+        
         # Calculate overall bounds
         if all_bounds:
             minx = min(bound[0] for bound in all_bounds)
@@ -1232,10 +1250,10 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 miny = center_y - max_range / 2
                 maxy = center_y + max_range / 2
             
-            # Now both ranges are equal, so scale_x and scale_y will be the same
-            scale_x = (width - 2*padding) / (maxx - minx)
-            scale_y = (height - 2*padding) / (maxy - miny)
-            scale = min(scale_x, scale_y)  # Will be the same for both, but keeping min for safety
+            # Now both ranges are equal, so use the same scale for both axes
+            available_width = width - 2*padding
+            available_height = height - 2*padding
+            scale = min(available_width, available_height) / max_range
         else:
             padding = 25  # pixels of padding
             # Original scaling logic
@@ -1266,7 +1284,60 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             12: 'salmon', 
             13: 'olive'
         }
-        
+    
+     
+        # Draw background polygon(s) if provided (behind lines/nodes)
+                
+        if poly is not None:
+            for geom in _iter_polys(poly):
+                if isinstance(geom, Polygon):
+                    poly_list = [geom]
+                elif isinstance(geom, MultiPolygon):
+                    poly_list = list(geom.geoms)
+                else:
+                    poly_list = []
+                for pg in poly_list:
+                    rings = [list(pg.exterior.coords)] + [list(r.coords) for r in pg.interiors]
+                    d = ""
+                    for coords in rings:
+                        pts = [transform_coords(x, y) for (x, y) in coords]
+                        d += "M " + " L ".join(f"{x},{y}" for (x, y) in pts) + " Z "
+                    dwg.add(dwg.path(
+                        d=d,
+                        fill='#ADD8E6',
+                        stroke='lightblue',
+                        stroke_width=2,
+                        fill_rule='evenodd',
+                        fill_opacity=0.15
+                    ))
+                    
+                    # Draw contour lines (exterior and interior rings)
+                    for coords in rings:
+                        pts = [transform_coords(x, y) for (x, y) in coords]
+                        contour_d = "M " + " L ".join(f"{x},{y}" for (x, y) in pts) + " Z"
+                        dwg.add(dwg.path(
+                            d=contour_d,
+                            fill='none',
+                            stroke='blue',
+                            stroke_width=1
+                        ))
+        # Draw LineStrings if provided
+        if linestrings is not None:
+            for linestring in linestrings:
+                if hasattr(linestring, 'geometry') and linestring.geometry:
+                    coords = list(linestring.geometry.coords)
+                elif hasattr(linestring, 'coords'):
+                    coords = list(linestring.coords)
+                else:
+                    continue
+                    
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]
+                dwg.add(dwg.path(d=path_data, stroke='black', stroke_width=2, fill='none'))
+
         # Draw AC lines
         for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
@@ -1342,13 +1413,15 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             legend_spacing = 20  # Space between legend items
             
             # Add legend title
-            dwg.add(dwg.text("Cable Types", 
-                            insert=(legend_x, legend_y - 10),
-                            font_size=15,
-                            font_family="NewComputerModernSans"))
+            
             
             # Add legend items
             if legend:
+
+                dwg.add(dwg.text("Cable Types", 
+                            insert=(legend_x, legend_y - 10),
+                            font_size=15,
+                            font_family="NewComputerModernSans"))
 
                 if grid.Cable_options[0].active_config is not None:
                 # Only show cable types that are active (>0.9)

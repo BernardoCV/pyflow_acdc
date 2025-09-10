@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 70kV_400mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.07780000227517875
+  R_Ohm_km: 0.07780000181006712
   L_mH_km: 0.37
   C_uF_km: 0.24
   G_uS_km: 0
-  A_rating: 625.0
-  MVA_rating: 75.77722283113837
+  A_rating: 496.25
+  MVA_rating: 60.167114927923876
   Nominal_voltage_kV: 70.0
   conductor_size: 400
   Cost_per_km: 291873.0

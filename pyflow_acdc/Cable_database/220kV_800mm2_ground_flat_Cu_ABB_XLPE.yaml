@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 220kV_800mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.036700003870716466
+  R_Ohm_km: 0.03670000335564297
   L_mH_km: 0.56
   C_uF_km: 0.17
   G_uS_km: 0
-  A_rating: 822.5
-  MVA_rating: 313.4145936295883
+  A_rating: 687.5
+  MVA_rating: 261.97268464479265
   Nominal_voltage_kV: 220.0
   conductor_size: 800
   Cost_per_km: 484593.0

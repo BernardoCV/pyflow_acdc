@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 70kV_240mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.12500000124050942
+  R_Ohm_km: 0.1250000010053323
   L_mH_km: 0.62
   C_uF_km: 0.2
   G_uS_km: 0
-  A_rating: 496.25
-  MVA_rating: 60.167114927923876
+  A_rating: 395.0
+  MVA_rating: 47.89120482927946
   Nominal_voltage_kV: 70.0
   conductor_size: 240
   Cost_per_km: 214785.00000000003

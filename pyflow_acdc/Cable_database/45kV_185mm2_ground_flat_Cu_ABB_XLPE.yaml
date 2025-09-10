@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 45kV_185mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.16400000097642628
+  R_Ohm_km: 0.1640000007668938
   L_mH_km: 0.63
   C_uF_km: 0.22
   G_uS_km: 0
-  A_rating: 432.5
-  MVA_rating: 33.710038842309274
+  A_rating: 341.25
+  MVA_rating: 26.597805213729572
   Nominal_voltage_kV: 45.0
   conductor_size: 185
   Cost_per_km: 188286.0

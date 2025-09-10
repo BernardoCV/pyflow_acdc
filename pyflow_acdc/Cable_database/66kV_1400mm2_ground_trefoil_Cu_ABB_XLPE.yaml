@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 66kV_1400mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.01980001252783192
+  R_Ohm_km: 0.019800009841379692
   L_mH_km: 0.31
-  C_uF_km: 7.3
+  C_uF_km: 0.46
   G_uS_km: 0
-  A_rating: 1177.5
-  MVA_rating: 134.6063285102153
+  A_rating: 907.5
+  MVA_rating: 103.7411831193379
   Nominal_voltage_kV: 66.0
   conductor_size: 1400
   Cost_per_km: 773673.0

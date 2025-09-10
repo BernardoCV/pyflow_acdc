@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 275kV_800mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.03670000379417907
+  R_Ohm_km: 0.03670000330794834
   L_mH_km: 0.56
   C_uF_km: 0.17
   G_uS_km: 0
-  A_rating: 822.5
-  MVA_rating: 391.7682420369854
+  A_rating: 687.5
+  MVA_rating: 327.4658558059909
   Nominal_voltage_kV: 275.0
   conductor_size: 800
   Cost_per_km: 484593.0

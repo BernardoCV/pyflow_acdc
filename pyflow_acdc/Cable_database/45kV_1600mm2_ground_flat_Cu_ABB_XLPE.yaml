@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 45kV_1600mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.01860001432084357
+  R_Ohm_km: 0.018600011185314638
   L_mH_km: 0.46
   C_uF_km: 0.54
   G_uS_km: 0
-  A_rating: 1173.75
-  MVA_rating: 91.48475859227864
+  A_rating: 935.0
+  MVA_rating: 72.8760377284605
   Nominal_voltage_kV: 45.0
   conductor_size: 1600
   Cost_per_km: 870033.0

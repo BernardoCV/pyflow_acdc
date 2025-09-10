@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 110kV_300mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.10000000140879538
+  R_Ohm_km: 0.10000000119148189
   L_mH_km: 0.42
   C_uF_km: 0.17
   G_uS_km: 0
-  A_rating: 543.75
-  MVA_rating: 103.59828892771347
+  A_rating: 428.75
+  MVA_rating: 81.68784621196717
   Nominal_voltage_kV: 110.0
   conductor_size: 300
   Cost_per_km: 243692.99999999997

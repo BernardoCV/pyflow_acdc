@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 220kV_1400mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.01980000834054593
+  R_Ohm_km: 0.019800007112280704
   L_mH_km: 0.37
   C_uF_km: 0.22
   G_uS_km: 0
-  A_rating: 1133.75
-  MVA_rating: 432.0167726778672
+  A_rating: 888.75
+  MVA_rating: 338.6592341499047
   Nominal_voltage_kV: 220.0
   conductor_size: 1400
   Cost_per_km: 773673.0

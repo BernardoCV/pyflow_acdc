@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 400kV_1000mm2_ground_flat_Cu_ABB_XLPE:
-  R_Ohm_km: 0.02910000460800596
+  R_Ohm_km: 0.029100004094786906
   L_mH_km: 0.56
   C_uF_km: 0.16
   G_uS_km: 0
-  A_rating: 892.5
-  MVA_rating: 618.3421383020892
+  A_rating: 760.0
+  MVA_rating: 526.5434455009387
   Nominal_voltage_kV: 400.0
   conductor_size: 1000
   Cost_per_km: 580953.0

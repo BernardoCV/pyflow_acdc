@@ -12,12 +12,12 @@
 #   - Cost_per_km: EUR/km
 #   - Type: AC or DC
 70kV_185mm2_ground_trefoil_Cu_ABB_XLPE:
-  R_Ohm_km: 0.1640000008810397
+  R_Ohm_km: 0.1640000007219248
   L_mH_km: 0.42
   C_uF_km: 0.19
   G_uS_km: 0
-  A_rating: 423.75
-  MVA_rating: 51.37695707951182
+  A_rating: 330.0
+  MVA_rating: 40.01037365484106
   Nominal_voltage_kV: 70.0
   conductor_size: 185
   Cost_per_km: 188286.0
