@@ -349,7 +349,7 @@ def get_TEP_variables(grid):
     return conv_var,DC_line_var,AC_line_var,gen_var
 
 
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=300,tee=False,export=True):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=300,tee=False,export=True,PV_set=False):
 
     analyse_OPF(grid)
     
@@ -358,11 +358,11 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
    
-    t1 = time.time()
+    t1 = time.perf_counter()
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC AC/DC hybrid OPF"
 
-    OPF_create_NLModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    OPF_create_NLModel_ACDC(model,grid,PV_set=PV_set,Price_Zones=PZ,TEP=True)
     
 
     obj_TEP = TEP_obj(model,grid,NPV)
@@ -376,20 +376,20 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     total_cost = obj_TEP + obj_OPF
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
 
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
     # model.obj.pprint()
 
-    model_results,solver_stats = OPF_solve(model,grid,solver)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     if export:
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ,TEP=True)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t2 = time.time() 
+    t2 = time.perf_counter() 
 
     t_modelexport = t2-t1
 
@@ -412,7 +412,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
    
-    t1 = time.time()
+    t1 = time.perf_counter()
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
@@ -428,27 +428,27 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     
 
     total_cost = obj_TEP + obj_OPF
-    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+    model.obj = pyo.Objective(rule=obj_TEP, sense=pyo.minimize)
 
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
 
    
     # model.obj.pprint()
-    t3 = time.time()
+    t3 = time.perf_counter()
     model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
     
     if model_results is None:
         return None, None, None, None
 
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     if export:
         ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t2 = time.time() 
+    t2 = time.perf_counter() 
 
     t_modelexport = t2-t1
 
@@ -464,7 +464,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     return model, model_results , timing_info, solver_stats
     
 
-def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin'):
+def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin',tee=False):
     analyse_OPF(grid)
    
 
@@ -514,7 +514,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     else:
         cab_types_set = []
 
-    t1 = time.time()
+    t1 = time.perf_counter()
     model = pyo.ConcreteModel()
     model.name        ="TEP TS MTDC AC/DC hybrid OPF"
     model.scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
@@ -620,14 +620,14 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     total_cost = obj_TEP + Hy*obj_weighted
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
 
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
-    model_results,solver_stats = OPF_solve(model,grid,solver)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee)
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelexport = t2-t1
         
     # TEP_TS_res ={}
@@ -657,7 +657,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     path_time = 0
     css_time = 0
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
-    t0 = time.time()
+    t0 = time.perf_counter()
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
     #print(f'DEBUG: t_MW {t_MW}')
     #print(f'DEBUG: starting max flow {max_flow}')
@@ -679,19 +679,20 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         timing_info = {}
         
         # Always run MIP check
-        t1 = time.time()
+        t1 = time.perf_counter()
         flag, high_flow,model_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee)
-        t2 = time.time()
+        t2 = time.perf_counter()
         timing_info['Paths'] = t2 - t1
         path_time += t2 - t1
 
         if not flag:
             if i == 0:
                 # If MIP fails on first iteration, return None
-                return None, None, None, None
+                return None, None, None, None,i
             else:
                 # If MIP fails on later iterations, break the loop
                 break
+        MIP_obj_value = pyo.value(model_MIP.objective)
         if  high_flow < max_flow:
             
             max_power_per_string = t_MW*high_flow 
@@ -704,10 +705,10 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
            
             grid.max_turbines_per_string = high_flow
         iter_cab_available= grid.Cable_options[0].cable_types.copy()
-        t3 = time.time()
+        t3 = time.perf_counter()
         #print(f'DEBUG: Iteration {i}')
         model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee,False)
-        t4 = time.time()
+        t4 = time.perf_counter()
         timing_info['CSS'] = t4 - t3
         css_time += t4 - t3
         if svg is not None:
@@ -792,10 +793,11 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         
 
         
-        t5 = time.time()
+        t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
         # Create a dictionary for this iteration's results
         iteration_result = {
+            'cable_length': MIP_obj_value,
             'model_obj': obj_value,  # Save the objective value
             'cable_options': iter_cab_available,  # Save a copy of the cable list
             'cables_used': used_cable_names,
@@ -828,6 +830,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     
     # After the while loop ends, create summary from all iterations
     summary_results = {
+        'cable_length': [result['cable_length'] for result in results],
         'model_obj':    [result['model_obj'] for result in results],
         'cable_options': [result['cable_options'] for result in results],
         'cables_used':  [result['cables_used'] for result in results],
@@ -851,8 +854,9 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     tot_timing_info['Paths'] = path_time
     tot_timing_info['CSS'] = css_time
     solver_stats = best_result['solver_stats']
+    best_i = best_result['i']
 
-    t5 = time.time()
+    t5 = time.perf_counter()
     if NL:
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
     else:
@@ -887,12 +891,12 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     grid.TEP_run=True
     grid.OPF_obj = weights_def
 
-    t_modelexport = time.time() - t5
+    t_modelexport = time.perf_counter() - t5
     tot_timing_info['export'] = t_modelexport
     tot_timing_info['sequential'] = t5 - t0
 
     models = (model_MIP,model)
-    return models, summary_results , tot_timing_info, solver_stats
+    return models, summary_results , tot_timing_info, solver_stats,best_i
 
 def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False,export=True):
 
@@ -900,7 +904,7 @@ def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,
     if NL:
         model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export)
     else:
-        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,time_limit,tee,export)
+        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export)
 
     return model, model_results , timing_info, solver_stats
 

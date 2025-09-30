@@ -1305,7 +1305,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     dwg.add(dwg.path(
                         d=d,
                         fill='#ADD8E6',
-                        stroke='lightblue',
+                        stroke='#ADD8E6',
                         stroke_width=2,
                         fill_rule='evenodd',
                         fill_opacity=0.15

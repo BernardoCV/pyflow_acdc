@@ -18,8 +18,6 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
         name = grid.name
     update_hovertexts(grid, text) 
 
-    # Initialize the map, centred around the North Sea
-    m = folium.Map(location=[56, 10], tiles=tiles,zoom_start=5)
     
     
     G = grid.Graph_toPlot  # Assuming this is your main graph object
@@ -329,7 +327,30 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     popup=row["hover_text"]
                 ).add_to(tech_name)
         s=1
+    # Calculate map center from node coordinates
+    if not gdf_nodes_AC.empty:
+        # Get bounds of all nodes
+        bounds = gdf_nodes_AC.total_bounds
+        # Calculate center point
+        center_lat = (bounds[1] + bounds[3]) / 2  # (min_y + max_y) / 2
+        center_lon = (bounds[0] + bounds[2]) / 2  # (min_x + max_x) / 2
+        map_center = [center_lat, center_lon]
+    else:
+        # Fallback to North Sea if no nodes
+        map_center = [56, 10]
     
+    # Initialize the map, centred around the nodes
+    if tiles.startswith('http'):
+        # Custom tile layer with attribution
+        m = folium.Map(location=map_center, zoom_start=5)
+        folium.TileLayer(
+            tiles=tiles,
+            attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            name='Esri World Imagery'
+        ).add_to(m)
+    else:
+        # Standard tile layer
+        m = folium.Map(location=map_center, tiles=tiles, zoom_start=5)
     
     # Function to add nodes with filtering by type and zone
     def add_nodes(gdf, tech_name):
@@ -441,7 +462,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
         folium.GeoJson(
             polygon,
             name="Area to Study",
-            style_function=lambda x: {"color": "blue", "weight": 2, "opacity": 0.6},
+            style_function=lambda x: {"color": "blue", "weight": 2, "opacity": 0.6, "fill": False},
             show=False
         ).add_to(m)
 

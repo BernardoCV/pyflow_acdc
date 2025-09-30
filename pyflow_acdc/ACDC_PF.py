@@ -57,7 +57,7 @@ def Power_flow(grid,tol_lim=1e-10, maxIter=100):
 
 
 def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
-    time_1 = time.time()
+    time_1 = time.perf_counter()
     grid.Update_PQ_AC()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
@@ -65,20 +65,20 @@ def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
     grid.Update_PQ_AC()
     grid.Line_AC_calc()
     grid.Line_AC_calc_exp()
-    time_2 = time.time()
+    time_2 = time.perf_counter()
     return time_2-time_1,ac_tol
     
 def DC_PowerFlow(grid, tol_lim=1e-10, maxIter=100,Droop_PF=True):
-    time_1 = time.time()
+    time_1 = time.perf_counter()
     grid.Update_P_DC()
     dc_tol =load_flow_DC(grid, tol_lim, maxIter,Droop_PF)
     grid.Update_P_DC()
     grid.Line_DC_calc()
-    time_2 = time.time()
+    time_2 = time.perf_counter()
     return time_2-time_1,dc_tol
 
 def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, internal_tol = 1e-8,change_slack2Droop=False, QLimit=False,Droop_PF=True):
-    time_1 = time.time()
+    time_1 = time.perf_counter()
     tolerance = 1
     grid.iter_num_seq = 0
     
@@ -214,7 +214,7 @@ def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, internal_tol = 1e-8,change_
     grid.Line_AC_calc_exp()
     grid.Line_DC_calc()
     
-    time_2=time.time()
+    time_2=time.perf_counter()
     t = time_2-time_1
     
     return t, tolerance_tracker,ps_iterations

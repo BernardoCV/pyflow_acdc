@@ -708,7 +708,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         grid.max_turbines_per_string = max_turbines_per_string
         
     
-    for node, attrs in array_graph.nodes(data=True):
+    for i, attrs in array_graph.nodes(data=True):
         if attrs['type'] == 'turbine':
             kV=   turbines_df.loc[attrs['original_idx']].kV_rating
             geo = turbines_df.loc[attrs['original_idx']].geometry
@@ -721,10 +721,13 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         if attrs['type'] == 'turbine':
             add_RenSource(grid,node,turbines_df.loc[attrs['original_idx']].MW_rating,ren_type='Wind',min_gamma=1-curtailment_allowed,Qrel=0)
             node.ct_limit = turbines_df.loc[attrs['original_idx']].connections
+            
         if attrs['type'] == 'substation':
             add_extGrid(grid,node,MVAmax=99999,Allow_sell=True,lf=LCoE)
             node.ct_limit = substations_df.loc[attrs['original_idx']].connections
             node.type = 'Slack'
+            node.V_ini = 1
+            node.theta_ini = 0
     
     # First pass: add all lines
     line_objects = {}  # Dictionary to store line objects by their name
@@ -757,7 +760,8 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
                     line_numbers_group.append(line_objects[edge_key].lineNumber)
             if len(line_numbers_group) > 1:  # Only add groups with more than one line
                 grid.crossing_groups.append(line_numbers_group)
-      
+    
+        
     grid.Update_Graph_AC()
     grid.create_Ybus_AC()
     grid.Array_opf = True  

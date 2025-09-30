@@ -15,7 +15,7 @@ from pathlib import Path
 
 def run_test():
     """Test CIGRE B4 power flow."""
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     S_base=100 #MVAres
     
@@ -51,7 +51,7 @@ def run_test():
     #model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
 
     # res.All()
-    end_time = time.time()
+    end_time = time.perf_counter()
     elapsed_time = end_time - start_time
 
     print ('------')

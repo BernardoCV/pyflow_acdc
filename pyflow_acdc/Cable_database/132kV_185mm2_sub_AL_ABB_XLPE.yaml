@@ -10,6 +10,7 @@
 #   - Nominal voltage: kV
 #   - conductor_size: mm^2
 #   - Cost_per_km: EUR/km
+#   Cost are only to be used for academic purposes as they do not reflect the real cost of the cables
 #   - Type: AC or DC
 132kV_185mm2_sub_AL_ABB_XLPE:
   R_Ohm_km: 0.19462643267692922
@@ -20,6 +21,6 @@
   MVA_rating: 76.59128671069575
   Nominal_voltage_kV: 132.0
   conductor_size: 185
-  Cost_per_km: 0
+  Cost_per_km: 188286.0
   Type: AC
   Reference: ABB

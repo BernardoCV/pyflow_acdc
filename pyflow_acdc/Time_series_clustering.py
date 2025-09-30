@@ -858,7 +858,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
         for n in n_clusters_list:
             print(f"  Clusters: {n}")
             
-            start_time = time.time()
+            start_time = time.perf_counter()
             try:
                 
                 n_clusters,_,CoV,data_info = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=ts_options[0],algorithm=algo, cv_threshold=ts_options[1] ,correlation_threshold=ts_options[2],print_details=print_details,correlation_decisions=correlation_decisions)
@@ -869,7 +869,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
                     CoV, inertia = CoV
                 else:
                     inertia = 0
-                time_taken = time.time() - start_time
+                time_taken = time.perf_counter() - start_time
 
                 
                 metrics = evaluate_clustering(data_scaled, labels)
@@ -1536,11 +1536,11 @@ def compare_kmedoids_methods(grid, n_clusters, data, scaling_data=None,
     
     for method in methods:
         try:
-            start_time = time.time()
+            start_time = time.perf_counter()
             method_results = cluster_Kmedoids(grid, n_clusters, data, scaling_data, 
                                             method=method, metric=metric, 
                                             print_details=False)
-            time_taken = time.time() - start_time
+            time_taken = time.perf_counter() - start_time
             
             results[method] = {
                 'CoV': method_results[1][0],

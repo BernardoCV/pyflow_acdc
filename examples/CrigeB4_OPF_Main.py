@@ -12,7 +12,7 @@ import pandas as pd
 import pyflow_acdc as pyf
 import os
 from pathlib import Path
-start_time = time.time()
+start_time = time.perf_counter()
 
 S_base=100 #MVAres
  
@@ -48,7 +48,7 @@ for conv in DCDC_data.itertuples():
 model, model_res , timing_info, solver_stats=pyf.Optimal_PF(grid)
 
 res.All()
-end_time = time.time()
+end_time = time.perf_counter()
 elapsed_time = end_time - start_time
 
 print ('------')

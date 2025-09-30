@@ -197,9 +197,9 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
     model = gp.Model("ACDC_OPF")
     
           
-    t1 = time.time()
+    t1 = time.perf_counter()
     model, gen_vars, ac_vars = OPF_create_LModel_ACDC_gurobi(model,grid)
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2 - t1
     
     # Add pprint method to model for easy inspection
@@ -216,9 +216,9 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
    # model.setParam("Heuristics", 0.9)       # Find feasible layouts fast
  
     #model.setParam("DisplayInterval", 5)    # Optional: watch progress closely
-    t3 = time.time()
+    t3 = time.perf_counter()
     model_res, solver_stats = solve_gurobi_model(model, grid)
-    t4 = time.time()
+    t4 = time.perf_counter()
     
     # Export results
     ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=tee)
@@ -234,7 +234,7 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discoun
     for obj in weights_def:
         weights_def[obj]['v']=calculate_objective(grid,obj,True)
         weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t5 = time.time()  
+    t5 = time.perf_counter()  
     t_modelexport = t5 - t4
     
     grid.OPF_run = True 

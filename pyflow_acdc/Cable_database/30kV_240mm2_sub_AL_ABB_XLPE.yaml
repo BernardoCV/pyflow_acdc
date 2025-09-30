@@ -10,6 +10,7 @@
 #   - Nominal voltage: kV
 #   - conductor_size: mm^2
 #   - Cost_per_km: EUR/km
+#   Cost are only to be used for academic purposes as they do not reflect the real cost of the cables
 #   - Type: AC or DC
 30kV_240mm2_sub_AL_ABB_XLPE:
   R_Ohm_km: 0.15071740519289023
@@ -20,6 +21,6 @@
   MVA_rating: 20.00518682742053
   Nominal_voltage_kV: 30.0
   conductor_size: 240
-  Cost_per_km: 0
+  Cost_per_km: 214785.00000000003
   Type: AC
   Reference: ABB

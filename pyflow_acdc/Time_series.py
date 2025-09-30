@@ -581,9 +581,9 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     
     analyse_OPF(grid)
        
-    t1 = time.time()
+    t1 = time.perf_counter()
     OPF_create_NLModel_ACDC(model,grid,PV_set,price_zone_restrictions)
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
     initial_values = {}
@@ -603,11 +603,11 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
                         price_zone.PGL_min -= price_zone.ImportExpand
                         price_zone.a = -price_zone.b / (2 * price_zone.PGL_min * grid.S_base) 
                     
-        t1= time.time()          
+        t1= time.perf_counter()          
         reset_to_initialize(model, initial_values)
     
         modify_parameters(grid,model,price_zone_restrictions)
-        t2= time.time()  
+        t2= time.perf_counter()  
         t_modelupdate = t2-t1
         
         results, solver_stats = OPF_solve(model,grid)
@@ -663,9 +663,9 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         idx += 1
     
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     ExportACDC_NLmodel_toPyflowACDC(model, grid, price_zone_restrictions)
-    t2 = time.time() 
+    t2 = time.perf_counter() 
     t_modelexport = t2-t1
     touple = pack_variables(Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
                             Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,

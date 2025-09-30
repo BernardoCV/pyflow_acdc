@@ -10,6 +10,7 @@
 #   - Nominal voltage: kV
 #   - conductor_size: mm^2
 #   - Cost_per_km: EUR/km
+#   Cost are only to be used for academic purposes as they do not reflect the real cost of the cables
 #   - Type: AC or DC
 66kV_630mm2_sub_AL_ABB_XLPE:
   R_Ohm_km: 0.06041359572360161
@@ -20,6 +21,6 @@
   MVA_rating: 68.58921197972754
   Nominal_voltage_kV: 66.0
   conductor_size: 630
-  Cost_per_km: 0
+  Cost_per_km: 402687.0
   Type: AC
   Reference: ABB

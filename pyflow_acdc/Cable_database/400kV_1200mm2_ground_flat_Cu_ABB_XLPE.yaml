@@ -10,6 +10,7 @@
 #   - Nominal voltage: kV
 #   - conductor_size: mm^2
 #   - Cost_per_km: EUR/km
+#   Cost are only to be used for academic purposes as they do not reflect the real cost of the cables
 #   - Type: AC or DC
 400kV_1200mm2_ground_flat_Cu_ABB_XLPE:
   R_Ohm_km: 0.02470000518538329

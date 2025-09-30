@@ -10,6 +10,7 @@
 #   - Nominal voltage: kV
 #   - conductor_size: mm^2
 #   - Cost_per_km: EUR/km
+#   Cost are only to be used for academic purposes as they do not reflect the real cost of the cables
 #   - Type: AC or DC
 220kV_500mm2_sub_AL_ABB_XLPE:
   R_Ohm_km: 0.07346533079905122
@@ -20,6 +21,6 @@
   MVA_rating: 205.7676359391826
   Nominal_voltage_kV: 220.0
   conductor_size: 500
-  Cost_per_km: 0
+  Cost_per_km: 340053.0
   Type: AC
   Reference: ABB

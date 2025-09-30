@@ -10,6 +10,7 @@
 #   - Nominal voltage: kV
 #   - conductor_size: mm^2
 #   - Cost_per_km: EUR/km
+#   Cost are only to be used for academic purposes as they do not reflect the real cost of the cables
 #   - Type: AC or DC
 150kV_300mm2_sub_AL_ABB_XLPE:
   R_Ohm_km: 0.12065753769576981
@@ -20,6 +21,6 @@
   MVA_rating: 111.71727708819259
   Nominal_voltage_kV: 150.0
   conductor_size: 300
-  Cost_per_km: 0
+  Cost_per_km: 243692.99999999997
   Type: AC
   Reference: ABB

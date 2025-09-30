@@ -861,8 +861,7 @@ def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False, solver_resu
                         line.network_flow = 0.0
         
         grid.Cable_options[0].active_config = gen_active_config
-        print(f'DEBUG: gen_active_config {gen_active_config}')
-
+        
         def process_line_AC_CT(line):
             l = line.lineNumber
             ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
@@ -1220,18 +1219,23 @@ def create_master_problem_pyomo(grid,crossings=True, max_flow=None):
         model.spanning_tree = pyo.Constraint(rule=spanning_tree_rule)
         
         # Constrain connections for source nodes (renewable nodes)
-        def source_connections_rule(model, node):
-            if node in model.source_nodes:
+        def connections_rule(model, node):
+            if  grid.nodes_AC[node].ct_limit is None:
+                    return pyo.Constraint.Skip
+            else:
                 node_connections = sum(model.line_used[line] 
                                      for line in model.lines
                                      if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or 
                                          grid.lines_AC_ct[line].toNode.nodeNumber == node))
                 return node_connections <= grid.nodes_AC[node].ct_limit
-            else:
-                return pyo.Constraint.Skip
+                
         
-        model.source_connections_limit = pyo.Constraint(model.nodes, rule=source_connections_rule)
+        model.connections_rule = pyo.Constraint(model.nodes, rule=connections_rule)
         
+
+
+
+
         # Flow conservation for all nodes
         def flow_conservation_rule(model, node):
             node_flow = 0

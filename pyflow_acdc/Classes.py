@@ -1303,7 +1303,7 @@ class Node_AC:
         self.Num_conv_connected=0
         self.connected_conv=set()
     
-        self.ct_limit=2
+        self.ct_limit=None
         self.max_turbines_per_string=99
         self.curtailment=1
 

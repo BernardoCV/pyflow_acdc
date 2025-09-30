@@ -89,7 +89,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
     model.name="""AC 'DC linear' OPF"""
     
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     
     # pr = cProfile.Profile()
     # pr.enable()
@@ -103,7 +103,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
     # ps.print_stats()
     # print(s.getvalue())
     
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
     """
@@ -118,10 +118,10 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
                 
     """
     """
-    t3 = time.time()
+    t3 = time.perf_counter()
     model_res,solver_stats = OPF_solve(model,grid,solver,tee)
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
@@ -136,7 +136,7 @@ def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,s
     # ps.sort_stats('cumulative')  # Can also try 'time'
     # ps.print_stats()
     # print(s.getvalue())
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelexport = t2-t1
    
        
@@ -158,7 +158,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
     model.name="AC/DC hybrid OPF"
     
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     
     # pr = cProfile.Profile()
     # pr.enable()
@@ -172,7 +172,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
     # ps.print_stats()
     # print(s.getvalue())
     
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
     """
@@ -196,7 +196,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
     """
     model_res,solver_stats = OPF_solve(model,grid,solver,tee)
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
@@ -211,7 +211,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
     # ps.sort_stats('cumulative')  # Can also try 'time'
     # ps.print_stats()
     # print(s.getvalue())
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelexport = t2-t1
    
        
@@ -509,8 +509,15 @@ def OPF_solve(model,grid,solver = 'ipopt',tee=False,time_limit=None):
     
 
     opt = pyo.SolverFactory(solver)
-    if solver == 'gurobi' and time_limit is not None:
-        opt.options['TimeLimit'] = time_limit
+    if time_limit is not None:
+        if solver == 'gurobi':
+            opt.options['TimeLimit'] = time_limit
+        elif solver == 'cbc':
+            opt.options['seconds'] = time_limit
+        elif solver == 'ipopt':
+            opt.options['max_cpu_time'] = time_limit
+        elif solver == 'bonmin':
+            opt.options['bonmin.time_limit'] = time_limit
     #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
     #if logging:
     #    results = opt.solve(model, logfile="ipopt_output.log")
