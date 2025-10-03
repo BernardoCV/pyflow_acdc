@@ -4,7 +4,9 @@ Created on Thu Feb 15 13:24:05 2024
 @author: BernardoCastro
 """
 import numpy as np
+import pandas as pd
 import pyomo.environ as pyo
+from pyomo.util.infeasible import log_infeasible_constraints
 
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -17,6 +19,11 @@ import cProfile
 import pstats
 from io import StringIO
 
+try:
+    import gurobipy
+    GUROBI_AVAILABLE = True
+except ImportError:
+    GUROBI_AVAILABLE = False
 
 
 import logging
@@ -467,107 +474,90 @@ def log_infeasible_constraints_limited(model, max_per_type=5):
     
     print("=" * 80)
 
-
-def OPF_solve(model,grid,solver = 'ipopt',tee=False,time_limit=None):
-    
+def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=False):
     solver = solver.lower()
+    feasible_solutions = []  # Always defined, but only populated if callback is used
 
-    if grid.MixedBinCont:
-           # opt = pyo.SolverFactory("mindtpy")
-           # results = opt.solve(model,mip_solver='glpk',nlp_solver='ipopt')
-           print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
-    """
-    if solver_options is None:
-        solver = 'ipopt' 
-        tol = 1e-8
-        max_iter = 3000
-        print_level = 12
-        acceptable_tol = 1e-6
-    else:
-        solver   = solver_options['solver'] if 'solver' in solver_options else 'ipopt'
-        tol      = solver_options['tol'] if 'tol' in solver_options else 1e-8
-        max_iter = solver_options['max_iter'] if 'max_iter' in solver_options else 3000
-        print_level = solver_options['print_level'] if 'print_level' in solver_options else 12
-        acceptable_tol = solver_options['acceptable_tol'] if 'acceptable_tol' in solver_options else 1e-6
+    if grid.MixedBinCont and solver == 'ipopt':
+        print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
 
-    
-    opt.options['max_iter']       = max_iter  # Maximum number of iterations
-    opt.options['tol']            = tol   # Convergence tolerance
-    opt.options['acceptable_tol'] = acceptable_tol   # Acceptable convergence tolerance
-    opt.options['print_level']    = print_level      # Output verbosity (0-12)
-    """
+    if callback and solver == 'gurobi' and GUROBI_AVAILABLE:
+        from gurobipy import GRB
+        opt = pyo.SolverFactory('gurobi_persistent')
+        opt.set_instance(model)
+        grb_model = opt._solver_model
 
-    #solver = solver_options['solver'] if 'solver' in solver_options else 'ipopt'
-    #tee = solver_options['tee'] if 'tee' in solver_options else True
-    #keepfiles = tee
+        grb_model._start_time = time.time()
 
-    
+        def my_callback(model, where):
+            if where == GRB.Callback.MIPSOL:
+                obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)
+                time_found = model.cbGet(GRB.Callback.RUNTIME)
+                feasible_solutions.append((time_found,obj))
+                print(f"Feasible solution found: Obj = {obj}, Time = {time_found:.2f}s")
 
-    #bonmin
-    #ipopt
-    #logging = solver_options['logging'] if 'logging' in solver_options else True
-    
+        if time_limit is not None:
+            grb_model.setParam("TimeLimit", time_limit)
 
-    opt = pyo.SolverFactory(solver)
-    if time_limit is not None:
-        if solver == 'gurobi':
-            opt.options['TimeLimit'] = time_limit
-        elif solver == 'cbc':
-            opt.options['seconds'] = time_limit
-        elif solver == 'ipopt':
-            opt.options['max_cpu_time'] = time_limit
-        elif solver == 'bonmin':
-            opt.options['bonmin.time_limit'] = time_limit
-    #opt.options['print_level']    = solver_options['print_level'] if 'print_level' in solver_options else 3
-    #if logging:
-    #    results = opt.solve(model, logfile="ipopt_output.log")
+        grb_model.optimize(my_callback)
+
+        from pyomo.opt.results.results_ import SolverResults
+        results = SolverResults()
+        results.solver.status = pyo.SolverStatus.ok
+        results.problem.upper_bound = grb_model.ObjVal
+        results.solver.time = grb_model.Runtime
+        feasible_solutions.append((grb_model.Runtime,grb_model.ObjVal))
         
-    #    with open("ipopt_output.log", "r") as f:
-    #        log_content = f.read()
-    #        print("Log content:", log_content)  # Debug print
+        if grb_model.Status == GRB.Status.OPTIMAL:
+            results.solver.termination_condition = pyo.TerminationCondition.optimal
+            opt.load_vars()
+        elif grb_model.Status == GRB.Status.INFEASIBLE:
+            results.solver.termination_condition = pyo.TerminationCondition.infeasible
+        else:
+            results.solver.termination_condition = pyo.TerminationCondition.unknown
+        opt._solver_model.dispose()  # Cleanup
+       
+    else:
+        opt = pyo.SolverFactory(solver)
+        if time_limit is not None:
+            if solver == 'gurobi':
+                opt.options['TimeLimit'] = time_limit
+            elif solver == 'cbc':
+                opt.options['seconds'] = time_limit
+            elif solver == 'ipopt':
+                opt.options['max_cpu_time'] = time_limit
+            elif solver == 'bonmin':
+                opt.options['bonmin.time_limit'] = time_limit
 
-    # Print the regex match attempt
-    #match = re.search(r"Number of Iterations\.+:\s*(\d+)", log_content)# Debug print
-    #num_iterations = int(match.group(1)) if match else None
-    
-    
-   
-    try:
-        results = opt.solve(model, tee=tee)
-        # Try both possible objective attribute names
         try:
-            _ = pyo.value(model.obj)
-        except AttributeError:
-            try:
-                _ = pyo.value(model.objective)
-            except AttributeError:
-                print("Warning: No objective function found in model")
-        feasible_solution_found = True
-    except (ValueError, AttributeError):
-        feasible_solution_found = False
+            results = opt.solve(model, tee=tee)
+        except (ValueError, AttributeError):
+            return None, None
 
-    if not feasible_solution_found:
-        return None, None
-    
-    num_iterations = None
+    try:
+        _ = pyo.value(model.obj)
+    except AttributeError:
+        try:
+            _ = pyo.value(model.objective)
+        except AttributeError:
+            print("Warning: No objective function found in model")
+            return None, None
 
     solver_stats = {
-        'iterations': num_iterations,  # May not exist in IPOPT
-        'best_objective': getattr(results.problem, 'upper_bound', None),  # IPOPT provides upper_bound
-        'time': getattr(results.solver, 'time', None),  # May not be available
-        'termination_condition': str(results.solver.termination_condition)
+        'iterations': None,
+        'best_objective': getattr(results.problem, 'upper_bound', None),
+        'time': getattr(results.solver, 'time', None),
+        'termination_condition': str(results.solver.termination_condition),
+        'feasible_solutions': feasible_solutions
     }
-    
-    if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
-        # Set the logging level to INFO
-        logging.getLogger('pyomo').setLevel(logging.INFO)
 
-        # Now call the limited version instead
+    if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
+        logging.getLogger('pyomo').setLevel(logging.INFO)
         log_infeasible_constraints(model)
-        #log_infeasible_constraints_limited(model, max_per_type=5)
-    
-        
-    return  results, solver_stats
+
+    return results, solver_stats
+
+
 
 def OPF_updateParam(model,grid):
  

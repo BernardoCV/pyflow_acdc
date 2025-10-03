@@ -8,6 +8,12 @@ Created on Thu Nov  7 18:25:02 2024
 import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
+import time
+try:
+    import gurobipy
+    GUROBI_AVAILABLE = True
+except ImportError:
+    GUROBI_AVAILABLE = False
 
 __all__ = [
     'OPF_create_LModel_ACDC',
@@ -1300,94 +1306,100 @@ def create_master_problem_pyomo(grid,crossings=True, max_flow=None):
             model.crossing_constraints = pyo.Constraint(model.crossing_groups, rule=crossing_constraint_rule)
             
         return model
-    
-    
-def MIP_path_graph(grid, max_flow=None, solver_name='glpk',crossings=False,tee=False):
-    """Test master problem using Pyomo with open-source solver"""
-    
-    # Create model
-    model = create_master_problem_pyomo(grid,crossings, max_flow)
-    
-    # Create solver
-    solver = pyo.SolverFactory(solver_name)
-    
-    if grid.MIP_time is not None:
-        if solver_name == 'gurobi': 
-            solver.options['TimeLimit']=grid.MIP_time
-        elif solver_name == 'glpk':
-            solver.options['tmlim'] = 300
-    
+def sync_gurobi_solution_to_pyomo(model, solver):
+    """Copy variable values from the Gurobi model into the Pyomo model."""
+    grb_model = solver._solver_model
+    for var in model.component_objects(pyo.Var, active=True):
+        for idx in var:
+            grb_var = grb_model.getVarByName(var[idx].name)
+            if grb_var is not None:
+                var[idx].set_value(grb_var.X)
 
-    # Solve
-    
-    
-    
-    # Check results
-    try:
-        results = solver.solve(model, tee=tee)
-        _ = pyo.value(model.objective)
-        feasible_solution_found = True
-    except (ValueError, AttributeError):
-        feasible_solution_found = False
+def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False):
+    """Solve the master MIP problem and track feasible solutions over time (optional with Gurobi callback)."""
+    model = create_master_problem_pyomo(grid, crossings, max_flow)
+    feasible_solutions = []
+    feasible_solution_found = False
+    high_flow = None
 
+    # === Gurobi + Callback path ===
+    if callback and solver_name == 'gurobi' and GUROBI_AVAILABLE:
+        from gurobipy import GRB
+        solver = pyo.SolverFactory('gurobi_persistent')
+        solver.set_instance(model)
+        grb_model = solver._solver_model
+
+        def my_callback(model, where):
+            if where == GRB.Callback.MIPSOL:
+                obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)
+                time_found = model.cbGet(GRB.Callback.RUNTIME)
+                feasible_solutions.append((time_found, obj))
+
+        if getattr(grid, "MIP_time", None) is not None:
+            grb_model.setParam("TimeLimit", grid.MIP_time)
+
+        grb_model.optimize(my_callback)
+
+        from pyomo.opt.results.results_ import SolverResults
+        results = SolverResults()
+        results.solver.status = pyo.SolverStatus.ok
+        results.problem.upper_bound = grb_model.ObjVal if grb_model.SolCount > 0 else None
+        results.solver.time = grb_model.Runtime
+
+        if grb_model.Status == GRB.Status.OPTIMAL:
+            results.solver.termination_condition = pyo.TerminationCondition.optimal
+            feasible_solution_found = True
+        elif grb_model.Status == GRB.Status.SUBOPTIMAL:
+            results.solver.termination_condition = pyo.TerminationCondition.feasible
+            feasible_solution_found = True
+        elif grb_model.Status == GRB.Status.TIME_LIMIT:
+            results.solver.termination_condition = pyo.TerminationCondition.maxTimeLimit
+            feasible_solution_found = grb_model.SolCount > 0
+        elif grb_model.Status == GRB.Status.INFEASIBLE:
+            results.solver.termination_condition = pyo.TerminationCondition.infeasible
+        else:
+            results.solver.termination_condition = pyo.TerminationCondition.unknown
+            feasible_solution_found = grb_model.SolCount > 0
+
+        if feasible_solution_found:
+            #sync_gurobi_solution_to_pyomo(model, solver)
+            
+            solver.load_vars()
+            feasible_solutions.append((grb_model.Runtime, grb_model.ObjVal))
+            
+        grb_model.dispose()
+
+    # === Other solvers (no callback) ===
+    else:
+        solver = pyo.SolverFactory(solver_name)
+        if getattr(grid, "MIP_time", None) is not None:
+            if solver_name == 'gurobi':
+                solver.options['TimeLimit'] = grid.MIP_time
+            elif solver_name == 'glpk':
+                solver.options['tmlim'] = grid.MIP_time
+
+        try:
+            solver.solve(model, tee=tee)
+            _ = pyo.value(model.objective)
+            feasible_solution_found = True
+            
+        except (ValueError, AttributeError):
+            feasible_solution_found = False
+
+    # === Post-solve handling ===
     if feasible_solution_found:
-        
-        #print(f'DEBUG: MIP problem solved with termination condition: {results.solver.termination_condition}')
-        #print('DEBUG: obj results', pyo.value(model.objective))
-        # Set active configurations
-        # Get the last available cable type index
+        flows = [abs(pyo.value(model.line_flow[line])) for line in model.lines]
+        high_flow = max(flows) if flows else 0
         last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
-        high_flow = max(abs(pyo.value(model.line_flow[line])) for line in model.lines)
         for line in model.lines:
             ct_line = grid.lines_AC_ct[line]
-            if pyo.value(model.line_used[line]) > 0.5:
-                ct_line.active_config = last_cable_type_index
-            else:
-                ct_line.active_config = -1
-        if tee:
-            print(f"✓ Master problem is optimal!")
-            print(f"  Objective: {pyo.value(model.objective):.2f}")
-        
-            # Count and display investments
-            investments = 0
-            print("\n=== NETWORK FLOW ANALYSIS ===")
-            print("Invested lines and their flows:")
-            for line in model.lines:
-                if pyo.value(model.line_used[line]) > 0.8:
-                    investments += 1
-                    line_obj = grid.lines_AC_ct[line]
-                    flow_value = pyo.value(model.line_flow[line])
-                    print(f"  Line {line}: {line_obj.fromNode.nodeNumber} -> {line_obj.toNode.nodeNumber}, Flow: {flow_value}")
-            
-            print("\nNode flows:")
-            for node in model.nodes:
-                node_flow = pyo.value(model.node_flow[node])
-                node_type = ""
-                if node in model.source_nodes:
-                    node_type = " (SOURCE)"
-                elif node in model.sink_nodes:
-                    node_type = " (SINK)"
-                else:
-                    node_type = " (INTERMEDIATE)"
-                print(f"  Node {node}: Net flow = {node_flow}{node_type}")
-    
-            
-            print(f"\n=== SUMMARY ===")
-            print(f"  Total investments: {investments}")
-            print(f"  Expected (numNodes-1): {len(grid.nodes_AC) - 1}")
-            
-            # Verify flow conservation
-            total_source_flow = sum(pyo.value(model.node_flow[node]) for node in model.source_nodes)
-            total_sink_flow = sum(pyo.value(model.node_flow[node]) for node in model.sink_nodes)
-            print(f"  Total source flow: {total_source_flow}")
-            print(f"  Total sink flow: {total_sink_flow}")
-            print(f"  Flow conservation check: {total_source_flow + total_sink_flow == 0}")
-            
-        return True , high_flow ,model
-    
+            ct_line.active_config = last_cable_type_index if pyo.value(model.line_used[line]) > 0.5 else -1
+
+        return True, high_flow, model, feasible_solutions
+
     else:
-        print(f"✗ MIP model failed")
-        
-        return False , None,model
+        print("✗ MIP model failed")
+        return False, None, model, feasible_solutions
+
 
     

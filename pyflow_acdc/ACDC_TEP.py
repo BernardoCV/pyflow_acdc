@@ -13,6 +13,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 
+
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
 from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
@@ -404,7 +405,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     }
     return model, model_results , timing_info, solver_stats
 
-def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False,export=True):
+def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False,export=True,fs=False):
     analyse_OPF(grid)
     
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
@@ -436,7 +437,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
    
     # model.obj.pprint()
     t3 = time.perf_counter()
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit,callback=fs)
     
     if model_results is None:
         return None, None, None, None
@@ -644,7 +645,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False):
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False):
     from .AC_OPF_L_model import MIP_path_graph
     
 
@@ -680,7 +681,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         
         # Always run MIP check
         t1 = time.perf_counter()
-        flag, high_flow,model_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee)
+        flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs)
+        
         t2 = time.perf_counter()
         timing_info['Paths'] = t2 - t1
         path_time += t2 - t1
@@ -707,7 +709,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         iter_cab_available= grid.Cable_options[0].cable_types.copy()
         t3 = time.perf_counter()
         #print(f'DEBUG: Iteration {i}')
-        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee,False)
+        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee,fs=fs)
+        feasible_solutions_CSS = solver_stats['feasible_solutions']
         t4 = time.perf_counter()
         timing_info['CSS'] = t4 - t3
         css_time += t4 - t3
@@ -807,6 +810,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             'MIP_model': model_MIP,
             'CSS_model': model,
             'i': i,
+            'feasible_solutions_MIP': feasible_solutions_MIP,
+            'feasible_solutions_CSS': feasible_solutions_CSS
         }
         results.append(iteration_result)  # Add to the results list   
         
@@ -836,7 +841,9 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         'cables_used':  [result['cables_used'] for result in results],
         'timing_info':  [result['timing_info'] for result in results],
         'solver_status':[result['model_results']['Solver'][0]['Status']  for result in results],
-        'iteration':    [result['i'] for result in results]
+        'iteration':    [result['i'] for result in results],
+        'feasible_solutions_MIP': [result['feasible_solutions_MIP'] for result in results],
+        'feasible_solutions_CSS': [result['feasible_solutions_CSS'] for result in results]
     }
 
     # Find best result
@@ -846,6 +853,17 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         best_result = results[0]  # Just return the single result
     
 
+    if fs:
+        feasible_solutions_MIP = [result['feasible_solutions_MIP'] for result in results]
+        feasible_solutions_CSS = [result['feasible_solutions_CSS'] for result in results]
+        plot_feasible_solutions_subplots(
+            feasible_solutions_MIP,
+            feasible_solutions_CSS,
+            show=False,
+            save_path=f'feasible_solutions_{grid.name}.png'
+        )
+
+    
     
 
     model = best_result['CSS_model']
@@ -897,14 +915,86 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
 
     models = (model_MIP,model)
     return models, summary_results , tot_timing_info, solver_stats,best_i
+    
 
-def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False,export=True):
+
+
+def plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, show=True, save_path=None, width_mm=None):
+    import matplotlib.pyplot as plt
+    FS = 10
+    # Maintain 40:20 aspect ratio regardless of absolute size (taller axes)
+    ratio = 20.0 / 40.0
+    if width_mm is not None:
+        fig_w_in = width_mm / 25.4
+        fig_h_in = fig_w_in * ratio
+    else:
+        fig_w_in = 6.0
+        fig_h_in = fig_w_in * ratio
+    figsize = (fig_w_in, fig_h_in)
+    # Two subplots side-by-side: MIP (left), CSS (right)
+    fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=False, sharey=False, constrained_layout=True)
+
+    def _plot(ax, results, title,yaxis):
+        if not results:
+            ax.set_title(title, fontsize=FS)
+            ax.set_xlabel('Time (s)', fontsize=FS)
+            ax.set_ylabel(yaxis, fontsize=FS)
+            ax.grid(True, alpha=0.3)
+            ax.tick_params(labelsize=FS)
+            return
+        has_any = False
+        for i, feas in enumerate(results):
+            if not feas:
+                continue
+            has_any = True
+            feas_sorted = sorted(feas, key=lambda x: x[0])
+            times = [t for t, _ in feas_sorted]
+            objs = [o for _, o in feas_sorted]
+            if title == 'CSS':
+                objs = [o/1e6 for o in objs]
+            ax.plot(times, objs, 'o-', label=f'i={i} (s={len(objs)})', markersize=5, linewidth=2)
+        ax.set_title(title, fontsize=FS*1.2)
+        ax.set_xlabel('Time (s)', fontsize=FS*1.1)
+        ax.set_ylabel(yaxis, fontsize=FS*1.1)
+        if has_any:
+            ax.legend(prop={'size': FS}, loc='upper right', frameon=False)
+        ax.tick_params(labelsize=FS)
+        ax.grid(True, alpha=0.3)
+
+    _plot(axes[0], results_mip, 'MIP', 'Cable length [km]')
+    _plot(axes[1], results_css, 'CSS', 'Objective [M€]')
+
+    if suptitle is not None:
+        fig.suptitle(suptitle, fontsize=FS*1.3)
+        fig.subplots_adjust(left=0.10, right=0.99, top=0.80, bottom=0.22, wspace=0.22)
+    else:
+        fig.subplots_adjust(left=0.08, right=0.99, top=0.98, bottom=0.18, wspace=0.18)
+
+    if save_path is not None:
+        dir_, base = os.path.split(save_path)
+        root, ext = os.path.splitext(base)
+        base = (root + ext.lower()).lower()  # lowercase name + extension
+        save_path = os.path.join(dir_, base)
+        
+        if save_path.endswith('.svg'):
+            fig.savefig(save_path, format='svg', bbox_inches='tight')
+        else:
+            fig.savefig(save_path, format='png', bbox_inches='tight')
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
+
+def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False,export=True,fs=False):
 
     grid.Array_opf = False
     if NL:
         model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export)
     else:
-        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export)
+        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export,fs)
 
     return model, model_results , timing_info, solver_stats
 
