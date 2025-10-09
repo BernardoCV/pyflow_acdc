@@ -474,7 +474,7 @@ def log_infeasible_constraints_limited(model, max_per_type=5):
     
     print("=" * 80)
 
-def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=False):
+def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=False, suppress_warnings=False):
     solver = solver.lower()
     feasible_solutions = []  # Always defined, but only populated if callback is used
 
@@ -552,8 +552,9 @@ def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=
     }
 
     if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
-        logging.getLogger('pyomo').setLevel(logging.INFO)
-        log_infeasible_constraints(model)
+        if not suppress_warnings:
+            logging.getLogger('pyomo').setLevel(logging.INFO)
+            log_infeasible_constraints(model)
 
     return results, solver_stats
 

@@ -1107,7 +1107,6 @@ def TEP_subObj(submodel,grid,ObjRule):
 
 def TEP_obj(model,grid,NPV):
   
-
     def Gen_investments():
         Gen_Inv=0
         for g in model.gen_AC:

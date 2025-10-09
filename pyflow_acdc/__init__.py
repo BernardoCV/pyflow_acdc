@@ -29,6 +29,11 @@ try:
 except ImportError:
     HAS_OPF = False
     
+try:
+    from .ACDC_TEP_pymoo import *
+    HAS_TEP_PYMOO = True
+except ImportError:
+    HAS_TEP_PYMOO = False
 
 try:
     from .Graph_Dash import *
@@ -146,6 +151,9 @@ __all__ = [
     'export_TEP_TS_results_to_excel',
     'MIP_path_graph',
 
+    # TEP_PYMOO
+    'transmission_expansion_pymoo',
+    
     # AC_L_CSS_GUROBI
     'Optimal_L_CSS_gurobi',
     'test_master_problem',

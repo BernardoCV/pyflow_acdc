@@ -1792,31 +1792,31 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
 
     if grid.ACmode:
         
-        model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
+        model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen,mutable=True)
         if grid.TEP_AC:    
-            model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)    
+            model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC,mutable=True)    
 
         if grid.REC_AC:
-            model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch)
+            model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch,mutable=True)
         
         if grid.CT_AC:
             if not grid.Array_opf:
-                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
+                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini,mutable=True)
             else:
-                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=0)
+                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=0,mutable=True)
     if grid.DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         P_lineDC_limit,NP_lineDC    = DC_lines_info
         lista_DCDC = DCDC_info
         
-        model.np_gen_DC = pyo.Param(model.gen_DC,initialize=np_gen_DC)
-        model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC)
+        model.np_gen_DC = pyo.Param(model.gen_DC,initialize=np_gen_DC,mutable=True)
+        model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC,mutable=True)
 
     if grid.ACmode and grid.DCmode:
         Conv_Lists, Conv_Volt = Conv_info
         lista_conv,NumConvP = Conv_Lists
 
-        model.NumConvP = pyo.Param(model.conv,initialize=NumConvP)
+        model.NumConvP = pyo.Param(model.conv,initialize=NumConvP,mutable=True)
 
 
 def TEP_variables(model,grid):
