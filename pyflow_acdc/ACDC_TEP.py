@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
-from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
+from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC,MIP_path_graph
 from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
 
 
@@ -31,7 +31,8 @@ __all__ = [
     'multi_scenario_TEP',
     'simple_CSS',
     'sequential_CSS',
-    'export_TEP_TS_results_to_excel'
+    'export_TEP_TS_results_to_excel',
+    'MIP_path_graph'
 ]
 
 def pack_variables(*args):
@@ -646,7 +647,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
 def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False):
-    from .AC_OPF_L_model import MIP_path_graph
+    
     
 
     staring_cables = grid.Cable_options[0].cable_types
@@ -668,7 +669,10 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     og_cable_types = grid.Cable_options[0].cable_types.copy()
     
     MIP_time = grid.MIP_time
-    max_flow = grid.max_turbines_per_string
+    if max_turbines_per_string is not None:
+        max_flow = max_turbines_per_string
+    else:
+        max_flow = grid.max_turbines_per_string
 
     flag = True
 
@@ -917,7 +921,101 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     return models, summary_results , tot_timing_info, solver_stats,best_i
     
 
+def plot_feasible_solutions(results, plot_type='MIP', suptitle=None, show=True, save_path=None, width_mm=None):
+    import matplotlib.pyplot as plt
+    # local import to ensure availability regardless of module-level imports
+    import os
+    FS = 10
+    
+    # Normalize input: accept a single feasible_solutions list, a list of those,
+    # a dict with key 'feasible_solutions_MIP', or a list of such dicts
+    def _is_pair_list(seq):
+        try:
+            return isinstance(seq, (list, tuple)) and len(seq) > 0 and isinstance(seq[0], (list, tuple)) and len(seq[0]) == 2
+        except Exception:
+            return False
+    
+    if results is None:
+        normalized_results = []
+    elif isinstance(results, dict) and 'feasible_solutions_MIP' in results:
+        normalized_results = [results.get('feasible_solutions_MIP', [])]
+    elif isinstance(results, list):
+        if len(results) > 0 and isinstance(results[0], dict) and 'feasible_solutions_MIP' in results[0]:
+            normalized_results = [r.get('feasible_solutions_MIP', []) for r in results]
+        elif _is_pair_list(results):
+            # single run provided as list of (time, obj)
+            normalized_results = [results]
+        else:
+            # assume already in the expected list-of-runs format
+            normalized_results = results
+    else:
+        # Fallback: treat as empty
+        normalized_results = []
+    
+    if width_mm is not None:
+        fig_w_in = width_mm / 25.4
+        fig_h_in = fig_w_in 
+    else:
+        fig_w_in = 6.0
+        fig_h_in = fig_w_in 
 
+    fig, ax = plt.subplots(1, 1, figsize=(fig_w_in, fig_h_in), sharex=False, sharey=False, constrained_layout=True)
+
+    # Normalize plot_type and set axis label
+    ptype = (plot_type or 'MIP').upper()
+    if ptype == 'CSS':
+        y_axis_label = 'Objective [M€]'
+    else:
+        ptype = 'MIP'
+        y_axis_label = 'Cable length [km]'
+
+    # plotting logic mirroring the subplots helper
+    if not normalized_results:
+        ax.set_title(ptype, fontsize=FS)
+        ax.set_xlabel('Time (s)', fontsize=FS)
+        ax.set_ylabel(y_axis_label, fontsize=FS)
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=FS)
+    else:
+        has_any = False
+        for i, feas in enumerate(normalized_results):
+            if not feas:
+                continue
+            has_any = True
+            feas_sorted = sorted(feas, key=lambda x: x[0])
+            times = [t for t, _ in feas_sorted]
+            objs = [o for _, o in feas_sorted]
+            if ptype == 'CSS':
+                objs = [o / 1e6 for o in objs]
+            ax.plot(times, objs, 'o-', label=f'i={i} (s={len(objs)})', markersize=5, linewidth=2)
+        ax.set_title(ptype, fontsize=FS*1.2)
+        ax.set_xlabel('Time (s)', fontsize=FS*1.1)
+        ax.set_ylabel(y_axis_label, fontsize=FS*1.1)
+        if has_any:
+            ax.legend(prop={'size': FS}, loc='upper right', frameon=False)
+        ax.tick_params(labelsize=FS)
+        ax.grid(True, alpha=0.3)
+
+    if suptitle is not None:
+        fig.suptitle(suptitle, fontsize=FS*1.3)
+        fig.subplots_adjust(left=0.10, right=0.99, top=0.80, bottom=0.22)
+    else:
+        fig.subplots_adjust(left=0.08, right=0.99, top=0.98, bottom=0.18)
+
+    if save_path is not None:
+        dir_, base = os.path.split(save_path)
+        root, ext = os.path.splitext(base)
+        base = (root + ext.lower()).lower()
+        save_path = os.path.join(dir_, base)
+        if save_path.endswith('.svg'):
+            fig.savefig(save_path, format='svg', bbox_inches='tight')
+        else:
+            fig.savefig(save_path, format='png', bbox_inches='tight')
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 def plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, show=True, save_path=None, width_mm=None):
     import matplotlib.pyplot as plt

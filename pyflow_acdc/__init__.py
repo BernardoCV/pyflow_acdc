@@ -144,6 +144,7 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'export_TEP_TS_results_to_excel',
+    'MIP_path_graph',
 
     # AC_L_CSS_GUROBI
     'Optimal_L_CSS_gurobi',

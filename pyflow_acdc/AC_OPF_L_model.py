@@ -16,6 +16,7 @@ except ImportError:
     GUROBI_AVAILABLE = False
 
 __all__ = [
+    'MIP_path_graph',
     'OPF_create_LModel_ACDC',
     'ExportACDC_Lmodel_toPyflowACDC'
 ]
@@ -1306,6 +1307,8 @@ def create_master_problem_pyomo(grid,crossings=True, max_flow=None):
             model.crossing_constraints = pyo.Constraint(model.crossing_groups, rule=crossing_constraint_rule)
             
         return model
+
+        
 def sync_gurobi_solution_to_pyomo(model, solver):
     """Copy variable values from the Gurobi model into the Pyomo model."""
     grb_model = solver._solver_model
