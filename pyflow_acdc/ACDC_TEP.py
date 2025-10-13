@@ -418,7 +418,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
-    OPF_create_LModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    OPF_create_LModel_ACDC(model,grid,Price_Zones=PZ,TEP=True)
     
 
     obj_TEP = TEP_obj(model,grid,NPV)
@@ -646,7 +646,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False):
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False):
     
     
 
@@ -833,7 +833,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             max_cable_capacity = max(grid.Cable_options[0].MVA_ratings)
             max_flow = int(max_cable_capacity / t_MW)
         else:
-            print("DEBUG: No more cable types available")
+            #print("DEBUG: No more cable types available")
             break
        
     

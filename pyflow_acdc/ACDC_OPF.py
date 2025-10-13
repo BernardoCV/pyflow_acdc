@@ -80,7 +80,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 
-def Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False):
+def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False):
     analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)

@@ -47,7 +47,9 @@ ALL_CASES = [
     #CT
     'array_sizing.py',
     #time series and dash
-    'ts_dash.py'
+    'ts_dash.py',
+    #wind farm array
+    'sequential_array.py'
 ]
 
 # Quick tests (basic functionality only)
