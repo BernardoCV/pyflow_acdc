@@ -10,12 +10,23 @@ from .Results_class import*
 from .Classes import*
 from .Class_editor import Cable_parameters, Converter_parameters, add_gen
 
+import pickle
+import gzip
+
+try:
+    import dill  # optional fallback
+    _dill = dill
+except Exception:
+    _dill = None
+
+
 __all__ = [ # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
     'Create_grid_from_turbine_graph',
     'Extend_grid_from_data',
-    'initialize_pyflowacdc'
+    'initialize_pyflowacdc',
+    'Create_grid_from_pickle'
 ]
 
 def initialize_pyflowacdc():
@@ -1282,6 +1293,20 @@ def Create_grid_from_mat(matfile):
     
     return [G, res]
 
+
+def Create_grid_from_pickle(path,use_dill=True):
+    initialize_pyflowacdc()
+
+    grid = load_pickle(path,use_dill)
+
+    res = Results(grid, decimals=3)
+    return [grid, res]
+
+def load_pickle(path,use_dill=True):
+    lib = _dill if (use_dill and _dill is not None) else pickle
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rb") as f:
+        return lib.load(f)
 
 def change_S_base(grid,Sbase_new):
     
