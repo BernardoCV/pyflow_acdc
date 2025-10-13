@@ -9,7 +9,7 @@ import time
 import pandas as pd
 import pyflow_acdc as pyf
 
-start_time = time.time()
+start_time = time.perf_counter()
 S_base=100 #MVA
 
 ext='Real'
@@ -29,12 +29,12 @@ Converter_data = pd.read_csv(f'Stagg5MATACDC/MATACDC_Converter_data_{ext}.csv')
 
 # """
 
-pyf.ACDC_sequential(grid,QLimit=False)
+time,tol,ps_iterations = pyf.ACDC_sequential(grid,QLimit=False)
 
 
 
 
-end_time = time.time()
+end_time = time.perf_counter()
 elapsed_time = end_time - start_time
 res.All()
 print ('------')

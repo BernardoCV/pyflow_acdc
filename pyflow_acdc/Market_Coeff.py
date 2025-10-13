@@ -83,7 +83,7 @@ def price_zone_coef_data(df,start,end,increase_eq_price=50):
     summer_time_offset = 0
     dst_active = False
     data_storage = {'Sell': [[] for _ in range(total_hours)], 'Purchase': [[] for _ in range(total_hours)], 'Dates': [None] * total_hours}
-    t1= time.time()    
+    t1= time.perf_counter()    
     
     for row in df.itertuples(index=False):
         
@@ -142,7 +142,7 @@ def price_zone_coef_data(df,start,end,increase_eq_price=50):
         data[i]['Sell'] = pd.DataFrame(data_storage['Sell'][i])
         data[i]['Purchase'] = pd.DataFrame(data_storage['Purchase'][i])
     
-    t2= time.time()    
+    t2= time.perf_counter()    
     t_loaddata = t2-t1    
     
     min_hour=max(min_hour,start)
@@ -172,7 +172,7 @@ def price_zone_coef_data(df,start,end,increase_eq_price=50):
         # print(hour)
     
         
-    t3 = time.time()
+    t3 = time.perf_counter()
     t_process = t3-t2
     t_avprocess = t_process/count
     timing_info = {

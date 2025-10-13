@@ -169,7 +169,8 @@ class Results:
             
             for node in self.Grid.nodes_AC:
                 if not self.Grid.OPF_run and node.type == 'Slack':
-                      PGi = node.P_INJ-(node.P_s.item())+node.PLi
+                      ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
+                      PGi = node.P_INJ-ps+node.PLi
                 else:
                       PGi = P_AC[node.nodeNumber].item()
                 generation += PGi*self.Grid.S_base      
@@ -536,7 +537,8 @@ class Results:
                             QGi = Q_AC[node.nodeNumber].item()
                             if not self.Grid.OPF_run:
                                 if node.type == 'Slack':
-                                    PGi = (node.P_INJ-node.P_s + node.PLi).item()
+                                    ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
+                                    PGi = node.P_INJ-ps + node.PLi
                                     QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
 
                                 if node.type == 'PV':
@@ -1099,9 +1101,9 @@ class Results:
                     tot+=cost
                     table.add_row([element, "AC Upgrade" ,"", "","",np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         for l in self.Grid.lines_AC_ct:
-            if l.array_opf:
+            if l.array_opf and l.active_config >=0:
                 element= l.name
-                ini= l.cable_types[l.ini_active_config]
+                ini= l.cable_types[l.ini_active_config] if l.ini_active_config >= 0 else ""
                 max=l.cable_types[l.max_active_config]
                 ct=l.active_config
                 type=l.cable_types[ct]

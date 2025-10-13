@@ -9,11 +9,14 @@ import numpy as np
 import pyomo.environ as pyo
 import pandas as pd
 import time
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC,calculate_objective
+
+from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
+from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC,MIP_path_graph
+from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
 
 
 __all__ = [
@@ -24,8 +27,12 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'transmission_expansion',
+    'linear_transmission_expansion',
     'multi_scenario_TEP',
-    'export_TEP_TS_results_to_excel'
+    'simple_CSS',
+    'sequential_CSS',
+    'export_TEP_TS_results_to_excel',
+    'MIP_path_graph'
 ]
 
 def pack_variables(*args):
@@ -348,6 +355,7 @@ def get_TEP_variables(grid):
 
     return conv_var,DC_line_var,AC_line_var,gen_var
 
+
 def MS_TEP_constraints(model,grid):
     
     
@@ -399,7 +407,7 @@ def MS_TEP_constraints(model,grid):
 
     
 
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False):
 
     analyse_OPF(grid)
     
@@ -408,11 +416,12 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
    
-    t1 = time.time()
+    t1 = time.perf_counter()
     model = pyo.ConcreteModel()
-    model.name        ="TEP MTDC AC/DC hybrid OPF"
+    model.name = "TEP MTDC AC/DC hybrid OPF"
 
-    OPF_createModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    OPF_create_NLModel_ACDC(model,grid,PV_set=PV_set,Price_Zones=PZ,TEP=True)
+    
 
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_OPF = OPF_obj(model,grid,weights_def,True)
@@ -425,19 +434,20 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     total_cost = obj_TEP + obj_OPF
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
 
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
     # model.obj.pprint()
 
-    model_results,solver_stats = OPF_solve(model,grid,solver)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
     
-    t1 = time.time()
-    ExportACDC_model_toPyflowACDC(model, grid, PZ,TEP=True)
-    for obj in weights_def:
-        weights_def[obj]['v']=calculate_objective(grid,obj,True)
-        weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t2 = time.time() 
+    t1 = time.perf_counter()
+    if export:
+        ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ,TEP=True)
+        for obj in weights_def:
+            weights_def[obj]['v']=calculate_objective(grid,obj,True)
+            weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
+    t2 = time.perf_counter() 
 
     t_modelexport = t2-t1
 
@@ -452,11 +462,73 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     }
     return model, model_results , timing_info, solver_stats
 
+def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False,export=True,fs=False):
+    analyse_OPF(grid)
+    
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+
+    grid.TEP_n_years = n_years
+    grid.TEP_discount_rate =discount_rate
+   
+    t1 = time.perf_counter()
+    model = pyo.ConcreteModel()
+    model.name = "TEP MTDC linear AC OPF"
+
+    OPF_create_LModel_ACDC(model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    
+
+    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_OPF = OPF_obj_L(model,grid,weights_def)
+    
+    present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    if NPV:
+        obj_OPF *=present_value
+    
+
+    total_cost = obj_TEP + obj_OPF
+    model.obj = pyo.Objective(rule=obj_TEP, sense=pyo.minimize)
+
+    t2 = time.perf_counter()  
+    t_modelcreate = t2-t1
+
+   
+    # model.obj.pprint()
+    t3 = time.perf_counter()
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit,callback=fs)
+    
+    if model_results is None:
+        return None, None, None, None
+
+    
+    t1 = time.perf_counter()
+    if export:
+        ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
+        for obj in weights_def:
+            weights_def[obj]['v']=calculate_objective(grid,obj,True)
+            weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
+    t2 = time.perf_counter() 
+
+    t_modelexport = t2-t1
+
+      
+    grid.TEP_run=True
+    grid.OPF_obj = weights_def
+
+    timing_info = {
+    "create": t_modelcreate,
+    "solve":  solver_stats['time'] if solver_stats['time'] is not None else t1-t3,
+    "export": t_modelexport,
+    }
+    return model, model_results , timing_info, solver_stats
+    
+
+
 def initialize_links(model,grid):
    
     analyse_OPF(grid)
    
 
+    
     if grid.DCmode:
         model.lines_DC    = pyo.Set(initialize=list(range(0, grid.nl_DC)))
     if grid.ACmode and grid.DCmode:
@@ -481,7 +553,7 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
     w={}
 
     base_model = pyo.ConcreteModel()
-    OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
+    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
     
     
     for t in model.scenario_frames:
@@ -550,11 +622,11 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
     t2 = time.time()  
     t_modelcreate = t2-t1
     
-    model_results,solver_stats = OPF_solve(model,grid,solver)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee)
     
-    t1 = time.time()
+    t1 = time.perf_counter()
     TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
-    t2 = time.time()  
+    t2 = time.perf_counter()  
     t_modelexport = t2-t1
         
     # TEP_TS_res ={}
@@ -571,6 +643,456 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
     
     return model, model_results , timing_info, solver_stats , TEP_TS_res
 
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,MIP_solver='glpk',CSS_L_solver='gurobi',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False):
+    
+    
+
+    staring_cables = grid.Cable_options[0].cable_types
+    new_cables = staring_cables.copy()
+  
+    results = []
+    tot_timing_info = {}
+    i = 0
+    path_time = 0
+    css_time = 0
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    t0 = time.perf_counter()
+    t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
+    #print(f'DEBUG: t_MW {t_MW}')
+    #print(f'DEBUG: starting max flow {max_flow}')
+
+    if max_iter is None:
+        max_iter = len(grid.Cable_options[0].cable_types)
+    og_cable_types = grid.Cable_options[0].cable_types.copy()
+    
+    MIP_time = grid.MIP_time
+    if max_turbines_per_string is not None:
+        max_flow = max_turbines_per_string
+    else:
+        max_flow = grid.max_turbines_per_string
+
+    flag = True
+
+    
+
+
+
+    while flag:
+        timing_info = {}
+        
+        # Always run MIP check
+        t1 = time.perf_counter()
+        flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs)
+        
+        t2 = time.perf_counter()
+        timing_info['Paths'] = t2 - t1
+        path_time += t2 - t1
+
+        if not flag:
+            if i == 0:
+                # If MIP fails on first iteration, return None
+                return None, None, None, None,i
+            else:
+                # If MIP fails on later iterations, break the loop
+                break
+        MIP_obj_value = pyo.value(model_MIP.objective)
+        if  high_flow < max_flow:
+            
+            max_power_per_string = t_MW*high_flow 
+            first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
+            for line in grid.lines_AC_ct:
+                if line.active_config > 0:
+                    line.active_config = first_index_to_comply
+
+            grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
+           
+            grid.max_turbines_per_string = high_flow
+        iter_cab_available= grid.Cable_options[0].cable_types.copy()
+        t3 = time.perf_counter()
+        #print(f'DEBUG: Iteration {i}')
+        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee,fs=fs)
+        feasible_solutions_CSS = solver_stats['feasible_solutions']
+        t4 = time.perf_counter()
+        timing_info['CSS'] = t4 - t3
+        css_time += t4 - t3
+        if svg is not None:
+            from .Graph_and_plot import save_network_svg
+            lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            gen_active_config = {k: np.float64(pyo.value(model.ct_types[k])) for k in model.ct_set}
+           
+            
+            grid.Cable_options[0].active_config = gen_active_config
+
+
+            def process_line_AC_CT(line):
+                l = line.lineNumber
+                ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
+                if any(ct_selected):
+                    line.active_config = np.where(ct_selected)[0][0]
+                    ct = list(model.ct_set)[line.active_config]
+                    Pfrom = lines_AC_CT_fromP[l][ct]
+                    Pto   = lines_AC_CT_toP[l][ct]
+                    Qfrom = 0.0
+                    Qto   = 0.0
+                else:
+                    line.active_config = -1
+                    Pfrom = 0
+                    Pto   = 0
+                    Qfrom = 0
+                    Qto   = 0
+                
+                line.fromS = (Pfrom + 1j*Qfrom)
+                line.toS = (Pto + 1j*Qto)
+                line.loss = 0
+                line.P_loss = 0
+
+            with ThreadPoolExecutor() as executor:
+                executor.map(process_line_AC_CT, grid.lines_AC_ct)
+
+            
+            if not os.path.exists('intermediate_networks'):
+                os.makedirs('intermediate_networks')
+            save_network_svg(grid, name=f'intermediate_networks/{svg}_{i}_{CSS_L_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
+        
+        if model_results['Solver'][0]['Status'] == 'ok':
+            obj_value = pyo.value(model.obj)
+        else:
+            obj_value = None  # or some default value
+
+        
+        
+        #print('DEBUG: Iteration',i)
+
+        used_cable_types = []
+        used_cable_names = []
+        
+        # Analyze which cable types were used in the optimization
+        if model_results['Solver'][0]['Status'] == 'ok':
+            # Get the cable types that were actually used
+           
+            for ct in model.ct_set:
+                if pyo.value(model.ct_types[ct]) > 0.5:  # Binary variable > 0.5 means it was selected
+                    used_cable_types.append(ct)
+                    used_cable_names.append(grid.Cable_options[0].cable_types[ct])
+            #print(f'DEBUG: Used cable types: {used_cable_types}')
+            
+            if used_cable_types:
+                # Find the largest cable type that was used
+                largest_used_index = max(used_cable_types)
+              
+                new_cables = new_cables[:largest_used_index]
+                
+            else:
+                # No cable types were used, remove the largest one
+                new_cables.pop()
+               
+        else:
+            # Optimization failed, remove the largest cable type
+            new_cables.pop()
+           
+        
+       
+        
+
+        
+        t5 = time.perf_counter()
+        timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
+        # Create a dictionary for this iteration's results
+        iteration_result = {
+            'cable_length': MIP_obj_value,
+            'model_obj': obj_value,  # Save the objective value
+            'cable_options': iter_cab_available,  # Save a copy of the cable list
+            'cables_used': used_cable_names,
+            'model_results': model_results,
+            'solver_stats': solver_stats,
+            'timing_info': timing_info,
+            'MIP_model': model_MIP,
+            'CSS_model': model,
+            'i': i,
+            'feasible_solutions_MIP': feasible_solutions_MIP,
+            'feasible_solutions_CSS': feasible_solutions_CSS
+        }
+        results.append(iteration_result)  # Add to the results list   
+        
+        if i > 0 and obj_value is not None and results[i-1]['model_obj'] is not None:
+            if obj_value > results[i-1]['model_obj']:
+                break
+        i += 1
+        if i > max_iter:
+            break
+        # Update grid with new cable set
+        if len(new_cables) > 0:
+            grid.Cable_options[0].cable_types = new_cables
+            
+            # Recalculate max_flow based on current cable set
+            max_cable_capacity = max(grid.Cable_options[0].MVA_ratings)
+            max_flow = int(max_cable_capacity / t_MW)
+        else:
+            print("DEBUG: No more cable types available")
+            break
+       
+    
+    # After the while loop ends, create summary from all iterations
+    summary_results = {
+        'cable_length': [result['cable_length'] for result in results],
+        'model_obj':    [result['model_obj'] for result in results],
+        'cable_options': [result['cable_options'] for result in results],
+        'cables_used':  [result['cables_used'] for result in results],
+        'timing_info':  [result['timing_info'] for result in results],
+        'solver_status':[result['model_results']['Solver'][0]['Status']  for result in results],
+        'iteration':    [result['i'] for result in results],
+        'feasible_solutions_MIP': [result['feasible_solutions_MIP'] for result in results],
+        'feasible_solutions_CSS': [result['feasible_solutions_CSS'] for result in results]
+    }
+
+    # Find best result
+    if len(results) > 1:
+        best_result = min(results, key=lambda x: x['model_obj'])
+    else:
+        best_result = results[0]  # Just return the single result
+    
+
+    if fs:
+        feasible_solutions_MIP = [result['feasible_solutions_MIP'] for result in results]
+        feasible_solutions_CSS = [result['feasible_solutions_CSS'] for result in results]
+        plot_feasible_solutions_subplots(
+            feasible_solutions_MIP,
+            feasible_solutions_CSS,
+            show=False,
+            save_path=f'feasible_solutions_{grid.name}.png'
+        )
+
+    
+    
+
+    model = best_result['CSS_model']
+    model_MIP = best_result['MIP_model']
+    model_results = best_result['model_results']
+    tot_timing_info['Paths'] = path_time
+    tot_timing_info['CSS'] = css_time
+    solver_stats = best_result['solver_stats']
+    best_i = best_result['i']
+
+    t5 = time.perf_counter()
+    if NL:
+        ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
+    else:
+        ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
+    
+    
+
+    grid.Cable_options[0].cable_types = og_cable_types
+    gen_active_config = grid.Cable_options[0].active_config
+    grid.Cable_options[0].active_config = [int(gen_active_config.get(k, 0)) for k in range(len(og_cable_types))]
+    
+    lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+    
+    def process_line_AC_CT(line):
+        l = line.lineNumber
+        ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
+        if any(ct_selected):
+            line.active_config = np.where(ct_selected)[0][0] 
+        else:
+            line.active_config = -1
+
+
+    with ThreadPoolExecutor() as executor:
+        executor.map(process_line_AC_CT, grid.lines_AC_ct)
+
+
+    present_value = Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
+
+    grid.TEP_run=True
+    grid.OPF_obj = weights_def
+
+    t_modelexport = time.perf_counter() - t5
+    tot_timing_info['export'] = t_modelexport
+    tot_timing_info['sequential'] = t5 - t0
+
+    models = (model_MIP,model)
+    return models, summary_results , tot_timing_info, solver_stats,best_i
+    
+
+def plot_feasible_solutions(results, plot_type='MIP', suptitle=None, show=True, save_path=None, width_mm=None):
+    import matplotlib.pyplot as plt
+    # local import to ensure availability regardless of module-level imports
+    import os
+    FS = 10
+    
+    # Normalize input: accept a single feasible_solutions list, a list of those,
+    # a dict with key 'feasible_solutions_MIP', or a list of such dicts
+    def _is_pair_list(seq):
+        try:
+            return isinstance(seq, (list, tuple)) and len(seq) > 0 and isinstance(seq[0], (list, tuple)) and len(seq[0]) == 2
+        except Exception:
+            return False
+    
+    if results is None:
+        normalized_results = []
+    elif isinstance(results, dict) and 'feasible_solutions_MIP' in results:
+        normalized_results = [results.get('feasible_solutions_MIP', [])]
+    elif isinstance(results, list):
+        if len(results) > 0 and isinstance(results[0], dict) and 'feasible_solutions_MIP' in results[0]:
+            normalized_results = [r.get('feasible_solutions_MIP', []) for r in results]
+        elif _is_pair_list(results):
+            # single run provided as list of (time, obj)
+            normalized_results = [results]
+        else:
+            # assume already in the expected list-of-runs format
+            normalized_results = results
+    else:
+        # Fallback: treat as empty
+        normalized_results = []
+    
+    if width_mm is not None:
+        fig_w_in = width_mm / 25.4
+        fig_h_in = fig_w_in 
+    else:
+        fig_w_in = 6.0
+        fig_h_in = fig_w_in 
+
+    fig, ax = plt.subplots(1, 1, figsize=(fig_w_in, fig_h_in), sharex=False, sharey=False, constrained_layout=True)
+
+    # Normalize plot_type and set axis label
+    ptype = (plot_type or 'MIP').upper()
+    if ptype == 'CSS':
+        y_axis_label = 'Objective [M€]'
+    else:
+        ptype = 'MIP'
+        y_axis_label = 'Cable length [km]'
+
+    # plotting logic mirroring the subplots helper
+    if not normalized_results:
+        ax.set_title(ptype, fontsize=FS)
+        ax.set_xlabel('Time (s)', fontsize=FS)
+        ax.set_ylabel(y_axis_label, fontsize=FS)
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=FS)
+    else:
+        has_any = False
+        for i, feas in enumerate(normalized_results):
+            if not feas:
+                continue
+            has_any = True
+            feas_sorted = sorted(feas, key=lambda x: x[0])
+            times = [t for t, _ in feas_sorted]
+            objs = [o for _, o in feas_sorted]
+            if ptype == 'CSS':
+                objs = [o / 1e6 for o in objs]
+            ax.plot(times, objs, 'o-', label=f'i={i} (s={len(objs)})', markersize=5, linewidth=2)
+        ax.set_title(ptype, fontsize=FS*1.2)
+        ax.set_xlabel('Time (s)', fontsize=FS*1.1)
+        ax.set_ylabel(y_axis_label, fontsize=FS*1.1)
+        if has_any:
+            ax.legend(prop={'size': FS}, loc='upper right', frameon=False)
+        ax.tick_params(labelsize=FS)
+        ax.grid(True, alpha=0.3)
+
+    if suptitle is not None:
+        fig.suptitle(suptitle, fontsize=FS*1.3)
+        fig.subplots_adjust(left=0.10, right=0.99, top=0.80, bottom=0.22)
+    else:
+        fig.subplots_adjust(left=0.08, right=0.99, top=0.98, bottom=0.18)
+
+    if save_path is not None:
+        dir_, base = os.path.split(save_path)
+        root, ext = os.path.splitext(base)
+        base = (root + ext.lower()).lower()
+        save_path = os.path.join(dir_, base)
+        if save_path.endswith('.svg'):
+            fig.savefig(save_path, format='svg', bbox_inches='tight')
+        else:
+            fig.savefig(save_path, format='png', bbox_inches='tight')
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+def plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, show=True, save_path=None, width_mm=None):
+    import matplotlib.pyplot as plt
+    FS = 10
+    # Maintain 40:20 aspect ratio regardless of absolute size (taller axes)
+    ratio = 20.0 / 40.0
+    if width_mm is not None:
+        fig_w_in = width_mm / 25.4
+        fig_h_in = fig_w_in * ratio
+    else:
+        fig_w_in = 6.0
+        fig_h_in = fig_w_in * ratio
+    figsize = (fig_w_in, fig_h_in)
+    # Two subplots side-by-side: MIP (left), CSS (right)
+    fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=False, sharey=False, constrained_layout=True)
+
+    def _plot(ax, results, title,yaxis):
+        if not results:
+            ax.set_title(title, fontsize=FS)
+            ax.set_xlabel('Time (s)', fontsize=FS)
+            ax.set_ylabel(yaxis, fontsize=FS)
+            ax.grid(True, alpha=0.3)
+            ax.tick_params(labelsize=FS)
+            return
+        has_any = False
+        for i, feas in enumerate(results):
+            if not feas:
+                continue
+            has_any = True
+            feas_sorted = sorted(feas, key=lambda x: x[0])
+            times = [t for t, _ in feas_sorted]
+            objs = [o for _, o in feas_sorted]
+            if title == 'CSS':
+                objs = [o/1e6 for o in objs]
+            ax.plot(times, objs, 'o-', label=f'i={i} (s={len(objs)})', markersize=5, linewidth=2)
+        ax.set_title(title, fontsize=FS*1.2)
+        ax.set_xlabel('Time (s)', fontsize=FS*1.1)
+        ax.set_ylabel(yaxis, fontsize=FS*1.1)
+        if has_any:
+            ax.legend(prop={'size': FS}, loc='upper right', frameon=False)
+        ax.tick_params(labelsize=FS)
+        ax.grid(True, alpha=0.3)
+
+    _plot(axes[0], results_mip, 'MIP', 'Cable length [km]')
+    _plot(axes[1], results_css, 'CSS', 'Objective [M€]')
+
+    if suptitle is not None:
+        fig.suptitle(suptitle, fontsize=FS*1.3)
+        fig.subplots_adjust(left=0.10, right=0.99, top=0.80, bottom=0.22, wspace=0.22)
+    else:
+        fig.subplots_adjust(left=0.08, right=0.99, top=0.98, bottom=0.18, wspace=0.18)
+
+    if save_path is not None:
+        dir_, base = os.path.split(save_path)
+        root, ext = os.path.splitext(base)
+        base = (root + ext.lower()).lower()  # lowercase name + extension
+        save_path = os.path.join(dir_, base)
+        
+        if save_path.endswith('.svg'):
+            fig.savefig(save_path, format='svg', bbox_inches='tight')
+        else:
+            fig.savefig(save_path, format='png', bbox_inches='tight')
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
+
+def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False,export=True,fs=False):
+
+    grid.Array_opf = False
+    if NL:
+        model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export)
+    else:
+        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export,fs)
+
+    return model, model_results , timing_info, solver_stats
+
 
 def TEP_subObj(submodel,grid,ObjRule):
     OnlyGen=True
@@ -582,7 +1104,6 @@ def TEP_subObj(submodel,grid,ObjRule):
 
 def TEP_obj(model,grid,NPV):
   
-
     def Gen_investments():
         Gen_Inv=0
         for g in model.gen_AC:
@@ -636,6 +1157,7 @@ def TEP_obj(model,grid,NPV):
                 else:
                     for ct in model.ct_set:
                         Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]/line.life_time_hours
+        
         return Inv_array
         
     
@@ -668,7 +1190,12 @@ def TEP_obj(model,grid,NPV):
     def CT_limit_rule(model):
             return sum(model.ct_types[ct] for ct in model.ct_set) <= grid.cab_types_allowed
     def ct_cable_type_rule(model, line):
-        return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
+        l = grid.lines_AC_ct[line]
+        if l.active_config >=0:
+            return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
+        else:
+            return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 0
+    
     
     def ct_types_upper_bound(model, ct):
         return sum(model.ct_branch[l, ct] for l in model.lines_AC_ct) <= len(model.lines_AC_ct) * model.ct_types[ct]
@@ -676,11 +1203,37 @@ def TEP_obj(model,grid,NPV):
     def ct_types_lower_bound(model, ct):
         return model.ct_types[ct] <= sum(model.ct_branch[l, ct] for l in model.lines_AC_ct)
         
+    def ct_Array_cable_type_rule(model, line):
+        return sum(model.ct_branch[line, ct] for ct in model.ct_set) <= 1
+    def ct_node_limit_rule(model, node):
+        nAC = grid.nodes_AC[node]
+        connections = 0
+        for line in nAC.connected_toCTLine:
+           for ct in model.ct_set:
+               connections += model.ct_branch[line.lineNumber,ct]
+        for line in nAC.connected_fromCTLine:
+           for ct in model.ct_set:
+               connections += model.ct_branch[line.lineNumber,ct]       
+        return connections <= nAC.ct_limit
+    
+    def ct_crossings_rule(model,ct_crossing):
+        return sum(model.ct_branch[line,ct] for line in grid.crossing_groups[ct_crossing] for ct in model.ct_set) <= 1
+    def ct_tree_rule(model):
+        return sum(model.ct_branch[line,ct] for line in model.lines_AC_ct for ct in model.ct_set) == len(grid.nodes_AC) - 1
     if grid.CT_AC:
-        model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)
+        
         model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
         model.ct_types_lower_bound = pyo.Constraint(model.ct_set, rule=ct_types_lower_bound)
         model.CT_limit_constraint = pyo.Constraint(rule=CT_limit_rule)
+        if grid.Array_opf:
+            model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_Array_cable_type_rule)
+            model.ct_node_limit_constraint = pyo.Constraint(model.nodes_AC, rule=ct_node_limit_rule)
+            model.ct_crossings = pyo.Set(initialize=list(range(len(grid.crossing_groups))))
+            model.ct_crossings_constraint = pyo.Constraint(model.ct_crossings, rule=ct_crossings_rule)
+            model.ct_tree_constraint = pyo.Constraint(rule=ct_tree_rule)
+            
+        else:
+            model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)    
         inv_array = Array_investments()
     else:
         inv_array = 0
@@ -833,12 +1386,21 @@ def get_line_data(t, model, grid):
         for l in grid.lines_AC_ct:
             if l.array_opf:
                 ln = l.lineNumber
-                active_config = np.where([pyo.value(model.ct_branch[ln,ct]) >= 0.99999 for ct in model.ct_set])[0][0]
-                ct = list(model.ct_set)[active_config]
-                P_to = np.float64(pyo.value(model.submodel[t].ct_PAC_to[ln,ct])) * grid.S_base
-                P_from = np.float64(pyo.value(model.submodel[t].ct_PAC_from[ln,ct])) * grid.S_base
-                Q_to = np.float64(pyo.value(model.submodel[t].ct_QAC_to[ln,ct])) * grid.S_base
-                Q_from = np.float64(pyo.value(model.submodel[t].ct_QAC_from[ln,ct])) * grid.S_base
+                # Check if any conductor type is selected
+                ct_selected = [pyo.value(model.ct_branch[ln,ct]) >= 0.99999 for ct in model.ct_set]
+                if any(ct_selected):
+                    active_config = np.where(ct_selected)[0][0]
+                    P_to = np.float64(pyo.value(model.submodel[t].ct_PAC_to[ln,active_config])) * grid.S_base
+                    P_from = np.float64(pyo.value(model.submodel[t].ct_PAC_from[ln,active_config])) * grid.S_base
+                    Q_to = np.float64(pyo.value(model.submodel[t].ct_QAC_to[ln,active_config])) * grid.S_base
+                    Q_from = np.float64(pyo.value(model.submodel[t].ct_QAC_from[ln,active_config])) * grid.S_base
+                else:
+                    active_config = -1  # or None, or handle appropriately
+                    P_to = 0
+                    P_from = 0
+                    Q_to = 0
+                    Q_from = 0
+                
                 S_to = np.sqrt(P_to**2 + Q_to**2)
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating_list[active_config] * 100
@@ -1034,7 +1596,13 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         for line in grid.lines_AC_ct:
             l=line.lineNumber
-            line.active_config = np.where([lines_AC_CT[l][ct] >= 0.75 for ct in model.ct_set])[0][0]
+            # Check if any conductor type is selected
+            ct_selected = [lines_AC_CT[l][ct] >= 0.90 for ct in model.ct_set]
+            if any(ct_selected):
+                line.active_config = np.where(ct_selected)[0][0]
+            else:
+                line.active_config = -1  # or None, or handle appropriately
+                # This line has no conductor type selected
     
     if DCmode:
         NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   

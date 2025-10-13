@@ -29,6 +29,11 @@ try:
 except ImportError:
     HAS_OPF = False
     
+try:
+    from .ACDC_TEP_pymoo import *
+    HAS_TEP_PYMOO = True
+except ImportError:
+    HAS_TEP_PYMOO = False
 
 try:
     from .Graph_Dash import *
@@ -36,6 +41,12 @@ try:
 except ImportError:
     HAS_DASH = False
     
+try:
+    from .AC_L_CSS_gurobi import *
+    from ...my_tests.MIP_graph_array import *
+    HAS_AC_L_CSS_GUROBI = True
+except ImportError:
+    HAS_AC_L_CSS_GUROBI = False
 
 try:
     from .Mapping import *
@@ -89,6 +100,7 @@ __all__ = [
     # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
+    'Create_grid_from_turbine_graph',
     'Extend_grid_from_data',
     
     # Line Modifications
@@ -119,6 +131,7 @@ __all__ = [
     
     # OPF
     'Optimal_PF',
+    'Optimal_L_PF',
     'OPF_solve',
     'OPF_obj',
     'OPF_line_res',
@@ -128,7 +141,10 @@ __all__ = [
     
     # TEP
     'transmission_expansion',
+    'linear_transmission_expansion',
     'multi_scenario_TEP',
+    'simple_CSS',
+    'sequential_CSS',
     'update_grid_price_zone_data',
     'expand_elements_from_pd',
     'repurpose_element_from_pd',
@@ -136,6 +152,16 @@ __all__ = [
     'Expand_element',
     'Translate_pd_TEP',
     'export_TEP_TS_results_to_excel',
+    'MIP_path_graph',
+
+    # TEP_PYMOO
+    'transmission_expansion_pymoo',
+    
+    # AC_L_CSS_GUROBI
+    'Optimal_L_CSS_gurobi',
+    'test_master_problem',
+
+    #MP_TEP
     'multi_period_TEP',
     'multi_period_MS_TEP',
 
@@ -191,3 +217,4 @@ for case_file in case_folder.glob("*.py"):
 
 # Optional: Add all cases to this module's global namespace
 globals().update(cases)    
+

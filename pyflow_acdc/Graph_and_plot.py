@@ -9,7 +9,7 @@ import base64
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import os
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString,Polygon,MultiPolygon
 
 from .Classes import Node_AC
 
@@ -288,7 +288,10 @@ def update_lineACrec_hovertext(line,S_base,text):
 
 def update_lineACct_hovertext(line,S_base,text):
     dec=2
-    line.direction = 'from' if line.fromS >= 0 else 'to'
+    line.direction = 'from' if np.real(line.fromS) >= 0 else 'to'
+    active_config = line.active_config
+    if active_config == -1:
+        return
     if text =='data':
         name = line.name
         fromnode = line.fromNode.name
@@ -530,6 +533,7 @@ def update_hovertexts(grid,text):
             except Exception as e:
                 print(f"Error in thread: {e}")
         
+            
 def initialize_positions(Grid):
     """Initialize positions for the grid nodes."""
     return Grid.node_positions if Grid.node_positions is not None else {}
@@ -1125,8 +1129,15 @@ def create_geometries(grid):
                     x, y = pos[node]
                     gen.geometry = Point(x, y)
 
-def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True):
-    """Save the network as SVG file"""
+def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False,poly=None,linestrings=None):
+    """Save the network as SVG file
+    
+    Parameters:
+    -----------
+    square_ratio : bool
+        If True, forces both x and y axes to have the same range (uses the largest range needed)
+        so that one step in x equals one step in y in the coordinate space.
+    """
     try:
         import svgwrite
         
@@ -1162,7 +1173,10 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             # Convert 88mm to pixels (assuming 96 DPI)
             width = int(88 * 96 / 25.4)  # 25.4mm = 1 inch
             # Maintain aspect ratio
-            height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
+            if square_ratio:
+                height = width 
+            else:
+                height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
 
         print(f"Current working directory: {os.getcwd()}")
         print(f"Will save as: {os.path.abspath(f'{name}.svg')}")
@@ -1187,6 +1201,24 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             if hasattr(gen, 'geometry') and gen.geometry:
                 all_bounds.append(gen.geometry.bounds)
         
+        # Add polygon bounds if provided
+        def _iter_polys(obj):
+            if obj is None:
+                return
+            if isinstance(obj, Polygon):
+                yield obj
+            elif isinstance(obj, MultiPolygon):
+                for poly in obj.geoms:
+                    yield poly
+            elif isinstance(obj, (list, tuple)):
+                for o in obj:
+                    yield from _iter_polys(o)  # Recursively handle nested structures
+
+        if poly is not None:
+            for geom in _iter_polys(poly):
+                all_bounds.append(geom.bounds)
+        
+        
         # Calculate overall bounds
         if all_bounds:
             minx = min(bound[0] for bound in all_bounds)
@@ -1198,10 +1230,36 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             return
 
         # Calculate scaling factors
-        padding = 50  # pixels of padding
-        scale_x = (width - 2*padding) / (maxx - minx)
-        scale_y = (height - 2*padding) / (maxy - miny)
-        scale = min(scale_x, scale_y)
+        
+        
+        if square_ratio:
+            padding = 10
+            # For square ratio: make both axes have the same range
+            x_range = maxx - minx
+            y_range = maxy - miny
+            max_range = max(x_range, y_range)
+            
+            # Expand the smaller dimension to match the larger one
+            if x_range < max_range:
+                center_x = (minx + maxx) / 2
+                minx = center_x - max_range / 2
+                maxx = center_x + max_range / 2
+            
+            if y_range < max_range:
+                center_y = (miny + maxy) / 2
+                miny = center_y - max_range / 2
+                maxy = center_y + max_range / 2
+            
+            # Now both ranges are equal, so use the same scale for both axes
+            available_width = width - 2*padding
+            available_height = height - 2*padding
+            scale = min(available_width, available_height) / max_range
+        else:
+            padding = 25  # pixels of padding
+            # Original scaling logic
+            scale_x = (width - 2*padding) / (maxx - minx)
+            scale_y = (height - 2*padding) / (maxy - miny)
+            scale = min(scale_x, scale_y)
         
         def transform_coords(x, y):
             """Transform coordinates to SVG space"""
@@ -1226,7 +1284,60 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             12: 'salmon', 
             13: 'olive'
         }
-        
+    
+     
+        # Draw background polygon(s) if provided (behind lines/nodes)
+                
+        if poly is not None:
+            for geom in _iter_polys(poly):
+                if isinstance(geom, Polygon):
+                    poly_list = [geom]
+                elif isinstance(geom, MultiPolygon):
+                    poly_list = list(geom.geoms)
+                else:
+                    poly_list = []
+                for pg in poly_list:
+                    rings = [list(pg.exterior.coords)] + [list(r.coords) for r in pg.interiors]
+                    d = ""
+                    for coords in rings:
+                        pts = [transform_coords(x, y) for (x, y) in coords]
+                        d += "M " + " L ".join(f"{x},{y}" for (x, y) in pts) + " Z "
+                    dwg.add(dwg.path(
+                        d=d,
+                        fill='#ADD8E6',
+                        stroke='#ADD8E6',
+                        stroke_width=2,
+                        fill_rule='evenodd',
+                        fill_opacity=0.15
+                    ))
+                    
+                    # Draw contour lines (exterior and interior rings)
+                    for coords in rings:
+                        pts = [transform_coords(x, y) for (x, y) in coords]
+                        contour_d = "M " + " L ".join(f"{x},{y}" for (x, y) in pts) + " Z"
+                        dwg.add(dwg.path(
+                            d=contour_d,
+                            fill='none',
+                            stroke='blue',
+                            stroke_width=1
+                        ))
+        # Draw LineStrings if provided
+        if linestrings is not None:
+            for linestring in linestrings:
+                if hasattr(linestring, 'geometry') and linestring.geometry:
+                    coords = list(linestring.geometry.coords)
+                elif hasattr(linestring, 'coords'):
+                    coords = list(linestring.coords)
+                else:
+                    continue
+                    
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]
+                dwg.add(dwg.path(d=path_data, stroke='black', stroke_width=2, fill='none'))
+
         # Draw AC lines
         for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
@@ -1240,6 +1351,8 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 if line in grid.lines_AC_rec and line.rec_branch:
                     color = "green"
                 elif line in grid.lines_AC_ct:
+                     if line.active_config <0:
+                         continue
                      color = cable_type_colors.get(line.active_config, "black")  
                 else:
                     color = "red" if getattr(line, 'isTf', False) else "black"  # Original logic for other lines
@@ -1291,7 +1404,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 x, y = node.geometry.x, node.geometry.y
                 svg_x, svg_y = transform_coords(x, y)
                 color = "black" if isinstance(node, Node_AC) else "purple"
-                dwg.add(dwg.circle(center=(svg_x, svg_y), r=3, 
+                dwg.add(dwg.circle(center=(svg_x, svg_y), r=1, 
                                  fill=color, stroke=color))
                 
         if grid.nct_AC != 0 and hasattr(grid.lines_AC_ct[0], 'cable_types'):
@@ -1300,26 +1413,50 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             legend_spacing = 20  # Space between legend items
             
             # Add legend title
-            dwg.add(dwg.text("Cable Types", 
-                            insert=(legend_x, legend_y - 10),
-                            font_size=15,
-                            font_family="NewComputerModernSans"))
+            
             
             # Add legend items
             if legend:
-                for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
-                    color = cable_type_colors.get(i, "black")
-                    # Add colored line
-                    dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
-                                end=(legend_x + 30, legend_y + i * legend_spacing),
-                                stroke=color,
-                                stroke_width=2))
-                    # Add text
-                    dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
-                                    insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
-                                    font_size=12,
-                                    font_family="NewComputerModernSans",
-                                    fill=color))
+
+                dwg.add(dwg.text("Cable Types", 
+                            insert=(legend_x, legend_y - 10),
+                            font_size=15,
+                            font_family="NewComputerModernSans"))
+
+                if grid.Cable_options[0].active_config is not None:
+                # Only show cable types that are active (>0.9)
+                    space = 0
+                    for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                        if grid.Cable_options[0].active_config[i] > 0.9:
+                            space += 1
+                            color = cable_type_colors.get(i, "black")
+                            # Add colored line
+                            dwg.add(dwg.line(start=(legend_x, legend_y + space * legend_spacing),
+                                        end=(legend_x + 30, legend_y + space * legend_spacing),
+                                        stroke=color,
+                                        stroke_width=2))
+                            # Add text
+                            dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                            insert=(legend_x + 40, legend_y + space * legend_spacing + 5),
+                                            font_size=12,
+                                            font_family="NewComputerModernSans",
+                                            fill=color))
+                
+                else:
+                    
+                    for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                        color = cable_type_colors.get(i, "black")
+                        # Add colored line
+                        dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
+                                    end=(legend_x + 30, legend_y + i * legend_spacing),
+                                    stroke=color,
+                                    stroke_width=2))
+                        # Add text
+                        dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                        insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
+                                        font_size=12,
+                                        font_family="NewComputerModernSans",
+                                        fill=color))
         
         # Save the SVG file
         dwg.save()

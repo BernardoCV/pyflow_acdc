@@ -63,7 +63,7 @@ This is the basic way to create a grid. This grid is the same as running MATACDC
     res= pyf.Results(grid,decimals=3)
 
 
-    pyf.ACDC_sequential(grid)
+    time,tol,ps_iterations = pyf.ACDC_sequential(grid)
 
     res.All()
 
@@ -109,7 +109,7 @@ Grids can also be built in the opposite order, creating the core grid first, the
     converter_2 = pyf.add_ACDC_converter(grid,ac_node_3, dc_node_2,'PV', 'Slack', Transformer_resistance=0.0015, Transformer_reactance=0.121, Phase_Reactor_R=0.0001, Phase_Reactor_X=0.16428, Filter=0.0887, Droop=0, kV_base=345, MVA_max=120)
     converter_3 = pyf.add_ACDC_converter(grid,ac_node_5, dc_node_3,'PQ', 'PAC'  , P_AC_MW=35, Q_AC_MVA=5, Transformer_resistance=0.0015, Transformer_reactance=0.121, Phase_Reactor_R=0.0001, Phase_Reactor_X=0.16428, Filter=0.0887, Droop=0, kV_base=345, MVA_max=120)
 
-    pyf.ACDC_sequential(grid)
+    time,tol,ps_iterations = pyf.ACDC_sequential(grid)
     res.All()
 
 
@@ -123,7 +123,7 @@ Examples of running a power flow...
 
     [grid,res]=pyf.PEI_grid()
 
-    pyf.ACDC_sequential(grid,QLimit=False)
+    time,tol,ps_iterations = pyf.ACDC_sequential(grid,QLimit=False)
 
     res.All()
     print ('------')
@@ -147,7 +147,7 @@ To run this, you need to have the OPF optional installed. This includes the foll
 
     [grid,res]=pyf.case39_acdc()
 
-    model, timing_info, [model_res,solver_stats] = pyf.OPF_ACDC(grid,ObjRule={'obj':{'w':1}})
+    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid,ObjRule=obj)
 
     res.All()
     print ('------')
@@ -197,7 +197,7 @@ Taking the Case 5 from the IEEE PES Power Grid Library [2]_.
 
     obj = {'Energy_cost'  : 1}
 
-    model, timing_info, [model_res,solver_stats] = pyf.OPF_ACDC(grid,ObjRule={'obj':{'w':1}})
+    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid,ObjRule=obj)
 
     res.All()
     print ('------')

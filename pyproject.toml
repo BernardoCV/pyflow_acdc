@@ -58,11 +58,7 @@ dependencies = ["numpy",
 
 mapping = ["folium"]
 
-OPF = [  "pyomo",
-         "ipopt"]
-OPF_linux = ["pyomo",
-             "ipopt",
-             "coin-or-bonmin"]
+OPF = ["pyomo"]
 
 Dash = ["dash"]
 
@@ -71,7 +67,7 @@ Repository     = "https://github.com/BernardoCV/pyflow_acdc"
 Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
 [tool.setuptools]
-packages = ["pyflow_acdc"]
+packages = ["pyflow_acdc","pyflow_tests"]
 
 [tool.setuptools.package-data]
 "pyflow_acdc" = [
@@ -80,3 +76,5 @@ packages = ["pyflow_acdc"]
     "example_grids/*.py"
 ]
 
+[project.scripts]
+pyflow-acdc-test = "pyflow_tests.run_tests:main"

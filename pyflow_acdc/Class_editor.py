@@ -371,7 +371,7 @@ def add_line_sizing(grid, fromNode, toNode,cable_types: list=[], active_config: 
     if isinstance(toNode, str):
         toNode = next((node for node in grid.nodes_AC if node.name == toNode), None)
     
-    line = Line_sizing(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
+    line = Size_selection(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
     grid.lines_AC_ct.append(line)
     if cable_option is not None:
         assign_lineToCable_options(grid,line.name,cable_option)
@@ -656,9 +656,17 @@ def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc
     return gen
 
 
-def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
+def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
+    if isinstance(node, str):
+        node_name = node
+        # Search in AC nodes first, then DC nodes
+        node = next((n for n in Grid.nodes_AC if n.name == node_name), None)
+        
+        if node is None:
+            print(f'Node {node_name} does not exist')
+            sys.exit()
     
-    
+
     if MVArmin is None:
         MVArmin=-MVAmax
     if MVArmax is None:
@@ -672,92 +680,94 @@ def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,M
         Min_pow_gen=-MVAmax/Grid.S_base
     else:
         Min_pow_gen=0
-    found=False 
-    for node in Grid.nodes_AC:
-        if node_name == node.name:
-             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf)
-             node.PGi = 0
-             node.QGi = 0
-             found=True
-             break
-    if not found:
-        print(f'Node {node_name} does not exist')
-        sys.exit()
+    
+    gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf)
+    node.PGi = 0
+    node.QGi = 0
+    
     gen.price_zone_link=price_zone_link
     if price_zone_link:
         gen.qf= 0
         gen.lf= node.price
+
+    # Iterate over all AC nodes to see if any is already 'Slack'
+    has_slack = any(n.type == 'Slack' for n in Grid.nodes_AC)
+    if not has_slack:
+        node.type = 'Slack'
     Grid.Generators.append(gen)
 
-def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind',min_gamma=0,Qrel=0):
+def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0):
     
+    # Handle string input by finding the node
+    if isinstance(node, str):
+        node_name = node
+        # Search in AC nodes first, then DC nodes
+        node = next((n for n in Grid.nodes_AC if n.name == node_name), None)
+        if node is None:
+            node = next((n for n in Grid.nodes_DC if n.name == node_name), None)
+        if node is None:
+            print(f'Node {node_name} does not exist')
+            sys.exit()
     
+    # Set default ren_source_name if not provided
     if ren_source_name is None:
-        ren_source_name= node_name
-    found=False 
-    for node in Grid.nodes_AC:
-        if node_name == node.name:
-            rensource= Ren_Source(ren_source_name,node,base/Grid.S_base)    
-            rensource.PRGi_available=available
-            rensource.connected= 'AC'
-            ACDC='AC'
-            rensource.rs_type= ren_type
-            if geometry is not None:
-                if isinstance(geometry, str): 
-                     geometry = loads(geometry)  
-                rensource.geometry= geometry
-            rensource.min_gamma = min_gamma
-            rensource.Qmax = base*Qrel/Grid.S_base
-            rensource.Qmin = -base*Qrel/Grid.S_base
-            Grid.rs2node['AC'][rensource.rsNumber]=node.nodeNumber
-            found = True
-            break
-    for node in Grid.nodes_DC:
-        if node_name == node.name:
-            rensource= Ren_Source(ren_source_name,node,base/Grid.S_base)    
-            rensource.PGi_available=available
-            rensource.connected= 'DC'
-            ACDC='DC'
-            rensource.rs_type= ren_type
-            if geometry is not None:
-                if isinstance(geometry, str): 
-                     geometry = loads(geometry)  
-                rensource.geometry= geometry
-            rensource.min_gamma = min_gamma
-            Grid.rs2node['DC'][rensource.rsNumber]=node.nodeNumber
-            found = True
-            break    
-
-    if not found:
-           print(f'Node {node_name} does not exist')
-           sys.exit()
-   
+        ren_source_name = node.name
+    
+    # Create renewable source
+    rensource = Ren_Source(ren_source_name, node, base/Grid.S_base)    
+    rensource.PRGi_available = available
+    rensource.rs_type = ren_type
+    rensource.min_gamma = min_gamma
+    
+    # Determine connection type and set appropriate attributes
+    if node in Grid.nodes_AC:
+        rensource.connected = 'AC'
+        ACDC = 'AC'
+        rensource.Qmax = base*Qrel/Grid.S_base
+        rensource.Qmin = -base*Qrel/Grid.S_base
+        Grid.rs2node['AC'][rensource.rsNumber] = node.nodeNumber
+    elif node in Grid.nodes_DC:
+        rensource.connected = 'DC'
+        ACDC = 'DC'
+        Grid.rs2node['DC'][rensource.rsNumber] = node.nodeNumber
+    else:
+        print(f'Node {node.name} is not in AC or DC nodes')
+        sys.exit()
+    
+    # Handle geometry
+    if geometry is not None:
+        if isinstance(geometry, str): 
+            geometry = loads(geometry)  
+        rensource.geometry = geometry
+    
+    # Add to grid
     Grid.RenSources.append(rensource)
     
-    
+    # Handle zone assignment
     if zone is not None:
-        rensource.zone=zone
-        assign_RenToZone(Grid,ren_source_name,zone)
+        rensource.zone = zone
+        assign_RenToZone(Grid, ren_source_name, zone)
     
+    # Handle price zone assignment
     if price_zone is not None:
-        rensource.price_zone=price_zone
+        rensource.price_zone = price_zone
         if MTDC is not None:
-            rensource.MTDC=MTDC
+            rensource.MTDC = MTDC
             main_price_zone = next((M for M in Grid.Price_Zones if price_zone == M.name), None)
             if main_price_zone is not None:
                 # Find or create the MTDC price_zone
                 MTDC_price_zone = next((mdc for mdc in Grid.Price_Zones if MTDC == mdc.name), None)
 
                 if MTDC_price_zone is None:
-                    # Create the offshore price_zone using the OffshorePrice_Zone class
-                    MTDC_price_zone= add_MTDC_price_zone(Grid,MTDC)
+                    # Create the MTDC price_zone using the MTDCPrice_Zone class
+                    MTDC_price_zone = add_MTDC_price_zone(Grid, MTDC)
             
             MTDC_price_zone.add_linked_price_zone(main_price_zone)
             main_price_zone.import_expand += base / Grid.S_base
             assign_nodeToPrice_Zone(Grid, node_name,MTDC, ACDC)
             # Additional logic for MTDC can be placed here
         elif Offshore:
-            rensource.Offshore=True
+            rensource.Offshore = True
             # Create an offshore price_zone by appending 'o' to the main price_zone's name
             oprice_zone_name = f'o_{price_zone}'
 
@@ -770,19 +780,19 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
 
                 if oprice_zone is None:
                     # Create the offshore price_zone using the OffshorePrice_Zone class
-                    oprice_zone= add_offshore_price_zone(Grid,main_price_zone,oprice_zone_name)
+                    oprice_zone = add_offshore_price_zone(Grid, main_price_zone, oprice_zone_name)
 
                 # Assign the node to the offshore price_zone
-                assign_nodeToPrice_Zone(Grid, node_name,oprice_zone_name,ACDC)
+                assign_nodeToPrice_Zone(Grid, node.name, oprice_zone_name, ACDC)
                 # Link the offshore price_zone to the main price_zone
                 main_price_zone.link_price_zone(oprice_zone)
                 # Expand the import capacity in the main price_zone
                 main_price_zone.import_expand += base / Grid.S_base
         else:
             # Assign the node to the main price_zone
-            assign_nodeToPrice_Zone(Grid, node_name, price_zone,ACDC)
-
-
+            assign_nodeToPrice_Zone(Grid, node.name, price_zone, ACDC)
+    
+    return rensource
 
 "Time series data "
 
@@ -1102,7 +1112,7 @@ def assign_lineToCable_options(Grid,line_name, new_cable_option_name):
     # Add line to the new cable_option
     if line_to_reassign not in new_cable_option.lines:
         new_cable_option.lines.append(line_to_reassign) 
-        line_to_reassign.cable_types = new_cable_option.cable_types
+        line_to_reassign.cable_types = new_cable_option._cable_types
 
 
 

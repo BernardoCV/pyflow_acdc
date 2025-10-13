@@ -12,14 +12,12 @@ import webbrowser
 from .Graph_and_plot import update_hovertexts, create_subgraph_color_dict
 from .Classes import Node_AC
 
-def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None):
+def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None,show=True):
     # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter" 
     if name is None:
         name = grid.name
     update_hovertexts(grid, text) 
 
-    # Initialize the map, centred around the North Sea
-    m = folium.Map(location=[56, 10], tiles=tiles,zoom_start=5)
     
     
     G = grid.Graph_toPlot  # Assuming this is your main graph object
@@ -59,12 +57,13 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 vmin=min_loss, 
                 vmax=max_loss
                 )
-        if coloring == 'Efficiency':
+        elif coloring == 'Efficiency':
            colormap = branca.colormap.LinearColormap(
                colors=["red", "yellow","green"],
                vmin=70, 
                vmax=100
                )
+        
         # test_values = [min_loss, (min_loss + max_loss) / 2, max_loss]
         # for val in test_values:
         #     print(f"Loss: {val}, Color: {colormap(val)}")
@@ -89,7 +88,8 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 ant_v = True
             if ant_path == 'All' and VL != 'MV':
                 ant_v = True
-           
+
+            thck= getattr(line_obj, 'np_line', 1)
             if coloring == 'loss':
                 color = colormap(np.real(line_obj.loss))
                 # print(f'{np.real(line.loss)} - {color}')
@@ -102,11 +102,34 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 eff=(1-loss/power)*100 if power != 0 else 0
                 color= colormap(eff)
                 # print(f'{eff} - {color}')
+            elif line_type == 'CSS':
+                cable_type_colors = {
+                    0: 'cyan', 
+                    1: 'magenta', 
+                    2: 'brown', 
+                    3: 'gray', 
+                    4: 'lime', 
+                    5: 'navy', 
+                    6: 'teal', 
+                    7: 'violet', 
+                    8: 'indigo', 
+                    9: 'turquoise', 
+                    10: 'beige', 
+                    11: 'coral', 
+                    12: 'salmon', 
+                    13: 'olive'
+                }
+                if line_obj.active_config != -1:
+                    color= cable_type_colors[line_obj.active_config]
+                else:
+                    color= 'black'
+                    thck= 0
             else:
                 color=('black' if getattr(line_obj, 'isTf', False)  # Defaults to False if 'isTF' does not exist/
                         else subgraph_colors[VL].get(subgraph_idx, "black") if line_type == 'AC' 
                         else 'darkblue' if line_type_indv == 'MTDC' 
                         else 'royalblue')
+           
             if geometry and not geometry.is_empty:
                 line_data.append({
                     "geometry": geometry,
@@ -114,7 +137,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     "name": getattr(line_obj, 'name', 'Unknown'),
                     "Direction": line_obj.direction,
                     "ant_viable": ant_v, 
-                    "thck": getattr(line_obj, 'np_line', 1),
+                    "thck": thck,
                     "VL" :VL,
                     "area":area,
                     "tf": getattr(line_obj, 'isTf', False),
@@ -138,6 +161,10 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     else:
         gdf_lines_AC_exp = gpd.GeoDataFrame(columns=["geometry", "type", "name", "VL", "tf", "hover_text", "color"])
 
+    if grid.lines_AC_ct != []:
+        gdf_lines_AC_ct = extract_line_data(grid.lines_AC_ct, "CSS")
+    else:
+        gdf_lines_AC_ct = gpd.GeoDataFrame(columns=["geometry", "type", "name", "VL", "tf", "hover_text", "color"])
     
     def filter_vl_and_tf(gdf):
     # Filter lines based on Voltage Level (VL)
@@ -299,8 +326,31 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     opacity=0.8,
                     popup=row["hover_text"]
                 ).add_to(tech_name)
-           
+        s=1
+    # Calculate map center from node coordinates
+    if not gdf_nodes_AC.empty:
+        # Get bounds of all nodes
+        bounds = gdf_nodes_AC.total_bounds
+        # Calculate center point
+        center_lat = (bounds[1] + bounds[3]) / 2  # (min_y + max_y) / 2
+        center_lon = (bounds[0] + bounds[2]) / 2  # (min_x + max_x) / 2
+        map_center = [center_lat, center_lon]
+    else:
+        # Fallback to North Sea if no nodes
+        map_center = [56, 10]
     
+    # Initialize the map, centred around the nodes
+    if tiles.startswith('http'):
+        # Custom tile layer with attribution
+        m = folium.Map(location=map_center, zoom_start=5)
+        folium.TileLayer(
+            tiles=tiles,
+            attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            name='Esri World Imagery'
+        ).add_to(m)
+    else:
+        # Standard tile layer
+        m = folium.Map(location=map_center, tiles=tiles, zoom_start=5)
     
     # Function to add nodes with filtering by type and zone
     def add_nodes(gdf, tech_name):
@@ -352,6 +402,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     hvdc   = folium.FeatureGroup(name="HVDC Lines")
     convs  = folium.FeatureGroup(name="Converters")
     transformers = folium.FeatureGroup(name="Transformers")
+    ct_AC = folium.FeatureGroup(name="Conductor Size Selection")
     exp_lines = folium.FeatureGroup(name="Exp Lines")
     
     
@@ -364,6 +415,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     add_lines(gdf_lines_AC_hv, hv_AC,ant)
     add_lines(gdf_lines_AC_ehv, ehv_AC,ant)
     add_lines(gdf_lines_AC_uhv, uhv_AC,ant)
+    add_lines(gdf_lines_AC_ct, ct_AC,ant)
     add_lines(gdf_lines_AC_exp, exp_lines,ant)
     add_lines(gdf_lines_AC_tf, transformers,ant)
     add_lines(gdf_lines_HVDC, hvdc,ant)
@@ -391,6 +443,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     hvdc.add_to(m)   if len(hvdc._children) > 0 else None
     convs.add_to(m)  if len(convs._children) > 0 else None
     transformers.add_to(m) if len(transformers._children) > 0 else None
+    ct_AC.add_to(m) if len(ct_AC._children) > 0 else None
     exp_lines.add_to(m)    if len(exp_lines._children) > 0 else None
         
     # Split gdf_gens by type and add markers for each type
@@ -409,7 +462,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
         folium.GeoJson(
             polygon,
             name="Area to Study",
-            style_function=lambda x: {"color": "blue", "weight": 2, "opacity": 0.6},
+            style_function=lambda x: {"color": "blue", "weight": 2, "opacity": 0.6, "fill": False},
             show=False
         ).add_to(m)
 
@@ -436,5 +489,6 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     abs_map_filename = os.path.abspath(map_filename)
     
     # Automatically open the map in the default web browser
-    webbrowser.open(f"file://{abs_map_filename}")
+    if show:
+        webbrowser.open(f"file://{abs_map_filename}")
     return m

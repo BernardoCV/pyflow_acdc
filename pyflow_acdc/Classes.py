@@ -73,6 +73,9 @@ class Grid:
         self.Cable_options=[]
         self.lines_AC_ct=[]
         self.cab_types_allowed=3
+        self.crossing_groups = []
+        self.MIP_time = None
+        self.MIP_check = False
         
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
@@ -150,6 +153,7 @@ class Grid:
         self.MixedBinCont = False
         self.TEP_n_years = 25
         self.TEP_discount_rate =0.02
+        self.Array_opf = False
         
         self.name = 'Grid'
         
@@ -264,6 +268,11 @@ class Grid:
         self._droop_nodes = None
         self._slackDC_nodes = None
         self._nodes_dict_DC = None        
+    
+
+    @property
+    def n_ren(self):
+        return len(self.RenSources) if self.RenSources is not None else 0
     
     @property
     def n_gen(self):
@@ -713,19 +722,19 @@ class Grid:
             line = self.lines_AC_ct[k]
             fromNode = line.fromNode.nodeNumber
             toNode = line.toNode.nodeNumber
+            if line.active_config >=0:
+                branch_ff = line.Ybus_list[line.active_config][0, 0]
+                branch_ft = line.Ybus_list[line.active_config][0, 1]
+                branch_tf = line.Ybus_list[line.active_config][1, 0]
+                branch_tt = line.Ybus_list[line.active_config][1, 1]
 
-            branch_ff = line.Ybus_list[line.active_config][0, 0]
-            branch_ft = line.Ybus_list[line.active_config][0, 1]
-            branch_tf = line.Ybus_list[line.active_config][1, 0]
-            branch_tt = line.Ybus_list[line.active_config][1, 1]
-
-            self.Ybus_AC_full[toNode, fromNode]+=branch_tf
-            self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+                self.Ybus_AC_full[toNode, fromNode]+=branch_tf
+                self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+                
+                
+                Ybus_nn_full[fromNode] += branch_ff
+                Ybus_nn_full[toNode] += branch_tt
             
-            
-            Ybus_nn_full[fromNode] += branch_ff
-            Ybus_nn_full[toNode] += branch_tt
-        
         for m in range(self.nn_AC):
             node = self.nodes_AC[m]
 
@@ -842,7 +851,8 @@ class Grid:
             
         # Process configurable transmission lines
         for line in self.lines_AC_ct:
-            self._calculate_line_power_flow(line, V_cart, use_configurable=True)
+            if line.active_config >=0:
+              self._calculate_line_power_flow(line, V_cart, use_configurable=True)
     
     def _initialize_voltage_cartesian(self):
         """
@@ -1328,8 +1338,9 @@ class Node_AC:
         self.price = 0.0
         self.Num_conv_connected=0
         self.connected_conv=set()
-   
-        
+    
+        self.ct_limit=None
+        self.max_turbines_per_string=99
         self.curtailment=1
 
         # self.Max_pow_gen=0
@@ -1838,7 +1849,7 @@ class rec_Line_AC(Line_AC):
                                         [branch_tf_new, branch_tt_new]])
 
 
-class Line_sizing(Line_AC):
+class Size_selection(Line_AC):
     lineNumber = 0
     names = set()
 
@@ -1876,8 +1887,8 @@ class Line_sizing(Line_AC):
 
     def __init__(self, fromNode: Node_AC, toNode: Node_AC, cable_types: list = None, active_config: int = 0, Length_km:float=1.0, S_base:float=100, name=None,geometry=None):       
         # Initialize basic line parameters
-        self.lineNumber = Line_sizing.lineNumber
-        Line_sizing.lineNumber += 1
+        self.lineNumber = Size_selection.lineNumber
+        Size_selection.lineNumber += 1
         
         self.Length_km = Length_km
         self.S_base = S_base
@@ -1892,7 +1903,7 @@ class Line_sizing(Line_AC):
         self._cable_types = cable_types if cable_types is not None else []
         self.ini_active_config = active_config
         self._active_config = active_config
-     
+        self.direction = 'from'
         # Initialize parameter lists
         self.R_list = []
         self.X_list = []
@@ -1908,7 +1919,11 @@ class Line_sizing(Line_AC):
         self.fromS = 0
         self.toS = 0
         self.loss = 0
-        # If cablez types are provided, validate and calculate parameters
+        self.P_loss =0
+        self.network_flow = None    
+
+        
+        # If cable types are provided, validate and calculate parameters
         if self._cable_types:
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
@@ -1917,7 +1932,9 @@ class Line_sizing(Line_AC):
             
             # Calculate parameters for all configurations
             self._calculate_all_parameters()
-
+        else:
+            # No cable types provided - set default zero parameters
+            self._set_zero_parameters()
             
         # Add array-specific attributes
         self.array_opf = True  # Flag for optimization
@@ -1937,24 +1954,39 @@ class Line_sizing(Line_AC):
     
     @active_config.setter
     def active_config(self, value):
-        if not 0 <= value < len(self._cable_types):
-            raise ValueError(f"Configuration index must be between 0 and {len(self._cable_types)-1}")
+        if not -1 <= value < len(self._cable_types):
+            raise ValueError(f"Configuration index must be between -1 and {len(self._cable_types)-1}")
         self._active_config = value
         self._update_active_parameters()
         
     def _update_active_parameters(self):
         """Update the line parameters based on the active configuration."""
-        self.R = self.R_list[self._active_config]
-        self.X = self.X_list[self._active_config]
-        self.G = self.G_list[self._active_config]
-        self.B = self.B_list[self._active_config]
-        self.MVA_rating = self.MVA_rating_list[self._active_config]
-        self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
-        self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
+        if self._active_config == -1 or not self._cable_types:
+            # No cable selected or no cable types available
+            self._set_zero_parameters()
+        else:
+            if self._active_config >= len(self.R_list):
+                self._active_config = len(self.R_list) - 1
+            self.R = self.R_list[self._active_config]
+            self.X = self.X_list[self._active_config]
+            self.G = self.G_list[self._active_config]
+            self.B = self.B_list[self._active_config]
+            self.MVA_rating = self.MVA_rating_list[self._active_config]
+            self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
+            self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
+        
+    def _set_zero_parameters(self):
+        """Set all parameters to zero (no cable selected)."""
+        self.R = 0
+        self.X = 0
+        self.G = 0
+        self.B = 0
+        self.MVA_rating = 0
+        self.Ybus_branch = np.zeros((2, 2), dtype=complex)  # Zero Ybus matrix
         
     def _calculate_all_parameters(self):
         """Calculate and store parameters for all configurations."""
-            # Initialize parameter lists
+        # Initialize parameter lists
         self.R_list = []
         self.X_list = []
         self.G_list = []
@@ -2034,47 +2066,118 @@ class Line_sizing(Line_AC):
     def get_cost_parameter(self,cable_type):
         return self._cable_database.loc[cable_type, 'Cost_per_km'] if 'Cost_per_km' in self._cable_database.columns else 1
     
+    def set_no_cable(self):
+        """Set the line to have no cable selected (zero Ybus matrix)."""
+        self._active_config = -1
+        self._update_active_parameters()
+    
+    def has_cable_selected(self):
+        """Check if a cable is currently selected."""
+        return self._active_config >= 0 and self._cable_types
+
 class Cable_options:
     Cable_options_num = 0
     names = set()
+    _cable_database = None  
     
-    @classmethod
-    def reset_class(cls):
-        cls.Cable_options_num = 0
-        cls.names = set()
-    
-    @property
-    def name(self):
-        return self._name
-    
-    @property
-    def cable_types(self):
-        return self._cable_types
+    def _calculate_MVA_ratings(self,cable_types):
+        mva_ratings = []
+        for cable_type in cable_types:
+            # Get MVA rating directly from database
+            if cable_type in self._cable_database.index:
+                cable_data = self._cable_database.loc[cable_type]
+                # Calculate MVA rating: A_rating * kV_base * sqrt(3) / 1000
+                A_rating = cable_data['A_rating']
+                kV_base = cable_data['Nominal_voltage_kV'] 
+                MVA_rating = A_rating * kV_base * np.sqrt(3) / 1000
+                mva_ratings.append(MVA_rating)
+            else:
+                raise ValueError(f"Cable type '{cable_type}' not found in database")
+        return mva_ratings
 
-    @cable_types.setter
-    def cable_types(self, value):
-        self._cable_types = value
-        if hasattr(self, 'lines'):
-            for line in self.lines:
-                line.cable_types = value
+    
+    def sort_cable_types_by_capacity(self):
+        """Sort cable types by MVA rating (smallest to largest)"""
+        # Create list of tuples (cable_type, mva_rating)
+        cable_ratings = list(zip(self._cable_types, self.MVA_ratings))
         
+        # Sort by MVA rating (ascending order)
+        cable_ratings.sort(key=lambda x: x[1])
+        
+        # Update cable types and ratings
+        self._cable_types = [cable for cable, _ in cable_ratings]
+        self.MVA_ratings = [rating for _, rating in cable_ratings]
+        
+        # Update all linked lines
+        for line in self.lines:
+            line.cable_types = self._cable_types
 
-    def __init__(self,cable_types:list,name=None):
+    @classmethod
+    def load_cable_database(cls):
+        """Load cable database from YAML files if not already loaded."""
+        if cls._cable_database is None:
+            # Get the path to the Cable_database directory
+            module_dir = Path(__file__).parent
+            cable_dir = module_dir / 'Cable_database'
+            
+            data_dict = {}
+            # Read all YAML files in the directory
+            for yaml_file in cable_dir.glob('*.yaml'):
+                with open(yaml_file, 'r', encoding='latin-1') as f:
+                    cable_data = yaml.safe_load(f)
+                    if cable_data:
+                        # Each file has one cable
+                        cable_name = list(cable_data.keys())[0]
+                        specs = cable_data[cable_name]
+                        
+                        # Only include AC cables
+                        if specs.get('Type', 'AC') == 'AC':
+                            data_dict[cable_name] = specs
+            
+            if data_dict:
+                # Convert to pandas DataFrame
+                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+    
+    def __init__(self, cable_types: list, name=None):
         self.Cable_options_num = Cable_options.Cable_options_num
         Cable_options.Cable_options_num += 1
         
-        self.cable_types = cable_types
+        # Load database if not already loaded
+        if Cable_options._cable_database is None:
+            Cable_options.load_cable_database()
+        
+        self._cable_types = cable_types
         self.lines = []
+        self.active_config = None
+        # Efficiently calculate MVA ratings in one pass
+        self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+        
+        # Sort by capacity (smallest to largest)
+        self.sort_cable_types_by_capacity()
+    
         if name is None:
-            self._name = str(self.Cable_options_num)
+            self.name = str(self.Cable_options_num)
         else:
-            self._name = name
+            self.name = name
             
         Cable_options.names.add(self.name)
         
+    @property
+    def cable_types(self):
+        return self._cable_types
     
-    
+    @cable_types.setter
+    def cable_types(self, new_cable_types):
+        """Set cable types and update all linked lines"""
+        self._cable_types = new_cable_types
+        
+        # Recalculate MVA ratings
+        self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
 
+        
+        # Update all linked lines
+        for line in self.lines:
+            line.cable_types = self._cable_types
 
 class TF_Line_AC:
     trafNumber = 0

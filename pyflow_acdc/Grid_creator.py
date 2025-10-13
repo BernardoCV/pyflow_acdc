@@ -2,6 +2,7 @@ from scipy.io import loadmat
 import pandas as pd
 import numpy as np
 import copy
+import networkx as nx
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
 
@@ -12,6 +13,7 @@ from .Class_editor import Cable_parameters, Converter_parameters, add_gen
 __all__ = [ # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
+    'Create_grid_from_turbine_graph',
     'Extend_grid_from_data',
     'initialize_pyflowacdc'
 ]
@@ -19,7 +21,7 @@ __all__ = [ # Grid Creation and Import
 def initialize_pyflowacdc():
     Node_AC.reset_class()
     Line_AC.reset_class()
-    Line_sizing.reset_class()
+    Size_selection.reset_class()
     TF_Line_AC.reset_class()
     
     Node_DC.reset_class()
@@ -681,7 +683,128 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
+    from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
+    from .Graph_and_plot import save_network_svg
+    from .AC_OPF_L_model import MIP_path_graph
+    turbines_df = Data["turbine"]
+    substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
+    
 
+    initialize_pyflowacdc()
+    grid = Grid(S_base)
+    if name is not None:
+        grid.name = name
+    res = Results(grid)
+
+    cable_option = add_cable_option(grid,cable_types)
+    t_MW = turbines_df.iloc[0].MW_rating
+    if max_turbines_per_string is not None:
+        
+        max_power_per_string = t_MW*max_turbines_per_string 
+        first_index_to_comply = next((i for i, rating in enumerate(cable_option.MVA_ratings) if rating >= max_power_per_string), len(cable_option.MVA_ratings) - 1)
+        cable_option._cable_types = cable_option._cable_types[:first_index_to_comply + 1]
+        cable_option.MVA_ratings = cable_option.MVA_ratings[:first_index_to_comply + 1]
+
+    else:
+    
+        max_cable_capacity = max(cable_option.MVA_ratings)
+        max_turbines_per_string = int(max_cable_capacity / t_MW)
+        # Store it in the grid for later use
+        grid.max_turbines_per_string = max_turbines_per_string
+        
+    
+    for i, attrs in array_graph.nodes(data=True):
+        if attrs['type'] == 'turbine':
+            kV=   turbines_df.loc[attrs['original_idx']].kV_rating
+            geo = turbines_df.loc[attrs['original_idx']].geometry
+        else: 
+            kV=   substations_df.loc[attrs['original_idx']].kV_rating
+            geo = substations_df.loc[attrs['original_idx']].geometry
+
+        node = add_AC_node(grid, kV, node_type='PQ',geometry=geo,name=str(attrs['original_idx']))
+
+        if attrs['type'] == 'turbine':
+            add_RenSource(grid,node,turbines_df.loc[attrs['original_idx']].MW_rating,ren_type='Wind',min_gamma=1-curtailment_allowed,Qrel=0)
+            node.ct_limit = turbines_df.loc[attrs['original_idx']].connections
+            
+        if attrs['type'] == 'substation':
+            add_extGrid(grid,node,MVAmax=99999,Allow_sell=True,lf=LCoE)
+            node.ct_limit = substations_df.loc[attrs['original_idx']].connections
+            node.type = 'Slack'
+            node.V_ini = 1
+            node.theta_ini = 0
+    
+    # First pass: add all lines
+    line_objects = {}  # Dictionary to store line objects by their name
+    
+    for u,v, attrs in array_graph.edges(data=True):
+        
+        fromnode = str(array_graph.nodes[u]['original_idx'])
+        tonode = str(array_graph.nodes[v]['original_idx'])
+
+
+        l = attrs['weight']/1000
+        geo= attrs['geometry']
+        
+        line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{fromnode}_{tonode}',geometry=geo,update_grid=False)
+        
+        # Store the line object with its name for later reference
+        edge_key = f'{fromnode}_{tonode}'
+        line_objects[edge_key] = line_obj
+    
+    # Add the complete crossing groups as line numbers to the grid
+    grid.crossing_groups = []
+
+    
+    if 'crossing_pairs' in Data and Data['crossing_pairs']:
+        limit_crossings=True
+        for crossing_group in Data['crossing_pairs']:
+            line_numbers_group = []
+            for edge_key in crossing_group:
+                if edge_key in line_objects:
+                    line_numbers_group.append(line_objects[edge_key].lineNumber)
+            if len(line_numbers_group) > 1:  # Only add groups with more than one line
+                grid.crossing_groups.append(line_numbers_group)
+    
+        
+    grid.Update_Graph_AC()
+    grid.create_Ybus_AC()
+    grid.Array_opf = True  
+    grid.cab_types_allowed = cable_types_allowed
+    grid.max_turbines_per_string = max_turbines_per_string
+    
+    grid.MIP_time = MIP_time
+    
+    # Enable crossings if there are crossing groups
+    
+    
+    if MIP_check:
+        grid.MIP_time=MIP_time
+        flag,high_flow,_ = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name=MIP_solver,crossings=limit_crossings,tee=MIP_tee)
+        
+
+        if not flag:
+            return None, None
+        if  high_flow < max_turbines_per_string:
+            
+            t_MW = turbines_df.iloc[0].MW_rating
+            max_power_per_string = t_MW*high_flow 
+            first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
+            for line in grid.lines_AC_ct:
+                if line.active_config > 0:
+                    line.active_config = first_index_to_comply
+
+            #grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
+        
+            
+            grid.max_turbines_per_string = high_flow
+  
+        if svg:
+            save_network_svg(grid, name='MIP_solve')
+
+        grid.MIP_check = True
+    return grid, res
 
 def Create_grid_from_mat(matfile):
     if not matfile.endswith('.mat'):
