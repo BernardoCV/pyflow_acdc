@@ -5,8 +5,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_model_toPyflowACDC,calculate_objective
+from .ACDC_OPF_NL_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
 from .ACDC_Static_TEP import get_TEP_variables,initialize_links,create_scenarios
 from .Time_series import modify_parameters
 
@@ -141,8 +141,8 @@ def MP_TEP_variables(model,grid):
             return model.inv_model[i].NumConvP[l] == model.ConvMP[l, i]
         model.MP_Conv_link_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_link)
 
+def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True):
 
-def multi_period_TEP(grid,NPV=True,n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin'):
     ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
     TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
     CFC = DCadd
@@ -156,7 +156,7 @@ def multi_period_TEP(grid,NPV=True,n_years=10,Hy=8760,discount_rate=0.02,ObjRule
     t1=time.time()
 
     model = pyo.ConcreteModel()
-    model.name        ="Multi-period TEP MTDC AC/DC hybrid OPF"
+    model.name        ="Dynamic TEP MTDC AC/DC hybrid OPF"
 
     n_periods = len(grid.inv_series[0].data)
 
@@ -197,7 +197,7 @@ def multi_period_TEP(grid,NPV=True,n_years=10,Hy=8760,discount_rate=0.02,ObjRule
     model_results,solver_stats = OPF_solve(model,grid,solver)
     
     t3 = time.time()
-    ExportACDC_model_toPyflowACDC(model.inv_model[i], grid, PZ,TEP=True)
+    ExportACDC_NLmodel_toPyflowACDC(model.inv_model[i], grid, PZ,TEP=True)
     
     MINLP = False
     if solver != 'ipopt':

@@ -631,7 +631,7 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
     
     
     
-    from .ACDC_TEP import get_TEP_variables
+    from .ACDC_Static_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
@@ -659,7 +659,7 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
 
 def TEP_variables(model,grid):
 
-    from .ACDC_TEP import get_TEP_variables
+    from .ACDC_Static_TEP import get_TEP_variables
 
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
@@ -1308,7 +1308,7 @@ def create_master_problem_pyomo(grid,crossings=True, max_flow=None):
             
         return model
 
-        
+
 def sync_gurobi_solution_to_pyomo(model, solver):
     """Copy variable values from the Gurobi model into the Pyomo model."""
     grb_model = solver._solver_model
