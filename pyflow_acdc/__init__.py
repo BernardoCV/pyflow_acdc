@@ -182,6 +182,8 @@ __all__ = [
     'export_OPF_results_to_excel',
     'save_grid_to_file',
     'save_grid_to_matlab',
+    'save_pickle',
+
     # Visualization
     
     'plot_Graph',

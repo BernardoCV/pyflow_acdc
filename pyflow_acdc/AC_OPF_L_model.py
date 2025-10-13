@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 
-def OPF_create_LModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
+def OPF_create_LModel_ACDC(model,grid,Price_Zones,TEP=False):
     from .ACDC_OPF import Translate_pyf_OPF 
     
     
@@ -30,7 +30,7 @@ def OPF_create_LModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
    
     Generation_variables(model,grid,gen_info,TEP)
 
-    AC_variables(model,grid,AC_info,PV_set)
+    AC_variables(model,grid,AC_info)
 
 
     if TEP:
@@ -91,7 +91,7 @@ def Generation_variables(model,grid,gen_info,TEP):
           
     model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)       
     s=1
-def AC_variables(model,grid,AC_info,PV_set):
+def AC_variables(model,grid,AC_info):
 
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
     

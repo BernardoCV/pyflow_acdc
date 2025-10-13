@@ -3,7 +3,7 @@ Optimal Power Flow Module
 
 This module provides functions for AC/DC hybrid optimal power flow analysis [1]_.
 
-functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_model
+functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_NL_model
 
 AC/DC Hybrid Optimal Power Flow
 -------------------------------

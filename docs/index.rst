@@ -54,6 +54,7 @@ API Documentation
 
    api/pf
    api/opf
+   api/L_opf
 
 .. toctree::
    :maxdepth: 3  
@@ -68,6 +69,9 @@ API Documentation
    :caption: Transmission Expansion Planning:
 
    api/tep
+   api/tep_pymoo
+   api/tep_dynamic
+   api/wf_array
 
 .. toctree::
    :maxdepth: 3
