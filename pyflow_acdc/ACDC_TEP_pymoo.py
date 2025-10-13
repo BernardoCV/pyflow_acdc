@@ -2,11 +2,12 @@ from pymoo.core.problem import ElementwiseProblem
 import numpy as np
 import pyomo.environ as pyo
 from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 import time
 import matplotlib.pyplot as plt
-from .ACDC_OPF_NL_model import analyse_OPF
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF_NL_model import analyse_OPF,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
 
 __all__ = [
     'transmission_expansion_pymoo'
@@ -16,14 +17,22 @@ __all__ = [
     
 
 class TEPOuterProblem(ElementwiseProblem):
-    def __init__(self, grid, weights_def, n_years, Hy, r, pv_set=False, pz=False, time_limit=60):
+    def __init__(self, grid, weights_def, n_years, Hy, r, pv_set=False, pz=False, time_limit=60,objective_type='sum'):
+        if objective_type == 'sum':
+            n_obj = 1
+        elif objective_type == 'pareto':
+            n_obj = 2
+        else:
+            raise ValueError("optimization_type must be 'sum' or 'pareto'")
+        
+        self.objective_type = objective_type
         t1=time.perf_counter()
         analyse_OPF(grid)
         self.grid = grid
         self._store_TEP_flags()
         n_var, xl, xu, vtype, self.bound_names = self._create_pymoo_bounds()
          
-        super().__init__(n_var=n_var, xl=xl, xu=xu, vtype=vtype)  # mix with bools if needed
+        super().__init__(n_var=n_var, n_obj=n_obj, xl=xl, xu=xu, vtype=vtype)  # mix with bools if needed
         
         self.weights_def = weights_def
         self.present_value = Hy * (1 - (1 + r) ** -n_years) / r
@@ -31,6 +40,7 @@ class TEPOuterProblem(ElementwiseProblem):
         self.pz = pz
         self.time_limit = time_limit
         self.pyomo_runs = 0
+        self.pyomo_feasible_solutions = 0
         self.pyomo_time = 0
 
 
@@ -325,7 +335,7 @@ class TEPOuterProblem(ElementwiseProblem):
                     self.model.ct_branch[obj_id, ct].set_value(1 if ct == int(value) else 0)
             elif obj_type == 'Array_ct_AC':
                 if int(value) == -1:
-                    # No cable type selected - set all to 0
+                    # No cable type selected - set all to 0 
                     for ct in self.model.ct_set:
                         self.model.ct_branch[obj_id, ct].set_value(0)
                 else:
@@ -355,55 +365,99 @@ class TEPOuterProblem(ElementwiseProblem):
             if results is None:
                 out["F"] = 1e24
                 return
+            
             capex = self._capex_from_model()
             opex = pyo.value(self.model.obj)
-            out["F"] = capex + self.present_value * opex
-        except Exception:
-            out["F"] = 1e24
+            if results.solver.termination_condition == pyo.TerminationCondition.optimal or results.solver.termination_condition == pyo.TerminationCondition.feasible:
+                self.pyomo_feasible_solutions += 1
 
-    def export_solution_to_grid(self, x):
+            opex  = self.present_value * opex
+            if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
+                capex = 1e12
+                opex = 1e12
+            if self.objective_type == 'sum':
+                out["F"] = capex +  opex
+            elif self.objective_type == 'pareto':
+                out["F"] = [capex,  opex]
+            
+            
+        except Exception:
+            if self.objective_type == 'sum':
+                out["F"] = 1e12
+            else:
+                out["F"] = [1e12, 1e12]
+            
+
+    def export_solution_to_grid(self, x,grid):
         """Export the best pymoo solution back to the grid object"""
         
         # Update model with the solution
         self._update_model_from_vector(x)
-        results, stats = OPF_solve(self.model, self.grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
+        results, stats = OPF_solve(self.model, grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
             
-        # Export the model to grid (reuse existing export function)
-        from .ACDC_OPF import ExportACDC_NLmodel_toPyflowACDC
-        
 
         # Get price zones info (you might need to pass this from __init__)
-        PZ = getattr(self, 'price_zones', False)
+        PZ = getattr(self, 'pz', False)
         # Restore original TEP flags
         self._restore_TEP_flags()
         # Export the solved model to grid
-        ExportACDC_NLmodel_toPyflowACDC(self.model, self.grid, PZ, TEP=False)
+        ExportACDC_NLmodel_toPyflowACDC(self.model, grid, PZ, TEP=True)
             
         
         
-        return self.grid
+        
 
-def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=300,tee=False,export=True,PV_set=False):
+def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='GA',time_limit=300,tee=False,n_gen=10):
     
             
     analyse_OPF(grid)
     
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
     # Create problem
-    problem = TEPOuterProblem(grid, weights_def, n_years=n_years, Hy=Hy, r=discount_rate)
+    if solver == 'GA':
+        algorithm = GA(pop_size=50)
+        objective_type = 'sum'
+    elif solver == 'NSGA2':
+        algorithm = NSGA2(pop_size=50)
+        objective_type = 'pareto'
+    else:
+        raise ValueError("solver must be 'GA' or 'NSGA2'")
+
+    problem = TEPOuterProblem(grid, weights_def, n_years=n_years, Hy=Hy, r=discount_rate,objective_type=objective_type)
 
     # Run optimization
-    algorithm = GA(pop_size=50)
+    
     
     res = minimize(problem, algorithm, 
-                  ('n_gen', 30), ('f_tol', 1e-6),
+                  ('n_gen', n_gen), ('f_tol', 1e-6),
                   save_history=True,
-                  verbose=True)
-    t2 = time.perf_counter()
+                  verbose=tee)
+  
+    if objective_type == 'sum':
+        return _handle_single_objective_result(res, problem, grid)
+    else:
+        return _handle_pareto_result(res, problem, grid,pareto_result='balanced')
+
+def _handle_single_objective_result(res, problem, grid):
+    """Handle single-objective optimization results"""
     # Export best solution to grid
+    # Export best solution to grid
+    t1 = time.perf_counter()
     best_solution = res.X  # Best decision vector
-    grid = problem.export_solution_to_grid(best_solution)
-    t3 = time.perf_counter()
+    
+    problem.export_solution_to_grid(best_solution,grid)
+    for obj in problem.weights_def:
+        problem.weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        problem.weights_def[obj]['NPV']=problem.weights_def[obj]['v']*problem.present_value
+    grid.TEP_run=True
+    grid.OPF_obj = problem.weights_def
+    t2 = time.perf_counter() 
+
+    t_modelexport = t2-t1
+
+    
+
+
     # Now grid contains the optimized solution
     print(f"Best objective: {res.F[0]}")
     print(f"Grid now has optimized investments")
@@ -419,7 +473,7 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=8760,discount_rate=
     timing_info = {
         "create": problem.t_modelcreate,  # Model creation time (negligible for pymoo)
         "solve": res.exec_time,  # Optimization time
-        "export": t3-t2,  # Export time (negligible)
+        "export": t_modelexport,  # Export time (negligible)
     }
     
     solver_stats = {
@@ -430,4 +484,78 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=8760,discount_rate=
         'feasible_solutions': []
     }
     # Return same format as original: model, results, timing_info, solver_stats
-    return problem.model, res, timing_info, solver_stats
+    return problem, res, timing_info, solver_stats
+
+def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
+    """Handle multi-objective optimization results"""
+    # Get Pareto front
+    pareto_front = res.F  # Shape: (n_solutions, 2)
+    pareto_solutions = res.X  # Shape: (n_solutions, n_variables)
+    
+    # Find different trade-off solutions
+    min_capex_idx = np.argmin(pareto_front[:, 0])
+    min_opex_idx = np.argmin(pareto_front[:, 1])
+    balanced_idx = np.argmin(np.sum(pareto_front, axis=1))
+    
+    # Export balanced solution to grid (or let user choose)
+    if pareto_result == 'balanced':
+        chosen_solution = pareto_solutions[balanced_idx]
+    elif pareto_result == 'min_capex':
+        chosen_solution = pareto_solutions[min_capex_idx]
+    elif pareto_result == 'min_opex':
+        chosen_solution = pareto_solutions[min_opex_idx]
+    else:
+        raise ValueError("pareto_result must be 'balanced', 'min_capex', or 'min_opex'")
+    problem.export_solution_to_grid(chosen_solution,grid)
+    for obj in problem.weights_def:
+        problem.weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        problem.weights_def[obj]['NPV']=problem.weights_def[obj]['v']*problem.present_value
+    grid.TEP_run=True
+    grid.OPF_obj = problem.weights_def
+    # All populations' objectives across generations
+    F_all = [e.pop.get("F") for e in res.history]              # list of (pop_size x n_obj)
+    F_all_flat = np.vstack(F_all)                              # (N_total x n_obj)
+    capex_all = F_all_flat[:, 0] / 1000000
+    opex_all = F_all_flat[:, 1] / (1000*problem.present_value)
+    idx = np.argsort(pareto_front[:, 0])
+    pf_sorted = pareto_front[idx]
+
+    pareto_capex = pf_sorted[:, 0] / 1_000_000
+    pareto_opex  = pf_sorted[:, 1] / (1000 * problem.present_value)
+
+    plt.scatter(capex_all, opex_all, s=10, alpha=0.25, color='gray')
+    plt.plot(pareto_capex, pareto_opex, '-o', markersize=4, linewidth=1.5, color='r')
+    plt.xlabel('CAPEX (M€)')
+    plt.ylabel('NPV OPEX (k€)')
+    plt.title('Pareto Front')
+    plt.show()
+    timing_info = {
+        "create": problem.t_modelcreate,
+        "solve": res.exec_time,
+        "export": 0,
+    }
+    
+    solver_stats = {
+        'iterations': res.algorithm.n_gen,
+        'best_objective': pareto_front[balanced_idx],
+        'time': res.exec_time,
+        'termination_condition': 'optimal',
+        'feasible_solutions': pareto_front.tolist()
+    }
+    
+    # Add Pareto-specific information
+    pareto_info = {
+        'pareto_front': pareto_front,
+        'pareto_solutions': pareto_solutions,
+        'min_capex_solution': pareto_solutions[min_capex_idx],
+        'min_opex_solution': pareto_solutions[min_opex_idx],
+        'balanced_solution': pareto_solutions[balanced_idx],
+        'min_capex_values': pareto_front[min_capex_idx],
+        'min_opex_values': pareto_front[min_opex_idx],
+        'balanced_values': pareto_front[balanced_idx]
+    }
+    
+    return problem, pareto_info, timing_info, solver_stats
+
+
+    

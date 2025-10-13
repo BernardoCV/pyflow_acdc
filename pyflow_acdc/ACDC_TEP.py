@@ -351,7 +351,7 @@ def get_TEP_variables(grid):
     return conv_var,DC_line_var,AC_line_var,gen_var
 
 
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=300,tee=False,export=True,PV_set=False):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False):
 
     analyse_OPF(grid)
     
