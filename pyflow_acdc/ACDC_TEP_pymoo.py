@@ -513,8 +513,12 @@ def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
     grid.TEP_run=True
     grid.OPF_obj = problem.weights_def
     # All populations' objectives across generations
-    F_all = [e.pop.get("F") for e in res.history]              # list of (pop_size x n_obj)
-    F_all_flat = np.vstack(F_all)                              # (N_total x n_obj)
+    F_all = [e.pop.get("F") for e in res.history]  # list of (pop_size x n_obj)
+    F_all_flat = np.vstack(F_all)               # (N_total x n_obj)
+    # Remove penalized entries exactly equal to [1e12, 1e12]
+    if F_all_flat.ndim == 2 and F_all_flat.shape[1] == 2:
+        valid_mask = ~np.all(F_all_flat == 1e12, axis=1)
+        F_all_flat = F_all_flat[valid_mask]
     capex_all = F_all_flat[:, 0] / 1000000
     opex_all = F_all_flat[:, 1] / (1000*problem.present_value)
     idx = np.argsort(pareto_front[:, 0])
