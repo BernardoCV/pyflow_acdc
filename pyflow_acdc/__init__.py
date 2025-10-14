@@ -43,7 +43,6 @@ except ImportError:
     
 try:
     from .AC_L_CSS_gurobi import *
-    from ...my_tests.MIP_graph_array import *
     HAS_AC_L_CSS_GUROBI = True
 except ImportError:
     HAS_AC_L_CSS_GUROBI = False
