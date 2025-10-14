@@ -523,12 +523,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     
 
 
-def initialize_links(model,grid):
-   
-    analyse_OPF(grid)
-   
-
-    
+def initialize_links(model,grid):    
     if grid.DCmode:
         model.lines_DC    = pyo.Set(initialize=list(range(0, grid.nl_DC)))
     if grid.ACmode and grid.DCmode:
@@ -544,9 +539,7 @@ def initialize_links(model,grid):
         model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
 
 def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy):
-    
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    
+       
     
     from .Time_series import  modify_parameters    
     
@@ -593,9 +586,8 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
 
 
 def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin',tee=False):
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
+    
+    analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
 
@@ -1350,10 +1342,8 @@ def get_curtailment_data(t, model, grid,n_clusters,clustering):
 
 def get_line_data(t, model, grid):
     row_data_lines = {'Time_Frame': t}
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
-    if TEP_AC:
+    
+    if grid.TEP_AC:
         for l in grid.lines_AC_exp:
             if l.np_line_opf:
                 ln = l.lineNumber
@@ -1365,7 +1355,7 @@ def get_line_data(t, model, grid):
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating * 100
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
-    if REC_AC:
+    if grid.REC_AC:
         for l in grid.lines_AC_rec:
             if l.rec_line_opf:
                 ln = l.lineNumber
@@ -1382,7 +1372,7 @@ def get_line_data(t, model, grid):
                     load = max(S_to, S_from) / l.MVA_rating * 100 
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
                 
-    if CT_AC:
+    if grid.CT_AC:
         for l in grid.lines_AC_ct:
             if l.array_opf:
                 ln = l.lineNumber
@@ -1405,7 +1395,7 @@ def get_line_data(t, model, grid):
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating_list[active_config] * 100
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
-    if DCmode:
+    if grid.DCmode:
         for l in grid.lines_DC:
             if l.np_line_opf:
                 ln = l.lineNumber
@@ -1469,10 +1459,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
 
     grid.OPF_run=True  
 
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
-
+   
     SW= sum(pyo.value(model.weights[t]) for t in model.scenario_frames)
     def process_ren_source(renSource):
         rs = renSource.rsNumber
@@ -1488,7 +1475,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         nAC = node.nodeNumber
         node.V_AC = np.float64(sum(pyo.value(model.submodel[t].V_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         node.theta = np.float64(sum(pyo.value(model.submodel[t].thetha_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-        if DCmode:
+        if grid.DCmode:
             node.P_s = np.float64(sum(pyo.value(model.submodel[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
             node.Q_s = np.float64(sum(pyo.value(model.submodel[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
     
@@ -1548,9 +1535,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         futures = []
         futures.extend([executor.submit(process_ac_node, node) for node in grid.nodes_AC])
         
-        if DCmode:
+        if grid.DCmode:
             futures.extend([executor.submit(process_dc_node, node) for node in grid.nodes_DC])
-        if ACmode and DCmode:
+        if grid.ACmode and grid.DCmode:
             futures.extend([executor.submit(process_converter, conv) for conv in grid.Converters_ACDC])
             
         if Price_Zones:
@@ -1583,16 +1570,16 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         node.P_INJ = Pf[i]
         node.Q_INJ = Qf[i]
 
-    if TEP_AC:  
+    if grid.TEP_AC:  
         NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}    
         for line in grid.lines_AC_exp:
             line.np_line=NumLinesACP_values[line.lineNumber] 
-    if REC_AC:
+    if grid.REC_AC:
         lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rec_branch.items()}
         for line in grid.lines_AC_rec:
             l = line.lineNumber
             line.rec_branch = True if lines_AC_REP[l] >= 0.99999 else False
-    if CT_AC:
+    if grid.CT_AC:
         lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
         for line in grid.lines_AC_ct:
             l=line.lineNumber
@@ -1604,7 +1591,7 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
                 line.active_config = -1  # or None, or handle appropriately
                 # This line has no conductor type selected
     
-    if DCmode:
+    if grid.DCmode:
         NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   
         for line in grid.lines_DC:
             line.np_line = NumLinesDCP_values[line.lineNumber]

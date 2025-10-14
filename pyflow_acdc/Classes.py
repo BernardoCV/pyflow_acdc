@@ -1009,6 +1009,7 @@ class Gen_AC:
         self.np_gen = 1
         self.np_gen_max=3
         self.np_gen_opf = False
+        self.np_gen_dynamic = [self.np_gen]
 
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
@@ -1783,6 +1784,8 @@ class Exp_Line_AC(Line_AC):
         self.np_line_b=0  #N_b base attribute
         self.np_line_i= 0 #N_i initial guess
         self.np_line_max = 1 #N_max max number of lines
+        self.np_dynamic = [self.np_line]   
+
         self.np_line_opf=True
         self.hover_text = None
         
@@ -2358,6 +2361,7 @@ class Line_DC:
         self.np_line_i= N_cables
         self.np_line_max = N_cables
         self.np_line_opf=False
+        self.np_dynamic = [self.np_line]   
 
         self.R = r
         self.MW_rating = MW_rating
@@ -2531,6 +2535,7 @@ class AC_DC_converter:
         self.NumConvP_b= nConvP
         self.NumConvP_i= nConvP
         self.NumConvP_max = nConvP
+        self.np_dynamic = [self.NumConvP]
         
         self.NUmConvP_opf=False
         self.base_cost = 0

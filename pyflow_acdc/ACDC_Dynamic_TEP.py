@@ -5,14 +5,16 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_NL_model import OPF_createModel_ACDC,analyse_OPF,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
 from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
 from .ACDC_Static_TEP import get_TEP_variables,initialize_links,create_scenarios
 from .Time_series import modify_parameters
+from .Graph_and_plot import save_network_svg, create_geometries
 
 __all__ = [
     'multi_period_TEP',
-    'multi_period_MS_TEP'
+    'multi_period_MS_TEP',
+    'save_MP_TEP_period_svgs'
 ]
 
 def pack_variables(*args):
@@ -58,12 +60,10 @@ def update_grid_investment_period(grid,inv,i):
                 break  # Stop after assigning to the correct node
 
 def MP_TEP_variables(model,grid):
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
+    
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
 
-    if GPR:
+    if grid.GPR:
         np_gen,np_gen_max = gen_var
 
         model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
@@ -84,9 +84,9 @@ def MP_TEP_variables(model,grid):
         model.MP_gen_link_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_link)
 
     
-    if ACmode:
+    if grid.ACmode:
         NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
-        if TEP_AC:
+        if grid.TEP_AC:
             model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
             def MP_AC_line_bounds(model,l,i):
                 return (NP_lineAC[l],NP_lineAC_max[l])
@@ -103,7 +103,7 @@ def MP_TEP_variables(model,grid):
                 return model.inv_model[i].NumLinesACP[l] == model.ACLinesMP[l, i]
             model.MP_AC_line_link_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_link)
 
-    if DCmode:
+    if grid.DCmode:
         NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
         
         model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
@@ -123,7 +123,7 @@ def MP_TEP_variables(model,grid):
         model.MP_DC_line_link_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_link)
 
 
-    if ACmode and DCmode:
+    if grid.ACmode and grid.DCmode:
         NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
         model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
         def MP_Conv_bounds(model,l,i):
@@ -143,9 +143,7 @@ def MP_TEP_variables(model,grid):
 
 def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True):
 
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
+    analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
@@ -165,7 +163,7 @@ def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rat
     model.inv_model = pyo.Block(model.inv_periods)
 
     base_model = pyo.ConcreteModel()
-    OPF_createModel_ACDC(base_model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
 
     for i in model.inv_periods:
         base_model_copy = base_model.clone()
@@ -174,7 +172,7 @@ def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rat
         for inv in grid.inv_series:    
             update_grid_investment_period(grid,inv,i)
 
-        modify_parameters(grid,model.inv_model[i],ACmode,DCmode,PZ)
+        modify_parameters(grid,model.inv_model[i],grid.ACmode,grid.DCmode,PZ)
 
         
         obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
@@ -223,9 +221,7 @@ def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rat
 
 
 def MP_TEP_obj(model,grid,n_years,discount_rate):
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
+    
     net_cost = 0
 
     for i in model.inv_periods:
@@ -233,7 +229,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
         AC_Inv_lines=0
         DC_Inv_lines=0
         Conv_Inv=0
-        if GPR:
+        if grid.GPR:
             
             for g in model.gen_AC:
                 gen = grid.Generators[g]
@@ -245,8 +241,8 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
             inv_gen=0
 
 
-        if ACmode:
-            if TEP_AC:
+        if grid.ACmode:
+            if grid.TEP_AC:
                 
                 for l in model.lines_AC_exp:
                     line = grid.lines_AC_exp[l]
@@ -255,7 +251,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
                     else:
                         AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1])*line.base_cost
                 
-        if DCmode:
+        if grid.DCmode:
             
             for l in model.lines_DC:
                 line = grid.lines_DC[l]
@@ -264,7 +260,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
                 else:
                     DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1])*line.base_cost
             
-        if ACmode and DCmode:
+        if grid.ACmode and grid.DCmode:
             
             for l in model.conv:
                 conv = grid.Converters_ACDC[l]
@@ -286,23 +282,23 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
 
 
 
-def export_MP_TEP_results_toPyflowACDC(model,grid,MINLP=False):
-    ACmode,DCmode,ACadd,DCadd,GPR = analyse_OPF(grid)
-    TEP_AC,TAP_tf,REC_AC,CT_AC = ACadd
-    CFC = DCadd
+def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False):
+    
+
     grid.MP_TEP_run=True
     
     n_periods = len(grid.inv_series[0].data)
     
     rows = []
     
-    if GPR:
+    if grid.GPR:
         if MINLP:
             gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i])) for (g, i) in model.np_gen}
         else:
             gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i]),2) for (g, i) in model.np_gen}
         for gen in grid.Generators:
             g = gen.genNumber
+            gen.np_dynamic = [gen_mp_values[g, i] for i in range(n_periods)]
             row = {'Element': str(gen.name)}
             row['Type'] = 'Generator'
             row['Initial'] = pyo.value(model.np_gen_base[g])
@@ -319,14 +315,15 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,MINLP=False):
             row['Total_Cost'] = total_cost
             rows.append(row)
 
-    if ACmode:
-        if TEP_AC:
+    if grid.ACmode:
+        if grid.TEP_AC:
             if MINLP:
                 ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i])) for (l, i) in model.ACLinesMP}   
             else:
                 ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i]),2) for (l, i) in model.ACLinesMP}   
             for line in grid.lines_AC_exp:
                 l = line.lineNumber
+                line.np_dynamic = [ac_lines_mp_values[l, i] for i in range(n_periods)]
                 row = {'Element': str(line.name)}
                 row['Type'] = 'AC Line'
                 row['Initial'] = pyo.value(model.NumLinesACP_base[l])
@@ -346,12 +343,13 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,MINLP=False):
         
 
 
-    if DCmode:
+    if grid.DCmode:
         dc_lines_mp_values = {(l, i): pyo.value(model.DCLinesMP[l, i]) for (l, i) in model.DCLinesMP}
 
         for line in grid.lines_DC:  
             if line.np_line_opf:
                 l = line.lineNumber
+                line.np_dynamic = [dc_lines_mp_values[l, i] for i in range(n_periods)]
                 row = {'Element': str(line.name)}
                 row['Type'] = 'DC Line'
                 row['Initial'] = pyo.value(model.NumLinesDCP_base[l])
@@ -368,10 +366,11 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,MINLP=False):
                 row['Total_Cost'] = total_cost
                 rows.append(row)
 
-    if ACmode and DCmode:
+    if grid.ACmode and grid.DCmode:
         acdc_conv_mp_values = {(c, i): pyo.value(model.ACDCConvMP[c, i]) for (c, i) in model.ACDCConvMP}
         for conv in grid.Converters_ACDC:
             c = conv.ConvNumber
+            conv.np_dynamic = [acdc_conv_mp_values[c, i] for i in range(n_periods)]
             row = {'Element': str(conv.name)}
             row['Type'] = 'ACDC Conv'
             row['Initial'] = pyo.value(model.NumConvP_base[c])
@@ -399,6 +398,9 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,MINLP=False):
             total_row[col] = ""
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
     
+
+    ExportACDC_NLmodel_toPyflowACDC(model.inv_model[-1],grid,Price_Zones,TEP=True)
+
     grid.MP_TEP_results = df  
 
 def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760, 
@@ -411,9 +413,8 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
     - Level 2: Time frames/scenarios for each investment period
     """
     # 1. Initial analysis and setup
-    ACmode, DCmode, ACadd, DCadd, GPR = analyse_OPF(grid)
-    TEP_AC, TAP_tf, REC_AC, CT_AC = ACadd
-    CFC = DCadd
+    analyse_OPF(grid)
+
     weights_def, Price_Zones = obj_w_rule(grid, ObjRule, True)
 
     # 2. Set grid parameters
@@ -446,7 +447,7 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
 
     # 5. Create base model and clone for each period/time frame
     base_model = pyo.ConcreteModel()
-    OPF_createModel_ACDC(base_model, grid, PV_set=False, Price_Zones=Price_Zones, TEP=True)
+    OPF_create_NLModel_ACDC(base_model, grid, PV_set=False, Price_Zones=Price_Zones, TEP=True)
 
     create_scenarios(model.inv_model[i],grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy)
 
@@ -467,7 +468,7 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
     MINLP = False
     if solver != 'ipopt':
         MINLP = True
-    TEP_TS_res = export_MP_TEP_results_toPyflowACDC(model, grid,MINLP)
+    TEP_TS_res = export_MP_TEP_results_toPyflowACDC(model, grid,Price_Zones,MINLP)
     t4 = time.time()
 
     timing_info = {
@@ -477,3 +478,37 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
     }
 
     return model, model_results, timing_info, solver_stats, TEP_TS_res  
+
+
+def save_MP_TEP_period_svgs(grid, name_prefix='grid_MP_TEP', journal=True, legend=True, square_ratio=False, poly=None, linestrings=None):
+    
+    periods = len(grid.inv_series[0].data)
+   
+    for i in range(periods):
+            # From DataFrame by names
+        set_grid_to_dynamic_state(grid, i) 
+
+        try:
+            create_geometries(grid)
+        except Exception:
+            pass
+
+        save_network_svg(
+            grid,
+            name=f"{name_prefix}_P{i}",
+            journal=journal,
+            legend=legend,
+            square_ratio=square_ratio,
+            poly=poly,
+            linestrings=linestrings
+        )
+
+    return
+
+def set_grid_to_dynamic_state(grid, investment_period):    
+    for line in grid.lines_AC_exp:
+        line.np_line = line.np_dynamic[investment_period]
+    for line in grid.lines_DC:
+        line.np_line = line.np_dynamic[investment_period]
+    for conv in grid.Converters_ACDC:
+        conv.NumConvP = conv.np_dynamic[investment_period]
