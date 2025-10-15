@@ -446,7 +446,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     
     t1 = time.perf_counter()
     if export:
-        ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
+        ExportACDC_Lmodel_toPyflowACDC(model, grid, TEP=True, solver_results=model_results, tee=tee)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
@@ -882,7 +882,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     if NL:
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
     else:
-        ExportACDC_Lmodel_toPyflowACDC(model, grid, PZ, TEP=True, solver_results=model_results, tee=tee)
+        ExportACDC_Lmodel_toPyflowACDC(model, grid, TEP=True, solver_results=model_results, tee=tee)
     
     
 
