@@ -132,7 +132,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    ExportACDC_Lmodel_toPyflowACDC(model, grid, Price_Zones)
+    ExportACDC_Lmodel_toPyflowACDC(model, grid)
     # pr.disable()
 
     for obj in weights_def:
