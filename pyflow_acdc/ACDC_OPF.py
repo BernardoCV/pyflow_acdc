@@ -233,7 +233,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
 
 
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
-    from .Time_series import update_grid_data,modify_parameters
+    from .Time_series import update_grid_data,_modify_parameters
     
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
         
@@ -258,7 +258,7 @@ def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=Tru
         for ts in grid.Time_series:
             update_grid_data(grid, ts, t)
                     
-        modify_parameters(grid,model.submodel[t],Price_Zones) 
+        _modify_parameters(grid,model.submodel[t],Price_Zones) 
         subobj = OPF_obj(model.submodel[t],grid,weights_def,OnlyGen)
         model.submodel[t].obj = pyo.Objective(rule=subobj, sense=pyo.minimize)
 

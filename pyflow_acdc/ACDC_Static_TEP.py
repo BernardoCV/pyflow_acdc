@@ -541,7 +541,7 @@ def initialize_links(model,grid):
 def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy):
        
     
-    from .Time_series import  modify_parameters    
+    from .Time_series import  _modify_parameters    
     
     w={}
 
@@ -558,7 +558,7 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
         for ts in grid.Time_series:
             update_grid_scenario_frame(grid,ts,t,n_clusters,clustering)
 
-        modify_parameters(grid,model.submodel[t],Price_Zones)
+        _modify_parameters(grid,model.submodel[t],Price_Zones)
         
         TEP_subObj(model.submodel[t],grid,weights_def)
         if clustering:

@@ -455,7 +455,7 @@ def reset_to_initialize(model, initial_values):
             for index in var_obj:
                 var_obj[index].set_value(initial_values[var_obj.name].get(index, 0))
                 
-def modify_parameters(grid,model,Price_Zones):
+def _modify_parameters(grid,model,Price_Zones):
     [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)    
     ACmode = grid.ACmode
     DCmode = grid.DCmode
@@ -609,7 +609,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t1= time.perf_counter()          
         reset_to_initialize(model, initial_values)
     
-        modify_parameters(grid,model,price_zone_restrictions)
+        _modify_parameters(grid,model,price_zone_restrictions)
         t2= time.perf_counter()  
         t_modelupdate = t2-t1
         

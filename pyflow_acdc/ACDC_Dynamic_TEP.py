@@ -2,13 +2,14 @@ import numpy as np
 import pyomo.environ as pyo
 import pandas as pd
 import time
+import math
 from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
 from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
 from .ACDC_Static_TEP import get_TEP_variables,initialize_links,create_scenarios
-from .Time_series import modify_parameters
+from .Time_series import _modify_parameters
 from .Graph_and_plot import save_network_svg, create_geometries
 
 __all__ = [
@@ -20,7 +21,7 @@ __all__ = [
 def pack_variables(*args):
     return args
 
-def update_grid_investment_period(grid,inv,i):
+def _update_grid_investment_period(grid,inv,i):
     idx = i
     typ = inv.type
     if typ == 'Load':
@@ -141,7 +142,7 @@ def MP_TEP_variables(model,grid):
             return model.inv_model[i].NumConvP[l] == model.ConvMP[l, i]
         model.MP_Conv_link_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_link)
 
-def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True):
+def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True):
 
     analyse_OPF(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
@@ -149,8 +150,6 @@ def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rat
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
                 
-    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
-
     t1=time.time()
 
     model = pyo.ConcreteModel()
@@ -165,21 +164,25 @@ def dynamic_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rat
     base_model = pyo.ConcreteModel()
     OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
 
+    for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC: 
+        _calculate_decomision_period(element,n_years)
+        
+
     for i in model.inv_periods:
         base_model_copy = base_model.clone()
         model.inv_model[i].transfer_attributes_from(base_model_copy)
        
         for inv in grid.inv_series:    
-            update_grid_investment_period(grid,inv,i)
+            _update_grid_investment_period(grid,inv,i)
 
-        modify_parameters(grid,model.inv_model[i],grid.ACmode,grid.DCmode,PZ)
+        _modify_parameters(grid,model.inv_model[i],grid.ACmode,grid.DCmode,PZ)
 
         
         obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
         
         present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
-        if NPV:
-            obj_OPF *=present_value
+        
+        obj_OPF *=present_value
         
         model.inv_model[i].obj = pyo.Objective(rule=obj_OPF, sense=pyo.minimize)
 
@@ -486,7 +489,7 @@ def save_MP_TEP_period_svgs(grid, name_prefix='grid_MP_TEP', journal=True, legen
    
     for i in range(periods):
             # From DataFrame by names
-        set_grid_to_dynamic_state(grid, i) 
+        _set_grid_to_dynamic_state(grid, i) 
 
         try:
             create_geometries(grid)
@@ -505,10 +508,16 @@ def save_MP_TEP_period_svgs(grid, name_prefix='grid_MP_TEP', journal=True, legen
 
     return
 
-def set_grid_to_dynamic_state(grid, investment_period):    
+def _set_grid_to_dynamic_state(grid, investment_period):    
     for line in grid.lines_AC_exp:
         line.np_line = line.np_dynamic[investment_period]
     for line in grid.lines_DC:
         line.np_line = line.np_dynamic[investment_period]
     for conv in grid.Converters_ACDC:
         conv.NumConvP = conv.np_dynamic[investment_period]
+
+def _calculate_decomision_period(element,n_years):
+
+    element.decomision_period = math.ceil(element.life_time/n_years)
+
+    
