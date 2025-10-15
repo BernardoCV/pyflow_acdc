@@ -22,11 +22,11 @@ __all__ = [
 ]
 
 
-def OPF_create_LModel_ACDC(model,grid,Price_Zones,TEP=False):
+def OPF_create_LModel_ACDC(model,grid,TEP=False):
     from .ACDC_OPF import Translate_pyf_OPF 
     
     
-    [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+    [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid)
    
     Generation_variables(model,grid,gen_info,TEP)
 

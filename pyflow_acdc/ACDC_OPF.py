@@ -101,7 +101,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    OPF_create_LModel_ACDC(model,grid,PV_set,Price_Zones)
+    OPF_create_LModel_ACDC(model,grid)
     # pr.disable()
     
     # s = StringIO()
