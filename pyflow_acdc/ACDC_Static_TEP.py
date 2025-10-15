@@ -465,7 +465,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False,export=True,fs=False):
     analyse_OPF(grid)
     
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, _ = obj_w_rule(grid,ObjRule,True)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -474,7 +474,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
-    OPF_create_LModel_ACDC(model,grid,Price_Zones=PZ,TEP=True)
+    OPF_create_LModel_ACDC(model,grid,TEP=True)
     
 
     obj_TEP = TEP_obj(model,grid,NPV)
