@@ -32,7 +32,8 @@ __all__ = [
     'simple_CSS',
     'sequential_CSS',
     'export_TEP_TS_results_to_excel',
-    'MIP_path_graph'
+    'MIP_path_graph',
+    'alpha_paretto'
 ]
 
 def pack_variables(*args):
@@ -405,9 +406,7 @@ def MS_TEP_constraints(model,grid):
     if grid.CT_AC:
         model.NP_ACline_ct_link_constraint = pyo.Constraint(model.lines_AC_ct,model.ct_set,model.scenario_frames, rule=NP_ACline_ct_link)
 
-    
-
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False):
+def _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set=False):
 
     analyse_OPF(grid)
     
@@ -416,7 +415,6 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
    
-    t1 = time.perf_counter()
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC AC/DC hybrid OPF"
 
@@ -429,7 +427,17 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     if NPV:
         obj_OPF *=present_value
+
+    return model, obj_TEP, obj_OPF, present_value,weights_def,PZ
+
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None):
     
+    t1 = time.perf_counter()
+    model, obj_TEP, obj_OPF, present_value,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set)
+    
+    if alpha is not None:
+        obj_TEP *= alpha
+        obj_OPF *= (1-alpha)
 
     total_cost = obj_TEP + obj_OPF
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
@@ -537,6 +545,37 @@ def initialize_links(model,grid):
         model.ct_set = pyo.Set(initialize=list(range(0,len(grid.Cable_options[0].cable_types))))
     if grid.GPR:
         model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
+
+def alpha_paretto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,solver='bonmin',time_limit=99999,tee=False):
+    model, obj_TEP, obj_OPF, present_value,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule)
+    results = []
+    model.alpha = pyo.Param(initialize=0,mutable=True)
+    modified_obj_TEP = obj_TEP * model.alpha
+    modified_obj_OPF = obj_OPF * (1-model.alpha)
+
+    total_cost = modified_obj_TEP + modified_obj_OPF
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+    for a in np.linspace(0, 1, steps):
+        
+        model.alpha.set_value(a)
+          
+        # model.obj.pprint()
+
+        model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+        
+        row = {
+            'alpha': a,
+            'obj_TEP': pyo.value(obj_TEP),
+            'obj_OPF': pyo.value(obj_OPF),
+            'Total_cost': pyo.value(model.obj),
+            'Time': solver_stats['time']
+        }
+        
+
+        
+        results.append(row)
+        
+    return results
 
 def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy):
        

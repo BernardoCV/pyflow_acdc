@@ -152,6 +152,7 @@ __all__ = [
     'Translate_pd_TEP',
     'export_TEP_TS_results_to_excel',
     'MIP_path_graph',
+    'alpha_paretto',
 
     # TEP_PYMOO
     'transmission_expansion_pymoo',

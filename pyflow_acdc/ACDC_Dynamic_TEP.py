@@ -13,7 +13,7 @@ from .Time_series import _modify_parameters
 from .Graph_and_plot import save_network_svg, create_geometries
 
 __all__ = [
-    'multi_period_TEP',
+    'dynamic_transmission_expansion',
     'multi_period_MS_TEP',
     'save_MP_TEP_period_svgs'
 ]

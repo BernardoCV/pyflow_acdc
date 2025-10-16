@@ -467,6 +467,42 @@ def log_infeasible_constraints_limited(model, max_per_type=5):
     
     print("=" * 80)
 
+def _gurobi_callback(model, feasible_solutions,time_limit):
+    from gurobipy import GRB
+    opt = pyo.SolverFactory('gurobi_persistent')
+    opt.set_instance(model)
+    grb_model = opt._solver_model
+
+    grb_model._start_time = time.time()
+
+    def my_callback(model, where):
+        if where == GRB.Callback.MIPSOL:
+            obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)
+            time_found = model.cbGet(GRB.Callback.RUNTIME)
+            feasible_solutions.append((time_found,obj))
+            print(f"Feasible solution found: Obj = {obj}, Time = {time_found:.2f}s")
+
+    if time_limit is not None:
+        grb_model.setParam("TimeLimit", time_limit)
+
+    grb_model.optimize(my_callback)
+
+    from pyomo.opt.results.results_ import SolverResults
+    results = SolverResults()
+    results.solver.status = pyo.SolverStatus.ok
+    results.problem.upper_bound = grb_model.ObjVal
+    results.solver.time = grb_model.Runtime
+    feasible_solutions.append((grb_model.Runtime,grb_model.ObjVal))
+    
+    if grb_model.Status == GRB.Status.OPTIMAL:
+        results.solver.termination_condition = pyo.TerminationCondition.optimal
+        opt.load_vars()
+    elif grb_model.Status == GRB.Status.INFEASIBLE:
+        results.solver.termination_condition = pyo.TerminationCondition.infeasible
+    else:
+        results.solver.termination_condition = pyo.TerminationCondition.unknown
+    opt._solver_model.dispose()  # Cleanup
+
 def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=False, suppress_warnings=False):
     solver = solver.lower()
     feasible_solutions = []  # Always defined, but only populated if callback is used
@@ -475,40 +511,7 @@ def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=
         print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
 
     if callback and solver == 'gurobi' and GUROBI_AVAILABLE:
-        from gurobipy import GRB
-        opt = pyo.SolverFactory('gurobi_persistent')
-        opt.set_instance(model)
-        grb_model = opt._solver_model
-
-        grb_model._start_time = time.time()
-
-        def my_callback(model, where):
-            if where == GRB.Callback.MIPSOL:
-                obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)
-                time_found = model.cbGet(GRB.Callback.RUNTIME)
-                feasible_solutions.append((time_found,obj))
-                print(f"Feasible solution found: Obj = {obj}, Time = {time_found:.2f}s")
-
-        if time_limit is not None:
-            grb_model.setParam("TimeLimit", time_limit)
-
-        grb_model.optimize(my_callback)
-
-        from pyomo.opt.results.results_ import SolverResults
-        results = SolverResults()
-        results.solver.status = pyo.SolverStatus.ok
-        results.problem.upper_bound = grb_model.ObjVal
-        results.solver.time = grb_model.Runtime
-        feasible_solutions.append((grb_model.Runtime,grb_model.ObjVal))
-        
-        if grb_model.Status == GRB.Status.OPTIMAL:
-            results.solver.termination_condition = pyo.TerminationCondition.optimal
-            opt.load_vars()
-        elif grb_model.Status == GRB.Status.INFEASIBLE:
-            results.solver.termination_condition = pyo.TerminationCondition.infeasible
-        else:
-            results.solver.termination_condition = pyo.TerminationCondition.unknown
-        opt._solver_model.dispose()  # Cleanup
+        _gurobi_callback(model, feasible_solutions,time_limit)
        
     else:
         opt = pyo.SolverFactory(solver)
