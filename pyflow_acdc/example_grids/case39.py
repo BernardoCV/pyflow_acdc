@@ -78,7 +78,7 @@ Converted to PyFlowACDC format from
 
 """
 
-def case39(TEP=False,exp='All',N_b=0,N_i=1,N_max=3,Increase=1):       
+def case39(TEP=False,exp='All',N_b=0,N_i=1,N_max=3,Increase=1,kappa=0.5):       
     
     S_base=100
     
@@ -175,6 +175,8 @@ def case39(TEP=False,exp='All',N_b=0,N_i=1,N_max=3,Increase=1):
     {'Line_id': 'L_AC46', 'fromNode': '29', 'toNode': '38', 'r': 0.0008, 'x': 0.0156, 'g': 0.0, 'b': 0.0, 'MVA_rating': 1200.0, 'kV_base': 345.0, 'm': 1.025, 'shift': 0.0, 'Cost MEUR': 9.37}
     ]
     lines_AC = pd.DataFrame(lines_AC_data)
+
+    lines_AC['Cost MEUR'] = lines_AC['Cost MEUR'] * kappa/0.5
 
     nodes_DC = None
 

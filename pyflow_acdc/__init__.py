@@ -153,6 +153,9 @@ __all__ = [
     'export_TEP_TS_results_to_excel',
     'MIP_path_graph',
     'alpha_paretto',
+    'rate_sensitivity',
+    'kappa_sensitivity',
+    'comprehensive_sensitivity_analysis',
 
     # TEP_PYMOO
     'transmission_expansion_pymoo',
@@ -183,6 +186,7 @@ __all__ = [
     'save_grid_to_file',
     'save_grid_to_matlab',
     'save_pickle',
+    'export_solver_progress_to_excel',
 
     # Visualization
     
@@ -191,6 +195,7 @@ __all__ = [
     'plot_neighbour_graph',
     'plot_TS_res',
     'save_network_svg',
+    'plot_model_feasebility',
     
     # Market Analysis
     'price_zone_data_pd',

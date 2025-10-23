@@ -18,6 +18,7 @@ __all__ = ['plot_Graph',
            'Time_series_prob',
            'plot_neighbour_graph',
            'plot_TS_res',
+           'plot_model_feasebility',
            'save_network_svg']
 
 def update_ACnode_hovertext(node,S_base,text):
@@ -1469,3 +1470,104 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
 
 
     
+def plot_model_feasebility(solver_stats,sol='all', x_axis='time', y_axis= 'objective', normalize = False,show=True, save_path=None, width_mm=None):
+    import matplotlib.pyplot as plt
+    # Respect optional width in millimeters for journal-style figures
+    fig = None
+    if width_mm is not None:
+        fig_w_in = width_mm / 25.4
+        fig_h_in = fig_w_in  # square by default
+        fig = plt.figure(figsize=(fig_w_in, fig_h_in))
+    #feasible_solutions.append((time_sec, objective, iterations))
+    if sol == 'all':
+        # [time_sec, objective, cumulative_iterations, nlp_call_num, is_feasible]
+        solutions = solver_stats['all_solutions']
+
+        if normalize:
+            # Only consider objectives that have feasible flag set to True
+            feasible_objectives = [objective for _, objective, _, _, is_feasible in solutions if is_feasible]
+            if feasible_objectives:
+                min_objective = min(feasible_objectives)
+            else:
+                min_objective = min(objective for _, objective, _, _, _ in solutions)
+            solutions = [ [time_sec, (objective/min_objective-1)*100, cumulative_iterations, nlp_call_num, is_feasible] for time_sec, objective, cumulative_iterations, nlp_call_num, is_feasible in solutions]
+    
+
+        if x_axis == 'time':
+            x_data = [time_sec for time_sec, _, _, _, _ in solutions]
+        elif x_axis == 'iterations':
+            x_data = [cumulative_iterations for _, _, cumulative_iterations, _, _ in solutions]
+
+        if y_axis == 'objective':
+            y_axis = 'objective [%]' if normalize else 'objective'
+            y_data = [objective for _, objective, _, _, _ in solutions]
+        elif y_axis == 'iterations':
+            y_data = [cumulative_iterations for _, _, cumulative_iterations, _, _ in solutions]
+
+        # Separate feasible and non-feasible points
+        feasible_x = []
+        feasible_y = []
+        regular_x = []
+        regular_y = []
+        
+        for i, solution in enumerate(solutions):
+            if solution[4]:  # is_feasible is True
+                feasible_x.append(x_data[i])
+                feasible_y.append(y_data[i])
+                regular_x.append(x_data[i])
+                regular_y.append(y_data[i])
+            else:
+                regular_x.append(x_data[i])
+                regular_y.append(y_data[i])
+
+        # Plot regular points in default color
+        if regular_x:
+            plt.plot(regular_x, regular_y, 'o-', color='blue', label='NLP Progress')
+        
+        # Plot feasible points in red
+        if feasible_x:
+            plt.plot(feasible_x, feasible_y, 'o', color='red', markersize=8, label='Feasible Solutions')
+        
+        plt.xlabel(x_axis)
+        plt.ylabel(y_axis)
+        plt.grid(True)
+        plt.legend()
+        if show:
+            plt.show()
+        if save_path is not None:
+            plt.savefig(save_path, bbox_inches='tight')
+        if not show and fig is not None:
+            plt.close(fig)
+        return
+
+    else:
+        # [time_sec, objective, iterations]
+        solutions = solver_stats['feasible_solutions']
+
+        if normalize:
+            min_objective = min(objective for _, objective, _ in solutions)
+            solutions = [ (time_sec, objective/min_objective, iterations) for time_sec, objective, iterations in solutions]
+
+        if x_axis == 'time':
+            x_data = [time_sec for time_sec, _, _ in solutions]
+        elif x_axis == 'iterations':
+            x_data = [iterations for _, _, iterations in solutions]
+
+        if y_axis == 'objective':
+            y_data = [objective for _, objective, _ in solutions]
+        elif y_axis == 'iterations':
+            y_data = [iterations for _, _, iterations in solutions]
+
+        plt.plot(x_data, y_data, 'o-')
+        plt.xlabel(x_axis)
+        plt.ylabel(y_axis)
+        plt.grid(True)
+        if show:
+            plt.show()
+        if save_path is not None:
+            plt.savefig(save_path, bbox_inches='tight')
+        if not show and fig is not None:
+            plt.close(fig)
+        return
+
+

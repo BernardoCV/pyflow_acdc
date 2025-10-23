@@ -2,7 +2,7 @@ import pyflow_acdc as pyf
 import pandas as pd
 
 
-def case118_TEP(exp='All',N_b=1,N_i=1,N_max=5):    
+def case118_TEP(exp='All',N_b=1,N_i=1,N_max=5,kappa=0.5):    
     
     S_base=100
     
@@ -318,6 +318,9 @@ def case118_TEP(exp='All',N_b=1,N_i=1,N_max=5):
     {'Line_id': 'L_186', 'fromNode': '76', 'toNode': '118', 'r': 0.0164, 'x': 0.0544, 'b': 0.01356, 'MVA_rating': 151.0, 'm': 1.0, 'shift': 0.0, 'Cost MEUR': 4.29}
     ]
     lines_AC = pd.DataFrame(lines_AC_data)
+
+
+    lines_AC['Cost MEUR'] = lines_AC['Cost MEUR'] * kappa/0.5
 
     nodes_DC = None
 

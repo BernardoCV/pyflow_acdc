@@ -16,7 +16,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC,MIP_path_graph
-from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective
+from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
+
+from .Graph_and_plot import save_network_svg
 
 
 __all__ = [
@@ -33,7 +35,10 @@ __all__ = [
     'sequential_CSS',
     'export_TEP_TS_results_to_excel',
     'MIP_path_graph',
-    'alpha_paretto'
+    'alpha_paretto',
+    'rate_sensitivity',
+    'kappa_sensitivity',
+    'comprehensive_sensitivity_analysis'
 ]
 
 def pack_variables(*args):
@@ -424,17 +429,18 @@ def _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set=False):
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_OPF = OPF_obj(model,grid,weights_def,True)
     
+
+    return model, obj_TEP, obj_OPF,weights_def,PZ
+
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None,callback=False):
+    
+    t1 = time.perf_counter()
+    model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set)
+    
     present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     if NPV:
         obj_OPF *=present_value
 
-    return model, obj_TEP, obj_OPF, present_value,weights_def,PZ
-
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None):
-    
-    t1 = time.perf_counter()
-    model, obj_TEP, obj_OPF, present_value,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set)
-    
     if alpha is not None:
         obj_TEP *= alpha
         obj_OPF *= (1-alpha)
@@ -447,7 +453,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     
     # model.obj.pprint()
 
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit,callback=callback)
     
     t1 = time.perf_counter()
     if export:
@@ -546,8 +552,11 @@ def initialize_links(model,grid):
     if grid.GPR:
         model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
 
-def alpha_paretto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,solver='bonmin',time_limit=99999,tee=False):
-    model, obj_TEP, obj_OPF, present_value,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule)
+def alpha_paretto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,solver='bonmin',time_limit=99999,tee=False,save_name=None):
+    model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule)
+    present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    if NPV:
+        obj_OPF *=present_value
     results = []
     model.alpha = pyo.Param(initialize=0,mutable=True)
     modified_obj_TEP = obj_TEP * model.alpha
@@ -555,12 +564,26 @@ def alpha_paretto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=8760,discount_rate=0
 
     total_cost = modified_obj_TEP + modified_obj_OPF
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
-    for a in np.linspace(0, 1, steps):
-        
-        model.alpha.set_value(a)
-          
-        # model.obj.pprint()
+    
+    # Store initial values for resetting
+    
+    initial_values = {}
+    for var_obj in model.component_objects(pyo.Var, active=True):
+        initial_values[var_obj.name] = {}
+        for index in var_obj:
+            initial_values[var_obj.name][index] = var_obj[index].value
+    
+    # Allow either an integer (count) or an iterable of alphas
+    if isinstance(steps, int):
+        steps_iter = np.linspace(0.0, 1.0, steps)
+    else:
+        steps_iter = np.asarray(steps, dtype=float).ravel()
 
+    for a in steps_iter:
+        print(f'Running alpha: {a}')
+        # Reset model variables to initial values
+        reset_to_initialize(model, initial_values)
+        model.alpha.set_value(a)
         model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
         
         row = {
@@ -568,14 +591,258 @@ def alpha_paretto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=8760,discount_rate=0
             'obj_TEP': pyo.value(obj_TEP),
             'obj_OPF': pyo.value(obj_OPF),
             'Total_cost': pyo.value(model.obj),
-            'Time': solver_stats['time']
+            'Time': solver_stats.get('time', None) if solver_stats is not None else None
         }
         
+        results.append(row)
 
+        if save_name is not None:
+            save_path = f'{save_name}_alpha_{a}.svg'
+            if grid.TEP_AC:
+                lines_AC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}
+                for line in grid.lines_AC_exp:
+                    l = line.lineNumber
+                    line.np_line = lines_AC_TEP[l]
+            for line in grid.lines_DC:
+                l = line.lineNumber
+                line.np_line = pyo.value(model.NumLinesDCP[l])
+            for conv in grid.Converters_ACDC:
+                c = conv.ConvNumber
+                conv.NUmConvP = pyo.value(model.NumConvP[c])
+
+            save_network_svg(grid,save_path)
+    
+    
+    df = pd.DataFrame(results)
+    
+    # Add normalized columns
+    df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
+    df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
+    
+    
+    
+    return df
+
+def rate_sensitivity(grid,steps,ObjRule,min_rate=0.0,max_rate=0.1,NPV=True,n_years=25,Hy=8760,solver='bonmin',time_limit=99999,tee=False):
+   
+    model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,min_rate,ObjRule)
+    
+    results = []
+    model.discount_rate = pyo.Param(initialize=min_rate,mutable=True)
+    present_value =   Hy*(1 - (1 + model.discount_rate) ** -n_years) / model.discount_rate
+    
+
+    obj_OPF  *= present_value
+
+    total_cost = obj_TEP + obj_OPF
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+    
+    # Store initial values for resetting
+    
+    initial_values = {}
+    for var_obj in model.component_objects(pyo.Var, active=True):
+        initial_values[var_obj.name] = {}
+        for index in var_obj:
+            initial_values[var_obj.name][index] = var_obj[index].value
+    
+    # Allow either an integer (count) or an iterable of alphas
+    if isinstance(steps, int):
+        steps_iter = np.linspace(min_rate, max_rate, steps)
+    else:
+        steps_iter = np.asarray(steps, dtype=float).ravel()
+
+    for rate in steps_iter:
+        print(f'Running rate: {rate}')
+        # Reset model variables to initial values
+        reset_to_initialize(model, initial_values)
+        model.discount_rate.set_value(rate)
+        model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+        
+        row = {
+            'rate': rate,
+            'obj_TEP': pyo.value(obj_TEP),
+            'obj_OPF': pyo.value(obj_OPF),
+            'Total_cost': pyo.value(model.obj),
+            'Time': solver_stats.get('time', None) if solver_stats is not None else None
+        }
         
         results.append(row)
+    
+    
+    df = pd.DataFrame(results)
+    
+    # Add normalized columns
+    df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
+    df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
+    
+    
+    
+    return df
+
+def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,solver='bonmin',time_limit=99999,tee=False):
+   
+    model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule)
+    
+    results = []
+    model.kappa = pyo.Param(initialize=min_kappa,mutable=True)
+    present_value =   Hy*(1 - (1 + model.discount_rate) ** -n_years) / model.discount_rate
+    
+
+    obj_OPF  *= present_value
+    obj_TEP *= model.kappa
+    total_cost = obj_TEP + obj_OPF
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+    
+    # Store initial values for resetting
+    
+    initial_values = {}
+    for var_obj in model.component_objects(pyo.Var, active=True):
+        initial_values[var_obj.name] = {}
+        for index in var_obj:
+            initial_values[var_obj.name][index] = var_obj[index].value
+    
+    # Allow either an integer (count) or an iterable of alphas
+    if isinstance(steps, int):
+        steps_iter = np.linspace(min_kappa, max_kappa, steps)
+    else:
+        steps_iter = np.asarray(steps, dtype=float).ravel()
+
+    for kappa in steps_iter:
+        print(f'Running rate: {rate}')
+        # Reset model variables to initial values
+        reset_to_initialize(model, initial_values)
+        model.kappa.set_value(kappa)
+        model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
         
-    return results
+        row = {
+            'kappa': kappa,
+            'obj_TEP': pyo.value(obj_TEP),
+            'obj_OPF': pyo.value(obj_OPF),
+            'Total_cost': pyo.value(model.obj),
+            'Time': solver_stats.get('time', None) if solver_stats is not None else None
+        }
+        
+        results.append(row)
+    
+    
+    df = pd.DataFrame(results)
+    
+    # Add normalized columns
+    df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
+    df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
+    
+    
+    
+    return df
+
+
+def comprehensive_sensitivity_analysis(
+    grid, 
+    ObjRule,
+    alpha_steps=None, 
+    rate_steps=None, 
+    kappa_steps=None,
+    alpha_range=(0.0, 1.0),
+    rate_range=(0.01, 0.1), 
+    kappa_range=(0.0, 1.0),
+    n_years=25, 
+    Hy=8760, 
+    discount_rate=0.02,
+    solver='bonmin', 
+    time_limit=99999, 
+    tee=False
+):
+    """
+    Comprehensive sensitivity analysis combining alpha, rate, and kappa variations.
+    
+    Parameters:
+    - alpha_steps, rate_steps, kappa_steps: Number of steps or specific values for each parameter
+    - alpha_range, rate_range, kappa_range: (min, max) tuples for parameter ranges
+    """
+    # Prepare base model
+    model, obj_TEP, obj_OPF, weights_def, PZ = _prepare_TEP_model(grid, True, n_years, Hy, discount_rate, ObjRule)
+    
+    # Create mutable parameters
+    model.alpha = pyo.Param(initialize=0.5, mutable=True)
+    model.discount_rate = pyo.Param(initialize=discount_rate, mutable=True) 
+    model.kappa = pyo.Param(initialize=0.5, mutable=True)
+    
+    # Store initial values
+    initial_values = {}
+    for var_obj in model.component_objects(pyo.Var, active=True):
+        initial_values[var_obj.name] = {}
+        for index in var_obj:
+            initial_values[var_obj.name][index] = var_obj[index].value
+    
+    results = []
+    
+    # Generate parameter ranges
+    alpha_values = _generate_steps(alpha_steps, alpha_range) if alpha_steps is not None else [None]
+    rate_values = _generate_steps(rate_steps, rate_range) if rate_steps is not None else [None] 
+    kappa_values = _generate_steps(kappa_steps, kappa_range) if kappa_steps is not None else [None]
+    # Set parameters
+    
+    # Calculate present value with current discount rate
+    
+    present_value = Hy * (1 - (1 + model.discount_rate) ** -n_years) / model.discount_rate
+    
+    obj_OPF  *= present_value
+    obj_TEP *= model.kappa
+
+
+    # Modify objectives
+    modified_obj_TEP = obj_TEP * model.alpha
+    modified_obj_OPF = obj_OPF * (1 - model.alpha)
+    
+    total_cost = modified_obj_TEP + modified_obj_OPF
+    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
+                
+    # Nested loops
+    for alpha in alpha_values:
+        print(f'Running alpha: {alpha}')
+        for rate in rate_values:
+            print(f'Running rate: {rate}')
+            for kappa in kappa_values:
+                print(f'Running: alpha={alpha}, rate={rate}, kappa={kappa}')
+                if alpha is not None:
+                    model.alpha.set_value(alpha)
+                if rate is not None:
+                    model.discount_rate.set_value(rate)
+                if kappa is not None:
+                    model.kappa.set_value(kappa)
+                # Reset model
+                reset_to_initialize(model, initial_values)
+                
+                
+                # Solve
+                model_results, solver_stats = OPF_solve(model, grid, solver, tee, time_limit)
+                
+                # Store results
+                row = {
+                    'alpha': alpha,
+                    'rate': rate, 
+                    'kappa': kappa,
+                    'obj_TEP': pyo.value(obj_TEP),
+                    'obj_OPF': pyo.value(obj_OPF),
+                    'Total_cost': pyo.value(model.obj),
+                    'Time': solver_stats.get('time', None) if solver_stats is not None else None
+                }
+                results.append(row)
+    
+    df = pd.DataFrame(results)
+    
+    # Add normalized columns
+    df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
+    df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
+    
+    return df
+
+def _generate_steps(steps, range_tuple):
+    """Helper function to generate parameter values"""
+    if isinstance(steps, int):
+        return np.linspace(range_tuple[0], range_tuple[1], steps)
+    else:
+        return np.asarray(steps, dtype=float).ravel()   
 
 def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy):
        

@@ -83,7 +83,7 @@ This grid has been modified to include Transmision expansion costs, as well as a
 
 """
 
-def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1):    
+def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1,kappa=1):    
     
     S_base=100
     
@@ -243,6 +243,7 @@ def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1):
         {'Line_id': 'L_DC_20', 'fromNode': '3', 'toNode': '10', 'r': 0.01, 'MW_rating': 100.0, 'kV_base': 345.0, 'Length_km': '1', 'Mono_Bi_polar': 'sm', 'Cost MEUR': 0.5},
         
         ]
+        
         conv_extra=[
             {'Conv_id': 'Conv_11', 'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '33', 'DC_node': '11', 'P_AC': -0.6, 'Q_AC': -0.4, 'P_DC': -0.586274, 'T_r': 0.01, 'T_x': 0.01, 'PR_r': 0.01, 'PR_x': 0.01, 'Filter_b': 0.01, 'Droop': '0.005', 'AC_kV_base': 345.0, 'MVA_rating': 100.0, 'Nconverter': 1.0, 'pol': 1.0, 'lossa': 1.1033, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 2.885, 'Ucmin': 0.9, 'Ucmax': 1.1, 'Cost MEUR': 13.0},
             {'Conv_id': 'Conv_12', 'AC_type': 'PQ', 'DC_type': 'P', 'AC_node': '38', 'DC_node': '12', 'P_AC': -0.6, 'Q_AC': -0.4, 'P_DC': -0.586274, 'T_r': 0.01, 'T_x': 0.01, 'PR_r': 0.01, 'PR_x': 0.01, 'Filter_b': 0.01, 'Droop': '0.005', 'AC_kV_base': 345.0, 'MVA_rating': 100.0, 'Nconverter': 1.0, 'pol': 1.0, 'lossa': 1.1033, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 2.885, 'Ucmin': 0.9, 'Ucmax': 1.1, 'Cost MEUR': 13.0},
@@ -257,12 +258,12 @@ def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1):
         
         for row in lines_DC_data:
             row['r']=0.001
-            row['Cost MEUR']= 0.05
-    
+            row['Cost MEUR']= 0.1*kappa
+        
     nodes_DC = pd.DataFrame(nodes_DC_data)
     lines_DC = pd.DataFrame(lines_DC_data)
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
-
+    Converters_ACDC['Cost MEUR'] = Converters_ACDC['Cost MEUR'] * kappa
     
     # Create the grid
     [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')

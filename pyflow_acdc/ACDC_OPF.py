@@ -8,6 +8,10 @@ import pandas as pd
 import pyomo.environ as pyo
 from pyomo.util.infeasible import log_infeasible_constraints
 
+import os
+import sys
+from contextlib import redirect_stdout
+
 import time
 from concurrent.futures import ThreadPoolExecutor
 import re
@@ -40,7 +44,9 @@ __all__ = [
     'OPF_line_res',
     'OPF_price_priceZone',
     'OPF_conv_results',
-    'fx_conv'
+    'fx_conv',
+    'export_solver_progress_to_excel',
+    'reset_to_initialize'
 ]
 
 def pack_variables(*args):
@@ -80,7 +86,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 
-def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False):
+def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False):
     analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -126,7 +132,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     """
     """
     t3 = time.perf_counter()
-    model_res,solver_stats = OPF_solve(model,grid,solver,tee)
+    model_res,solver_stats = OPF_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
     # pr = cProfile.Profile()
@@ -156,7 +162,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False):
+def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False,callback=False):
     analyse_OPF(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -201,7 +207,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
                 
     """
     """
-    model_res,solver_stats = OPF_solve(model,grid,solver,tee)
+    model_res,solver_stats = OPF_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
     # pr = cProfile.Profile()
@@ -492,7 +498,7 @@ def _gurobi_callback(model, feasible_solutions,time_limit):
     results.solver.status = pyo.SolverStatus.ok
     results.problem.upper_bound = grb_model.ObjVal
     results.solver.time = grb_model.Runtime
-    feasible_solutions.append((grb_model.Runtime,grb_model.ObjVal))
+    feasible_solutions.append((grb_model.Runtime,grb_model.ObjVal,grb_model.IterCount,grb_model.IterCount,True))
     
     if grb_model.Status == GRB.Status.OPTIMAL:
         results.solver.termination_condition = pyo.TerminationCondition.optimal
@@ -502,17 +508,204 @@ def _gurobi_callback(model, feasible_solutions,time_limit):
     else:
         results.solver.termination_condition = pyo.TerminationCondition.unknown
     opt._solver_model.dispose()  # Cleanup
+    return results, feasible_solutions
+
+def _parse_bonmin_log(log_path):
+    """Parse Bonmin log file to extract feasible solutions and all solutions.
+    Returns tuple of (feasible_solutions, all_solutions) where each is a list of (time, objective, iterations) tuples.
+    """
+    feasible_solutions = []
+    all_solutions = []
+    last_nlp_call = 0
+    cumulative_iterations = 0
+    cumulative_time = 0
+    
+    try:
+        with open(log_path, 'r') as f:
+            pending_header = False
+            for line in f:
+                # Detect NLP table header; don't infer anything here
+                if line.startswith('NLP0012I'):
+                    pending_header = True
+                    continue
+                # Look for integer solution lines like:
+                # Cbc0004I Integer solution of 1.5954776e+10 found after 1563 iterations and 63 nodes (5.62 seconds)
+                if 'Integer solution of' in line and ('found after' in line or 'found by' in line):
+                    # Extract objective value
+                    obj_match = re.search(r'Integer solution of ([\d\.eE\+\-]+)', line)
+                    # Extract iterations (handles both "found after X iterations" and "found by X after Y iterations")
+                    iter_match = re.search(r'(?:found after|after) (\d+) iterations', line)
+                    # Extract time
+                    time_match = re.search(r'\(([\d\.]+) seconds\)', line)
+                    
+                    if obj_match and iter_match and time_match:
+                        try:
+                            objective = all_solutions[-1][1]
+                            iterations = all_solutions[-1][2]
+                            time_sec = all_solutions[-1][0]
+                            # Only explicit integer solution lines define feasibility
+                            feasible_solutions.append((time_sec, objective, iterations))
+                            if all_solutions:
+                                all_solutions[-1][4] = True
+                                
+                        except (ValueError, TypeError):
+                            continue
+                
+                # Also look for NLP iteration lines like:
+                # NLP0014I            24         OPT 8.9135036e+09       25 0.341783
+                elif 'NLP0014I' in line and 'OPT' in line:
+                    # Extract objective value, iteration count (It), and time from NLP lines.
+                    # Example: "NLP0014I           120         OPT 1.5954776e+10       25 0.045817"
+                    # parts[1]=NLP solver call number, parts[2]=Status, parts[3]=Obj, parts[4]=It, parts[5]=time
+                    parts = line.strip().split()
+                    if len(parts) >= 6:
+                        try:
+                            # Handle NLP0014I * 1 OPT format where * is a separate token
+                            if parts[1] == '*':
+                                # Format: NLP0014I * 1 OPT obj it time
+                                nlp_call_num = int(parts[2])
+                                objective = float(parts[4])
+                                nlp_iterations = int(parts[5])
+                                time_sec = float(parts[6])
+                            else:
+                                # Format: NLP0014I 1 OPT obj it time
+                                nlp_call_num = int(parts[1])
+                                objective = float(parts[3])
+                                nlp_iterations = int(parts[4])
+                                time_sec = float(parts[5])
+                            
+                            # Always record progress; do not infer feasibility from numbering changes
+                            cumulative_iterations += nlp_iterations
+                            cumulative_time += time_sec
+                            solution_data = [cumulative_time, objective, cumulative_iterations, nlp_call_num, False]
+                            all_solutions.append(solution_data)
+                            last_nlp_call = nlp_call_num
+                            pending_header = False
+                                
+                        except (ValueError, TypeError, IndexError):
+                            continue
+    except (FileNotFoundError, IOError):
+        pass
+    return feasible_solutions, all_solutions
+
+def _parse_ipopt_log(log_path):
+    """Parse Ipopt log file to extract iteration progress.
+    Returns list of (time, objective, iteration, nlp_call_num, is_feasible) tuples.
+    """
+    progress_events = []
+    
+    try:
+        with open(log_path, 'r') as f:
+            for line in f:
+                # Look for Ipopt iteration lines like:
+                # iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
+                #   0  1.5929771e+10 1.00e+00 1.00e+00  -1.0 1.00e+00    -  1.00e+00 1.00e+00   0
+                if re.match(r'^\s*\d+\s+[\d\.eE\+\-]+\s+', line.strip()):
+                    parts = line.strip().split()
+                    if len(parts) >= 3:  # Need at least iter, obj, inf_pr
+                        try:
+                            iteration = int(parts[0])
+                            objective = float(parts[1])
+                            inf_pr = float(parts[2])  # Primal infeasibility
+                            
+                            # Determine feasibility based on inf_pr (typically < 1e-6 is feasible)
+                            is_feasible = inf_pr < 1e-6
+                            
+                            # For time, we'll use cumulative iteration count as proxy
+                            # (since Ipopt doesn't always show per-iteration time)
+                            progress_events.append((iteration, objective,is_feasible))
+                        except (ValueError, IndexError):
+                            continue
+    except (FileNotFoundError, IOError):
+        pass
+    
+    return progress_events
+
+def _solver_progress(model, feasible_solutions, solver_name, time_limit, log_path, tee_console=True):
+    """Unified progress tracking for Ipopt and Bonmin solvers."""
+    opt = pyo.SolverFactory(solver_name)
+    
+    # Set time limit based on solver
+    if time_limit is not None:
+        if solver_name == 'ipopt':
+            opt.options['max_cpu_time'] = time_limit
+        elif solver_name == 'bonmin':
+            opt.options['bonmin.time_limit'] = time_limit
+    
+    start = time.perf_counter()
+    
+    with open(log_path, 'w') as log_file:
+        if tee_console:
+            # Show on console AND write to file
+            import sys
+            original_stdout = sys.stdout
+            class TeeWriter:
+                def write(self, s):
+                    log_file.write(s)
+                    original_stdout.write(s)
+                def flush(self):
+                    log_file.flush()
+                    original_stdout.flush()
+            sys.stdout = TeeWriter()
+            try:
+                results = opt.solve(model, tee=True)
+            finally:
+                sys.stdout = original_stdout
+        else:
+            # Only write to file
+            from contextlib import redirect_stdout
+            with redirect_stdout(log_file):
+                results = opt.solve(model, tee=True)
+    
+    end = time.perf_counter()
+
+    # Parse the log file based on solver type
+    all_solutions = []
+    if solver_name == 'ipopt':
+        parsed_events = _parse_ipopt_log(log_path)
+        # Convert to same format as feasible_solutions for consistency
+        for iter_num, obj, is_feasible in parsed_events:
+            if is_feasible:
+                feasible_solutions.append((iter_num, obj, iter_num))
+            all_solutions.append([iter_num, obj, iter_num, iter_num, is_feasible])
+    elif solver_name == 'bonmin':
+        parsed_feasible, parsed_all = _parse_bonmin_log(log_path)
+        feasible_solutions.extend(parsed_feasible)
+        all_solutions.extend(parsed_all)
+
+    return results, feasible_solutions, all_solutions
+
+def reset_to_initialize(model, initial_values):
+    """
+    Resets all variables in the Pyomo model to their original initialize values.
+    model: Pyomo ConcreteModel
+        The Pyomo model whose variables are to be reset.
+    initial_values: dict
+        A dictionary containing the original initialize values of variables.
+    """
+    for var_obj in model.component_objects(pyo.Var, active=True):
+        if var_obj.name in initial_values:
+            for index in var_obj:
+                var_obj[index].set_value(initial_values[var_obj.name].get(index, 0))
+
 
 def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=False, suppress_warnings=False):
     solver = solver.lower()
     feasible_solutions = []  # Always defined, but only populated if callback is used
+    all_solutions = []  # Always defined, but only populated if callback is used
 
     if grid.MixedBinCont and solver == 'ipopt':
         print('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
 
-    if callback and solver == 'gurobi' and GUROBI_AVAILABLE:
-        _gurobi_callback(model, feasible_solutions,time_limit)
-       
+    if callback:
+        if solver == 'gurobi' and GUROBI_AVAILABLE:
+            results, feasible_solutions = _gurobi_callback(model, feasible_solutions,time_limit)
+            # For Gurobi, all_solutions is the same as feasible_solutions
+            all_solutions = feasible_solutions.copy()
+        elif solver == 'bonmin':
+            results, feasible_solutions, all_solutions = _solver_progress(model, feasible_solutions, 'bonmin', time_limit, 'bonmin.log', tee_console=tee)
+        elif solver == 'ipopt':
+            results, feasible_solutions, all_solutions = _solver_progress(model, feasible_solutions, 'ipopt', time_limit, 'ipopt.log', tee_console=tee)
     else:
         opt = pyo.SolverFactory(solver)
         if time_limit is not None:
@@ -544,7 +737,8 @@ def OPF_solve(model, grid, solver='ipopt', tee=False, time_limit=None, callback=
         'best_objective': getattr(results.problem, 'upper_bound', None),
         'time': getattr(results.solver, 'time', None),
         'termination_condition': str(results.solver.termination_condition),
-        'feasible_solutions': feasible_solutions
+        'feasible_solutions': feasible_solutions,
+        'all_solutions': all_solutions
     }
 
     if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
@@ -1170,3 +1364,44 @@ def calculate_objective(grid,obj,OnlyGen=True):
         return sum((gen.PGen-gen.Pset)**2 for gen in grid.Generators)
     
     return 0
+
+def export_solver_progress_to_excel(solver_stats, save_path):
+    import pandas as pd
+    """Export solver progress to a 6-column Excel regardless of length differences.
+
+    Columns:
+    - time_all, obj_all, iter_all (from all_solutions)
+    - time_feasible, obj_feasible, iter_feasible (from feasible_solutions)
+    """
+    # all_solutions format: [time_sec, objective, cumulative_iterations, nlp_call_num, is_feasible]
+    all_solutions = solver_stats.get('all_solutions', []) or []
+    feasible_solutions = solver_stats.get('feasible_solutions', []) or []  # (time, obj, iterations)
+
+    # Map to uniform tuples (time, obj, iter)
+    all_triplets = [(a[0], a[1], a[2]) for a in all_solutions]
+    feas_triplets = [(f[0], f[1], f[2]) for f in feasible_solutions]
+
+    max_len = max(len(all_triplets), len(feas_triplets))
+
+    # Pad shorter list with None
+    def pad(seq, n):
+        return seq + [(None, None, None)] * (n - len(seq))
+
+    all_padded = pad(all_triplets, max_len)
+    feas_padded = pad(feas_triplets, max_len)
+
+    df = pd.DataFrame({
+        'time_all': [t for t, _, _ in all_padded],
+        'obj_all': [o for _, o, _ in all_padded],
+        'iter_all': [it for _, _, it in all_padded],
+        'time_feasible': [t for t, _, _ in feas_padded],
+        'obj_feasible': [o for _, o, _ in feas_padded],
+        'iter_feasible': [it for _, _, it in feas_padded],
+    })
+
+    # Ensure .xlsx extension
+    if not isinstance(save_path, str) or not save_path.lower().endswith('.xlsx'):
+        save_path = f"{save_path}.xlsx"
+
+    df.to_excel(save_path, index=False)
+    return save_path

@@ -44,7 +44,7 @@ This grid has been modified to include Transmision expansion costs, as well as a
 
 """
 
-def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3):    
+def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=0.5):    
     
     S_base=100
     
@@ -226,7 +226,10 @@ def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3):
         ]
         
         lines_DC_data.extend(lines_DC_data_extra)
-        
+            
+        lines_AC_data['Cost MEUR'] = lines_AC_data['Cost MEUR'] * kappa/0.5
+        lines_DC_data['Cost MEUR'] = lines_DC_data['Cost MEUR'] * kappa/0.5
+        Converters_ACDC_data['Cost MEUR'] = Converters_ACDC_data['Cost MEUR'] * kappa/0.5
     lines_AC = pd.DataFrame(lines_AC_data)    
     nodes_DC = pd.DataFrame(nodes_DC_data)
     lines_DC = pd.DataFrame(lines_DC_data)

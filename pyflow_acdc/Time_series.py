@@ -36,7 +36,8 @@ try:
         OPF_conv_results,
         pack_variables,
         Translate_pyf_OPF,
-        TS_parallel_OPF
+        TS_parallel_OPF,
+        reset_to_initialize
     )
     pyomo_imp= True
     
@@ -442,18 +443,7 @@ def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restriction
 
     return average_elapsed_time
 
-def reset_to_initialize(model, initial_values):
-    """
-    Resets all variables in the Pyomo model to their original initialize values.
-    model: Pyomo ConcreteModel
-        The Pyomo model whose variables are to be reset.
-    initial_values: dict
-        A dictionary containing the original initialize values of variables.
-    """
-    for var_obj in model.component_objects(pyo.Var, active=True):
-        if var_obj.name in initial_values:
-            for index in var_obj:
-                var_obj[index].set_value(initial_values[var_obj.name].get(index, 0))
+
                 
 def _modify_parameters(grid,model,Price_Zones):
     [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)    
