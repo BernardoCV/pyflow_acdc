@@ -726,7 +726,7 @@ def TEP_variables(model,grid):
         model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=ct_types_ini)
 
 
-def ExportACDC_Lmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False, solver_results=None, tee=False):
+def ExportACDC_Lmodel_toPyflowACDC(model,grid, solver_results=None, tee=False):
     """
     Export Pyomo results back to grid object
     
