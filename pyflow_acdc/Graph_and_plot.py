@@ -1039,7 +1039,7 @@ def create_subgraph_color_dict(G):
     
     color_palette_1 = itertools.cycle([
      'darkviolet', 'green',  'red',
-    'darkoragne', 'hotpink', 'lightseagreen'
+    'darkorange', 'hotpink', 'lightseagreen'
     ])
     
     color_palette_2 = itertools.cycle([

@@ -6,8 +6,9 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 import time
 import matplotlib.pyplot as plt
-from .ACDC_OPF_NL_model import analyse_OPF,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF_NL_model import analyse_grid,ExportACDC_NLmodel_toPyflowACDC
 from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
+from .Class_editor import analyse_grid
 
 __all__ = [
     'transmission_expansion_pymoo'
@@ -27,7 +28,7 @@ class TEPOuterProblem(ElementwiseProblem):
         
         self.objective_type = objective_type
         t1=time.perf_counter()
-        analyse_OPF(grid)
+        analyse_grid(grid)
         self.grid = grid
         self._store_TEP_flags()
         n_var, xl, xu, vtype, self.bound_names = self._create_pymoo_bounds()
@@ -410,7 +411,7 @@ class TEPOuterProblem(ElementwiseProblem):
 def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='GA',time_limit=300,tee=False,n_gen=10):
     
             
-    analyse_OPF(grid)
+    analyse_grid(grid)
     
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
     # Create problem

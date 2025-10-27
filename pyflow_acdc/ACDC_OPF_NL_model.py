@@ -9,38 +9,20 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
+from .Class_editor import analyse_grid
+
 __all__ = [
-    'analyse_OPF',
     'OPF_create_NLModel_ACDC',
     'ExportACDC_NLmodel_toPyflowACDC'
 ]
 
-def analyse_OPF(grid):
-    # Check if analysis has already been done for this grid
-    if hasattr(grid, 'ACmode'):
-        return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
-    
-    # Perform the analysis and store directly on grid
-    grid.ACmode = grid.nn_AC != 0       #AC nodes present
-    grid.DCmode = grid.nn_DC != 0       #DC nodes present
-    grid.TEP_AC = grid.nle_AC != 0 #AC expansion lines present
-    grid.REC_AC = grid.nlr_AC != 0 #AC reconductoring lines present
-    grid.TAP_tf = grid.nttf != 0    #AC transformer lines present
-    grid.CT_AC  = grid.nct_AC!= 0 #AC conductor size selection lines present
-    grid.CFC = grid.ncfc_DC != 0 #DC variable voltage converter lines present
-    grid.CDC = grid.ncdc_DC != 0 #DC-DC converter lines present
-    grid.GPR = any(gen.np_gen_opf for gen in grid.Generators)
 
-    return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
     
 
 def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
     from .ACDC_OPF import Translate_pyf_OPF 
     
-    
-    
-    
-    
+
     
     [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
    

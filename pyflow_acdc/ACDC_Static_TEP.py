@@ -12,9 +12,9 @@ import time
 import os
 from concurrent.futures import ThreadPoolExecutor
 
+from .Class_editor import analyse_grid
 
-
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables
+from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC,MIP_path_graph
 from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
 
@@ -158,9 +158,11 @@ def repurpose_element_from_pd(grid,rec_elements):
         get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'MVA_rating_new',default_value=99999),
         get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'Life_time',default_value=1),
         get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'base_cost',default_value=0),
-
+        False
+            
     ))
-
+    grid.Update_Graph_AC()
+    grid.create_Ybus_AC()    
 
 
 def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_cost, exp):
@@ -413,7 +415,7 @@ def MS_TEP_constraints(model,grid):
 
 def _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set=False):
 
-    analyse_OPF(grid)
+    analyse_grid(grid)
     
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
 
@@ -477,7 +479,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     return model, model_results , timing_info, solver_stats
 
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False,export=True,fs=False):
-    analyse_OPF(grid)
+    analyse_grid(grid)
     
     weights_def, _ = obj_w_rule(grid,ObjRule,True)
 
@@ -893,7 +895,7 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
 
 def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin',tee=False):
     
-    analyse_OPF(grid)
+    analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
 

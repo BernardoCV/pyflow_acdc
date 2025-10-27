@@ -13,6 +13,7 @@ from scipy import stats as st
 
 import time
 
+from .Class_editor import analyse_grid
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
 
 
@@ -26,14 +27,14 @@ __all__ = ['Time_series_PF',
 
 try:
     import pyomo.environ as pyo
-    from .ACDC_OPF_NL_model import (analyse_OPF,
+    from .ACDC_OPF_NL_model import (
         OPF_create_NLModel_ACDC,
         ExportACDC_NLmodel_toPyflowACDC)
     
     from .ACDC_OPF import (
         OPF_solve,
         OPF_obj,
-        OPF_conv_results,
+        OPF_step_results,
         pack_variables,
         Translate_pyf_OPF,
         TS_parallel_OPF,
@@ -177,11 +178,11 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
 def update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
     for node in grid.nodes_AC:
-        if node.type == 'Slack' or node.extGrid == 2:
+        if node.type == 'Slack':
             PGi = (node.P_INJ - node.P_s - node.PGi_ren * node.curtailment + node.PLi).item()
             QGi = node.Q_INJ - node.Q_s - node.Q_s_fx + node.QLi
-            if node.Max_pow_gen !=0:
-                loading = np.sqrt(PGi**2 + QGi**2) / node.Max_pow_gen
+            if node.S_rating !=0:
+                loading = np.sqrt(PGi**2 + QGi**2) / node.S_rating
             else:
                 loading = 0
             row_data.update({
@@ -229,53 +230,102 @@ def calculate_line_loading_from_model(grid,model,idx):
     loadS_AC = np.zeros(grid.Num_Grids_AC)
     loadP_DC = np.zeros(grid.Num_Grids_DC)
     line_data = {'time': idx+1}
+ 
     
-    keys = sorted(model.PAC_from.keys())
+    
+    if grid.ACmode:
+        keys = sorted(model.PAC_from.keys())
 
-    PAC_from = np.array([np.float64(pyo.value(model.PAC_from[k])) for k in keys])
-    QAC_from = np.array([np.float64(pyo.value(model.QAC_from[k])) for k in keys])
-    PAC_to = np.array([np.float64(pyo.value(model.PAC_to[k])) for k in keys])
-    QAC_to = np.array([np.float64(pyo.value(model.QAC_to[k])) for k in keys])
+        PAC_from = np.array([np.float64(pyo.value(model.PAC_from[k])) for k in keys])
+        QAC_from = np.array([np.float64(pyo.value(model.QAC_from[k])) for k in keys])
+        PAC_to = np.array([np.float64(pyo.value(model.PAC_to[k])) for k in keys])
+        QAC_to = np.array([np.float64(pyo.value(model.QAC_to[k])) for k in keys])
 
-    S_from   =np.sqrt(PAC_from**2+QAC_from**2)
-    S_to     =np.sqrt(PAC_to**2+QAC_to**2)
-    
-    
-    PDC_from = {k: np.float64(pyo.value(v)) for k, v in model.PDC_from.items()}
-    PDC_to   = {k: np.float64(pyo.value(v)) for k, v in model.PDC_to.items()}
-    
-    for line in grid.lines_AC:
-        G = grid.Graph_line_to_Grid_index_AC[line]
-        load = max(abs(S_from[line.lineNumber]), abs(S_to[line.lineNumber]))
-        loadS_AC[G] += load
-        line_data[f'AC_Load_{line.name}'] = load * grid.S_base / line.MVA_rating
-        line_data[f'AC_from_{line.name}'] = PAC_from[line.lineNumber] * grid.S_base
-        line_data[f'AC_to_{line.name}']   = PAC_to[line.lineNumber]   * grid.S_base 
+        S_from   =np.sqrt(PAC_from**2+QAC_from**2)
+        S_to     =np.sqrt(PAC_to**2+QAC_to**2)
+        
+        for line in grid.lines_AC:
+            G = grid.Graph_line_to_Grid_index_AC[line]
+            load = max(abs(S_from[line.lineNumber]), abs(S_to[line.lineNumber]))
+            loadS_AC[G] += load
+            line_data[f'AC_Load_{line.name}'] = load * grid.S_base / line.MVA_rating
+            line_data[f'AC_from_{line.name}'] = PAC_from[line.lineNumber] * grid.S_base
+            line_data[f'AC_to_{line.name}']   = PAC_to[line.lineNumber]   * grid.S_base 
 
-    for line in grid.lines_DC:
-        G = grid.Graph_line_to_Grid_index_DC[line]
-        load = max(abs(PDC_from[line.lineNumber]), abs(PDC_to[line.lineNumber]))
-        loadP_DC[G] += load
-        line_data[f'DC_Load_{line.name}'] = load * grid.S_base / line.MW_rating
-        line_data[f'DC_from_{line.name}'] = PDC_from[line.lineNumber] * grid.S_base
-        line_data[f'DC_to_{line.name}']   = PDC_to[line.lineNumber]   * grid.S_base 
+        if grid.TEP_AC:    
+            lines_AC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}
+            lines_AC_TEP_fromP = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_from.items()}
+            lines_AC_TEP_toP = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_to.items()}
+            lines_AC_TEP_fromQ = {k: np.float64(pyo.value(v)) for k, v in model.exp_QAC_from.items()}
+            lines_AC_TEP_toQ = {k: np.float64(pyo.value(v)) for k, v in model.exp_QAC_to.items()}
+            lines_AC_TEP_P_loss = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_line_loss.items()}
+            for line in grid.lines_AC_exp:
+                G = grid.Graph_line_to_Grid_index_AC[line]
+                l = line.lineNumber
+                line.np_line = lines_AC_TEP[l]
+                line.P_loss = lines_AC_TEP_P_loss[l]*lines_AC_TEP[l]
+                line_data[f'AC_from_{line.name}'] =  (lines_AC_TEP_fromP[l] + 1j*lines_AC_TEP_fromQ[l])*lines_AC_TEP[l]
+                line_data[f'AC_to_{line.name}'] = (lines_AC_TEP_toP[l] + 1j*lines_AC_TEP_toQ[l])*lines_AC_TEP[l]
+                load = max(abs(line_data[f'AC_from_{line.name}']), abs(line_data[f'AC_to_{line.name}']))
+                loadS_AC[G] += load
+                line_data[f'AC_Load_{line.name}'] = load * grid.S_base / (line.MVA_rating * line.np_line)
+        if grid.REC_AC:
+            lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rec_branch.items()}
+            lines_AC_REC_fromP = {k: {state: np.float64(pyo.value(model.rec_PAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+            lines_AC_REC_toP = {k: {state: np.float64(pyo.value(model.rec_PAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+            lines_AC_REC_fromQ = {k: {state: np.float64(pyo.value(model.rec_QAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+            lines_AC_REC_toQ = {k: {state: np.float64(pyo.value(model.rec_QAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
+            lines_AC_REC_P_loss = {k: np.float64(pyo.value(v)) for k, v in model.rec_PAC_line_loss.items()}
+            
+            for line in grid.lines_AC_rec:
+                G = grid.Graph_line_to_Grid_index_AC[line]
+                l = line.lineNumber
+                line.rec_branch = True if lines_AC_REP[l] >= 0.99999 else False
+                line.P_loss = lines_AC_REC_P_loss[l]
+                state = 1 if line.rec_branch else 0
+                line_data[f'AC_from_{line.name}'] = (lines_AC_REC_fromP[l][state] + 1j*lines_AC_REC_fromQ[l][state])
+                line_data[f'AC_to_{line.name}'] = (lines_AC_REC_toP[l][state] + 1j*lines_AC_REC_toQ[l][state])
+                load = max(abs(line_data[f'AC_from_{line.name}']), abs(line_data[f'AC_to_{line.name}']))
+                loadS_AC[G] += load
+                if state == 1:
+                    line_data[f'AC_Load_{line.name}'] = load * grid.S_base / line.MVA_rating_new 
+                else:
+                    line_data[f'AC_Load_{line.name}'] = load * grid.S_base / line.MVA_rating
+
+
+    if grid.DCmode:
+        
+        PDC_from = {k: np.float64(pyo.value(v)) for k, v in model.PDC_from.items()}
+        PDC_to   = {k: np.float64(pyo.value(v)) for k, v in model.PDC_to.items()}
+        for line in grid.lines_DC:
+            G = grid.Graph_line_to_Grid_index_DC[line]
+            load = max(abs(PDC_from[line.lineNumber]), abs(PDC_to[line.lineNumber]))
+            loadP_DC[G] += load
+            line_data[f'DC_Load_{line.name}'] = load * grid.S_base / line.MW_rating
+            line_data[f'DC_from_{line.name}'] = PDC_from[line.lineNumber] * grid.S_base
+            line_data[f'DC_to_{line.name}']   = PDC_to[line.lineNumber]   * grid.S_base 
 
     return line_data, loadS_AC, loadP_DC
 
 def calculate_grid_loading(grid, loadS_AC, loadP_DC,idx):
     grid_data_loading = {'time': idx+1}
     total_loading = 0
-    total_rating = sum(grid.rating_grid_AC) + sum(grid.rating_grid_DC)
+    total_rating = 0
+    if grid.ACmode:
+        total_rating += sum(grid.rating_grid_AC)
+    if grid.DCmode:
+        total_rating += sum(grid.rating_grid_DC)
+    if grid.ACmode:
+        for g in range(grid.Num_Grids_AC):
+            loading = loadS_AC[g] * grid.S_base
+            total_loading += loading
+            grid_data_loading[f'Loading_Grid_AC_{g+1}'] = 0 if grid.rating_grid_AC[g] == 0 else loading / grid.rating_grid_AC[g]
 
-    for g in range(grid.Num_Grids_AC):
-        loading = loadS_AC[g] * grid.S_base
-        total_loading += loading
-        grid_data_loading[f'Loading_Grid_AC_{g+1}'] = 0 if grid.rating_grid_AC[g] == 0 else loading / grid.rating_grid_AC[g]
-
-    for g in range(grid.Num_Grids_DC):
-        loading = loadP_DC[g] * grid.S_base
-        total_loading += loading
-        grid_data_loading[f'Loading_Grid_DC_{g+1}'] = loading / grid.rating_grid_DC[g]
+    if grid.DCmode:
+        for g in range(grid.Num_Grids_DC):
+            loading = loadP_DC[g] * grid.S_base
+            total_loading += loading
+            grid_data_loading[f'Loading_Grid_DC_{g+1}'] = loading / grid.rating_grid_DC[g]
 
     grid_data_loading['Total'] = 0 if total_rating == 0 else total_loading /total_rating
     return grid_data_loading
@@ -295,7 +345,7 @@ def calculate_price_zone_price_from_model(grid,model,idx):
     
     return price_zone_price
 
-def TS_ACDC_PF(grid, start=1, end=99999,print_step=False):
+def TS_ACDC_PF(grid, start=1, end=99999,print_step=False,tol_lim=1e-10, maxIter=100):
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     if TS_len < end:
@@ -307,7 +357,7 @@ def TS_ACDC_PF(grid, start=1, end=99999,print_step=False):
     Time_series_line_res = []
     Time_series_conv_res = []
     Time_series_grid_loading = []
-  
+    analyse_grid(grid)
     # saving droop configuration to reset each time, if not it takes power set from previous point.
     grid.Pconv_save = np.zeros(grid.nconv)
     for conv in grid.Converters_ACDC:
@@ -318,30 +368,41 @@ def TS_ACDC_PF(grid, start=1, end=99999,print_step=False):
   
         for ts in grid.Time_series:
             update_grid_data(grid, ts, idx)
+        if grid.ACmode and grid.DCmode:    
+            for conv in grid.Converters_ACDC:         
+                if conv.type in ['Droop', 'P']:
+                    conv.P_DC = grid.Pconv_save[conv.ConvNumber] #This resets the converters droop target
             
-        for conv in grid.Converters_ACDC:         
-            if conv.type in ['Droop', 'P']:
-                 conv.P_DC = grid.Pconv_save[conv.ConvNumber] #This resets the converters droop target
-        
-        ACDC_sequential(grid,QLimit=False)
-        
+            ACDC_sequential(grid,QLimit=False)
+        elif grid.ACmode:
+            t,tol=AC_PowerFlow(grid,tol_lim, maxIter)
+        elif grid.DCmode:
+            t,tol=DC_PowerFlow(grid,tol_lim, maxIter)
+
         with ThreadPoolExecutor() as executor:
             # Submit the functions to the executor
             future_row_data = executor.submit(update_ac_nodes, grid, idx)
-            future_conv_data = executor.submit(update_converters, grid, idx)
             future_line_data = executor.submit(calculate_line_loading, grid, idx)
-    
+            if grid.ACmode and grid.DCmode:
+                future_conv_data = executor.submit(update_converters, grid, idx)
+                conv_data = future_conv_data.result()
+            else:
+                conv_data = None
             # Wait for the results
             row_data = future_row_data.result()
-            conv_data = future_conv_data.result()
             line_data, loadS_AC, loadP_DC = future_line_data.result()
             
         grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC,idx)
-   
+        row_data['time'] = idx+1
         Time_series_res.append(row_data)
-        Time_series_conv_res.append(conv_data)
+        if conv_data is not None:
+            conv_data['time'] = idx+1
+            Time_series_conv_res.append(conv_data)
+        line_data['time'] = idx+1
         Time_series_line_res.append(line_data)
+        grid_data_loading['time'] = idx+1
         Time_series_grid_loading.append(grid_data_loading)
+        
     
         if print_step:
             print(idx+1)
@@ -363,8 +424,8 @@ def TS_ACDC_PF(grid, start=1, end=99999,print_step=False):
     grid.time_series_results['ac_line_loading'] = ac_line_res
     grid.time_series_results['dc_line_loading'] = dc_line_res
     
-    
-    grid.time_series_results['converter_loading'] = to_dataframe(Time_series_conv_res)
+    if grid.ACmode and grid.DCmode:
+        grid.time_series_results['converter_loading'] = to_dataframe(Time_series_conv_res)
     grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
  
     grid.Time_series_ran = True
@@ -573,7 +634,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     model = pyo.ConcreteModel()
     model.name="TS AC/DC hybrid OPF"
     
-    analyse_OPF(grid)
+    analyse_grid(grid)
        
     t1 = time.perf_counter()
     OPF_create_NLModel_ACDC(model,grid,PV_set,price_zone_restrictions)
@@ -610,9 +671,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         total_solve_time += t_modelsolve
       
         count += 1
-        
-        [opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] = OPF_conv_results(model,grid)
-        
+        [opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] = OPF_step_results(model,grid)
+                 
         
         opt_res_curtailment['time'] = idx+1
         opt_res_P_conv_AC['time'] = idx+1

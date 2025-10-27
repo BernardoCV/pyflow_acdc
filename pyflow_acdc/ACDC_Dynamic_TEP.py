@@ -6,9 +6,10 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,analyse_OPF,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
 from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
 from .ACDC_Static_TEP import get_TEP_variables,initialize_links,create_scenarios
+from .Class_editor import analyse_grid
 from .Time_series import _modify_parameters
 from .Graph_and_plot import save_network_svg, create_geometries
 
@@ -144,7 +145,7 @@ def MP_TEP_variables(model,grid):
 
 def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True):
 
-    analyse_OPF(grid)
+    analyse_grid(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
 
     grid.TEP_n_years = n_years
@@ -416,7 +417,7 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
     - Level 2: Time frames/scenarios for each investment period
     """
     # 1. Initial analysis and setup
-    analyse_OPF(grid)
+    analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid, ObjRule, True)
 

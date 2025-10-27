@@ -66,6 +66,9 @@ __all__ = [
     'cart2pol',
     'pol2cartz',
     'cartz2pol',
+
+    # Analysis
+    'analyse_grid',
 ]
 
 def pol2cart(r, theta):
@@ -288,7 +291,7 @@ def change_line_AC_to_expandable(grid, line_name,update_grid=True):
         grid.create_Ybus_AC()
     return expandable_line    
 
-def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
+def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,update_grid=True):
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -317,7 +320,8 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
         }
         rec_line = rec_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
         grid.lines_AC_rec.append(rec_line)
-        grid.Update_Graph_AC()
+        if update_grid:
+            grid.Update_Graph_AC()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
@@ -325,7 +329,8 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
     
     for i, line in enumerate(grid.lines_AC_rec):
         line.lineNumber = i 
-    grid.create_Ybus_AC()    
+    if update_grid:
+        grid.create_Ybus_AC()    
     return rec_line  
 
 def change_line_AC_to_tap_transformer(grid, line_name):
@@ -540,13 +545,18 @@ def add_generators(Grid,Gen_csv):
         Gen_data = Gen_csv
     else:
         Gen_data = pd.read_csv(Gen_csv)
-   
-    Gen_data = Gen_data.set_index('Gen')
+    if 'Gen' in Gen_data.columns:
+        Gen_data = Gen_data.set_index('Gen')
     
     
     for index, row in Gen_data.iterrows():
         var_name = Gen_data.at[index, 'Gen_name'] if 'Gen_name' in Gen_data.columns else index
-        node_name = str(Gen_data.at[index, 'Node'])
+        if 'Node' in Gen_data.columns:
+            node_name = str(Gen_data.at[index, 'Node'])
+        elif 'node' in Gen_data.columns:
+            node_name = str(Gen_data.at[index, 'node'])
+        else:
+            raise ValueError(f"No 'Node' or 'node' column found in Gen_data for index {index}")
         
         MWmax = Gen_data.at[index, 'MWmax'] if 'MWmax' in Gen_data.columns else None
         MWmin = Gen_data.at[index, 'MWmin'] if 'MWmin' in Gen_data.columns else 0
@@ -1222,6 +1232,19 @@ def expand_cable_database(data, format='yaml', save_yalm=False):
 
 
 
+def analyse_grid(grid):
+    
+    # Perform the analysis and store directly on grid
+    grid.ACmode = grid.nn_AC != 0       #AC nodes present
+    grid.DCmode = grid.nn_DC != 0       #DC nodes present
+    grid.TEP_AC = grid.nle_AC != 0 #AC expansion lines present
+    grid.REC_AC = grid.nlr_AC != 0 #AC reconductoring lines present
+    grid.TAP_tf = grid.nttf != 0    #AC transformer lines present
+    grid.CT_AC  = grid.nct_AC!= 0 #AC conductor size selection lines present
+    grid.CFC = grid.ncfc_DC != 0 #DC variable voltage converter lines present
+    grid.CDC = grid.ncdc_DC != 0 #DC-DC converter lines present
+    grid.GPR = any(gen.np_gen_opf for gen in grid.Generators)
 
+    return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
     
 

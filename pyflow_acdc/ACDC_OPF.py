@@ -18,7 +18,7 @@ import re
 
 from  .ACDC_OPF_NL_model import *
 from  .AC_OPF_L_model import *
-
+from .Class_editor import analyse_grid
 import cProfile
 import pstats
 from io import StringIO
@@ -43,7 +43,7 @@ __all__ = [
     'OPF_obj',
     'OPF_line_res',
     'OPF_price_priceZone',
-    'OPF_conv_results',
+    'OPF_step_results',
     'fx_conv',
     'export_solver_progress_to_excel',
     'reset_to_initialize'
@@ -87,7 +87,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False):
-    analyse_OPF(grid)
+    analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
     
@@ -163,7 +163,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     return model, model_res , timing_info, solver_stats
 
 def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False,callback=False):
-    analyse_OPF(grid)
+    analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
         
@@ -295,7 +295,7 @@ def obtain_results_TSOPF(model,grid,current_range,idx,Price_Zones) :
         # print(t+1)
         
         (opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,
-         opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv) = OPF_conv_results(model.submodel[t], grid)
+         opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv) = OPF_step_results(model.submodel[t], grid)
         
         opt_res_Loading_lines,opt_res_Loading_grid=OPF_line_res (model.submodel[t],grid)
         
@@ -1233,7 +1233,7 @@ def OPF_price_priceZone (model,grid):
     
     return opt_res_Loading_pz
  
-def OPF_conv_results(model,grid):
+def OPF_step_results(model,grid):
     opt_res_P_conv_DC = {}
     opt_res_P_conv_AC = {}
     opt_res_Q_conv_AC = {}
@@ -1243,26 +1243,27 @@ def OPF_conv_results(model,grid):
     opt_res_Q_extGrid  = {}
     opt_res_curtailment ={}
    
-    P_conv_DC_conv_values= {k: np.float64(pyo.value(v)) for k, v in model.P_conv_DC.items()}
-    P_conv_s_AC_values   = {k: np.float64(pyo.value(v)) for k, v in model.P_conv_s_AC.items()}
-    Q_conv_s_AC_values   = {k: np.float64(pyo.value(v)) for k, v in model.Q_conv_s_AC.items()}
-    
-    def process_converter(conv):
-        nconv = conv.ConvNumber
-        name = conv.name   
-       
-        opt_res_P_conv_DC[name] = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] * conv.NumConvP
-        opt_res_P_conv_AC[name] = P_conv_s_AC_values[nconv] * conv.NumConvP
-        opt_res_Q_conv_AC[name] = Q_conv_s_AC_values[nconv] * conv.NumConvP
+    if grid.ACmode and grid.DCmode:
+        P_conv_DC_conv_values= {k: np.float64(pyo.value(v)) for k, v in model.P_conv_DC.items()}
+        P_conv_s_AC_values   = {k: np.float64(pyo.value(v)) for k, v in model.P_conv_s_AC.items()}
+        Q_conv_s_AC_values   = {k: np.float64(pyo.value(v)) for k, v in model.Q_conv_s_AC.items()}
+        
+        def process_converter(conv):
+            nconv = conv.ConvNumber
+            name = conv.name   
+           
+            opt_res_P_conv_DC[name] = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] * conv.NumConvP
+            opt_res_P_conv_AC[name] = P_conv_s_AC_values[nconv] * conv.NumConvP
+            opt_res_Q_conv_AC[name] = Q_conv_s_AC_values[nconv] * conv.NumConvP
+                
             
-        
-        S_AC = np.sqrt(opt_res_P_conv_AC[name]**2 + opt_res_Q_conv_AC[name]**2)
-        P_DC = opt_res_P_conv_DC[name]
-        
-        opt_res_Loading_conv[name]=max(S_AC, np.abs(P_DC)) * grid.S_base / (conv.MVA_max*conv.NumConvP)
-       
-    with ThreadPoolExecutor() as executor:
-        executor.map(process_converter, grid.Converters_ACDC)
+            S_AC = np.sqrt(opt_res_P_conv_AC[name]**2 + opt_res_Q_conv_AC[name]**2)
+            P_DC = opt_res_P_conv_DC[name]
+            
+            opt_res_Loading_conv[name]=max(S_AC, np.abs(P_DC)) * grid.S_base / (conv.MVA_max*conv.NumConvP)
+    
+        with ThreadPoolExecutor() as executor:
+            executor.map(process_converter, grid.Converters_ACDC)
     
     Pload_values = {k: np.float64(pyo.value(v)) for k, v in model.P_known_AC.items()}
     PGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen.items()}

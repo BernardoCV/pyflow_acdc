@@ -6,6 +6,7 @@ Provides functions for AC and AC/DC power flow analysis.
 import numpy as np
 import sys
 import time
+from .Class_editor import analyse_grid
 
 __all__ = [
     'AC_PowerFlow',
@@ -41,17 +42,12 @@ def cartz2pol(z):
     return r, theta
 
 def Power_flow(grid,tol_lim=1e-10, maxIter=100):
-    ACmode = False
-    if grid.nn_AC!=0:
-        ACmode = True
-    DCmode = False
-    if grid.nn_DC!=0:
-        DCmode = True   
-    if ACmode and DCmode:
+    analyse_grid(grid)
+    if grid.ACmode and grid.DCmode:
         t,tol,_=ACDC_sequential(grid,tol_lim, maxIter)
-    elif ACmode:
+    elif grid.ACmode:
         t,tol=AC_PowerFlow(grid,tol_lim, maxIter)
-    elif DCmode:
+    elif grid.DCmode:
         t,tol=DC_PowerFlow(grid,tol_lim, maxIter)
     return t,tol
 

@@ -14,8 +14,8 @@ from .Graph_and_plot import save_network_svg
 
 __all__ = ['Optimal_L_CSS_gurobi']
 
-from .ACDC_OPF import analyse_OPF, obj_w_rule, calculate_objective
-
+from .ACDC_OPF import  obj_w_rule, calculate_objective
+from .Class_editor import analyse_grid
 
 def print_gurobi_model(model, gen_vars=None, ac_vars=None, detailed=True):
     """
@@ -189,7 +189,7 @@ def debug_infeasibility(model, gen_vars=None, ac_vars=None):
 def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02,tee=False,time_limit=300):
     """Main function to create and solve Gurobi model"""
     
-    analyse_OPF(grid)
+    analyse_grid(grid)
     if not grid.CT_AC:
         raise ValueError("No conductor size selection connections found in the grid")
     

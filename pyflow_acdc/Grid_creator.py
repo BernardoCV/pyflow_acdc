@@ -246,7 +246,12 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             shift        = AC_line_data.at[index, 'shift']        if 'shift'        in AC_line_data.columns else 0
 
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
-            isTF = True if  'transformer_id' in AC_line_data.columns else False
+            if 'is_transformer' in AC_line_data.columns:
+                isTF = AC_line_data.at[index, 'is_transformer'] == 1
+            elif 'transformer_id' in AC_line_data.columns:
+                isTF = True
+            else:
+                isTF = False 
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
                                          Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
             if geometry is not None:
@@ -280,7 +285,12 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             shift        = AC_line_data.at[index, 'shift']        if 'shift'        in AC_line_data.columns else 0
 
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
-            isTF = True if  'transformer_id' in AC_line_data.columns else False
+            if 'is_transformer' in AC_line_data.columns:
+                isTF = AC_line_data.at[index, 'is_transformer'] == 1
+            elif 'transformer_id' in AC_line_data.columns:
+                isTF = True
+            else:
+                isTF = False
             
             if A_rating is not None:
                 N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
@@ -297,6 +307,9 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
                                          Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name))
+            
+            
+            
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -328,11 +341,17 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
             m    = AC_line_data.at[index, 'm']             if 'm'            in AC_line_data.columns else 1
             shift= AC_line_data.at[index, 'shift']         if 'shift'        in AC_line_data.columns else 0
-                
+           
+            if 'is_transformer' in AC_line_data.columns:
+                isTF = AC_line_data.at[index, 'is_transformer'] == 1
+            elif 'transformer_id' in AC_line_data.columns:
+                isTF = True
+            else:
+                isTF = False    
             [Resistance, Reactance, Conductance, Susceptance, MVA_rating] = Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables=N_cables)
             
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
-            isTF = True if  'transformer_id' in AC_line_data.columns else False
+           
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
                                          Reactance, Conductance, Susceptance, MVA_rating, km,m,shift,name=str(var_name),S_base=S_base)
             if geometry is not None:

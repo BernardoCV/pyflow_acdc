@@ -992,6 +992,8 @@ class Gen_AC:
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
         self.Node_AC=node.name
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
         self.geometry= node.geometry
         self.kV_base = node.kV_base
         self.PZ = node.PZ
@@ -1003,6 +1005,10 @@ class Gen_AC:
         self.Min_pow_genR=Min_pow_genR
         
         self.Max_S= S_rated
+        if S_rated is not None:
+            node.S_rating += S_rated
+        else:
+            node.S_rating += np.sqrt(Max_pow_gen**2 + max(abs(Min_pow_genR),abs(Max_pow_genR))**2)
         
         self.np_gen_i = 1
         self.np_gen_b = 1
@@ -1074,6 +1080,8 @@ class Gen_DC:
         self.genNumber_DC = Gen_DC.genNumber_DC
         Gen_DC.genNumber_DC += 1
         self.Node_DC=node.name
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
         self.geometry= node.geometry
         self.kV_base = node.kV_base
         self.PZ = node.PZ
@@ -1144,6 +1152,10 @@ class Ren_Source:
        
         
         self.Node=node.name
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
+
+        node.S_rating += PGi_ren_base
         
         self.geometry= node.geometry
         self.kV_base = node.kV_base
@@ -1295,7 +1307,7 @@ class Node_AC:
         self.RenSource=False
         # self.PGRi_linked=False
         # self.Ren_source_zone=None
-        
+        self.S_rating = 0
         
         self.PLi= Power_load
 
@@ -1466,6 +1478,7 @@ class Node_DC:
         self._PLi_factor =1  # 0-1 value used for time series or scenario management
         self._PLi_inv_factor=1 # value used for investment period load increase
         
+        self.S_rating = 0
         self.TS_dict = {
             'Load' : None,
             'price': None,

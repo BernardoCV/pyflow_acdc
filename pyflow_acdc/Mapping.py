@@ -2,15 +2,111 @@ import networkx as nx
 import numpy as np
 import os
 from importlib import resources
+import colorsys
 
 import geopandas as gpd
 import folium
 import branca
 from folium.plugins import Draw,MarkerCluster,AntPath
 import webbrowser
-
+from shapely.geometry import Point, LineString
 from .Graph_and_plot import update_hovertexts, create_subgraph_color_dict
 from .Classes import Node_AC
+
+def darken_color(color, factor=0.6):
+    """
+    Darken a CSS color by reducing its brightness.
+    
+    Args:
+        color: CSS color name (e.g., 'royalblue', 'black') or hex string
+        factor: How much to darken (0.0 to 1.0). Lower = darker. Default 0.6.
+    
+    Returns:
+        Hex color string (e.g., '#4a5a7f')
+    """
+    # Dictionary of common CSS color names to RGB
+    css_colors = {
+        'black': (0, 0, 0),
+        'white': (1, 1, 1),
+        'red': (1, 0, 0),
+        'green': (0, 0.5, 0),
+        'blue': (0, 0, 1),
+        'yellow': (1, 1, 0),
+        'cyan': (0, 1, 1),
+        'magenta': (1, 0, 1),
+        'orange': (1, 0.647, 0),
+        'purple': (0.5, 0, 0.5),
+        'brown': (0.647, 0.165, 0.165),
+        'pink': (1, 0.753, 0.796),
+        'gray': (0.5, 0.5, 0.5),
+        'grey': (0.5, 0.5, 0.5),
+        'darkblue': (0, 0, 0.545),
+        'royalblue': (0.255, 0.412, 0.882),
+        'teal': (0, 0.5, 0.5),
+        'violet': (0.933, 0.510, 0.933),
+        'indigo': (0.294, 0, 0.510),
+        'turquoise': (0.251, 0.878, 0.816),
+        'beige': (0.961, 0.961, 0.863),
+        'coral': (1, 0.498, 0.314),
+        'salmon': (0.980, 0.502, 0.447),
+        'olive': (0.502, 0.502, 0),
+        'lime': (0, 1, 0),
+        'navy': (0, 0, 0.5),
+        'limegreen': (0.196, 0.804, 0.196),
+        'burlywood': (0.871, 0.722, 0.529),
+        'darkviolet': (0.580, 0, 0.827),
+        'hotpink': (1, 0.412, 0.706),
+        'lightseagreen': (0.125, 0.698, 0.667),
+        'darkmagenta': (0.545, 0, 0.545),
+        'darkolivegreen': (0.333, 0.420, 0.184),
+        'darkgoldenrod': (0.722, 0.525, 0.043),
+        'crimson': (0.863, 0.078, 0.235),
+        'darkcyan': (0, 0.545, 0.545),
+        'orchid': (0.855, 0.439, 0.839),
+        'lightgreen': (0.565, 0.933, 0.565),
+        'navajowhite': (1, 0.871, 0.678),
+        'tan': (0.824, 0.706, 0.549),
+        'lightpink': (1, 0.714, 0.757),
+        'paleturquoise': (0.686, 0.933, 0.933),
+        'darkorange': (1, 0.549, 0)
+    }
+    
+    # Get RGB value
+    rgb = css_colors.get(color.lower(), (0.5, 0.5, 0.5))  # Default to gray if not found
+    
+    # Convert RGB to HSV (Hue, Saturation, Value)
+    hsv = colorsys.rgb_to_hsv(rgb[0], rgb[1], rgb[2])
+    
+    # Reduce the Value (brightness) component
+    new_v = max(0.0, hsv[2] * factor)  # Ensure we don't go negative
+    
+    # Convert back to RGB
+    new_rgb = colorsys.hsv_to_rgb(hsv[0], hsv[1], new_v)
+    
+    # Convert to hex
+    hex_color = '#{:02x}{:02x}{:02x}'.format(
+        int(new_rgb[0] * 255),
+        int(new_rgb[1] * 255),
+        int(new_rgb[2] * 255)
+    )
+    
+    return hex_color
+
+def create_geometries(grid):
+    for node in grid.nodes_AC+grid.nodes_DC:
+        if node.x_coord is not None and node.y_coord is not None and node.geometry is None:
+            node.geometry = Point(node.x_coord, node.y_coord)
+    for line in grid.lines_AC+grid.lines_DC +grid.lines_AC_tf+grid.lines_AC_rec+grid.lines_AC_ct+grid.lines_AC_exp:
+        if line.fromNode.x_coord is not None and line.fromNode.y_coord is not None and line.toNode.x_coord is not None and line.toNode.y_coord is not None and line.geometry is None:
+            line.geometry = LineString([(line.fromNode.x_coord, line.fromNode.y_coord),
+                                        (line.toNode.x_coord, line.toNode.y_coord)])
+    for conv in grid.Converters_ACDC:
+        if conv.Node_AC.x_coord is not None and conv.Node_AC.y_coord is not None and conv.Node_DC.x_coord is not None and conv.Node_DC.y_coord is not None and conv.geometry is None:
+            conv.geometry = LineString([(conv.Node_AC.x_coord, conv.Node_AC.y_coord),
+                                        (conv.Node_DC.x_coord, conv.Node_DC.y_coord)])
+    for gen in grid.Generators+grid.Generators_DC+grid.RenSources:
+        if gen.x_coord is not None and gen.y_coord is not None and gen.geometry is None:
+            gen.geometry = Point(gen.x_coord, gen.y_coord)
 
 def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None,show=True):
     # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter" 
@@ -18,7 +114,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
         name = grid.name
     update_hovertexts(grid, text) 
 
-    
+    create_geometries(grid)
     
     G = grid.Graph_toPlot  # Assuming this is your main graph object
     subgraph_colors= create_subgraph_color_dict(G)
@@ -57,6 +153,12 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 vmin=min_loss, 
                 vmax=max_loss
                 )
+        elif coloring == 'loading':
+            colormap = branca.colormap.LinearColormap(
+                colors=["green", "yellow", "red"],
+                vmin=0, 
+                vmax=100
+                )
         elif coloring == 'Efficiency':
            colormap = branca.colormap.LinearColormap(
                colors=["red", "yellow","green"],
@@ -93,6 +195,27 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
             if coloring == 'loss':
                 color = colormap(np.real(line_obj.loss))
                 # print(f'{np.real(line.loss)} - {color}')
+            elif coloring == 'loading':
+                S_base= line_obj.S_base
+                if line_type in {'AC','rec_AC','exp_AC'}:
+                    Sfrom = abs(line.fromS)*S_base
+                    Sto   = abs(line.toS)*S_base
+                    if line_type== 'AC':
+                        load=max(Sfrom, Sto)/line_obj.MVA_rating*100
+                    elif line_type == 'rec_AC':
+                        if line_obj.rec_branch:
+                            load = max(Sfrom, Sto)/(line_obj.MVA_rating_new)*100
+                        else:
+                            load = max(Sfrom, Sto)/(line_obj.MVA_rating)*100
+                    elif line_type == 'exp_AC':
+                        load = max(Sfrom, Sto)/(line_obj.MVA_rating*line_obj.np_line)*100
+                elif line_type == 'DC':
+                    p_to = line.toP*S_base/line.np_line
+                    p_from = line.fromP*S_base/line.np_line
+                    load = max(p_to, p_from)/line.MW_rating*100
+                else:
+                    load = 50
+                color = colormap(np.real(load))
             elif coloring == 'Efficiency':
                 loss =np.real(line_obj.loss)
                 if line_type== 'DC':
@@ -126,10 +249,11 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                     thck= 0
             else:
                 color=('black' if getattr(line_obj, 'isTf', False)  # Defaults to False if 'isTF' does not exist/
-                        else subgraph_colors[VL].get(subgraph_idx, "black") if line_type == 'AC' 
+                        else subgraph_colors[VL].get(subgraph_idx, "black") if line_type == 'AC' or line_type == 'rec_AC' 
                         else 'darkblue' if line_type_indv == 'MTDC' 
                         else 'royalblue')
-           
+            if line_type == 'rec_AC' and line_obj.rec_branch:
+                color = darken_color(color, factor=0.6) 
             if geometry and not geometry.is_empty:
                 line_data.append({
                     "geometry": geometry,
@@ -157,10 +281,14 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     # Create GeoDataFrames for AC and HVDC lines
     gdf_lines_AC = extract_line_data(grid.lines_AC+grid.lines_AC_tf, "AC")
     if grid.lines_AC_exp != []:
-        gdf_lines_AC_exp = extract_line_data(grid.lines_AC_exp, "AC")
+        gdf_lines_AC_exp = extract_line_data(grid.lines_AC_exp, "exp_AC")
     else:
         gdf_lines_AC_exp = gpd.GeoDataFrame(columns=["geometry", "type", "name", "VL", "tf", "hover_text", "color"])
 
+    if grid.lines_AC_rec != []:
+        gdf_lines_AC_rec = extract_line_data(grid.lines_AC_rec, "rec_AC")
+    else:
+        gdf_lines_AC_rec = gpd.GeoDataFrame(columns=["geometry", "type", "name", "VL", "tf", "hover_text", "color"])
     if grid.lines_AC_ct != []:
         gdf_lines_AC_ct = extract_line_data(grid.lines_AC_ct, "CSS")
     else:
@@ -340,7 +468,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
         map_center = [56, 10]
     
     # Initialize the map, centred around the nodes
-    if tiles.startswith('http'):
+    if tiles is not None and tiles.startswith('http'):
         # Custom tile layer with attribution
         m = folium.Map(location=map_center, zoom_start=5)
         folium.TileLayer(
@@ -379,8 +507,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 lat, lon = row['geometry'].y, row['geometry'].x
                 try:
                     # For Python 3.9+
-                    with resources.files('pyflow_acdc').joinpath('folium_images').joinpath(f'{typ}.png') as icon_path:
-                        icon_path = str(icon_path)
+                    icon_path = str(resources.files('pyflow_acdc').joinpath('folium_images').joinpath(f'{typ}.png'))
                 except Exception:
                     # Fallback for older Python versions
                     icon_path = os.path.join(os.path.dirname(__file__), 'folium_images', f'{typ}.png')
@@ -404,7 +531,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     transformers = folium.FeatureGroup(name="Transformers")
     ct_AC = folium.FeatureGroup(name="Conductor Size Selection")
     exp_lines = folium.FeatureGroup(name="Exp Lines")
-    
+    rec_lines = folium.FeatureGroup(name="Rec Lines")
     
     if ant_path == 'All' or ant_path == 'Reduced':
         ant = True
@@ -417,6 +544,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     add_lines(gdf_lines_AC_uhv, uhv_AC,ant)
     add_lines(gdf_lines_AC_ct, ct_AC,ant)
     add_lines(gdf_lines_AC_exp, exp_lines,ant)
+    add_lines(gdf_lines_AC_rec, rec_lines,ant)
     add_lines(gdf_lines_AC_tf, transformers,ant)
     add_lines(gdf_lines_HVDC, hvdc,ant)
     add_lines(gdf_conv, convs, ant)
@@ -445,6 +573,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
     transformers.add_to(m) if len(transformers._children) > 0 else None
     ct_AC.add_to(m) if len(ct_AC._children) > 0 else None
     exp_lines.add_to(m)    if len(exp_lines._children) > 0 else None
+    rec_lines.add_to(m) if len(rec_lines._children) > 0 else None
         
     # Split gdf_gens by type and add markers for each type
     for gen_type, subset in gdf_gens.groupby('type'):  # Split by 'type'
