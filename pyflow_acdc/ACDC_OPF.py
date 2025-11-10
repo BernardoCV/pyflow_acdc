@@ -162,7 +162,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='ipopt',tee=False,callback=False):
+def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False):
     analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -176,7 +176,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,sol
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones)
+    OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,limit_flow_rate=limit_flow_rate)
     # pr.disable()
     
     # s = StringIO()
@@ -794,7 +794,10 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         AC= 0
         DC= 0
         if grid.ACmode:
-            AC= sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+            if grid.act_gen:
+                AC= sum((((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc)*model.gen_active[gen.genNumber]) for gen in grid.Generators)
+            else:
+                AC= sum(((model.PGi_gen[gen.genNumber]*grid.S_base)**2*gen.qf+model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
         if grid.DCmode:
             DC= sum(((model.PGi_gen_DC[gen.genNumber_DC]*grid.S_base)**2*gen.qf+model.PGi_gen_DC[gen.genNumber_DC]*grid.S_base*model.lf_dc[gen.genNumber_DC]+model.np_gen_DC[gen.genNumber_DC]*gen.fc) for gen in grid.Generators_DC)
         
@@ -1271,7 +1274,10 @@ def OPF_step_results(model,grid):
     gamma_values = {k: np.float64(pyo.value(v)) for k, v in model.gamma.items()}
     Pren_values  = {k: np.float64(pyo.value(v)) for k, v in model.P_renSource.items()}
     Qren_values  = {k: np.float64(pyo.value(v)) for k, v in model.Q_renSource.items()}
-    
+    if grid.act_gen:
+        gen_active_values = {k: np.float64(pyo.value(v)) for k, v in model.gen_active.items()}
+    else:
+        gen_active_values = {k: 1 for k in model.gen_AC.keys()}
     def process_load(node):
         nAC= node.nodeNumber
         name = node.name
@@ -1285,8 +1291,8 @@ def OPF_step_results(model,grid):
     def process_element(element):
         if hasattr(element, 'genNumber'):  # Generator
             name = element.name
-            opt_res_P_extGrid [name] = PGen_values[element.genNumber]
-            opt_res_Q_extGrid [name] = QGen_values[element.genNumber]
+            opt_res_P_extGrid [name] = PGen_values[element.genNumber]*gen_active_values[element.genNumber]
+            opt_res_Q_extGrid [name] = QGen_values[element.genNumber]*gen_active_values[element.genNumber]
 
         elif hasattr(element, 'rsNumber'):  # Renewable Source
             name = element.name

@@ -985,12 +985,56 @@ class Gen_AC:
         return self._name
 
     @property
+    def S_base(self):
+        return self._S_base
+    
+    @property
     def life_time_hours(self):
         return self.life_time *8760
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        
+        old_S_base = getattr(self, "_S_base", None)
+        if old_S_base is not None and old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.Max_pow_gen *= rate
+                self.Max_pow_genR *= rate
+                self.Min_pow_gen *= rate
+                self.Min_pow_genR *= rate
+                self.PGen *= rate
+                self.QGen *= rate
+                self.Pset *= rate
+                self.Qset *= rate
+                self.Max_S *= rate
+        self._S_base = new_S_base
     
-    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other',installation_cost:float=0):
+    @property
+    def capacity_MVA(self):
+        maxMVAR = max(abs(self.Max_pow_genR),abs(self.Min_pow_genR))
+        if self.Max_S is not None:
+            return self.Max_S *self.S_base
+        elif self.Max_pow_gen >0:
+            return (self.Max_pow_gen**2+maxMVAR**2)**0.5*self.S_base
+        else:
+            return maxMVAR*self.S_base
+    
+    @property
+    def loading(self):
+        return self.apparent_MVA/(self.capacity_MVA*self.np_gen)*100 if self.np_gen >0 else 0
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.PGen), abs(self.QGen)) * self.S_base
+
+
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other',installation_cost:float=0,S_base:float=100):
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
+        self.S_base = S_base
+        self.S_base_i = S_base
+        
         self.Node_AC=node.name
         self.x_coord = node.x_coord
         self.y_coord = node.y_coord
@@ -1003,12 +1047,10 @@ class Gen_AC:
         self.Min_pow_gen=Min_pow_gen
         self.Max_pow_genR=Max_pow_genR
         self.Min_pow_genR=Min_pow_genR
-        
+
         self.Max_S= S_rated
-        if S_rated is not None:
-            node.S_rating += S_rated
-        else:
-            node.S_rating += np.sqrt(Max_pow_gen**2 + max(abs(Min_pow_genR),abs(Max_pow_genR))**2)
+        
+        node.S_rating += self.capacity_MVA
         
         self.np_gen_i = 1
         self.np_gen_b = 1
@@ -1016,6 +1058,9 @@ class Gen_AC:
         self.np_gen_max=3
         self.np_gen_opf = False
         self.np_gen_dynamic = [self.np_gen]
+
+        self.activate_gen_opf = False
+        self.gen_active = 1 
 
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
@@ -1073,12 +1118,41 @@ class Gen_DC:
         return self._name
 
     @property
+    def S_base(self):
+        return self._S_base
+    
+    @property
     def life_time_hours(self):
         return self.life_time *8760
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        
+        old_S_base = getattr(self, "_S_base", None)
+        if old_S_base is not None and old_S_base != new_S_base:  
+                rate = old_S_base / new_S_base
+                self.Max_pow_gen *= rate
+                self.PGen *= rate
+                self.Pset *= rate
+        self._S_base = new_S_base
+    @property
+    def capacity_MW(self):
+        return self.Max_pow_gen*self.S_base
     
-    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type='Other',installation_cost:float=0):
+    @property
+    def loading(self):
+        return self.PGen/(self.capacity_MW*self.np_gen)*100 if self.np_gen >0 else 0
+   
+
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type='Other',installation_cost:float=0,S_base:float=100):
         self.genNumber_DC = Gen_DC.genNumber_DC
         Gen_DC.genNumber_DC += 1
+
+        self.S_base = S_base
+        self.S_base_i = S_base
+
         self.Node_DC=node.name
         self.x_coord = node.x_coord
         self.y_coord = node.y_coord
@@ -1140,8 +1214,41 @@ class Ren_Source:
     def name(self):
         return self._name
 
+    @property
+    def S_base(self):
+        return self._S_base
     
-    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind'):
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        old_S_base = getattr(self, "_S_base", None)
+        if old_S_base is not None and old_S_base != new_S_base:  
+            rate = old_S_base / new_S_base
+            self.Max_S *= rate
+            self.PGi_ren_base *= rate
+            self.QGi_ren *= rate
+            self.Qmin *= rate
+            self.Qmax *= rate
+        self._S_base = new_S_base
+    
+    @property
+    def capacity_MVA(self):
+       
+        return self.PGi_ren_base*self.S_base
+    
+    @property
+    def loading(self):
+        return self.apparent_MVA/self.capacity_MVA*100
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.PGen), abs(self.QGen)) * self.S_base
+    
+    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100):
         self.rsNumber = Ren_Source.rsNumber
         Ren_Source.rsNumber += 1
         
@@ -1150,6 +1257,9 @@ class Ren_Source:
         
         self.curtailable= True
        
+        self.life_time = 30
+        self.S_base = S_base
+        self.S_base_i = S_base
         
         self.Node=node.name
         self.x_coord = node.x_coord
@@ -1187,7 +1297,7 @@ class Ren_Source:
         self.Qmax=0
         self.Qmin=0
         
-        self.Max_S= PGi_ren_base
+        self.Max_S= PGi_ren_base*1.05
             
         node.connected_RenSource.append(self)
         node.RenSource=True
@@ -1640,7 +1750,19 @@ class Line_AC:
     @property
     def name(self):
         return self._name
-        
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.fromS), abs(self.toS)) * self.S_base
+
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating
+
+    @property
+    def loading(self):
+        cap = self.capacity_MVA
+        return 0.0 if cap == 0 else (self.apparent_MVA / cap) * 100.0 
+
     def remove(self):
         """Method to handle line removal from the class-level attributes."""
         Line_AC.lineNumber -= 1  # Decrement the line number counter
@@ -1690,6 +1812,8 @@ class Line_AC:
         self.shift = shift
         self.tap= self.m * np.exp(1j*self.shift)  
         
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
         # Set Cable_type
         self._Cable_type = Cable_type
         
@@ -1742,7 +1866,8 @@ class Line_AC:
             rate = old_S_base / new_S_base
             if self.Ybus_branch is not None and old_S_base != new_S_base:
                 self.Ybus_branch /= rate
-        self._S_base = new_S_base        
+        self._S_base = new_S_base
+
     @property
     def Cable_type(self):
         return self._Cable_type
@@ -1780,7 +1905,10 @@ class Line_AC:
         self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
         
 class Exp_Line_AC(Line_AC):
-    
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating * self.np_line
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
@@ -1801,12 +1929,18 @@ class Exp_Line_AC(Line_AC):
 
         self.np_line_opf=True
         self.hover_text = None
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
         
         self.toNode.connected_toExpLine.append(self)
         self.fromNode.connected_fromExpLine.append(self)
 
 class rec_Line_AC(Line_AC):
     
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating_new if getattr(self, 'rec_branch', False) else self.MVA_rating
 
     def __init__(self,r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1827,7 +1961,10 @@ class rec_Line_AC(Line_AC):
         self.G_new = g_new
         self.B_new = b_new
         self.MVA_rating_new = MVA_rating_new
-        
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         # Calculate new Ybus_branch
         self._calculate_Ybus_branch_new()
 
@@ -1886,7 +2023,10 @@ class Size_selection(Line_AC):
     def life_time_hours(self):
         return self.life_time *8760
     
-
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating_list[self._active_config]
+    
     @cable_types.setter
     def cable_types(self, value):
         """Set cable types and recalculate parameters if the list changes."""
@@ -1930,6 +2070,9 @@ class Size_selection(Line_AC):
         self.Ybus_list = []
 
         self.life_time = 25
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
 
         self.geometry = geometry
         self.fromS = 0
@@ -2223,7 +2366,10 @@ class TF_Line_AC:
         self.Y = self.G + self.B * 1j
         self.kV_base = kV_base
         self.MVA_rating = MVA_rating
-        
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         self.m =m
         self.shift = shift
         
@@ -2285,6 +2431,7 @@ class Line_DC:
     lineNumber = 0
     names = set()
     _cable_database = None
+
     
     @classmethod
     def load_cable_database(cls):
@@ -2327,6 +2474,18 @@ class Line_DC:
     @property
     def name(self):
         return self._name
+    @property
+    def power_MW(self):
+        return max(abs(self.fromP), abs(self.toP)) * self.S_base
+
+    @property
+    def capacity_MW(self):
+        return self.MW_rating * self.np_line
+
+    @property
+    def loading(self):
+        cap = self.capacity_MW
+        return 0.0 if cap == 0 else (self.power_MW / cap) * 100.0
 
     def get_cable_parameters(self, Cable_type, S_base, Length_km, N_cables,kV_base):
         from .Class_editor import Cable_parameters
@@ -2391,6 +2550,9 @@ class Line_DC:
         self.direction = 'from'
  
         self.loss =0
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
         
         self.base_cost = 0
         self.life_time = 25
@@ -2536,13 +2698,91 @@ class AC_DC_converter:
         
     @property
     def life_time_hours(self):
-        return self.life_time *8760       
-            
-    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, name=None):
+        return self.life_time *8760  
+
+    @property
+    def capacity_MVA(self):
+        # Treat non-positive as 0; NumConvP may be 0 before sizing
+        return max(self.MVA_max * getattr(self, 'NumConvP', 1), 0.0)
+
+    @property
+    def loading(self):
+        cap = self.capacity_MVA
+        return 0.0 if cap == 0 else (self.apparent_MVA / cap) * 100.0
+
+    @property
+    def apparent_MVA(self):
+        return max(abs(getattr(self, 'P_AC', 0.0)), abs(getattr(self, 'P_DC', 0.0))) * self.S_base
+    
+    @property
+    def S_base(self):
+        return self._S_base
+    
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):  
+            old_S_base = self._S_base
+            rate = old_S_base / new_S_base
+            if self.R is not None and old_S_base != new_S_base:
+                self.R_t *= rate
+                self.X_t *= rate
+                self.PR_R *= rate
+                self.PR_X *= rate
+                self.Bf *= rate
+                self.P_DC *= rate
+                self.P_AC *= rate
+                self.Q_AC *= rate
+                self.Z_Y_parameters()
+    
+        self._S_base = new_S_base     
+
+    
+    def Z_Y_parameters(self):
+            self.Ztf = self.R_t+1j*self.X_t
+            self.Zc = self.PR_R+1j*self.PR_X
+            if self.Bf != 0:
+                self.Zf = 1/(1j*self.Bf)
+            else:
+                self.Zf = 0
+
+            if self.R_t != 0:
+                self.Y_tf = 1/self.Ztf
+                self.Gtf = np.real(self.Y_tf)
+                self.Btf = np.imag(self.Y_tf)
+            else:
+                self.Gtf = 0
+                self.Btf = 0
+
+            if self.PR_R != 0:
+                self.Y_c = 1/self.Zc
+                self.Gc = np.real(self.Y_c)
+                self.Bc = np.imag(self.Y_c)
+            else:
+                self.Gc = 0
+                self.Bc = 0
+                
+            self.Z1 = 0
+            self.Z2 = 0
+            self.Z3 = 0
+            if self.Zf != 0:
+                self.Z2 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zf
+            if self.Zc != 0:
+                self.Z1 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zc
+            if self.Ztf != 0:
+                self.Z3 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Ztf
+
+
+        
+
+    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, 
+            Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,
+            lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, S_base:float=100, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
         AC_DC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
-        
+        self.S_base = S_base
         self._NumConvP= nConvP
 
         self.NumConvP_b= nConvP
@@ -2579,7 +2819,8 @@ class AC_DC_converter:
         #     # print(name)mm
         #     self.type='PAC'
 
-        
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
 
 
         self.type = DC_type
@@ -2654,39 +2895,7 @@ class AC_DC_converter:
         self.Qc = 0
         self.Pc = 0
 
-        self.Ztf = self.R_t+1j*self.X_t
-        self.Zc = self.PR_R+1j*self.PR_X
-        if self.Bf != 0:
-            self.Zf = 1/(1j*self.Bf)
-        else:
-            self.Zf = 0
-
-        if self.R_t != 0:
-            self.Y_tf = 1/self.Ztf
-            self.Gtf = np.real(self.Y_tf)
-            self.Btf = np.imag(self.Y_tf)
-        else:
-            self.Gtf = 0
-            self.Btf = 0
-
-        if self.PR_R != 0:
-            self.Y_c = 1/self.Zc
-            self.Gc = np.real(self.Y_c)
-            self.Bc = np.imag(self.Y_c)
-        else:
-            self.Gc = 0
-            self.Bc = 0
-            
-        self.Z1 = 0
-        self.Z2 = 0
-        self.Z3 = 0
-        if self.Zf != 0:
-            self.Z2 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zf
-        if self.Zc != 0:
-            self.Z1 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zc
-        if self.Ztf != 0:
-            self.Z3 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Ztf
-
+        self.Z_Y_parameters()
 
         self.hover_text = None
         self.geometry = None
@@ -2725,7 +2934,9 @@ class DCDC_converter:
         # type: (1=P, 2=droop, 3=Slack)
         # self.type = element_type
 
-        
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         self.fromNode = fromNode
         self.toNode = toNode
         self.Pset = Pset

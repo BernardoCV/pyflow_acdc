@@ -153,7 +153,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
                 vmin=min_loss, 
                 vmax=max_loss
                 )
-        elif coloring == 'loading':
+        elif coloring in ['loading','ts_max_loading','ts_avg_loading']:
             colormap = branca.colormap.LinearColormap(
                 colors=["green", "yellow", "red"],
                 vmin=0, 
@@ -195,27 +195,18 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
             if coloring == 'loss':
                 color = colormap(np.real(line_obj.loss))
                 # print(f'{np.real(line.loss)} - {color}')
-            elif coloring == 'loading':
-                S_base= line_obj.S_base
-                if line_type in {'AC','rec_AC','exp_AC'}:
-                    Sfrom = abs(line.fromS)*S_base
-                    Sto   = abs(line.toS)*S_base
-                    if line_type== 'AC':
-                        load=max(Sfrom, Sto)/line_obj.MVA_rating*100
-                    elif line_type == 'rec_AC':
-                        if line_obj.rec_branch:
-                            load = max(Sfrom, Sto)/(line_obj.MVA_rating_new)*100
-                        else:
-                            load = max(Sfrom, Sto)/(line_obj.MVA_rating)*100
-                    elif line_type == 'exp_AC':
-                        load = max(Sfrom, Sto)/(line_obj.MVA_rating*line_obj.np_line)*100
-                elif line_type == 'DC':
-                    p_to = line.toP*S_base/line.np_line
-                    p_from = line.fromP*S_base/line.np_line
-                    load = max(p_to, p_from)/line.MW_rating*100
+            elif coloring in ['loading','ts_max_loading','ts_avg_loading']:
+                if coloring == 'ts_max_loading':
+                    load_show  = line_obj.ts_max_loading
+                elif coloring == 'ts_avg_loading':
+                    load_show  = line_obj.ts_avg_loading
                 else:
-                    load = 50
-                color = colormap(np.real(load))
+                    load_show  = line_obj.loading
+                if int(load_show) > 100:
+                    color = 'blue'
+                else:
+                    color = colormap(np.real(load_show))
+                    
             elif coloring == 'Efficiency':
                 loss =np.real(line_obj.loss)
                 if line_type== 'DC':
@@ -557,7 +548,7 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
 
     layer_names = [
     "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
-    "Solid Biomass", "Wind", "Other", "Solar", "Waste", "Biogas", "Geothermal"
+    "Solid Biomass", "Wind", "Other", "Solar", "Waste", "Biogas", "Geothermal","CCGT"
     ]
     # Dictionary to store FeatureGroups for each generation type
     layers = {name: folium.FeatureGroup(name=name, show=False) for name in layer_names}

@@ -69,6 +69,7 @@ __all__ = [
 
     # Analysis
     'analyse_grid',
+    'grid_state',
 ]
 
 def pol2cart(r, theta):
@@ -540,7 +541,7 @@ def add_offshore_price_zone(Grid,main_price_zone,name):
 
 "Components for optimal power flow"
 
-def add_generators(Grid,Gen_csv):
+def add_generators(Grid,Gen_csv,curtailmet_allowed=1):
     if isinstance(Gen_csv, pd.DataFrame):
         Gen_data = Gen_csv
     else:
@@ -560,8 +561,8 @@ def add_generators(Grid,Gen_csv):
         
         MWmax = Gen_data.at[index, 'MWmax'] if 'MWmax' in Gen_data.columns else None
         MWmin = Gen_data.at[index, 'MWmin'] if 'MWmin' in Gen_data.columns else 0
-        MVArmin = Gen_data.at[index, 'MVArmin'] if 'MVArmin' in Gen_data.columns else 0
-        MVArmax = Gen_data.at[index, 'MVArmax'] if 'MVArmax' in Gen_data.columns else 99999
+        MVArmin = Gen_data.at[index, 'MVARmin'] if 'MVARmin' in Gen_data.columns else None
+        MVArmax = Gen_data.at[index, 'MVARmax'] if 'MVARmax' in Gen_data.columns else None
         
         PsetMW = Gen_data.at[index, 'PsetMW']  if 'PsetMW'  in Gen_data.columns else 0
         QsetMVA= Gen_data.at[index, 'QsetMVA'] if 'QsetMVA' in Gen_data.columns else 0
@@ -569,12 +570,17 @@ def add_generators(Grid,Gen_csv):
         qf = Gen_data.at[index, 'Quadratic factor'] if 'Quadratic factor' in Gen_data.columns else 0
         fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
+        Ren_zone = Gen_data.at[index, 'Ren_zone'] if 'Ren_zone' in Gen_data.columns else None
         price_zone_link = False
         
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
         if fuel_type.lower() in ["wind", "solar"]:
-            add_RenSource(Grid,node_name, MWmax,ren_source_name=var_name ,geometry=geo,ren_type=fuel_type)
+            add_RenSource(Grid,node_name, MWmax,ren_source_name=var_name ,geometry=geo,ren_type=fuel_type,Qmin=MVArmin,Qmax=MVArmax,min_gamma=(1-curtailmet_allowed),zone=Ren_zone)
         else:
+            if MVArmax is None:
+                MVArmax = 9999
+            if MVArmin is None:
+                MVArmin = -9999
             add_gen(Grid, node_name,var_name, price_zone_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo)  
         
 def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=99999,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type='Other',geometry= None,installation_cost:float=0,np_gen:int=1):
@@ -596,14 +602,16 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,
     for node in Grid.nodes_AC:
    
         if node_name == node.name:
-             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,fc,Pset,Qset,Smax,installation_cost)
+             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,fc,Pset,Qset,Smax,installation_cost,S_base=Grid.S_base)
              node.PGi = 0
              node.QGi = 0
              if fuel_type not in [
              "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
-             "Solid Biomass",  "Other", "Waste", "Biogas", "Geothermal"
+             "Solid Biomass",  "Other", "Waste", "Biogas", "Geothermal","CCGT"
              ]:
                  fuel_type = 'Other'
+             elif fuel_type == 'Gas':
+                 fuel_type = 'Natural Gas'
              gen.gen_type = fuel_type
              gen.np_gen = np_gen
              if geometry is not None:
@@ -636,7 +644,7 @@ def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc
     for node in Grid.nodes_DC:
    
         if node_name == node.name:
-             gen = Gen_DC(gen_name, node,Max_pow_gen,Min_pow_gen,qf,lf,fc,Pset,installation_cost)
+             gen = Gen_DC(gen_name, node,Max_pow_gen,Min_pow_gen,qf,lf,fc,Pset,installation_cost,S_base=Grid.S_base)
              node.PGi = 0
              if fuel_type not in [
              "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
@@ -666,7 +674,7 @@ def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc
     return gen
 
 
-def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
+def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MWmax=None,MVArmin=None,MVArmax=None,Allow_sell=True):
     if isinstance(node, str):
         node_name = node
         # Search in AC nodes first, then DC nodes
@@ -675,14 +683,15 @@ def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
         if node is None:
             print(f'Node {node_name} does not exist')
             sys.exit()
-    
+    if MWmax is None:
+        MWmax=MVAmax
 
     if MVArmin is None:
         MVArmin=-MVAmax
     if MVArmax is None:
         MVArmax=MVAmax
     
-    Max_pow_gen=MVAmax/Grid.S_base
+    Max_pow_gen=MWmax/Grid.S_base
  
     Max_pow_genR=MVArmax/Grid.S_base
     Min_pow_genR=MVArmin/Grid.S_base
@@ -690,8 +699,8 @@ def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
         Min_pow_gen=-MVAmax/Grid.S_base
     else:
         Min_pow_gen=0
-    
-    gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf)
+    rating = MVAmax/ Grid.S_base
+    gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,S_rated=rating)
     node.PGi = 0
     node.QGi = 0
     
@@ -706,7 +715,7 @@ def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
         node.type = 'Slack'
     Grid.Generators.append(gen)
 
-def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0):
+def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0,Qmin=None,Qmax=None):
     
     # Handle string input by finding the node
     if isinstance(node, str):
@@ -724,7 +733,7 @@ def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None
         ren_source_name = node.name
     
     # Create renewable source
-    rensource = Ren_Source(ren_source_name, node, base/Grid.S_base)    
+    rensource = Ren_Source(ren_source_name, node, base/Grid.S_base,S_base=Grid.S_base)    
     rensource.PRGi_available = available
     rensource.rs_type = ren_type
     rensource.min_gamma = min_gamma
@@ -733,8 +742,14 @@ def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None
     if node in Grid.nodes_AC:
         rensource.connected = 'AC'
         ACDC = 'AC'
-        rensource.Qmax = base*Qrel/Grid.S_base
-        rensource.Qmin = -base*Qrel/Grid.S_base
+        if Qmax is not None:
+            rensource.Qmax = Qmax/Grid.S_base
+        else:
+            rensource.Qmax = base*Qrel/Grid.S_base
+        if Qmin is not None:    
+            rensource.Qmin = Qmin/Grid.S_base
+        else:
+            rensource.Qmin = -base*Qrel/Grid.S_base
         Grid.rs2node['AC'][rensource.rsNumber] = node.nodeNumber
     elif node in Grid.nodes_DC:
         rensource.connected = 'DC'
@@ -856,7 +871,7 @@ def time_series_dict(grid, ts):
                 node.TS_dict[typ] = ts.TS_num
                 break  # Stop after assigning to the correct node
                 
-    elif typ in ['WPP', 'OWPP', 'SF', 'REN']:
+    elif typ in ['WPP', 'OWPP', 'SF', 'REN', 'Solar']:
         for zone in grid.RenSource_zones:
             if ts.element_name == zone.name:
                 zone.TS_dict['PRGi_available'] = ts.TS_num
@@ -1230,7 +1245,22 @@ def expand_cable_database(data, format='yaml', save_yalm=False):
     print(f"Added {len(new_cables_ac)} new cables to AC and {len(new_cables_dc)} new cables to DC database")
 
 
-
+def grid_state(grid):
+    Total_load = 0
+    min_generation = 0
+    max_generation = 0
+    for node in grid.nodes_AC:
+        Total_load += node.PLi
+    for node in grid.nodes_DC:
+        Total_load += node.PLi
+    for gen in grid.Generators:
+        min_generation += gen.Min_pow_gen*gen.np_gen if not gen.activate_gen_opf else 0
+        max_generation += gen.Max_pow_gen*gen.np_gen 
+    
+    for ren in grid.RenSources:
+        min_generation += ren.PGi_ren*ren.min_gamma
+        max_generation += ren.PGi_ren
+    return Total_load, min_generation, max_generation
 
 def analyse_grid(grid):
     

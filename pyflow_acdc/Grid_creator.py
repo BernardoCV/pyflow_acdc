@@ -306,7 +306,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             
             
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
-                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name))
+                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
             
             
             
@@ -571,7 +571,9 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 
             geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
                      
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,arm_res=arm_res, name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, 
+                    MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,arm_res=arm_res, 
+                    name=str(var_name),S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -633,7 +635,8 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             PR_X_pu = Phase_Reactor_X/Z_base
             Filter_pu = Filter*Z_base
 
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base,
+             MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name),S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -692,7 +695,8 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             
            
             Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC,
-                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax ,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name))
+                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax ,
+                                                   lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name),S_base=S_base)
         
             if geometry is not None:
                 if isinstance(geometry, str): 
@@ -1201,7 +1205,8 @@ def Create_grid_from_mat(matfile):
             LossCrec        = Converter_data.at[index, 'LossCrec']
             LossCinv        = Converter_data.at[index, 'LossCinv']
         
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, 
+            MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,name=str(var_name),S_base=S_base)
 
             if Converter_data.at[index, 'cost'] >= 0:
                 Converters[var_name].NUmConvP_opf = True
@@ -1337,7 +1342,10 @@ def change_S_base(grid,Sbase_new):
     rate = Sbase_old/Sbase_new
     for line in grid.lines_AC:
         line.S_base = Sbase_new
-        
+    for line in grid.lines_DC:
+        line.S_base = Sbase_new
+    for conv in grid.Converters:
+        conv.S_base = Sbase_new
     for node in grid.nodes_AC:
         node.PGi *= rate 
         node.PLi *= rate 

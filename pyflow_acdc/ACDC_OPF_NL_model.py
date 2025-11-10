@@ -9,7 +9,6 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .Class_editor import analyse_grid
 
 __all__ = [
     'OPF_create_NLModel_ACDC',
@@ -19,20 +18,21 @@ __all__ = [
 
     
 
-def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
+def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True):
     from .ACDC_OPF import Translate_pyf_OPF 
     
-
+    if limit_flow_rate is True:
+        limit_flow_rate = 1
     
     [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
    
     Generation_variables(model,grid,gen_info,TEP)
 
     if grid.ACmode:
-        AC_variables(model,grid,AC_info,PV_set)
+        AC_variables(model,grid,AC_info,PV_set,limit_flow_rate)
 
     if grid.DCmode:
-        DC_variables(model,grid,DC_info,TEP)
+        DC_variables(model,grid,DC_info,TEP,limit_flow_rate)
     
     if grid.DCmode and grid.ACmode:
         Converter_variables(model,grid,Conv_info)
@@ -49,7 +49,7 @@ def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False):
         price_zone_parameters(model,grid,AC_info,DC_info,gen_info)
 
     if grid.ACmode:
-        AC_constraints(model,grid,AC_info)
+        AC_constraints(model,grid,AC_info,limit_flow_rate)
 
     if grid.DCmode:
         DC_constraints(model,grid)
@@ -87,10 +87,12 @@ def Generation_variables(model,grid,gen_info,TEP):
     
     
     grid.GPR = False
-    
+    grid.act_gen = False
     if any(gen.np_gen_opf for gen in grid.Generators) and TEP:
         grid.GPR = True
-
+    if any(gen.activate_gen_opf for gen in grid.Generators):
+        grid.act_gen = True
+    
     def P_Gen_bounds(model, g):
         gen = grid.Generators[g]
         return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
@@ -131,7 +133,8 @@ def Generation_variables(model,grid,gen_info,TEP):
         else:
             model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
             model.QGi_gen = pyo.Var(model.gen_AC,bounds=Q_Gen_bounds, initialize=Q_gen_ini) 
-    
+        if grid.act_gen:
+            model.gen_active = pyo.Var(model.gen_AC, domain=pyo.Binary, initialize=1)
     def P_Gen_bounds_DC(model, g):
         gen = grid.Generators_DC[g]
         return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
@@ -157,7 +160,7 @@ def Generation_variables(model,grid,gen_info,TEP):
             model.PGi_gen_DC = pyo.Var(model.gen_DC,bounds=P_Gen_bounds_DC, initialize=P_gen_ini_DC)
            
     s=1
-def AC_variables(model,grid,AC_info,PV_set):
+def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
 
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
     
@@ -291,7 +294,10 @@ def AC_variables(model,grid,AC_info,PV_set):
     
     #AC Lines variables
     def Sbounds_lines(model, line):
-        return (-S_lineAC_limit[line], S_lineAC_limit[line])
+        if limit_flow_rate is False:
+            return (None,None)
+        
+        return (-S_lineAC_limit[line]*limit_flow_rate, S_lineAC_limit[line]*limit_flow_rate)
     
     
     model.PAC_to       = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
@@ -301,6 +307,8 @@ def AC_variables(model,grid,AC_info,PV_set):
     model.PAC_line_loss= pyo.Var(model.lines_AC, initialize=0)
 
     def Sbounds_lines_exp(model, line):
+        if not limit_flow_rate:
+            return (None,None)
         return (-S_lineACexp_limit[line], S_lineACexp_limit[line])
    
     if grid.TEP_AC:
@@ -311,8 +319,12 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.exp_PAC_line_loss= pyo.Var(model.lines_AC_exp, initialize=0)
     
     def Sbounds_lines_tf(model, line):
+        if not limit_flow_rate:
+            return (None,None)
         return (-S_lineACtf_limit[line], S_lineACtf_limit[line])
     def bounds_tf_tap(model, tf):
+        if not limit_flow_rate:
+            return (None,None)
         return (0.95*m_tf_og[tf], 1.05*m_tf_og[tf])
     
     if grid.TAP_tf:
@@ -354,7 +366,7 @@ def AC_variables(model,grid,AC_info,PV_set):
         model.ct_PAC_line_loss = pyo.Var(model.lines_AC_ct,initialize=0)
         
 
-def AC_constraints(model,grid,AC_info):
+def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
     
     
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
@@ -413,12 +425,18 @@ def AC_constraints(model,grid,AC_info):
     # Adds all generators in the AC nodes they are connected to
     def Gen_PAC_rule(model,node):
        nAC = grid.nodes_AC[node]
-       P_gen = sum(model.PGi_gen[gen.genNumber] for gen in nAC.connected_gen)                  
+       if grid.act_gen:
+            P_gen = sum(model.PGi_gen[gen.genNumber]*model.gen_active[gen.genNumber] for gen in nAC.connected_gen)                  
+       else:
+            P_gen = sum(model.PGi_gen[gen.genNumber] for gen in nAC.connected_gen)                  
        return  model.PGi_opt[node] ==   P_gen
            
     def Gen_Q_rule(model,node):
        nAC = grid.nodes_AC[node]
-       Q_gen = sum(model.QGi_gen[gen.genNumber] for gen in nAC.connected_gen) 
+       if grid.act_gen:
+            Q_gen = sum(model.QGi_gen[gen.genNumber]*model.gen_active[gen.genNumber] for gen in nAC.connected_gen)                  
+       else:
+            Q_gen = sum(model.QGi_gen[gen.genNumber] for gen in nAC.connected_gen)                  
        return  model.QGi_opt[node] ==   Q_gen
     
     model.Gen_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_PAC_rule)
@@ -855,7 +873,6 @@ def AC_constraints(model,grid,AC_info):
         model.tf_Qto_AC_line_constraint   = pyo.Constraint(model.lines_AC_tf, rule=Q_to_AC_line_tf)
         model.tf_Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_tf, rule=Q_from_AC_line_tf)
         model.tf_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_tf, rule=P_loss_AC_rule_tf)
-    
     "AC inequality constraints"
     #AC gen inequality
     def S_gen_AC_limit_rule(model,ngen):
@@ -866,6 +883,18 @@ def AC_constraints(model,grid,AC_info):
             return model.PGi_gen[ngen]**2+model.QGi_gen[ngen]**2 <= (gen.Max_S*model.np_gen[ngen])**2 
     
     model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
+    
+    # Fix gen_active to 1 for generators where activate_gen_opf is False
+    if grid.act_gen:
+        def gen_active_fix_rule(model, ngen):
+            gen = grid.Generators[ngen]
+            if not gen.activate_gen_opf:
+                return model.gen_active[ngen] == 1
+            else:
+                return pyo.Constraint.Skip
+        
+        model.gen_active_fix_constraint = pyo.Constraint(model.gen_AC, rule=gen_active_fix_rule)
+    
     #AC Ren sources inequality
     
     def S_renS_AC_limit_rule(model,rs):
@@ -877,73 +906,73 @@ def AC_constraints(model,grid,AC_info):
     
     model.S_renS_AC_limit_constraint   = pyo.Constraint(model.ren_sources, rule=S_renS_AC_limit_rule)
     
-    #AC lines inequality
-    def S_to_AC_limit_rule(model,line):
+    
+    if limit_flow_rate is not False:
         
-        return model.PAC_to[line]**2+model.QAC_to[line]**2 <= S_lineAC_limit[line]**2
-    def S_from_AC_limit_rule(model,line):
+        #AC lines inequality
+        def S_to_AC_limit_rule(model,line):
+            
+            return model.PAC_to[line]**2+model.QAC_to[line]**2 <= (S_lineAC_limit[line]*limit_flow_rate)**2
+        def S_from_AC_limit_rule(model,line):
+            
+            return model.PAC_from[line]**2+model.QAC_from[line]**2 <= (S_lineAC_limit[line]*limit_flow_rate)**2
         
-        return model.PAC_from[line]**2+model.QAC_from[line]**2 <= S_lineAC_limit[line]**2
-    
-    
-    model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
-    model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
-    
-    def S_to_AC_limit_rule_exp(model,line):
-        return model.exp_PAC_to[line]**2+model.exp_QAC_to[line]**2 <= S_lineACexp_limit[line]**2
-    def S_from_AC_limit_rule_exp(model,line):
-        return model.exp_PAC_from[line]**2+model.exp_QAC_from[line]**2 <= S_lineACexp_limit[line]**2
-    
-    if grid.TEP_AC:
-        model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
-        model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
-    
-    def S_to_AC_limit_rule_tf(model,line):
         
-        return model.tf_PAC_to[line]**2+model.tf_QAC_to[line]**2 <= S_lineACtf_limit[line]**2
-    def S_from_AC_limit_rule_tf(model,line):
+        model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
+        model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
         
-        return model.tf_PAC_from[line]**2+model.tf_QAC_from[line]**2 <= S_lineACtf_limit[line]**2
+        def S_to_AC_limit_rule_exp(model,line):
+            return model.exp_PAC_to[line]**2+model.exp_QAC_to[line]**2 <= (S_lineACexp_limit[line]*limit_flow_rate)**2
+        def S_from_AC_limit_rule_exp(model,line):
+            return model.exp_PAC_from[line]**2+model.exp_QAC_from[line]**2 <= (S_lineACexp_limit[line]*limit_flow_rate)**2
+        
+        if grid.TEP_AC:
+            model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
+            model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
+        
+        def S_to_AC_limit_rule_tf(model,line):
+            
+            return model.tf_PAC_to[line]**2+model.tf_QAC_to[line]**2 <= (S_lineACtf_limit[line]*limit_flow_rate)**2
+        def S_from_AC_limit_rule_tf(model,line):
+            
+            return model.tf_PAC_from[line]**2+model.tf_QAC_from[line]**2 <= (S_lineACtf_limit[line]*limit_flow_rate)**2
+        
+        if grid.TAP_tf:
+            model.tf_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_tf, rule=S_to_AC_limit_rule_tf)
+            model.tf_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_tf, rule=S_from_AC_limit_rule_tf)
+        
+        def S_to_AC_line_rule_rec(model, line, state):
+            if state == 0:
+                return (model.rec_PAC_to[line,0]**2+model.rec_QAC_to[line,0]**2)*(1-model.rec_branch[line]) <= (S_lineACrec_lim[line]*limit_flow_rate)**2
+            else:
+                return (model.rec_PAC_to[line,1]**2+model.rec_QAC_to[line,1]**2)*model.rec_branch[line] <= (S_lineACrec_lim_new[line]*limit_flow_rate)**2 
+        def S_from_AC_limit_rule_rec(model,line,state):
+            if state == 0:
+                return (model.rec_PAC_from[line,0]**2+model.rec_QAC_from[line,0]**2)*(1-model.rec_branch[line]) <= (S_lineACrec_lim[line]*limit_flow_rate)**2
+            else:
+                return (model.rec_PAC_from[line,1]**2+model.rec_QAC_from[line,1]**2)*model.rec_branch[line] <= (S_lineACrec_lim_new[line]*limit_flow_rate)**2
     
-    if grid.TAP_tf:
-        model.tf_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_tf, rule=S_to_AC_limit_rule_tf)
-        model.tf_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_tf, rule=S_from_AC_limit_rule_tf)
+        if grid.REC_AC:
+            model.rec_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec)
+            model.rec_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec)
     
-    def S_to_AC_line_rule_rec(model, line, state):
-        if state == 0:
-            return (model.rec_PAC_to[line,0]**2+model.rec_QAC_to[line,0]**2)*(1-model.rec_branch[line]) <= S_lineACrec_lim[line]**2
-        else:
-            return (model.rec_PAC_to[line,1]**2+model.rec_QAC_to[line,1]**2)*model.rec_branch[line] <= S_lineACrec_lim_new[line]**2 
-    def S_from_AC_limit_rule_rec(model,line,state):
-        if state == 0:
-            return (model.rec_PAC_from[line,0]**2+model.rec_QAC_from[line,0]**2)*(1-model.rec_branch[line]) <= S_lineACrec_lim[line]**2
-        else:
-            return (model.rec_PAC_from[line,1]**2+model.rec_QAC_from[line,1]**2)*model.rec_branch[line] <= S_lineACrec_lim_new[line]**2
-   
-    if grid.REC_AC:
-        model.rec_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec)
-        model.rec_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec)
-   
-   
-    def S_to_AC_line_rule_ct(model, line, ct):
-        return (model.ct_PAC_to[line,ct]**2+model.ct_QAC_to[line,ct]**2)*(model.ct_branch[line,ct]) <= S_lineACct_lim[line,ct]**2
-    def S_from_AC_limit_rule_ct(model,line,ct):
-        return (model.ct_PAC_from[line,ct]**2+model.ct_QAC_from[line,ct]**2)*(model.ct_branch[line,ct]) <= S_lineACct_lim[line,ct]**2
-   
     
+        def S_to_AC_line_rule_ct(model, line, ct):
+            return (model.ct_PAC_to[line,ct]**2+model.ct_QAC_to[line,ct]**2)*(model.ct_branch[line,ct]) <= (S_lineACct_lim[line,ct]*limit_flow_rate)**2
+        def S_from_AC_limit_rule_ct(model,line,ct):
+            return (model.ct_PAC_from[line,ct]**2+model.ct_QAC_from[line,ct]**2)*(model.ct_branch[line,ct]) <= (S_lineACct_lim[line,ct]*limit_flow_rate)**2
+    
+        
 
-    if grid.CT_AC:
-        model.ct_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct)
-        model.ct_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct)
-       
+        if grid.CT_AC:
+            model.ct_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct)
+            model.ct_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct)
+        
     s=1
         
 
-def DC_variables(model,grid,DC_info,TEP=False):
+def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
 
-    
-    
-    
 
     DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         
@@ -961,7 +990,10 @@ def DC_variables(model,grid,DC_info,TEP=False):
     def DC_V_slack_rule(model, node):
         return model.V_DC[node] == V_ini_DC[node]
     def Pbounds_lines(model, line):
-        return (-P_lineDC_limit[line], P_lineDC_limit[line])
+        if limit_flow_rate is False:
+            return (None,None)
+        return (-P_lineDC_limit[line]*limit_flow_rate, P_lineDC_limit[line]*limit_flow_rate)
+       
     
     def P_conv_DC_node_bounds(model,node): #This limits the varable of those DC nodes that do not have a converter connected 
          if node in DC_nodes_connected_conv:
@@ -1042,7 +1074,7 @@ def DC_constraints(model,grid):
    
     def Gen_P_rule_DC(model,node):
         nDC = grid.nodes_DC[node]
-        P_gen = sum(model.PGi_gen_DC[gen.genNumber_DC] for gen in nDC.connected_gen)                  
+        P_gen = sum(model.PGi_gen_DC[gen.genNumber_DC]*model.np_gen_DC[gen.genNumber_DC] for gen in nDC.connected_gen)                  
         return  model.PGi_opt_DC[node] ==   P_gen
 
 
@@ -1891,22 +1923,22 @@ def TEP_variables(model,grid):
 
             def P_gen_DC_lower_bound_rule(model, gen):
                 g = grid.Generators_DC[gen]
-                return (g.Min_pow_gen * model.np_gen[gen] <= model.PGi_gen[gen])
+                return (g.Min_pow_gen * model.np_gen_DC[gen] <= model.PGi_gen_DC[gen])
             def P_gen_DC_upper_bound_rule(model, gen):
                 g = grid.Generators_DC[gen]
-                return (model.PGi_gen[gen] <= g.Max_pow_gen * model.np_gen[gen])
+                return (model.PGi_gen_DC[gen] <= g.Max_pow_gen * model.np_gen_DC[gen])
 
     
 
-            model.np_gen = pyo.Var(model.gen_DC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds_DC,initialize=np_gen_DC)
-            model.np_gen_base = pyo.Param(model.gen_DC,initialize=np_gen_DC)  
+            model.np_gen_DC = pyo.Var(model.gen_DC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds_DC,initialize=np_gen_DC)
+            model.np_gen_DC_base = pyo.Param(model.gen_DC,initialize=np_gen_DC)  
 
             model.PGi_lower_bound = pyo.Constraint(model.gen_DC,rule=P_gen_DC_lower_bound_rule)
             model.PGi_upper_bound = pyo.Constraint(model.gen_DC,rule=P_gen_DC_upper_bound_rule)
 
 
-        else:
-            model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
+        elif hasattr(model,'gen_DC'):
+            model.np_gen_DC = pyo.Param(model.gen_DC,initialize=np_gen_DC)
             
         def NPline_bounds(model, line):
             element=grid.lines_DC[line]
@@ -1941,6 +1973,10 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
     if grid.ACmode:
         PGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen.items()}
         QGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.QGi_gen.items()}
+        if grid.act_gen:
+            gen_active_values = {k: np.float64(pyo.value(v)) for k, v in model.gen_active.items()}
+        else:
+            gen_active_values = {k: 1 for k in model.gen_AC.keys()}
     if grid.DCmode:
         PGen_DC_values = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen_DC.items()}
     
@@ -1949,8 +1985,9 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
     
     def process_element(element):
         if hasattr(element, 'genNumber'):  # Generator
-            element.PGen = PGen_values[element.genNumber]
-            element.QGen = QGen_values[element.genNumber]
+            element.PGen = PGen_values[element.genNumber]*gen_active_values[element.genNumber]
+            element.QGen = QGen_values[element.genNumber]*gen_active_values[element.genNumber]
+            element.gen_active = gen_active_values[element.genNumber]
         elif hasattr(element, 'genNumber_DC'):  # Generator
             element.PGen = PGen_DC_values[element.genNumber_DC]
         elif hasattr(element, 'rsNumber'):  # Renewable Source

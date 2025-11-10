@@ -179,6 +179,7 @@ __all__ = [
     'run_clustering_analysis_and_plot',
     'identify_correlations',
     'update_grid_data',
+    'cluster_analysis',
     
     # Export
     'export_results_to_excel',

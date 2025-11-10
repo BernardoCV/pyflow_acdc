@@ -13,7 +13,7 @@ from scipy import stats as st
 
 import time
 
-from .Class_editor import analyse_grid
+from .Class_editor import analyse_grid, grid_state
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
 
 
@@ -38,7 +38,8 @@ try:
         pack_variables,
         Translate_pyf_OPF,
         TS_parallel_OPF,
-        reset_to_initialize
+        reset_to_initialize,
+        calculate_objective
     )
     pyomo_imp= True
     
@@ -107,9 +108,12 @@ def combine_TS(ts_list, rep_year=False):
     
     return combined_df
 
-def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
+def update_grid_data(grid,ts, idx,price_zone_restrictions=False,use_clusters=False,n_clusters=None):
     typ = ts.type
-    
+    if use_clusters:
+        ts_data = ts.data_clustered[n_clusters]
+    else:
+        ts_data = ts.data
     # Pre-build dictionaries for fast lookups if not already present
     if not hasattr(grid, 'Price_Zones_dict'):
         grid.Price_Zones_dict = {pz.name: pz for pz in grid.Price_Zones}
@@ -127,53 +131,53 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False):
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
             if typ == 'a_CG':
-                price_zone.a_base = ts.data[idx]
+                price_zone.a_base = ts_data[idx]
             elif typ == 'b_CG':
-                price_zone.b = ts.data[idx]
+                price_zone.b = ts_data[idx]
             elif typ == 'c_CG':
-                price_zone.c = ts.data[idx]
+                price_zone.c = ts_data[idx]
             elif typ == 'PGL_min':
-                price_zone.PGL_min_base = ts.data[idx]
+                price_zone.PGL_min_base = ts_data[idx]
             elif typ == 'PGL_max':
-                price_zone.PGL_max = ts.data[idx]
+                price_zone.PGL_max = ts_data[idx]
     
     if typ == 'price':
         # Directly access price zone and nodes using dictionaries
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
-            price_zone.price = ts.data[idx]
+            price_zone.price = ts_data[idx]
         
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
-            node.price = ts.data[idx]
+            node.price = ts_data[idx]
             
         node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
         if node_dc:
-            node_dc.price = ts.data[idx]    
+            node_dc.price = ts_data[idx]    
     
     elif typ == 'Load':
         # Directly access price zone and nodes using dictionaries
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
-            price_zone.PLi_factor = ts.data[idx]
+            price_zone.PLi_factor = ts_data[idx]
         
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
-            node.PLi_factor = ts.data[idx]
+            node.PLi_factor = ts_data[idx]
             
         node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
         if node_dc:
-            node_dc.PLi_factor = ts.data[idx]    
+            node_dc.PLi_factor = ts_data[idx]    
     
-    elif typ in ['WPP', 'OWPP', 'SF', 'REN']:
+    elif typ in ['WPP', 'OWPP', 'SF', 'REN','Solar']:
         # Directly access RenSource_zones and RenSources using dictionaries
         zone = grid.RenSource_zones_dict.get(ts.element_name, None)
         if zone:
-            zone.PRGi_available = ts.data[idx]
+            zone.PRGi_available = ts_data[idx]
         
         rs = grid.RenSources_dict.get(ts.element_name, None)
         if rs:
-            rs.PRGi_available = ts.data[idx]
+            rs.PRGi_available = ts_data[idx]
 
 def update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
@@ -210,17 +214,17 @@ def calculate_line_loading(grid,idx):
 
     for line in grid.lines_AC:
         G = grid.Graph_line_to_Grid_index_AC[line]
-        load = max(abs(line.fromS), abs(line.toS))
+        load = line.apparent_MVA
         loadS_AC[G] += load
-        line_data[f'AC_Load_{line.name}'] = load * grid.S_base / line.MVA_rating
+        line_data[f'AC_Load_{line.name}'] = line.loading/100
         line_data[f'AC_from_{line.name}'] = np.real(line.fromS) * grid.S_base
         line_data[f'AC_to_{line.name}']   = np.real(line.toS) * grid.S_base 
 
     for line in grid.lines_DC:
         G = grid.Graph_line_to_Grid_index_DC[line]
-        load = max(line.toP, line.fromP)
+        load = line.apparent_MVA
         loadP_DC[G] += load
-        line_data[f'DC_Load_{line.name}'] = load * grid.S_base / line.MW_rating
+        line_data[f'DC_Load_{line.name}'] = line.loading/100
         line_data[f'DC_from_{line.name}'] = line.fromP * grid.S_base
         line_data[f'DC_to_{line.name}']   = line.toP * grid.S_base 
 
@@ -268,7 +272,7 @@ def calculate_line_loading_from_model(grid,model,idx):
                 line_data[f'AC_to_{line.name}'] = (lines_AC_TEP_toP[l] + 1j*lines_AC_TEP_toQ[l])*lines_AC_TEP[l]
                 load = max(abs(line_data[f'AC_from_{line.name}']), abs(line_data[f'AC_to_{line.name}']))
                 loadS_AC[G] += load
-                line_data[f'AC_Load_{line.name}'] = load * grid.S_base / (line.MVA_rating * line.np_line)
+                line_data[f'AC_Load_{line.name}'] = load * grid.S_base / line.capacity_MVA if line.capacity_MVA > 0 else 0
         if grid.REC_AC:
             lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rec_branch.items()}
             lines_AC_REC_fromP = {k: {state: np.float64(pyo.value(model.rec_PAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
@@ -301,7 +305,7 @@ def calculate_line_loading_from_model(grid,model,idx):
             G = grid.Graph_line_to_Grid_index_DC[line]
             load = max(abs(PDC_from[line.lineNumber]), abs(PDC_to[line.lineNumber]))
             loadP_DC[G] += load
-            line_data[f'DC_Load_{line.name}'] = load * grid.S_base / line.MW_rating
+            line_data[f'DC_Load_{line.name}'] = load * grid.S_base / line.capacity_MW if line.capacity_MW > 0 else 0
             line_data[f'DC_from_{line.name}'] = PDC_from[line.lineNumber] * grid.S_base
             line_data[f'DC_to_{line.name}']   = PDC_to[line.lineNumber]   * grid.S_base 
 
@@ -362,7 +366,7 @@ def TS_ACDC_PF(grid, start=1, end=99999,print_step=False,tol_lim=1e-10, maxIter=
     grid.Pconv_save = np.zeros(grid.nconv)
     for conv in grid.Converters_ACDC:
         grid.Pconv_save[conv.ConvNumber] = conv.P_DC
-
+    
     while idx < max_time:
         
   
@@ -576,7 +580,7 @@ def _modify_parameters(grid,model,Price_Zones):
     
     
                 
-def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=False,expand=False,print_step=False):
+def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=False,expand=False,print_step=False,limit_flow_rate=True,use_clusters=False,solver='ipopt'):
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     total_solve_time  = 0
@@ -637,7 +641,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     analyse_grid(grid)
        
     t1 = time.perf_counter()
-    OPF_create_NLModel_ACDC(model,grid,PV_set,price_zone_restrictions)
+    OPF_create_NLModel_ACDC(model,grid,PV_set,price_zone_restrictions,limit_flow_rate=limit_flow_rate)
     t2 = time.perf_counter()  
     t_modelcreate = t2-t1
     
@@ -651,12 +655,39 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     if expand:
         for price_zone in grid.Price_Zones:
             price_zone.expand_import = True
-
+        
+    infeasible= 0
+    inf_list=[]
+    n_clusters = 1
+    if use_clusters:
+        available_clusters = list(grid.Time_series[0].data_clustered.keys())
+        if len(available_clusters) == 0:
+            use_clusters = False
+            n_clusters = None
+            print("No clusters available")
+            print("Please run clustering first,running full Time series")
+        elif len(available_clusters) == 1:
+            n_clusters = available_clusters[0]
+        else:
+            print(f"Multiple clusters available: {available_clusters}")
+            print("Please select a cluster")
+            n_clusters = int(input("Enter the cluster number: "))
+            if n_clusters not in available_clusters:
+                raise ValueError(f"Invalid cluster number {n_clusters}. Available clusters: {available_clusters}")
+        max_time  = len(grid.Time_series[0].data_clustered[n_clusters])
 
     while idx < max_time:
         for ts in grid.Time_series:
-            update_grid_data(grid,ts, idx,price_zone_restrictions)
-       
+            update_grid_data(grid,ts, idx,price_zone_restrictions,use_clusters=use_clusters,n_clusters=n_clusters)
+        Total_load, min_generation, max_generation = grid_state(grid)     
+
+        if Total_load < min_generation or Total_load > max_generation:
+            print(f"Total load {Total_load} is out of bounds {min_generation} and {max_generation}")
+            inf_list.append(idx+1)
+            idx += 1
+            infeasible += 1
+            
+            continue
         t1= time.perf_counter()          
         reset_to_initialize(model, initial_values)
     
@@ -664,7 +695,14 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t2= time.perf_counter()  
         t_modelupdate = t2-t1
         
-        results, solver_stats = OPF_solve(model,grid)
+        results, solver_stats = OPF_solve(model,grid,solver,suppress_warnings=True)
+        if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
+            infeasible += 1
+            inf_list.append(idx+1)
+            if print_step:
+                print(f"{idx+1} infeasible")
+            idx += 1
+            continue
         t_modelsolve = solver_stats['time']
         
         total_update_time+= t_modelupdate
@@ -718,6 +756,8 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     
     t1 = time.perf_counter()
     ExportACDC_NLmodel_toPyflowACDC(model, grid, price_zone_restrictions)
+    for obj in weights_def:
+        weights_def[obj]['v']=calculate_objective(grid,obj)
     t2 = time.perf_counter() 
     t_modelexport = t2-t1
     touple = pack_variables(Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
@@ -728,7 +768,9 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     av_t_modelsolve = total_solve_time / count
     av_t_modelupdate=total_update_time / count
     
-    save_TS_to_grid (grid,touple)
+    save_TS_to_grid (grid,touple,infeasible)
+    
+    grid.OPF_obj = weights_def
     grid.OPF_run=True  
     grid.Time_series_ran = True
     
@@ -745,7 +787,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
     return timing_info
 
 
-def save_TS_to_grid (grid,touple):
+def save_TS_to_grid (grid,touple,infeasible):
     # Create the DataFrame from the list of rows
     (Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
     Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
@@ -783,6 +825,26 @@ def save_TS_to_grid (grid,touple):
     grid.time_series_results['ac_line_loading'] = ac_line_res
     grid.time_series_results['dc_line_loading'] = dc_line_res
     
+
+    for line in (grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_exp):
+        col = line.name
+        if col in ac_line_res:
+            max_frac = float(ac_line_res[col].max())
+            avg_frac = float(ac_line_res[col].mean())
+            setattr(line, 'ts_max_loading', max_frac*100)   
+            setattr(line, 'ts_avg_loading', avg_frac*100)    # fraction of rating (0..)
+            
+
+    # DC lines
+    for line in grid.lines_DC:
+        col = line.name
+        if col in dc_line_res:
+            max_frac = float(dc_line_res[col].max())
+            avg_frac = float(dc_line_res[col].mean())
+            setattr(line, 'ts_max_loading', max_frac*100)
+            setattr(line, 'ts_avg_loading', avg_frac*100)
+
+            
     grouped_columns_load = {}
     grouped_columns = {}   
     # Group columns based on prefix in external generation data
@@ -812,7 +874,7 @@ def save_TS_to_grid (grid,touple):
          
          
     Ext_Gen_joined  = Ext_Gen_joined[[col for col in Ext_Gen_joined.columns if col != 'RenSource'] + ['RenSource']]
-
+    grid.ts_infeasible_count = infeasible
     grid.time_series_results['real_load_by_zone']  = Ext_Load_joined
     grid.time_series_results['real_power_by_zone'] = Ext_Gen_joined
     grid.time_series_results['reactive_power_opf'].columns = grid.time_series_results['reactive_power_opf'].columns.str.replace('Reactor_' , '',regex=False)
@@ -934,6 +996,9 @@ def results_TS_OPF(grid,excel_file_path,grid_names=None,stats=None,times=None):
         # Write each DataFrame to a separate sheet
         if times is not None:
             times_df = pd.DataFrame(list(times.items()), columns=['Metric', 'Time (s)'])
+            row_space = pd.DataFrame({'Metric': [''], 'Time (s)': ['']})
+            row_infeasible = pd.DataFrame({'Metric': ['Infeasible'], 'Time (s)': [grid.ts_infeasible_count]})
+            times_df = pd.concat([times_df, row_space, row_infeasible], ignore_index=True)
             times_df.to_excel(writer, sheet_name='Time', index=False)
         
         (grid.time_series_results['line_loading'] * 100).to_excel(writer, sheet_name='All line loading', index=True)

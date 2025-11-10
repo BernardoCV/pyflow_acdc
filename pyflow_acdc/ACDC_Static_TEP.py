@@ -103,7 +103,7 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
                 node.PLi_factor = ts_data[idx]
                 break  # Stop after assigning to the correct node
 
-    elif typ in ['WPP', 'OWPP','SF','REN']:
+    elif typ in ['WPP', 'OWPP','SF','REN','Solar']:
         for zone in grid.RenSource_zones:
             if ts.element_name == zone.name:
                 zone.PRGi_available = ts_data[idx]
@@ -138,8 +138,11 @@ def expand_elements_from_pd(grid,exp_elements):
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'Life_time'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'base_cost'),
         get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'per_unit_cost'),
-        get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'exp')
+        get_column_value(exp_elements.loc[exp_elements[exp_elements.iloc[:, 0] == name].index[0], :], 'exp'),
+        False
     ))
+    grid.Update_Graph_AC()
+    grid.create_Ybus_AC() 
 
 def repurpose_element_from_pd(grid,rec_elements):
     from .Class_editor import change_line_AC_to_reconducting
@@ -710,7 +713,7 @@ def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_
         steps_iter = np.asarray(steps, dtype=float).ravel()
 
     for kappa in steps_iter:
-        print(f'Running rate: {rate}')
+        print(f'Running rate: {kappa}')
         # Reset model variables to initial values
         reset_to_initialize(model, initial_values)
         model.kappa.set_value(kappa)
@@ -846,7 +849,7 @@ def _generate_steps(steps, range_tuple):
     else:
         return np.asarray(steps, dtype=float).ravel()   
 
-def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy):
+def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy,alpha,limit_flow_rate):
        
     
     from .Time_series import  _modify_parameters    
@@ -854,7 +857,7 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
     w={}
 
     base_model = pyo.ConcreteModel()
-    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True)
+    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True,limit_flow_rate=limit_flow_rate)
     
     
     for t in model.scenario_frames:
@@ -870,7 +873,7 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
         
         TEP_subObj(model.submodel[t],grid,weights_def)
         if clustering:
-            w[t]= float(grid.Clusters[n_clusters][t-1])
+            w[t]= float(grid.Clusters[n_clusters]['Weight'][t-1])
 
         elif any(ts.element_name == 'TEP_w' for ts in grid.Time_series):
             w[t] = next(ts.data[t-1] for ts in grid.Time_series if ts.element_name == 'TEP_w')
@@ -888,12 +891,15 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
     obj_TEP = TEP_obj(model,grid,NPV)
     obj_weighted = weighted_subobj(model,NPV,n_years,discount_rate)
     
-    total_cost = obj_TEP + Hy*obj_weighted
+    if alpha is None:
+        total_cost = obj_TEP + Hy*obj_weighted
+    else:    
+        total_cost = obj_TEP*alpha + Hy*obj_weighted*(1-alpha)
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
 
+    s=1
 
-
-def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin',tee=False):
+def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin',tee=False,callback=False,alpha=None,limit_flow_rate=True):
     
     analyse_grid(grid)
 
@@ -901,10 +907,13 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
-    
+    if tee:
+        print('Trying clustering')
     try:
         from .Time_series_clustering import cluster_analysis
         n_clusters,clustering = cluster_analysis(grid,clustering_options)
+        if ('print_details' in clustering_options and clustering_options['print_details']) or tee:
+            print('Clustering done')
     except:
         n_clusters = len(grid.Time_series[0].data)
         clustering = False
@@ -917,15 +926,19 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
     #print(list(model.scenario_frames))
     model.submodel    = pyo.Block(model.scenario_frames)
     
-    create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy)
+    create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy,alpha,limit_flow_rate)
 
     t2 = time.time()  
     t_modelcreate = t2-t1
-    
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee)
+    if tee : 
+        print('Model loaded') 
+    model_results,solver_stats = OPF_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
     TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
+    
+    TEP_TS_res['OPF_obj'] = weights_def
+    
     t2 = time.perf_counter()  
     t_modelexport = t2-t1
         
@@ -1399,7 +1412,7 @@ def TEP_subObj(submodel,grid,ObjRule):
 
     obj_rule= OPF_obj(submodel,grid,ObjRule,OnlyGen)
     submodel.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
-
+    s=1
     
 
 def TEP_obj(model,grid,NPV):
@@ -2024,13 +2037,33 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         # Create empty DataFrame with the same structure for consistency
         flipped_data_SC = pd.DataFrame()
     
-    
+    frames = [int(t) for t in model.scenario_frames]
+    weights_df = pd.DataFrame(
+        [[float(pyo.value(model.weights[t])) for t in frames]],
+        index=['Weight'],
+        columns=frames
+        )
+
     # Pack all variables into the final result
-    TEP_TS_res = pack_variables(clustering,n_clusters,
-        flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
-        flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen
-    )
-    grid.TEP_TS_res=TEP_TS_res
+    TEP_TS_res =     {
+    'clustering': clustering,
+    'n_clusters': n_clusters,
+    'weights': weights_df,
+
+
+    'PN': flipped_data_PN if flipped_data_PN is not None else None,
+    'PZGEN': flipped_data_PZGEN if flipped_data_PZGEN is not None else None,
+    'SC': flipped_data_SC if flipped_data_SC is not None else None,
+
+    'curtailment': flipped_data_curt,
+    'curtailment_per': flipped_data_curt_per,
+    'lines': flipped_data_lines,
+    'converters': flipped_data_conv,
+    'price': flipped_data_price,
+    'pgen': flipped_data_pgen,
+    'qgen': flipped_data_qgen,
+    }
+    
     
       
     grid.Line_AC_calc()
