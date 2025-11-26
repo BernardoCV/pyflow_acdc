@@ -6,59 +6,17 @@ Provides grid simulation and power flow analysis functionality.
 from pathlib import Path
 import importlib.util
 
+# Core imports - required modules
 from .Results_class import *
 from .Class_editor import *
 from .Grid_creator import *
 from .Classes import *
-
 from .Export_files import *
 from .Time_series import *
-
 from .ACDC_PF import *
-
 from .Graph_and_plot import *
 from .Market_Coeff import *
 
-
-# Try to import OPF module if pyomo is available
-try:
-    from .ACDC_OPF import *
-    from .ACDC_Static_TEP import *
-    from .ACDC_Dynamic_TEP import *
-    HAS_OPF = True
-except ImportError:
-    HAS_OPF = False
-    
-try:
-    from .ACDC_TEP_pymoo import *
-    HAS_TEP_PYMOO = True
-except ImportError:
-    HAS_TEP_PYMOO = False
-
-try:
-    from .Graph_Dash import *
-    HAS_DASH = True
-except ImportError:
-    HAS_DASH = False
-    
-try:
-    from .AC_L_CSS_gurobi import *
-    HAS_AC_L_CSS_GUROBI = True
-except ImportError:
-    HAS_AC_L_CSS_GUROBI = False
-
-try:
-    from .Mapping import *
-    HAS_MAPPING = True
-except ImportError:
-    HAS_MAPPING = False
-
-try:
-    from .Time_series_clustering import *
-    HAS_CLUSTERING = True
-except ImportError:
-    HAS_CLUSTERING = False
-    
 # Define what should be available when users do: from pyflow_acdc import *
 __all__ = [
     # Results
@@ -128,58 +86,11 @@ __all__ = [
     'ACDC_sequential',
     'Power_flow',
     
-    # OPF
-    'Optimal_PF',
-    'Optimal_L_PF',
-    'OPF_solve',
-    'OPF_obj',
-    'OPF_line_res',
-    'OPF_price_priceZone',
-    'OPF_conv_results',
-    'Translate_pyf_OPF',
-    
-    # TEP
-    'transmission_expansion',
-    'linear_transmission_expansion',
-    'multi_scenario_TEP',
-    'simple_CSS',
-    'sequential_CSS',
-    'update_grid_price_zone_data',
-    'expand_elements_from_pd',
-    'repurpose_element_from_pd',
-    'update_attributes',
-    'Expand_element',
-    'Translate_pd_TEP',
-    'export_TEP_TS_results_to_excel',
-    'MIP_path_graph',
-    'alpha_paretto',
-    'rate_sensitivity',
-    'kappa_sensitivity',
-    'comprehensive_sensitivity_analysis',
-
-    # TEP_PYMOO
-    'transmission_expansion_pymoo',
-    
-    # AC_L_CSS_GUROBI
-    'Optimal_L_CSS_gurobi',
-    'test_master_problem',
-
-    #MP_TEP
-    'multi_period_TEP',
-    'multi_period_MS_TEP',
-
     # Time Series Analysis
     'Time_series_PF',
     'TS_ACDC_PF',
-    'TS_ACDC_OPF',
-    'TS_ACDC_OPF_parallel',
     'Time_series_statistics',
-    'results_TS_OPF',
-    'cluster_TS',
-    'run_clustering_analysis_and_plot',
-    'identify_correlations',
     'update_grid_data',
-    'cluster_analysis',
     
     # Export
     'export_results_to_excel',
@@ -190,7 +101,6 @@ __all__ = [
     'export_solver_progress_to_excel',
 
     # Visualization
-    
     'plot_Graph',
     'Time_series_prob',
     'plot_neighbour_graph',
@@ -203,9 +113,87 @@ __all__ = [
     'price_zone_coef_data',
     'plot_curves',
     'clean_entsoe_data',
-
-    'run_dash',
+    'update_grid_price_zone_data',
 ]
+
+# Try to import OPF module if pyomo is available
+try:
+    from .ACDC_OPF import *
+    # Time_series module functions that depend on OPF are already imported via Time_series
+    # but we need to add them to __all__ only if OPF is available
+    __all__.extend([
+        'Optimal_PF', 'Optimal_L_PF', 'OPF_solve', 'OPF_obj', 'OPF_line_res',
+        'OPF_price_priceZone', 'OPF_conv_results', 'Translate_pyf_OPF',
+        'TS_ACDC_OPF', 'TS_ACDC_OPF_parallel', 'results_TS_OPF'
+    ])
+    HAS_OPF = True
+    
+    # ACDC_Static_TEP also requires OPF/pyomo
+    try:
+        from .ACDC_Static_TEP import *
+        __all__.extend([
+            'transmission_expansion', 'linear_transmission_expansion',
+            'multi_scenario_TEP', 'expand_elements_from_pd',
+            'repurpose_element_from_pd', 'update_attributes', 'Expand_element',
+            'Translate_pd_TEP', 'export_TEP_TS_results_to_excel',
+            'alpha_paretto', 'rate_sensitivity', 'kappa_sensitivity',
+            'comprehensive_sensitivity_analysis'
+        ])
+    except ImportError:
+        pass
+    
+    # Array_OPT depends on both OPF and Static_TEP modules
+    try:
+        from .Array_OPT import *
+        __all__.extend(['simple_CSS', 'sequential_CSS', 'MIP_path_graph'])
+    except ImportError:
+        pass
+    
+except ImportError:
+    HAS_OPF = False
+
+try:
+    from .ACDC_Dynamic_TEP import *
+    __all__.extend(['multi_period_TEP', 'multi_period_MS_TEP'])
+except ImportError:
+    pass
+    
+try:
+    from .ACDC_TEP_pymoo import *
+    __all__.append('transmission_expansion_pymoo')
+    HAS_TEP_PYMOO = True
+except ImportError:
+    HAS_TEP_PYMOO = False
+
+try:
+    from .Graph_Dash import *
+    __all__.append('run_dash')
+    HAS_DASH = True
+except ImportError:
+    HAS_DASH = False
+    
+try:
+    from .AC_L_CSS_gurobi import *
+    __all__.extend(['Optimal_L_CSS_gurobi', 'test_master_problem'])
+    HAS_AC_L_CSS_GUROBI = True
+except ImportError:
+    HAS_AC_L_CSS_GUROBI = False
+
+try:
+    from .Mapping import *
+    HAS_MAPPING = True
+except ImportError:
+    HAS_MAPPING = False
+
+try:
+    from .Time_series_clustering import *
+    __all__.extend([
+        'cluster_TS', 'run_clustering_analysis_and_plot',
+        'identify_correlations', 'cluster_analysis'
+    ])
+    HAS_CLUSTERING = True
+except ImportError:
+    HAS_CLUSTERING = False
 
 # Dynamically load all .py files in the 'cases/' folder
 case_folder = Path(__file__).parent / "example_grids"

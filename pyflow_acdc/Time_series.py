@@ -17,12 +17,10 @@ from .Class_editor import analyse_grid, grid_state
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential 
 
 
+# Base __all__ with functions that don't require OPF
 __all__ = ['Time_series_PF',
            'TS_ACDC_PF',
-           'TS_ACDC_OPF_parallel',
-           'TS_ACDC_OPF',
            'Time_series_statistics',
-           'results_TS_OPF',
            'update_grid_data']
 
 try:
@@ -42,6 +40,8 @@ try:
         calculate_objective
     )
     pyomo_imp= True
+    # Add OPF-dependent functions to __all__ only if pyomo is available
+    __all__.extend(['TS_ACDC_OPF_parallel', 'TS_ACDC_OPF', 'results_TS_OPF'])
     
 except ImportError:    
     pyomo_imp= False

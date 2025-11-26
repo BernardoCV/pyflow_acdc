@@ -720,7 +720,11 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
     from .Graph_and_plot import save_network_svg
-    from .AC_OPF_L_model import MIP_path_graph
+    try:
+        from .Array_OPT import MIP_path_graph
+        mip_check_av =True
+    except:    
+        mip_check_av =False
     turbines_df = Data["turbine"]
     substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
     
@@ -749,20 +753,20 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         
     
     for i, attrs in array_graph.nodes(data=True):
-        if attrs['type'] == 'turbine':
+        if attrs['point_type'] == 'turbine':
             kV=   turbines_df.loc[attrs['original_idx']].kV_rating
             geo = turbines_df.loc[attrs['original_idx']].geometry
         else: 
             kV=   substations_df.loc[attrs['original_idx']].kV_rating
             geo = substations_df.loc[attrs['original_idx']].geometry
 
-        node = add_AC_node(grid, kV, node_type='PQ',geometry=geo,name=str(attrs['original_idx']))
+        node = add_AC_node(grid, kV, node_type='PQ',geometry=geo,name=str(i))
 
-        if attrs['type'] == 'turbine':
+        if attrs['point_type'] == 'turbine':
             add_RenSource(grid,node,turbines_df.loc[attrs['original_idx']].MW_rating,ren_type='Wind',min_gamma=1-curtailment_allowed,Qrel=0)
             node.ct_limit = turbines_df.loc[attrs['original_idx']].connections
             
-        if attrs['type'] == 'substation':
+        if attrs['point_type'] == 'substation':
             add_extGrid(grid,node,MVAmax=99999,Allow_sell=True,lf=LCoE)
             node.ct_limit = substations_df.loc[attrs['original_idx']].connections
             node.type = 'Slack'
@@ -774,14 +778,14 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     
     for u,v, attrs in array_graph.edges(data=True):
         
-        fromnode = str(array_graph.nodes[u]['original_idx'])
-        tonode = str(array_graph.nodes[v]['original_idx'])
-
+        fromnode = str(u)
+        tonode = str(v)
+        name= f'{str(u)}_{str(v)}'
 
         l = attrs['weight']/1000
         geo= attrs['geometry']
         
-        line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=f'{fromnode}_{tonode}',geometry=geo,update_grid=False)
+        line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=name,geometry=geo,update_grid=False)
         
         # Store the line object with its name for later reference
         edge_key = f'{fromnode}_{tonode}'
@@ -813,7 +817,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     # Enable crossings if there are crossing groups
     
     
-    if MIP_check:
+    if MIP_check and mip_check_av:
         grid.MIP_time=MIP_time
         flag,high_flow,_ = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name=MIP_solver,crossings=limit_crossings,tee=MIP_tee)
         
