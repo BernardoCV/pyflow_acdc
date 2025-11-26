@@ -473,20 +473,31 @@ def log_infeasible_constraints_limited(model, max_per_type=5):
     
     print("=" * 80)
 
-def _gurobi_callback(model, feasible_solutions,time_limit):
+def _gurobi_callback(model, feasible_solutions, time_limit):
     from gurobipy import GRB
     opt = pyo.SolverFactory('gurobi_persistent')
     opt.set_instance(model)
     grb_model = opt._solver_model
 
-    grb_model._start_time = time.time()
-
     def my_callback(model, where):
         if where == GRB.Callback.MIPSOL:
-            obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)
+            # New feasible solution found
             time_found = model.cbGet(GRB.Callback.RUNTIME)
-            feasible_solutions.append((time_found,obj))
-            print(f"Feasible solution found: Obj = {obj}, Time = {time_found:.2f}s")
+            obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)  # incumbent obj (this solution)
+            
+            # Global best bound at this moment
+            bound = model.cbGet(GRB.Callback.MIPSOL_OBJBND)
+
+            gap = None
+            # Check that we actually have a meaningful incumbent and bound
+            if obj < GRB.INFINITY and bound > -GRB.INFINITY:
+                denom = abs(obj)
+                if denom < 1e-10:
+                    denom = 1e-10  # avoid division by zero for tiny objectives
+                gap = abs(bound - obj) / denom  # same definition Gurobi uses
+
+            # Store: (time, value, gap)
+            feasible_solutions.append((time_found, obj, gap))
 
     if time_limit is not None:
         grb_model.setParam("TimeLimit", time_limit)
@@ -496,9 +507,17 @@ def _gurobi_callback(model, feasible_solutions,time_limit):
     from pyomo.opt.results.results_ import SolverResults
     results = SolverResults()
     results.solver.status = pyo.SolverStatus.ok
-    results.problem.upper_bound = grb_model.ObjVal
+    results.problem.upper_bound = grb_model.ObjVal if grb_model.SolCount > 0 else None
     results.solver.time = grb_model.Runtime
-    feasible_solutions.append((grb_model.Runtime,grb_model.ObjVal,grb_model.IterCount,grb_model.IterCount,True))
+    
+    # Calculate final gap and append final solution
+    final_gap = None
+    if grb_model.SolCount > 0:
+        obj_val = grb_model.ObjVal
+        obj_bound = grb_model.ObjBound
+        if obj_bound != GRB.INFINITY and obj_bound != -GRB.INFINITY and abs(obj_val) > 1e-10:
+            final_gap = abs(obj_val - obj_bound) / abs(obj_val)
+        feasible_solutions.append((grb_model.Runtime, obj_val, final_gap))
     
     if grb_model.Status == GRB.Status.OPTIMAL:
         results.solver.termination_condition = pyo.TerminationCondition.optimal

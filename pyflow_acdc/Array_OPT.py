@@ -248,6 +248,12 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             show=False,
             save_path=f'feasible_solutions_{grid.name}.png'
         )
+        # Export to Excel with MIP and CSS sheets
+        export_feasible_solutions_to_excel(
+            feasible_solutions_MIP,
+            feasible_solutions_CSS,
+            save_path=f'feasible_solutions_{grid.name}.xlsx'
+        )
 
     
     
@@ -371,22 +377,14 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         if getattr(grid, "MIP_time", None) is not None:
             grb_model.setParam("TimeLimit", grid.MIP_time)
         
-        # MIPFocus: 0=balanced, 1=feasibility, 2=optimality, 3=bound improvement
-        # For faster gap reduction, use 2 (optimality) or 3 (bound improvement)
-        # Default was 1 (feasibility) which prioritizes finding solutions over closing gap
-        mip_focus = getattr(grid, "MIP_focus", 2)  # Default to 2 for better gap reduction
+        # Settings for spanning tree / network flow MIP
+        mip_focus = getattr(grid, "MIP_focus", 1)  # Focus on finding good solutions fast
         grb_model.setParam("MIPFocus", mip_focus)
-        
-       
-        # Additional parameters to improve gap reduction:
-        # Increase cutting planes to strengthen LP relaxation
-        grb_model.setParam("Cuts", 2)  # 2=aggressive cutting
-        
-        # Increase heuristics to find better solutions faster
-        grb_model.setParam("Heuristics", 0.05)  # Spend 5% of time on heuristics
-        
-        # Improve presolve to reduce problem size
-        grb_model.setParam("Presolve", 2)  # 2=aggressive presolve
+        grb_model.setParam("Cuts", 2)  # Aggressive cuts
+        grb_model.setParam("Heuristics", 0.2)  # More time on heuristics
+        grb_model.setParam("Presolve", 2)  # Aggressive presolve
+        grb_model.setParam("Threads", 0)  # Use all available cores
+        grb_model.setParam("Symmetry", 2)  # Aggressive symmetry detection
         
         grb_model.optimize(my_callback)
 
@@ -437,15 +435,14 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         if getattr(grid, "MIP_time", None) is not None:
             if solver_name == 'gurobi':
                 solver.options['TimeLimit'] = grid.MIP_time
-                # Use MIPFocus=2 for better gap reduction instead of 1
-                mip_focus = getattr(grid, "MIP_focus", 2)
+                # Settings for spanning tree / network flow MIP
+                mip_focus = getattr(grid, "MIP_focus", 1)  # Focus on finding good solutions fast
                 solver.options['MIPFocus'] = mip_focus
-                # Add gap tolerance
-               
-                solver.options['MIPGap'] = mip_gap
-                solver.options['Cuts'] = 2  # Aggressive cutting
-                solver.options['Heuristics'] = 0.05
-                solver.options['Presolve'] = 2
+                solver.options['Cuts'] = 2  # Aggressive cuts
+                solver.options['Heuristics'] = 0.2  # More time on heuristics
+                solver.options['Presolve'] = 2  # Aggressive presolve
+                solver.options['Threads'] = 0  # Use all available cores
+                solver.options['Symmetry'] = 2  # Aggressive symmetry detection
             elif solver_name == 'glpk':
                 solver.options['tmlim'] = grid.MIP_time
 
@@ -804,7 +801,7 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
     # Two subplots side-by-side: MIP (left), CSS (right)
     fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=False, sharey=False, constrained_layout=True)
 
-    def _plot(ax, results, title,yaxis):
+    def _plot(ax, results, title, yaxis, plot_gap=False):
         if not results:
             ax.set_title(title, fontsize=FS)
             ax.set_xlabel('Time (s)', fontsize=FS)
@@ -818,11 +815,21 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
                 continue
             has_any = True
             feas_sorted = sorted(feas, key=lambda x: x[0])
-            times = [t for t, _ in feas_sorted]
-            objs = [o for _, o in feas_sorted]
-            if title == 'CSS':
-                objs = [o/1e6 for o in objs]
-            ax.plot(times, objs, 'o-', label=f'i={i} (s={len(objs)})', markersize=5, linewidth=2)
+            times = [t for t, o, g in feas_sorted]
+            if plot_gap:
+                # Plot gap (tuple[2]) as percentage
+                values = [g * 100 if g is not None else None for t, o, g in feas_sorted]
+                # Filter out None values
+                valid_data = [(t, v) for t, v in zip(times, values) if v is not None]
+                if valid_data:
+                    times = [t for t, v in valid_data]
+                    values = [v for t, v in valid_data]
+            else:
+                values = [o for t, o, g in feas_sorted]
+                if title == 'CSS':
+                    values = [o/1e6 for o in values]
+            if times and values:
+                ax.plot(times, values, 'o-', label=f'i={i} (s={len(values)})', markersize=5, linewidth=2)
         ax.set_title(title, fontsize=FS*1.2)
         ax.set_xlabel('Time (s)', fontsize=FS*1.1)
         ax.set_ylabel(yaxis, fontsize=FS*1.1)
@@ -831,8 +838,9 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
         ax.tick_params(labelsize=FS)
         ax.grid(True, alpha=0.3)
 
-    _plot(axes[0], results_mip, 'MIP', 'Cable length [km]')
-    _plot(axes[1], results_css, 'CSS', 'Objective [M€]')
+    # Plot time vs gap for MIP, time vs objective for CSS
+    _plot(axes[0], results_mip, 'MIP', 'Gap [%]', plot_gap=True)
+    _plot(axes[1], results_css, 'CSS', 'Objective [M€]', plot_gap=True)
 
     if suptitle is not None:
         fig.suptitle(suptitle, fontsize=FS*1.3)
@@ -856,6 +864,63 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
     else:
         plt.close(fig)
 
+
+def export_feasible_solutions_to_excel(results_mip, results_css, save_path):
+    """
+    Export MIP and CSS feasible solutions to Excel with two sheets.
+    
+    Each iteration's solutions are in columns: {i}_t, {i}_obj, {i}_gap
+    Rows correspond to solution index within that iteration.
+    
+    Args:
+        results_mip: List of lists, each inner list contains (time, obj, gap) tuples for MIP
+        results_css: List of lists, each inner list contains (time, obj, gap) tuples for CSS
+        save_path: Path to save the Excel file
+    """
+    import pandas as pd
+    
+    def _create_dataframe(results, name):
+        """Create a DataFrame from results with columns for each iteration."""
+        if not results:
+            return pd.DataFrame()
+        
+        # Find max number of solutions across all iterations
+        max_solutions = max(len(feas) if feas else 0 for feas in results)
+        if max_solutions == 0:
+            return pd.DataFrame()
+        
+        data = {}
+        for i, feas in enumerate(results):
+            if not feas:
+                continue
+            # Sort by time
+            feas_sorted = sorted(feas, key=lambda x: x[0])
+            
+            times = [t for t, o, g in feas_sorted]
+            objs = [o for t, o, g in feas_sorted]
+            gaps = [g * 100 if g is not None else None for t, o, g in feas_sorted]
+            
+            # Pad to max_solutions length
+            times.extend([None] * (max_solutions - len(times)))
+            objs.extend([None] * (max_solutions - len(objs)))
+            gaps.extend([None] * (max_solutions - len(gaps)))
+            
+            data[f'{i+1}_t'] = times
+            data[f'{i+1}_obj'] = objs
+            data[f'{i+1}_gap'] = gaps
+        
+        return pd.DataFrame(data)
+    
+    mip_df = _create_dataframe(results_mip, 'MIP')
+    css_df = _create_dataframe(results_css, 'CSS')
+    
+    with pd.ExcelWriter(save_path, engine='xlsxwriter') as writer:
+        if not mip_df.empty:
+            mip_df.to_excel(writer, sheet_name='MIP', index=False)
+        if not css_df.empty:
+            css_df.to_excel(writer, sheet_name='CSS', index=False)
+    
+    print(f"Feasible solutions saved to: {save_path}")
 
 
 def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=300,NL=False,tee=False,export=True,fs=False):
