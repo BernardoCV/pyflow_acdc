@@ -63,15 +63,13 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     while flag:
         timing_info = {}
         
-        # Always run MIP check
+        t1 = time.perf_counter()
         if sub_min_connections:
             flag, high_flow,model_MIP,feasible_solutions_MIP ,ns, sub_iter , path_time = min_sub_connections(grid, max_flow)
         else:
-
-            t1 = time.perf_counter()
             flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs)
             
-            t2 = time.perf_counter()
+        t2 = time.perf_counter()
         timing_info['Paths'] = t2 - t1
         path_time += t2 - t1
 
@@ -372,7 +370,24 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
 
         if getattr(grid, "MIP_time", None) is not None:
             grb_model.setParam("TimeLimit", grid.MIP_time)
-        grb_model.setParam("MIPFocus", 1)
+        
+        # MIPFocus: 0=balanced, 1=feasibility, 2=optimality, 3=bound improvement
+        # For faster gap reduction, use 2 (optimality) or 3 (bound improvement)
+        # Default was 1 (feasibility) which prioritizes finding solutions over closing gap
+        mip_focus = getattr(grid, "MIP_focus", 2)  # Default to 2 for better gap reduction
+        grb_model.setParam("MIPFocus", mip_focus)
+        
+       
+        # Additional parameters to improve gap reduction:
+        # Increase cutting planes to strengthen LP relaxation
+        grb_model.setParam("Cuts", 2)  # 2=aggressive cutting
+        
+        # Increase heuristics to find better solutions faster
+        grb_model.setParam("Heuristics", 0.05)  # Spend 5% of time on heuristics
+        
+        # Improve presolve to reduce problem size
+        grb_model.setParam("Presolve", 2)  # 2=aggressive presolve
+        
         grb_model.optimize(my_callback)
 
         from pyomo.opt.results.results_ import SolverResults
@@ -422,7 +437,15 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         if getattr(grid, "MIP_time", None) is not None:
             if solver_name == 'gurobi':
                 solver.options['TimeLimit'] = grid.MIP_time
-                solver.options['MIPFocus'] = 1
+                # Use MIPFocus=2 for better gap reduction instead of 1
+                mip_focus = getattr(grid, "MIP_focus", 2)
+                solver.options['MIPFocus'] = mip_focus
+                # Add gap tolerance
+               
+                solver.options['MIPGap'] = mip_gap
+                solver.options['Cuts'] = 2  # Aggressive cutting
+                solver.options['Heuristics'] = 0.05
+                solver.options['Presolve'] = 2
             elif solver_name == 'glpk':
                 solver.options['tmlim'] = grid.MIP_time
 
