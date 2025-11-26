@@ -55,6 +55,11 @@ def run_case(case,MIP_solver='gurobi'):
 def run_test():
     """Test CIGRE B4 optimal power flow."""
     try:
+        import dill
+    except ImportError:
+        print("dill is not installed (required to load pickle files)...")
+        return
+    try:
         import pyomo
     except ImportError:
         print("pyomo is not installed...")

@@ -3,9 +3,9 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import logging
 import itertools
-import branca
 import base64
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +13,23 @@ import os
 from shapely.geometry import Point, LineString,Polygon,MultiPolygon
 
 from .Classes import Node_AC
+
+
+def _loading_colormap(value, vmin=0, vmax=100):
+    """
+    Map a value to a color (green -> yellow -> red) for loading visualization.
+    Replaces branca.colormap.LinearColormap.
+    """
+    # Clamp value to range
+    normalized = max(0, min(1, (value - vmin) / (vmax - vmin)))
+    
+    # Create colormap: green (0) -> yellow (0.5) -> red (1)
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        'loading', ['green', 'yellow', 'red']
+    )
+    rgba = cmap(normalized)
+    # Return as hex color string
+    return mcolors.to_hex(rgba)
 
 
 __all__ = ['plot_Graph',
@@ -1311,12 +1328,6 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 path_data = path_data[:-2]
                 dwg.add(dwg.path(d=path_data, stroke='black', stroke_width=2, fill='none'))
 
-        if coloring in ['loading','ts_max_loading','ts_avg_loading']:
-            colormap = branca.colormap.LinearColormap(
-                colors=["green", "yellow", "red"],
-                vmin=0, 
-                vmax=100
-                )
         # Draw AC lines
         for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
@@ -1336,7 +1347,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     if int(load_show) > 100:
                         color = 'blue'
                     else:
-                        color = colormap(load_show)
+                        color = _loading_colormap(load_show)
                         color, opacity = _svg_color_and_opacity(color)
                 else:
                     if line in grid.lines_AC_rec and line.rec_branch:
@@ -1360,7 +1371,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]
                 if coloring == 'loading':
-                    map_color = colormap(min(max(line.loading,line.ts_max_loading),100))
+                    map_color = _loading_colormap(min(max(line.loading,line.ts_max_loading),100))
                     color, opacity = _svg_color_and_opacity(map_color)
                 else:
                     if line.np_line - line.np_line_b > 0.001:
