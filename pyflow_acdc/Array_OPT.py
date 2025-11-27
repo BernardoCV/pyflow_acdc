@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import math
 import pyomo.environ as pyo
+import pandas as pd
 try:
     import gurobipy
     GUROBI_AVAILABLE = True
@@ -88,7 +89,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             if tee and i==0:
                 print(f'Using user defined substation limit path graph for sequential CSS')
             flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend)
-
+            sub_iter = 1
         
         t2 = time.perf_counter()
         if tee:     
@@ -236,6 +237,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             'timing_info': timing_info,
             'MIP_model': model_MIP,
             'CSS_model': model,
+            'sub_iter': sub_iter,
             'i': i,
             'feasible_solutions_MIP': feasible_solutions_MIP,
             'feasible_solutions_CSS': feasible_solutions_CSS
@@ -278,6 +280,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         'timing_info':  [result['timing_info'] for result in results],
         'solver_status':[result['model_results']['Solver'][0]['Status']  for result in results],
         'iteration':    [result['i'] for result in results],
+        'sub_iter':     [result['sub_iter'] for result in results],
         'feasible_solutions_MIP': [result['feasible_solutions_MIP'] for result in results],
         'feasible_solutions_CSS': [result['feasible_solutions_CSS'] for result in results]
     }
@@ -293,12 +296,28 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         feasible_solutions_MIP = [result['feasible_solutions_MIP'] for result in results]
         feasible_solutions_CSS = [result['feasible_solutions_CSS'] for result in results]
         # Save feasible solutions plot in the sequential_CSS folder
-        feasible_sol_path = os.path.join(save_dir, f'feasible_solutions_{grid.name}.png')
+        feasible_sol_gap_path = os.path.join(save_dir, f'feasible_solutions_{grid.name}_gap.png')
+        feasible_sol_obj_path = os.path.join(save_dir, f'feasible_solutions_{grid.name}_obj.png')
         _plot_feasible_solutions_subplots(
             feasible_solutions_MIP,
             feasible_solutions_CSS,
             show=False,
-            save_path=feasible_sol_path
+            save_path=feasible_sol_obj_path,
+            type='obj'
+        )
+        _plot_feasible_solutions_subplots(
+            feasible_solutions_MIP,
+            feasible_solutions_CSS,
+            show=False,
+            save_path=feasible_sol_gap_path,
+            type='gap'
+        )
+        # Export feasible solutions to Excel/CSV
+        feasible_sol_excel_path = os.path.join(save_dir, f'feasible_solutions_{grid.name}.csv')
+        _export_feasible_solutions_to_excel(
+            feasible_solutions_MIP,
+            feasible_solutions_CSS,
+            save_path=feasible_sol_excel_path
         )
 
     
@@ -1366,7 +1385,92 @@ def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=
     else:
         plt.close(fig)
 
-def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, show=True, save_path=None, width_mm=None):
+def _export_feasible_solutions_to_excel(results_mip, results_css, save_path):
+    """
+    Export feasible solutions to separate CSV files (one for MIP, one for CSS) or Excel.
+    Format: 0_t, 0_obj, 0_gap, 1_t, 1_obj, 1_gap, ...
+    
+    Args:
+        results_mip: List of feasible solutions for MIP (each is list of (time, obj, gap) tuples)
+        results_css: List of feasible solutions for CSS (each is list of (time, obj, gap) tuples)
+        save_path: Base path (will create _MIP.csv and _CSS.csv, or single .xlsx file)
+    """
+    
+    # Determine format from extension
+    base_path = save_path
+    if save_path.lower().endswith('.csv'):
+        base_path = save_path[:-4]  # Remove .csv extension
+        file_format = 'csv'
+    elif save_path.lower().endswith('.xlsx'):
+        file_format = 'excel'
+    else:
+        # Default to CSV
+        file_format = 'csv'
+    
+    def _export_single(results, suffix, max_solutions):
+        """Export a single set of results (MIP or CSS)"""
+        if not results:
+            return None
+        
+        data = {}
+        max_iter = len(results)
+        
+        for i in range(max_iter):
+            if results[i]:
+                feas_sorted = sorted(results[i], key=lambda x: x[0])  # Sort by time
+                # Pad to max_solutions with NaN
+                times = [t for t, _, _ in feas_sorted] + [np.nan] * (max_solutions - len(feas_sorted))
+                objs = [o for _, o, _ in feas_sorted] + [np.nan] * (max_solutions - len(feas_sorted))
+                gaps = [g for _, _, g in feas_sorted] + [np.nan] * (max_solutions - len(feas_sorted))
+                
+                data[f'{i}_t'] = times[:max_solutions]
+                data[f'{i}_obj'] = objs[:max_solutions]
+                data[f'{i}_gap'] = gaps[:max_solutions]
+        
+        if not data:
+            return None
+        
+        df = pd.DataFrame(data)
+        
+        if file_format == 'csv':
+            csv_path = f"{base_path}_{suffix}.csv"
+            df.to_csv(csv_path, index=False)
+            print(f"Feasible solutions ({suffix}) exported to CSV: {csv_path}")
+            return None
+        else:
+            # For Excel, return DataFrame to write to sheet
+            return df
+    
+    # Find maximum number of feasible solutions for each type
+    max_mip_solutions = max((len(feas) for feas in results_mip if feas), default=0)
+    max_css_solutions = max((len(feas) for feas in results_css if feas), default=0)
+    
+    if max_mip_solutions == 0 and max_css_solutions == 0:
+        print("Warning: No feasible solutions to export")
+        return
+    
+    if file_format == 'csv':
+        # Save separate CSV files
+        if max_mip_solutions > 0:
+            _export_single(results_mip, 'MIP', max_mip_solutions)
+        if max_css_solutions > 0:
+            _export_single(results_css, 'CSS', max_css_solutions)
+    else:
+        # Save to Excel with separate sheets
+        excel_path = f"{base_path}.xlsx" if not base_path.endswith('.xlsx') else base_path
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            if max_mip_solutions > 0:
+                df_mip = _export_single(results_mip, 'MIP', max_mip_solutions)
+                if df_mip is not None:
+                    df_mip.to_excel(writer, sheet_name='MIP', index=False)
+            if max_css_solutions > 0:
+                df_css = _export_single(results_css, 'CSS', max_css_solutions)
+                if df_css is not None:
+                    df_css.to_excel(writer, sheet_name='CSS', index=False)
+        print(f"Feasible solutions exported to Excel: {excel_path}")
+
+
+def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, show=True, save_path=None, width_mm=None,type='gap'):
     import matplotlib.pyplot as plt
     FS = 10
     # Maintain 40:20 aspect ratio regardless of absolute size (taller axes)
@@ -1381,7 +1485,7 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
     # Two subplots side-by-side: MIP (left), CSS (right)
     fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=False, sharey=False, constrained_layout=True)
 
-    def _plot(ax, results, title,yaxis):
+    def _plot(ax, results, title,yaxis,type):
         if not results:
             ax.set_title(title, fontsize=FS)
             ax.set_xlabel('Time (s)', fontsize=FS)
@@ -1395,11 +1499,16 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
                 continue
             has_any = True
             feas_sorted = sorted(feas, key=lambda x: x[0])
-            times = [t for t, _ in feas_sorted]
-            objs = [o for _, o in feas_sorted]
-            if title == 'CSS':
-                objs = [o/1e6 for o in objs]
-            ax.plot(times, objs, 'o-', label=f'i={i} (s={len(objs)})', markersize=5, linewidth=2)
+            # Unpack (time, objective, gap) tuples
+            times = [t for t, _, _ in feas_sorted]
+            if type == 'gap':
+                # Handle None gaps - convert to percentage, use 0 if None
+                gap = [(g * 100 if g is not None else 0) for _, _, g in feas_sorted]
+            else:
+                gap = [o for _, o, _ in feas_sorted]
+                if title == 'CSS':
+                    gap = [o/1e6 for o in gap]
+            ax.plot(times, gap, 'o-', label=f'i={i} (s={len(gap)})', markersize=5, linewidth=2)
         ax.set_title(title, fontsize=FS*1.2)
         ax.set_xlabel('Time (s)', fontsize=FS*1.1)
         ax.set_ylabel(yaxis, fontsize=FS*1.1)
@@ -1407,9 +1516,14 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
             ax.legend(prop={'size': FS}, loc='upper right', frameon=False)
         ax.tick_params(labelsize=FS)
         ax.grid(True, alpha=0.3)
-
-    _plot(axes[0], results_mip, 'MIP', 'Cable length [km]')
-    _plot(axes[1], results_css, 'CSS', 'Objective [M€]')
+    
+    if type == 'gap':
+        _plot(axes[0], results_mip, 'MIP', 'Gap [%]',type)
+        _plot(axes[1], results_css, 'CSS', 'Gap [%]',type)
+    else:
+        _plot(axes[0], results_mip, 'MIP', 'Cable length [km]',type)
+        _plot(axes[1], results_css, 'CSS', 'Objective [M€]',type)
+   
 
     if suptitle is not None:
         fig.suptitle(suptitle, fontsize=FS*1.3)
