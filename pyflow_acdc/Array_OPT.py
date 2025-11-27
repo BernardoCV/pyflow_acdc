@@ -10,6 +10,12 @@ try:
 except ImportError:
     GUROBI_AVAILABLE = False
 
+try:
+    from ortools.sat.python import cp_model
+    ORTOOLS_AVAILABLE = True
+except ImportError:
+    ORTOOLS_AVAILABLE = False
+
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
 from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
@@ -26,7 +32,7 @@ __all__ = [
 ]
 
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None):
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,MIP_gap=0.01,backend='pyomo'):
     
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
@@ -77,11 +83,11 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         if sub_min_connections:
             if tee and i==0:
                 print(f'Using min sub connections iterationfor sequential CSS')
-            flag, high_flow,model_MIP,feasible_solutions_MIP ,ns, sub_iter , path_time = min_sub_connections(grid, max_flow,solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs)
+            flag, high_flow,model_MIP,feasible_solutions_MIP ,ns, sub_iter , path_time = min_sub_connections(grid, max_flow,solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend)
         else:
             if tee and i==0:
                 print(f'Using user defined substation limit path graph for sequential CSS')
-            flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs)
+            flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend)
 
         
         t2 = time.perf_counter()
@@ -101,7 +107,15 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
                 if tee:
                     print(f'MIP failed on iteration {i}, breaking loop')
                 break
-        MIP_obj_value = pyo.value(model_MIP.objective)
+        # Handle both Pyomo model and OR-Tools MockModel
+        if hasattr(model_MIP, 'objective'):
+            # Pyomo model
+            MIP_obj_value = pyo.value(model_MIP.objective)
+        elif hasattr(model_MIP, 'objective_value'):
+            # OR-Tools MockModel
+            MIP_obj_value = model_MIP.objective_value
+        else:
+            raise AttributeError("model_MIP must have either 'objective' (Pyomo) or 'objective_value' (OR-Tools) attribute")
         if  high_flow < max_flow:
             
             max_power_per_string = t_MW*high_flow 
@@ -342,7 +356,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     
 
 
-def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, callback=False):
+def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, callback=False,MIP_gap=None, backend='pyomo'):
     tn = grid.n_ren
     sn = grid.nn_AC - grid.n_ren
 
@@ -361,7 +375,7 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
                 node.ct_limit = ns
 
         t0 = time.perf_counter()
-        flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name, crossings, tee,callback)
+        flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name, crossings, tee,callback,MIP_gap,backend)
         t1 = time.perf_counter()
         path_time = t1 - t0
         i+=1
@@ -379,8 +393,41 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
 
 
 
-def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False):
-    """Solve the master MIP problem and track feasible solutions over time (optional with Gurobi callback)."""
+def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False, MIP_gap=None, backend='pyomo'):
+    """
+    Solve the master MIP problem and track feasible solutions over time.
+    
+    Parameters:
+    -----------
+    backend : str, optional
+        Backend to use: 'pyomo' (default) or 'ortools'
+        - 'pyomo': Uses Pyomo with external solver (GLPK, Gurobi, etc.)
+        - 'ortools': Uses OR-Tools CP-SAT solver (built-in, faster)
+    
+    Returns:
+    --------
+    success : bool
+        True if solution found, False otherwise
+    high_flow : float or None
+        Maximum flow value in solution
+    model : Pyomo model or MockModel
+        Solved model object
+    feasible_solutions : list
+        List of (time, objective_value, gap) tuples if callback=True
+    """
+    # Route to appropriate backend
+    if backend.lower() == 'ortools':
+        if not ORTOOLS_AVAILABLE:
+            raise ImportError(
+                "OR-Tools is not installed. Please install it with: pip install ortools\n"
+                "Alternatively, use backend='pyomo' (default) which uses Pyomo with external solvers."
+            )
+        return MIP_path_graph_ortools(grid, max_flow=max_flow, crossings=crossings, 
+                                      tee=tee, callback=callback, MIP_gap=MIP_gap)
+    elif backend.lower() != 'pyomo':
+        raise ValueError(f"Unknown backend: {backend}. Must be 'pyomo' or 'ortools'")
+    
+    # Original Pyomo implementation
     model = _create_master_problem_pyomo(grid, crossings, max_flow)
     feasible_solutions = []
     feasible_solution_found = False
@@ -434,6 +481,9 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         # Improve presolve to reduce problem size
         grb_model.setParam("Presolve", 2)  # 2=aggressive presolve
         
+        if MIP_gap is not None:
+            grb_model.setParam("MIPGap", MIP_gap)
+
         grb_model.optimize(my_callback)
 
         from pyomo.opt.results.results_ import SolverResults
@@ -484,21 +534,31 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     # === Other solvers (no callback) ===
     else:
         solver = pyo.SolverFactory(solver_name)
-        if getattr(grid, "MIP_time", None) is not None:
-            if solver_name == 'gurobi':
+        if solver_name == 'gurobi':
+            # Set Gurobi-specific parameters regardless of MIP_time
+            # Use MIPFocus=2 for better gap reduction instead of 1
+            mip_focus = getattr(grid, "MIP_focus", 2)
+            solver.options['MIPFocus'] = mip_focus
+            solver.options['Cuts'] = 2  # Aggressive cutting
+            solver.options['Heuristics'] = 0.05
+            solver.options['Presolve'] = 2
+            if MIP_gap is not None:
+                solver.options['MIPGap'] = MIP_gap
+            if getattr(grid, "MIP_time", None) is not None:
                 solver.options['TimeLimit'] = grid.MIP_time
-                # Use MIPFocus=2 for better gap reduction instead of 1
-                mip_focus = getattr(grid, "MIP_focus", 2)
-                solver.options['MIPFocus'] = mip_focus
-                # Add gap tolerance
-                mip_gap = getattr(grid, "MIP_gap", 0.01)
-                solver.options['MIPGap'] = mip_gap
-                solver.options['Cuts'] = 2  # Aggressive cutting
-                solver.options['Heuristics'] = 0.05
-                solver.options['Presolve'] = 2
-            elif solver_name == 'glpk':
+        elif solver_name == 'glpk':
+            if getattr(grid, "MIP_time", None) is not None:
                 solver.options['tmlim'] = grid.MIP_time
-
+        elif solver_name == 'cbc':
+            if getattr(grid, "MIP_time", None) is not None:
+                solver.options['seconds'] = grid.MIP_time
+            if MIP_gap is not None:
+                solver.options['ratioGap'] = MIP_gap
+        elif solver_name == 'highs':
+            if getattr(grid, "MIP_time", None) is not None:
+                solver.options['time_limit'] = grid.MIP_time
+            if MIP_gap is not None:
+                solver.options['mip_rel_gap'] = MIP_gap
         try:
             results = solver.solve(model, tee=tee)
             # Check solver results to determine if solve was successful
@@ -541,8 +601,157 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         print("✗ MIP model failed")
         return False, None, None, feasible_solutions
 
-
+def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None):
+    """Solve the master MIP problem using OR-Tools CP-SAT solver."""
+    if not ORTOOLS_AVAILABLE:
+        raise ImportError(
+            "OR-Tools is not installed. Please install it with: pip install ortools"
+        )
+    length_scale = 1000
+    from ortools.sat.python import cp_model
     
+    # Create model
+    model, vars_dict = _create_master_problem_ortools(grid, crossings, max_flow, length_scale)
+    
+    feasible_solutions = []
+    feasible_solution_found = False
+    high_flow = None
+    
+    # Create solver
+    solver = cp_model.CpSolver()
+    
+    # Set solver parameters
+    if tee:
+        solver.parameters.log_search_progress = True
+    
+    # Set time limit if specified
+    if hasattr(grid, "MIP_time") and grid.MIP_time is not None:
+        solver.parameters.max_time_in_seconds = grid.MIP_time
+    
+    # Set MIP gap if specified (CP-SAT uses relative gap)
+    if MIP_gap is not None:
+        solver.parameters.relative_gap_limit = MIP_gap
+    
+    # Callback for tracking feasible solutions (if requested)
+    if callback:
+        class SolutionCallback(cp_model.CpSolverSolutionCallback):
+            def __init__(self, vars_dict, feasible_solutions):
+                cp_model.CpSolverSolutionCallback.__init__(self)
+                self.vars_dict = vars_dict
+                self.feasible_solutions = feasible_solutions
+                self.solution_count = 0
+            
+            def on_solution_callback(self):
+                self.solution_count += 1
+                runtime = self.WallTime()
+                objective = self.ObjectiveValue()
+                
+                # Try to get bound if available (CP-SAT may not provide in callback)
+                try:
+                    bound = self.BestObjectiveBound()
+                except:
+                    bound = None
+                
+                # Calculate relative gap
+                relgap = None
+                if bound is not None and objective is not None and abs(objective) > 1e-10:
+                    relgap = 1.0 - bound / objective
+                
+                # Store as tuple for compatibility: (time, objective, gap)
+                self.feasible_solutions.append((runtime, objective, relgap))
+        
+        callback_obj = SolutionCallback(vars_dict, feasible_solutions)
+        status = solver.Solve(model, callback_obj)
+    else:
+        status = solver.Solve(model)
+    
+    # Check solution status
+    if status == cp_model.OPTIMAL:
+        feasible_solution_found = True
+    elif status == cp_model.FEASIBLE:
+        feasible_solution_found = True
+    elif status == cp_model.INFEASIBLE:
+        feasible_solution_found = False
+    elif status == cp_model.MODEL_INVALID:
+        feasible_solution_found = False
+    else:
+        # TIMEOUT or other status - check if we have a solution by checking objective value
+        # CP-SAT returns a very large value if no solution found
+        try:
+            obj_val = solver.ObjectiveValue()
+            # If objective is reasonable (not infinity), we have a solution
+            feasible_solution_found = obj_val < 1e20
+        except:
+            feasible_solution_found = False
+    
+    # Post-solve handling
+    if feasible_solution_found:
+        # Extract solution values
+        line_used_vals = {}
+        line_flow_vals = {}
+        
+        for l in vars_dict["line_used"]:
+            line_used_vals[l] = solver.Value(vars_dict["line_used"][l])
+            line_flow_vals[l] = solver.Value(vars_dict["line_flow"][l])
+        
+        # Calculate high flow
+        flows = [abs(line_flow_vals[l]) for l in line_flow_vals]
+        high_flow = max(flows) if flows else 0
+        
+        # Update grid with solution
+        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+        for l in line_used_vals:
+            ct_line = grid.lines_AC_ct[l]
+            ct_line.active_config = last_cable_type_index if line_used_vals[l] > 0 else -1
+        
+        # Create SolutionInfo for final solution
+        objective = solver.ObjectiveValue()
+        runtime = solver.WallTime()
+        
+        # Get bound if available
+        try:
+            bound = solver.BestObjectiveBound()
+        except:
+            bound = None
+        
+        # Calculate relative gap
+        relgap = None
+        if bound is not None and objective is not None and abs(objective) > 1e-10:
+            relgap = 1.0 - bound / objective
+        elif status == cp_model.OPTIMAL:
+            relgap = 0.0  # Optimal means gap is 0
+        
+        # Get termination status name
+        termination_map = {
+            cp_model.OPTIMAL: 'OPTIMAL',
+            cp_model.FEASIBLE: 'FEASIBLE',
+            cp_model.INFEASIBLE: 'INFEASIBLE',
+            cp_model.MODEL_INVALID: 'MODEL_INVALID',
+            cp_model.UNKNOWN: 'UNKNOWN'
+        }
+        termination = termination_map.get(status, 'UNKNOWN')
+    
+        # Add final solution to feasible_solutions if callback was used
+        if callback:
+            # Store as tuple for compatibility: (time, objective, gap)
+            feasible_solutions.append((runtime, objective, relgap))
+        
+        # Create a mock model-like object for compatibility with Pyomo version
+        class MockModel:
+            def __init__(self, vars_dict, line_used_vals, line_flow_vals, objective_value):
+                self.vars_dict = vars_dict
+                self.line_used_vals = line_used_vals
+                self.line_flow_vals = line_flow_vals
+                self.objective_value = objective_value
+             
+        
+        mock_model = MockModel(vars_dict, line_used_vals, line_flow_vals, objective)
+        
+        return True, high_flow, mock_model, feasible_solutions
+    else:
+        print("✗ MIP model failed (OR-Tools)")
+        return False, None, None, feasible_solutions
+
 def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
         """Create master problem using Pyomo"""
         
@@ -737,6 +946,305 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
             
         return model
     
+
+
+
+
+def _create_master_problem_ortools(grid, crossings=True, max_flow=None, length_scale=1000):
+    """
+    OR-Tools version of _create_master_problem_pyomo(grid, crossings=True, max_flow=None)
+
+    Returns:
+        model: cp_model.CpModel
+        vars_dict: {
+            "line_used": {line: BoolVar},
+            "line_flow": {line: IntVar},
+            "line_flow_dir": {line: BoolVar},
+            "node_flow": {node: IntVar},
+            "source_nodes": list[int],
+            "sink_nodes": list[int],
+        }
+    """
+    if not ORTOOLS_AVAILABLE:
+        raise ImportError(
+            "OR-Tools is not installed. Please install it with: pip install ortools"
+        )
+    
+    from ortools.sat.python import cp_model
+
+    model = cp_model.CpModel()
+
+    # --------------------
+    # Basic sets and parameters
+    # --------------------
+    num_lines = len(grid.lines_AC_ct)
+    num_nodes = len(grid.nodes_AC)
+
+    lines = range(num_lines)
+    nodes = range(num_nodes)
+
+    if max_flow is None:
+        max_flow = num_nodes - 1
+
+    # Identify sources (renewables) and sinks (generators / substations)
+    source_nodes = []
+    sink_nodes = []
+
+    for n in nodes:
+        nAC = grid.nodes_AC[n]
+        if getattr(nAC, "connected_gen", False):
+            sink_nodes.append(n)
+        if getattr(nAC, "connected_RenSource", False):
+            source_nodes.append(n)
+
+    if not sink_nodes:
+        raise ValueError("No generator nodes found!")
+
+    source_nodes_set = set(source_nodes)
+    sink_nodes_set = set(sink_nodes)
+
+    # Non-sink nodes count
+    nT = num_nodes - len(sink_nodes)
+    nS = len(sink_nodes)
+
+    # Minimum connections for sink nodes (same formula as Pyomo version)
+    # ceil(non_sink_nodes / (total_sink_capacity))
+    if nS > 0:
+        min_connections_per_sink = math.ceil(nT / (nS * max_flow))
+    else:
+        min_connections_per_sink = 0
+
+    # --------------------
+    # Precompute line incidence and bounds
+    # --------------------
+    incident_lines = {n: [] for n in nodes}
+    line_from = {}
+    line_to = {}
+    line_lb = {}
+    line_ub = {}
+
+    for l in lines:
+        line_obj = grid.lines_AC_ct[l]
+        from_node = line_obj.fromNode
+        to_node = line_obj.toNode
+
+        from_idx = from_node.nodeNumber
+        to_idx = to_node.nodeNumber
+
+        line_from[l] = from_idx
+        line_to[l] = to_idx
+
+        incident_lines[from_idx].append(l)
+        incident_lines[to_idx].append(l)
+
+        # Bounds depend on slack nodes (substations)
+        from_is_slack = getattr(from_node, "type", None) == "Slack"
+        to_is_slack = getattr(to_node, "type", None) == "Slack"
+
+        if from_is_slack or to_is_slack:
+            lb, ub = -max_flow, max_flow
+        else:
+            lb, ub = -(max_flow - 1), (max_flow - 1)
+
+        line_lb[l] = lb
+        line_ub[l] = ub
+
+    # Node flow bounds: each source contributes +1, sinks absorb −1
+    max_node_flow = len(source_nodes)
+
+    # --------------------
+    # Variables
+    # --------------------
+    # Binary: line_used[l] = 1 if line is active
+    line_used = {
+        l: model.NewBoolVar(f"line_used[{l}]")
+        for l in lines
+    }
+
+    # Binary: line_flow_dir[l] = 1 for "positive" orientation, 0 for "negative"
+    line_flow_dir = {
+        l: model.NewBoolVar(f"line_flow_dir[{l}]")
+        for l in lines
+    }
+
+    # Integer flow on each line (can be negative)
+    line_flow = {
+        l: model.NewIntVar(line_lb[l], line_ub[l], f"line_flow[{l}]")
+        for l in lines
+    }
+
+    # Integer net flow at each node
+    node_flow = {
+        n: model.NewIntVar(-max_node_flow, max_node_flow, f"node_flow[{n}]")
+        for n in nodes
+    }
+
+    # --------------------
+    # Objective: minimize total cable length
+    # CP-SAT needs integer coefficients: we scale Length_km by length_scale.
+    # Using math.ceil to round up to nearest meter integer (conservative approach).
+    # Effective objective = sum(line_used[l] * Length_km[l]) up to a constant factor.
+    # --------------------
+    coeffs = []
+    for l in lines:
+        length_km = grid.lines_AC_ct[l].Length_km
+        coeff = math.ceil(length_km * length_scale)  # Round up to nearest meter
+        coeffs.append(coeff)
+
+    model.Minimize(sum(coeffs[l] * line_used[l] for l in lines))
+
+    # --------------------
+    # Spanning tree constraint:
+    #   sum(line_used) == num_nodes - num_sink_nodes
+    # (same as original)
+    # --------------------
+    model.Add(sum(line_used[l] for l in lines) == num_nodes - len(sink_nodes))
+
+    # --------------------
+    # Connection constraints
+    # --------------------
+    # Upper bound: ct_limit per node if given
+    for n in nodes:
+        nAC = grid.nodes_AC[n]
+        ct_limit = getattr(nAC, "ct_limit", None)
+        if ct_limit is not None:
+            model.Add(
+                sum(line_used[l] for l in incident_lines[n]) <= ct_limit
+            )
+
+    # Lower bound:
+    # - For sinks: >= min_connections_per_sink
+    # - For non-sinks: >= 1
+    for n in nodes:
+        deg = sum(line_used[l] for l in incident_lines[n])
+
+        if n in sink_nodes_set:
+            if min_connections_per_sink > 0:
+                model.Add(deg >= min_connections_per_sink)
+        else:
+            model.Add(deg >= 1)
+
+    # --------------------
+    # Flow conservation: node_flow[n] = sum(outgoing) - sum(ingoing)
+    # --------------------
+    for n in nodes:
+        expr_terms = []
+        for l in incident_lines[n]:
+            if line_from[l] == n:
+                expr_terms.append(line_flow[l])
+            elif line_to[l] == n:
+                expr_terms.append(-line_flow[l])
+            else:
+                # Should not happen
+                pass
+        if expr_terms:
+            model.Add(node_flow[n] == sum(expr_terms))
+        else:
+            model.Add(node_flow[n] == 0)
+
+    # --------------------
+    # Source nodes: node_flow[n] == 1
+    # --------------------
+    for n in source_nodes:
+        model.Add(node_flow[n] == 1)
+
+    # --------------------
+    # Intermediate nodes: net flow = 0 (not source, not sink)
+    # --------------------
+    for n in nodes:
+        if n not in source_nodes_set and n not in sink_nodes_set:
+            model.Add(node_flow[n] == 0)
+
+    # --------------------
+    # Total sink absorption: sum(node_flow[sink]) == -len(source_nodes)
+    # --------------------
+    if sink_nodes:
+        model.Add(
+            sum(node_flow[n] for n in sink_nodes) == -len(source_nodes)
+        )
+
+    # --------------------
+    # Link flow to investment: |line_flow| <= max_flow * line_used
+    # --------------------
+    for l in lines:
+        model.Add(line_flow[l] <= max_flow * line_used[l])
+        model.Add(line_flow[l] >= -max_flow * line_used[l])
+
+    # --------------------
+    # Nonzero flow when line is used:
+    #   If line_used=1 and line_flow_dir=1 -> line_flow >= 1
+    #   If line_used=1 and line_flow_dir=0 -> line_flow <= -1
+    #
+    # Using Big-M linearization (expanded to avoid product of vars)
+    # --------------------
+    M = max_flow + 1
+
+    # flow_nonzero_positive:
+    # line_flow >= 1 - M*(1 - line_used) - M*(1 - line_flow_dir)
+    # Expand:
+    #   = 1 - M + M*line_used - M + M*line_flow_dir
+    #   = (1 - 2M) + M*line_used + M*line_flow_dir
+    for l in lines:
+        model.Add(
+            line_flow[l] >=
+            (1 - 2 * M)
+            + M * line_used[l]
+            + M * line_flow_dir[l]
+        )
+
+    # flow_nonzero_negative:
+    # line_flow <= -1 + M*(1 - line_used) + M*(line_flow_dir)
+    # Expand:
+    #   = -1 + M - M*line_used + M*line_flow_dir
+    for l in lines:
+        model.Add(
+            line_flow[l] <=
+            (-1 + M)
+            - M * line_used[l]
+            + M * line_flow_dir[l]
+        )
+
+    # Direction variable only active when line is used:
+    # line_flow_dir <= line_used
+    for l in lines:
+        model.Add(line_flow_dir[l] <= line_used[l])
+
+    # --------------------
+    # Crossing constraints: at most one line per crossing group
+    # --------------------
+    if crossings and hasattr(grid, "crossing_groups") and grid.crossing_groups:
+        # Map lineNumber -> index
+        line_number_to_idx = {
+            grid.lines_AC_ct[l].lineNumber: l
+            for l in lines
+        }
+
+        for group_idx, group in enumerate(grid.crossing_groups):
+            # group is a collection of lineNumbers
+            line_indices = [
+                line_number_to_idx[ln]
+                for ln in group
+                if ln in line_number_to_idx
+            ]
+            if line_indices:
+                model.Add(
+                    sum(line_used[l] for l in line_indices) <= 1
+                )
+
+    # --------------------
+    # Return model + handy variable dict
+    # --------------------
+    vars_dict = {
+        "line_used": line_used,
+        "line_flow": line_flow,
+        "line_flow_dir": line_flow_dir,
+        "node_flow": node_flow,
+        "source_nodes": source_nodes,
+        "sink_nodes": sink_nodes,
+    }
+
+    return model, vars_dict
+
 
 def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=None, show=True, save_path=None, width_mm=None):
     import matplotlib.pyplot as plt
