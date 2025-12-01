@@ -223,13 +223,16 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
        
         
 
-        
+        cable_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.lines))
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
+        total_cost = MIP_obj_value+obj_value
         # Create a dictionary for this iteration's results
         iteration_result = {
-            'cable_length': MIP_obj_value,
-            'model_obj': obj_value,  # Save the objective value
+            'cable_length': cable_length,
+            'installation_cost': MIP_obj_value,
+            'cable_cost': obj_value,
+            'total_cost': total_cost,  # Save the objective value
             'cable_options': iter_cab_available,  # Save a copy of the cable list
             'cables_used': used_cable_names,
             'model_results': model_results,
@@ -244,8 +247,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         }
         results.append(iteration_result)  # Add to the results list   
         
-        if i > 0 and obj_value is not None and results[i-1]['model_obj'] is not None:
-            if obj_value > results[i-1]['model_obj']:
+        if i > 0 and total_cost is not None and results[i-1]['total_cost'] is not None:
+            if total_cost > results[i-1]['total_cost']:
                 if tee:
                     print(f'Iteration {i} objective value increased, breaking loop')
                 break
@@ -274,7 +277,9 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     # After the while loop ends, create summary from all iterations
     summary_results = {
         'cable_length': [result['cable_length'] for result in results],
-        'model_obj':    [result['model_obj'] for result in results],
+        'installation_cost': [result['installation_cost'] for result in results],
+        'cable_cost':    [result['cable_cost'] for result in results],
+        'total_cost':   [result['total_cost'] for result in results],
         'cable_options': [result['cable_options'] for result in results],
         'cables_used':  [result['cables_used'] for result in results],
         'timing_info':  [result['timing_info'] for result in results],
@@ -287,7 +292,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
 
     # Find best result
     if len(results) > 1:
-        best_result = min(results, key=lambda x: x['model_obj'])
+        best_result = min(results, key=lambda x: x['total_cost'])
     else:
         best_result = results[0]  # Just return the single result
     
@@ -916,20 +921,17 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
         model.line_flow_dir = pyo.Var(model.lines, domain=pyo.Binary)
         # Objective: minimize total cable length (+ optional investment cost)
         def objective_rule(model):
-           
+            installation_cost = sum(model.line_used[line] * grid.lines_AC_ct[line].installation_cost  for line in model.lines)
             if enable_cable_types:
                 # Add cable type investment costs
-                investment_cost = 0
+                cable_type_cost = 0
                 for line in model.lines:
                     line_obj = grid.lines_AC_ct[line]
                     for ct in model.ct_set:
-                        investment_cost += model.ct_branch[line, ct] * line_obj.base_cost[ct]
-                return investment_cost
+                        cable_type_cost += model.ct_branch[line, ct] * line_obj.base_cost[ct]
+                return installation_cost + cable_type_cost
             else:
-                length_cost = sum(model.line_used[line] * grid.lines_AC_ct[line].Length_km 
-                             for line in model.lines)
-            
-                return length_cost
+                return installation_cost
         
         model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
         

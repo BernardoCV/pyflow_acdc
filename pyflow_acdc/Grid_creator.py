@@ -753,10 +753,12 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         
     
     for i, attrs in array_graph.nodes(data=True):
-        if attrs['point_type'] == 'turbine':
+        if attrs['point_type'] == 'access_point':
+            pass
+        elif attrs['point_type'] == 'turbine':
             kV=   turbines_df.loc[attrs['original_idx']].kV_rating
             geo = turbines_df.loc[attrs['original_idx']].geometry
-        elif attrs['point_type'] != 'acess_point': 
+        else: 
             kV=   substations_df.loc[attrs['original_idx']].kV_rating
             geo = substations_df.loc[attrs['original_idx']].geometry
 
@@ -782,11 +784,14 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         tonode = str(v)
         name= f'{str(u)}_{str(v)}'
 
-        l = attrs['weight']/1000
+        l = attrs['length']/1000
         geo= attrs['geometry']
+        w_l = attrs['weight']/1000
         
         line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=name,geometry=geo,update_grid=False)
         
+        line_obj.installation_cost_per_km = 304000
+        line_obj.weighted_Length_km = w_l
         # Store the line object with its name for later reference
         edge_key = f'{fromnode}_{tonode}'
         line_objects[edge_key] = line_obj
