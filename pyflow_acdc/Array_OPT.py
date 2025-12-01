@@ -412,7 +412,8 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
 
 
 
-def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False, MIP_gap=None, backend='pyomo'):
+def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False, MIP_gap=None, backend='pyomo',
+                   enable_cable_types=False, t_MW=None, cab_types_allowed=None):
     """
     Solve the master MIP problem and track feasible solutions over time.
     
@@ -422,6 +423,12 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         Backend to use: 'pyomo' (default) or 'ortools'
         - 'pyomo': Uses Pyomo with external solver (GLPK, Gurobi, etc.)
         - 'ortools': Uses OR-Tools CP-SAT solver (built-in, faster)
+    enable_cable_types : bool
+        If True, enable individual cable type selection per line
+    t_MW : float
+        Turbine MW rating (needed to calculate flow capacity from MVA ratings)
+    cab_types_allowed : int, optional
+        Maximum number of cable types that can be used (linking constraint)
     
     Returns:
     --------
@@ -441,13 +448,19 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                 "OR-Tools is not installed. Please install it with: pip install ortools\n"
                 "Alternatively, use backend='pyomo' (default) which uses Pyomo with external solvers."
             )
+        # Note: OR-Tools version doesn't support cable types yet
+        if enable_cable_types:
+            raise NotImplementedError("Cable type selection not yet implemented for OR-Tools backend")
         return MIP_path_graph_ortools(grid, max_flow=max_flow, crossings=crossings, 
                                       tee=tee, callback=callback, MIP_gap=MIP_gap)
     elif backend.lower() != 'pyomo':
         raise ValueError(f"Unknown backend: {backend}. Must be 'pyomo' or 'ortools'")
     
     # Original Pyomo implementation
-    model = _create_master_problem_pyomo(grid, crossings, max_flow)
+    model = _create_master_problem_pyomo(grid, crossings, max_flow, 
+                                         enable_cable_types=enable_cable_types,
+                                         t_MW=t_MW,
+                                         cab_types_allowed=cab_types_allowed)
     feasible_solutions = []
     feasible_solution_found = False
     high_flow = None
@@ -609,10 +622,31 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     if feasible_solution_found:
         flows = [abs(pyo.value(model.line_flow[line])) for line in model.lines]
         high_flow = max(flows) if flows else 0
-        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+        
+        # Assign cable types to lines
         for line in model.lines:
             ct_line = grid.lines_AC_ct[line]
-            ct_line.active_config = last_cable_type_index if pyo.value(model.line_used[line]) > 0.5 else -1
+            line_used = pyo.value(model.line_used[line]) > 0.5
+            
+            if not line_used:
+                ct_line.active_config = -1
+            elif enable_cable_types and hasattr(model, 'ct_branch'):
+                # Read selected cable type from ct_branch
+                selected_ct = None
+                for ct in model.ct_set:
+                    if pyo.value(model.ct_branch[line, ct]) > 0.5:
+                        selected_ct = ct
+                        break
+                if selected_ct is not None:
+                    ct_line.active_config = selected_ct
+                else:
+                    # Fallback: use last cable type if no selection found
+                    last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+                    ct_line.active_config = last_cable_type_index
+            else:
+                # No cable type selection: use last cable type as default
+                last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+                ct_line.active_config = last_cable_type_index
 
         return True, high_flow, model, feasible_solutions
 
@@ -771,8 +805,21 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
         print("✗ MIP model failed (OR-Tools)")
         return False, None, None, feasible_solutions
 
-def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
-        """Create master problem using Pyomo"""
+def _create_master_problem_pyomo(grid,crossings=True, max_flow=None, 
+                                  enable_cable_types=False, 
+                                  t_MW=None,
+                                  cab_types_allowed=None):
+        """Create master problem using Pyomo
+        
+        Parameters:
+        -----------
+        enable_cable_types : bool
+            If True, enable individual cable type selection per line
+        t_MW : float
+            Turbine MW rating (needed to calculate flow capacity from MVA ratings)
+        cab_types_allowed : int, optional
+            Maximum number of cable types that can be used (linking constraint)
+        """
         
         if max_flow is None:
             max_flow = len(grid.nodes_AC) - 1
@@ -807,6 +854,37 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
         # Binary variables: one per line (used or not)
         model.line_used = pyo.Var(model.lines, domain=pyo.Binary)
         
+        # Cable type selection (if enabled)
+        if enable_cable_types:
+            if grid.Cable_options is None or len(grid.Cable_options) == 0:
+                raise ValueError("enable_cable_types=True but no Cable_options found in grid")
+            if t_MW is None:
+                raise ValueError("t_MW must be provided when enable_cable_types=True")
+            
+            # Cable type set
+            model.ct_set = pyo.Set(initialize=range(len(grid.Cable_options[0]._cable_types)))
+            
+            # Calculate flow capacity for each cable type (in turbine units)
+            # Flow capacity = int(MVA_rating / t_MW)
+            ct_flow_capacity = {}
+            for ct in model.ct_set:
+                mva_rating = grid.Cable_options[0].MVA_ratings[ct]
+                ct_flow_capacity[ct] = int(mva_rating / t_MW)
+            model.ct_flow_capacity = pyo.Param(model.ct_set, initialize=ct_flow_capacity)
+            
+            # Cable type selection: ct_branch[line, ct] = 1 if cable type ct selected for line
+            model.ct_branch = pyo.Var(model.lines, model.ct_set, domain=pyo.Binary)
+            
+            # Optional: Global cable type indicator (Z_k style from image)
+            # ct_types[ct] = 1 if cable type ct is used anywhere
+            model.ct_types = pyo.Var(model.ct_set, domain=pyo.Binary)
+            
+            # LINKING: line_used and ct_branch are linked via cable_type_selection_rule constraint:
+            # sum(ct_branch[line, ct]) == line_used[line]
+            # This ensures:
+            # - If line_used[line] = 1: exactly one ct_branch[line, ct] = 1 (one cable type selected)
+            # - If line_used[line] = 0: all ct_branch[line, ct] = 0 (no cable type selected)
+        
         def line_flow_bounds(model, line):
             line_obj = grid.lines_AC_ct[line]
             from_node = line_obj.fromNode
@@ -816,20 +894,42 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
             from_is_slack = from_node.type == 'Slack'
             to_is_slack = to_node.type == 'Slack'
             
-            # If line connects to slack node: use full capacity [-max_flow, max_flow]
-            if from_is_slack or to_is_slack:
-                return (-max_flow, max_flow)
+            # If cable types enabled, use max capacity from all cable types
+            if enable_cable_types:
+                max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
+                # If line connects to slack node: use full capacity
+                if from_is_slack or to_is_slack:
+                    return (-max_ct_flow, max_ct_flow)
+                else:
+                    # If line connects PQ-PQ (turbine-turbine): use reduced capacity
+                    return (-(max_ct_flow - 1), max_ct_flow - 1)
             else:
-                # If line connects PQ-PQ (turbine-turbine): use reduced capacity
-                return (-(max_flow - 1), max_flow - 1)
+                # Original bounds (no cable type selection)
+                if from_is_slack or to_is_slack:
+                    return (-max_flow, max_flow)
+                else:
+                    return (-(max_flow - 1), max_flow - 1)
+        
         # Flow variables (integer - can carry flow in either direction)
         model.line_flow = pyo.Var(model.lines, domain=pyo.Integers, bounds=line_flow_bounds)
         model.node_flow = pyo.Var(model.nodes, domain=pyo.Integers)
         model.line_flow_dir = pyo.Var(model.lines, domain=pyo.Binary)
-        # Objective: minimize total cable length
+        # Objective: minimize total cable length (+ optional investment cost)
         def objective_rule(model):
-            return sum(model.line_used[line] * grid.lines_AC_ct[line].Length_km 
-                      for line in model.lines)
+           
+            if enable_cable_types:
+                # Add cable type investment costs
+                investment_cost = 0
+                for line in model.lines:
+                    line_obj = grid.lines_AC_ct[line]
+                    for ct in model.ct_set:
+                        investment_cost += model.ct_branch[line, ct] * line_obj.base_cost[ct]
+                return investment_cost
+            else:
+                length_cost = sum(model.line_used[line] * grid.lines_AC_ct[line].Length_km 
+                             for line in model.lines)
+            
+                return length_cost
         
         model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
         
@@ -864,8 +964,12 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
             if node in model.sink_nodes:
                 # Calculate minimum connections per sink based on capacity
                 # Formula: ceil((non_sink_nodes) / (total_sink_capacity))
-                
-                min_connections = math.ceil(nT/(nS*max_flow))
+                if enable_cable_types:
+                    # Use max cable type capacity for sink capacity calculation
+                    max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
+                    min_connections = math.ceil(nT/(nS*max_ct_flow))
+                else:
+                    min_connections = math.ceil(nT/(nS*max_flow))
                 return node_connections >= min_connections
             else:
                 # For non-sink nodes, minimum is 1
@@ -918,31 +1022,88 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None):
         model.intermediate_node = pyo.Constraint(model.nodes, rule=intermediate_node_rule)
         
         # Link flow to investment: can only use lines we invest in
-        def flow_investment_rule(model, line):
-            return model.line_flow[line] <= max_flow * model.line_used[line]
+        if enable_cable_types:
+            # Flow capacity linked to selected cable type
+            def flow_capacity_upper_rule(model, line):
+                # Flow <= sum(flow_capacity[ct] * ct_branch[line, ct])
+                return model.line_flow[line] <= sum(model.ct_flow_capacity[ct] * model.ct_branch[line, ct] 
+                                                   for ct in model.ct_set)
+            
+            def flow_capacity_lower_rule(model, line):
+                # Flow >= -sum(flow_capacity[line, ct] * ct_branch[line, ct])
+                return model.line_flow[line] >= -sum(model.ct_flow_capacity[ct] * model.ct_branch[line, ct] 
+                                                    for ct in model.ct_set)
+            
+            # Cable type selection: each used line must have exactly one cable type
+            # CONSTRAINT LINKING line_used and ct_branch:
+            # sum(ct_branch[line, ct]) == line_used[line]
+            # - If line_used[line] = 1: exactly one ct_branch[line, ct] = 1 (one cable type selected)
+            # - If line_used[line] = 0: all ct_branch[line, ct] = 0 (no cable type selected)
+            def cable_type_selection_rule(model, line):
+                return sum(model.ct_branch[line, ct] for ct in model.ct_set) == model.line_used[line]
+            
+            model.flow_capacity_upper = pyo.Constraint(model.lines, rule=flow_capacity_upper_rule)
+            model.flow_capacity_lower = pyo.Constraint(model.lines, rule=flow_capacity_lower_rule)
+            model.cable_type_selection = pyo.Constraint(model.lines, rule=cable_type_selection_rule)
+            
+            # Link ct_types to ct_branch using homogeneity constraint from image formulation
+            # Constraint: sum(ct_branch[line, ct]) - (NN-1) * ct_types[ct] <= 0
+            # Which is: sum(ct_branch[line, ct]) <= (NN-1) * ct_types[ct]
+            # Where NN-1 = len(nodes) - len(sink_nodes) (spanning tree has exactly this many lines)
+            # This constraint enforces BOTH directions:
+            # - If ct_types[ct] = 0: then sum(ct_branch) <= 0, so no lines use ct
+            # - If sum(ct_branch) > 0 (any line uses ct): then ct_types[ct] must be 1
+            #   (because if ct_types[ct] = 0, we'd have sum(ct_branch) <= 0, contradiction)
+            # So the lower bound constraint is NOT needed - homogeneity constraint is sufficient!
+            NN_minus_1 = len(model.nodes) - len(model.sink_nodes)  # Number of lines in spanning tree
+            
+            def ct_types_homogeneity_rule(model, ct):
+                # Image formulation: sum X_i,j,k - (NN-1) * Z_k <= 0
+                return sum(model.ct_branch[line, ct] for line in model.lines) - NN_minus_1 * model.ct_types[ct] <= 0
+            
+            model.ct_types_homogeneity = pyo.Constraint(model.ct_set, rule=ct_types_homogeneity_rule)
+            
+            # Optional: Limit total cable types used (linking constraint)
+            if cab_types_allowed is not None:
+                def ct_limit_rule(model):
+                    return sum(model.ct_types[ct] for ct in model.ct_set) <= cab_types_allowed
+                model.ct_limit = pyo.Constraint(rule=ct_limit_rule)
+        else:
+            # Original flow constraints (no cable type selection)
+            def flow_investment_rule(model, line):
+                return model.line_flow[line] <= max_flow * model.line_used[line]
 
-        def flow_investment_rule_2(model, line):
-            return model.line_flow[line] >= -max_flow * model.line_used[line]
+            def flow_investment_rule_2(model, line):
+                return model.line_flow[line] >= -max_flow * model.line_used[line]
+            
+            model.flow_investment_link = pyo.Constraint(model.lines, rule=flow_investment_rule)
+            model.flow_investment_link_2 = pyo.Constraint(model.lines, rule=flow_investment_rule_2)
 
         # NEW: If line is used, flow must be >= 1 (when positive) OR <= -1 (when negative)
         def flow_nonzero_positive(model, line):
             # If line_used=1 and line_flow_dir=1, then line_flow >= 1
             # If line_used=0 or line_flow_dir=0, this constraint is relaxed
-            M = max_flow + 1
+            if enable_cable_types:
+                max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
+                M = max_ct_flow + 1
+            else:
+                M = max_flow + 1
             return model.line_flow[line] >= 1 - M * (1 - model.line_used[line]) - M * (1 - model.line_flow_dir[line])
 
         def flow_nonzero_negative(model, line):
             # If line_used=1 and line_flow_dir=0, then line_flow <= -1
             # If line_used=0 or line_flow_dir=1, this constraint is relaxed
-            M = max_flow + 1
+            if enable_cable_types:
+                max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
+                M = max_ct_flow + 1
+            else:
+                M = max_flow + 1
             return model.line_flow[line] <= -1 + M * (1 - model.line_used[line]) + M * model.line_flow_dir[line]
 
         # Ensure direction variable is only active when line is used
         def flow_dir_active(model, line):
             return model.line_flow_dir[line] <= model.line_used[line]
 
-        model.flow_investment_link = pyo.Constraint(model.lines, rule=flow_investment_rule)
-        model.flow_investment_link_2 = pyo.Constraint(model.lines, rule=flow_investment_rule_2)
         model.flow_nonzero_pos = pyo.Constraint(model.lines, rule=flow_nonzero_positive)
         model.flow_nonzero_neg = pyo.Constraint(model.lines, rule=flow_nonzero_negative)
         model.flow_dir_active = pyo.Constraint(model.lines, rule=flow_dir_active)

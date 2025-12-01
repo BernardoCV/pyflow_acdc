@@ -1048,7 +1048,12 @@ def TEP_obj(model,grid,NPV):
         inv_line_AC_rec = 0
 
     def CT_limit_rule(model):
+            # Upper bound: limit total cable types used
             return sum(model.ct_types[ct] for ct in model.ct_set) <= grid.cab_types_allowed
+    
+    def CT_limit_lower_bound_rule(model):
+            # Lower bound: at least 1 cable type must be used (matching image formulation)
+            return 1 <= sum(model.ct_types[ct] for ct in model.ct_set)
     def ct_cable_type_rule(model, line):
         l = grid.lines_AC_ct[line]
         if l.active_config >=0:
@@ -1085,6 +1090,7 @@ def TEP_obj(model,grid,NPV):
         model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
         model.ct_types_lower_bound = pyo.Constraint(model.ct_set, rule=ct_types_lower_bound)
         model.CT_limit_constraint = pyo.Constraint(rule=CT_limit_rule)
+        model.CT_limit_lower_bound_constraint = pyo.Constraint(rule=CT_limit_lower_bound_rule)
         if grid.Array_opf:
             model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_Array_cable_type_rule)
             model.ct_node_limit_constraint = pyo.Constraint(model.nodes_AC, rule=ct_node_limit_rule)
