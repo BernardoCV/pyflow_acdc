@@ -224,12 +224,14 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         
 
         cable_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.lines))
+        weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].weighted_Length_km for line in model_MIP.lines))
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
         total_cost = MIP_obj_value+obj_value
         # Create a dictionary for this iteration's results
         iteration_result = {
             'cable_length': cable_length,
+            'weighted_length': weighted_length,
             'installation_cost': MIP_obj_value,
             'cable_cost': obj_value,
             'total_cost': total_cost,  # Save the objective value
@@ -277,6 +279,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     # After the while loop ends, create summary from all iterations
     summary_results = {
         'cable_length': [result['cable_length'] for result in results],
+        'weighted_length': [result['weighted_length'] for result in results],
         'installation_cost': [result['installation_cost'] for result in results],
         'cable_cost':    [result['cable_cost'] for result in results],
         'total_cost':   [result['total_cost'] for result in results],
