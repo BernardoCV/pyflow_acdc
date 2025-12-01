@@ -54,8 +54,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     results = []
     tot_timing_info = {}
     i = 0
-    path_time = 0
-    css_time = 0
+    seq_path_time = 0
+    seq_css_time = 0
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
     t0 = time.perf_counter()
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
@@ -95,7 +95,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         if tee:     
             print(f'Iteration {i} MIP finished in {t2 - t1} seconds')
         timing_info['Paths'] = t2 - t1
-        path_time += t2 - t1
+        seq_path_time += t2 - t1
 
         if not flag:
             if i == 0:
@@ -137,7 +137,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         if tee:
             print(f'Iteration {i} CSS finished in {t4 - t3} seconds')
         timing_info['CSS'] = t4 - t3
-        css_time += t4 - t3
+        seq_css_time += t4 - t3
         if svg is not None:
             if tee:
                 print(f'Iteration {i} saving SVG')
@@ -326,8 +326,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     model = best_result['CSS_model']
     model_MIP = best_result['MIP_model']
     model_results = best_result['model_results']
-    tot_timing_info['Paths'] = path_time
-    tot_timing_info['CSS'] = css_time
+    tot_timing_info['Paths'] = seq_path_time
+    tot_timing_info['CSS'] = seq_css_time
     solver_stats = best_result['solver_stats']
     best_i = best_result['i']
 
