@@ -717,7 +717,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
     from .Graph_and_plot import save_network_svg
     try:
@@ -790,7 +790,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         
         line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=name,geometry=geo,update_grid=False)
         
-        line_obj.installation_cost_per_km = 304000
+        line_obj.installation_cost_per_km = trenching_cost
         line_obj.weighted_Length_km = w_l
         # Store the line object with its name for later reference
         edge_key = f'{fromnode}_{tonode}'
