@@ -1976,7 +1976,8 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         if grid.act_gen:
             gen_active_values = {k: np.float64(pyo.value(v)) for k, v in model.gen_active.items()}
         else:
-            gen_active_values = {k: 1 for k in model.gen_AC.keys()}
+            # Use same keys as PGen_values to ensure consistency
+            gen_active_values = {k: 1 for k in PGen_values.keys()}
     if grid.DCmode:
         PGen_DC_values = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen_DC.items()}
     
@@ -1997,7 +1998,7 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
     # Combine Generators and Renewable Sources into one iterable
     elements = grid.Generators + grid.RenSources + grid.Generators_DC
     
-    # Parallelize processing
+    # Parallelize processing    
     with ThreadPoolExecutor() as executor:
         executor.map(process_element, elements)
         

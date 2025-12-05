@@ -1296,7 +1296,8 @@ def OPF_step_results(model,grid):
     if grid.act_gen:
         gen_active_values = {k: np.float64(pyo.value(v)) for k, v in model.gen_active.items()}
     else:
-        gen_active_values = {k: 1 for k in model.gen_AC.keys()}
+        # Use same keys as PGen_values to ensure consistency
+        gen_active_values = {k: 1 for k in PGen_values.keys()}
     def process_load(node):
         nAC= node.nodeNumber
         name = node.name
@@ -1344,7 +1345,11 @@ def calculate_objective(grid,obj,OnlyGen=True):
         AC= 0
         DC= 0
         if grid.ACmode:
-            AC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
+            if grid.act_gen:
+                # gen.PGen already includes gen_active multiplier from export, so don't multiply again
+                AC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
+            else:
+                AC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
         if grid.DCmode:
             DC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators_DC)
         return AC+DC

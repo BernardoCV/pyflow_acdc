@@ -13,7 +13,7 @@ def matlab_loader():
     current_file = Path(__file__).resolve()
     path = str(current_file.parent)
 
-    data = f'{path}/case39_var.mat'
+    data = f'{path}/case39_acdc_var.mat'
 
     [grid,res]=pyf.Create_grid_from_mat(data)
 
@@ -25,7 +25,6 @@ def matlab_loader():
 
     print(nac)
 
-    JustOne = True
         
     model, model_res,timing_info, solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
 
