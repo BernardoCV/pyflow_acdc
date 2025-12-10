@@ -154,7 +154,7 @@ class Grid:
         self.TEP_n_years = 25
         self.TEP_discount_rate =0.02
         self.Array_opf = False
-        
+        self.act_gen = False
         self.name = 'Grid'
         
         if self.nodes_AC:
