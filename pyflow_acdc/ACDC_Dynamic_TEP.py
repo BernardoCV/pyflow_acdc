@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
+from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective
 from .ACDC_Static_TEP import get_TEP_variables,initialize_links,create_scenarios
 from .Class_editor import analyse_grid
 from .Time_series import _modify_parameters
@@ -196,7 +196,7 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discou
     
     t2 = time.time()
 
-    model_results,solver_stats = OPF_solve(model,grid,solver)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver)
     
     t3 = time.time()
     ExportACDC_NLmodel_toPyflowACDC(model.inv_model[i], grid, PZ,TEP=True)
@@ -465,7 +465,7 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
 
     # 10. Solve the model
     t2 = time.time()
-    model_results, solver_stats = OPF_solve(model, grid, solver)
+    model_results, solver_stats = pyomo_model_solve(model, grid, solver)
     t3 = time.time()
 
     # 11. Export results

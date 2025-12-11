@@ -122,7 +122,7 @@ try:
     # Time_series module functions that depend on OPF are already imported via Time_series
     # but we need to add them to __all__ only if OPF is available
     __all__.extend([
-        'Optimal_PF', 'Optimal_L_PF', 'OPF_solve', 'OPF_obj', 'OPF_line_res',
+        'Optimal_PF', 'Optimal_L_PF', 'pyomo_model_solve', 'OPF_obj', 'OPF_line_res',
         'OPF_price_priceZone', 'OPF_conv_results', 'Translate_pyf_OPF',
         'TS_ACDC_OPF', 'TS_ACDC_OPF_parallel', 'results_TS_OPF'
     ])

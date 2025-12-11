@@ -30,7 +30,7 @@ try:
         ExportACDC_NLmodel_toPyflowACDC)
     
     from .ACDC_OPF import (
-        OPF_solve,
+        pyomo_model_solve,
         OPF_obj,
         OPF_step_results,
         pack_variables,
@@ -695,7 +695,7 @@ def TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=Fal
         t2= time.perf_counter()  
         t_modelupdate = t2-t1
         
-        results, solver_stats = OPF_solve(model,grid,solver,suppress_warnings=True)
+        results, solver_stats = pyomo_model_solve(model,grid,solver,suppress_warnings=True)
         if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
             infeasible += 1
             inf_list.append(idx+1)

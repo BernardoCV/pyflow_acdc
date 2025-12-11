@@ -7,7 +7,7 @@ from pymoo.optimize import minimize
 import time
 import matplotlib.pyplot as plt
 from .ACDC_OPF_NL_model import analyse_grid,ExportACDC_NLmodel_toPyflowACDC
-from .ACDC_OPF import OPF_solve,OPF_obj,obj_w_rule,calculate_objective
+from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective
 from .Class_editor import analyse_grid
 
 __all__ = [
@@ -361,7 +361,7 @@ class TEPOuterProblem(ElementwiseProblem):
             self._update_model_from_vector(x)
             self.pyomo_runs += 1
             
-            results, stats = OPF_solve(self.model, self.grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
+            results, stats = pyomo_model_solve(self.model, self.grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
             self.pyomo_time += stats['time']
             if results is None:
                 out["F"] = 1e24
@@ -394,7 +394,7 @@ class TEPOuterProblem(ElementwiseProblem):
         
         # Update model with the solution
         self._update_model_from_vector(x)
-        results, stats = OPF_solve(self.model, grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
+        results, stats = pyomo_model_solve(self.model, grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
             
 
         # Get price zones info (you might need to pass this from __init__)

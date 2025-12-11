@@ -108,7 +108,7 @@ def create_geometries(grid):
         if gen.x_coord is not None and gen.y_coord is not None and gen.geometry is None:
             gen.geometry = Point(gen.x_coord, gen.y_coord)
 
-def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None,show=True):
+def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=None,linestrings=None,ant_path='None',clustering=True,coloring=None,show=True):
     # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter" 
     if name is None:
         name = grid.name
@@ -586,10 +586,29 @@ def plot_folium(grid, text='inPu', name=None,tiles="CartoDB Positron",polygon=No
             show=False
         ).add_to(m)
 
+    if linestrings is not None:
+        # Handle both single linestring and list of linestrings
+        if not isinstance(linestrings, list):
+            linestrings = [linestrings]
+        
+        for linestring in linestrings:
+            
+            coords = [(y, x) for x, y in linestring.coords]  # convert (lon, lat) → (lat, lon)
+
+            folium.PolyLine(
+                coords,
+                color="black",
+                weight=2,
+                opacity=1
+            ).add_to(m)
+            
+
     Draw(   export=True,  # Allows downloading edited layers
             edit_options={'poly': {'allowIntersection': False}},  # Prevents self-intersecting edits
             draw_options={'polygon': True, 'polyline': True, 'rectangle': True, 'circle': False},
         ).add_to(m)
+
+
     # Draw().add_to(m)
     if coloring == 'Efficiency':
         colormap = branca.colormap.LinearColormap(

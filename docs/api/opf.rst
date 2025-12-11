@@ -229,7 +229,7 @@ Tested with:
 - IPOPT
 - Bonmin
 
-.. function::  OPF_solve(model,grid,solver = 'ipopt')
+.. function::  pyomo_model_solve(model,grid,solver = 'ipopt')
 
    Solves the OPF model using the specified solver.
 
@@ -241,7 +241,7 @@ Tested with:
 
    .. code-block:: python
 
-        results, solver_stats =pyf.OPF_solve(model,grid)
+        results, solver_stats =pyf.pyomo_model_solve(model,grid)
 
 
 **References**

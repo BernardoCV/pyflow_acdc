@@ -779,10 +779,22 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     line_objects = {}  # Dictionary to store line objects by their name
     
     for u,v, attrs in array_graph.edges(data=True):
+        # Ensure substations are always toNode so positive flow goes towards them
+        # Note: In the graph, substation-turbine edges always have substation as u (from add_substation_paths_to_graph)
+        u_is_substation = array_graph.nodes[u].get('point_type') == 'substation'
+        v_is_substation = array_graph.nodes[v].get('point_type') == 'substation'
         
-        fromnode = str(u)
-        tonode = str(v)
-        name= f'{str(u)}_{str(v)}'
+        # If u is substation and v is not, swap them (substation becomes toNode)
+        # This is the common case for substation-turbine edges
+        # If both or neither are substations, keep original order
+        if u_is_substation and not v_is_substation:
+            fromnode = str(v)
+            tonode = str(u)
+            name= f'{str(v)}_{str(u)}'
+        else:
+            fromnode = str(u)
+            tonode = str(v)
+            name= f'{str(u)}_{str(v)}'
 
         l = attrs['length']/1000
         geo= attrs['geometry']
@@ -792,9 +804,10 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         
         line_obj.installation_cost_per_km = trenching_cost
         line_obj.weighted_Length_km = w_l
-        # Store the line object with its name for later reference
-        edge_key = f'{fromnode}_{tonode}'
-        line_objects[edge_key] = line_obj
+        # Store the line object using original graph edge key format for crossing_pairs lookup
+        # crossing_pairs uses _generate_edge_key which creates f"{str(u)}_{str(v)}" (original graph order)
+        original_edge_key = f'{str(u)}_{str(v)}'
+        line_objects[original_edge_key] = line_obj
     
     # Add the complete crossing groups as line numbers to the grid
     grid.crossing_groups = []
