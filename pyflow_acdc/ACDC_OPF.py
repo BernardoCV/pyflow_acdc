@@ -814,7 +814,9 @@ def _solver_progress(model, feasible_solutions, solver_name, time_limit, log_pat
     if solver_name == 'highs':
         # HiGHS supports direct log file output
         opt.options['log_file'] = log_path
-        opt.options['log_to_console'] = False  # We'll use Pyomo's tee for console
+        # Set log_to_console based on tee_console: when tee=True, allow HiGHS to write to console
+        # so Pyomo's tee can capture it properly (fixes Windows output stream issues)
+        opt.options['log_to_console'] = tee_console
     elif solver_name == 'ipopt':
         # IPOPT can write to a log file
         opt.options['output_file'] = log_path

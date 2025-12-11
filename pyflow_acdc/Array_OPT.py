@@ -33,7 +33,9 @@ __all__ = [
 ]
 
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,MIP_gap=0.01,backend='pyomo'):
+def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
+                   MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,
+                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=None,fixed_substation_connections=None):
     
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
@@ -88,7 +90,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         else:
             if tee and i==0:
                 print(f'Using user defined substation limit path graph for sequential CSS')
-            flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend)
+            flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend,min_turbines_per_string=min_turbines_per_string,fixed_substation_connections=fixed_substation_connections)
             sub_iter = 1
         
         t2 = time.perf_counter()

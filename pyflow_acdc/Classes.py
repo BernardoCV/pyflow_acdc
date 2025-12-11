@@ -1714,33 +1714,50 @@ class Line_AC:
     _cable_database = None
     
     @classmethod
-    def load_cable_database(cls):
-        """Load cable database from YAML files if not already loaded."""
+    def load_cable_database(cls, cable_database=None):
+        """Load cable database from YAML files if not already loaded, or use provided DataFrame.
+        
+        Parameters
+        ----------
+        cable_database : pd.DataFrame, optional
+            If provided, use this DataFrame as the cable database instead of loading from YAML files.
+            The DataFrame should have cable names as index and cable specifications as columns.
+            Only AC cables will be used (filtered by Type='AC' if Type column exists).
+        """
         if cls._cable_database is None:
-            # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent
-            cable_dir = module_dir / 'Cable_database'
-            
-            data_dict = {}
-            # Read all YAML files in the directory
-            for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r', encoding='latin-1') as f:
-                    cable_data = yaml.safe_load(f)
-                    if cable_data:
-                        # Each file has one cable
-                        cable_name = list(cable_data.keys())[0]
-                        specs = cable_data[cable_name]
-                        
-                        # Only include AC cables
-                        if specs.get('Type', 'AC') == 'AC':
-                            data_dict[cable_name] = specs
-            
-            if data_dict:
-                # Convert to pandas DataFrame
-                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
-                #print(f"Loaded {len(data_dict)} AC cables into database")
+            if cable_database is not None:
+                # Use provided DataFrame, but filter for AC cables if Type column exists
+                if 'Type' in cable_database.columns:
+                    cls._cable_database = cable_database[cable_database['Type'] == 'AC'].copy()
+                else:
+                    # Assume all are AC if no Type column
+                    cls._cable_database = cable_database.copy()
             else:
-                print("No AC cable data found in any YAML files")
+                # Load from YAML files
+                # Get the path to the Cable_database directory
+                module_dir = Path(__file__).parent
+                cable_dir = module_dir / 'Cable_database'
+                
+                data_dict = {}
+                # Read all YAML files in the directory
+                for yaml_file in cable_dir.glob('*.yaml'):
+                    with open(yaml_file, 'r', encoding='latin-1') as f:
+                        cable_data = yaml.safe_load(f)
+                        if cable_data:
+                            # Each file has one cable
+                            cable_name = list(cable_data.keys())[0]
+                            specs = cable_data[cable_name]
+                            
+                            # Only include AC cables
+                            if specs.get('Type', 'AC') == 'AC':
+                                data_dict[cable_name] = specs
+                
+                if data_dict:
+                    # Convert to pandas DataFrame
+                    cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+                    #print(f"Loaded {len(data_dict)} AC cables into database")
+                else:
+                    print("No AC cable data found in any YAML files")
 
     @classmethod
     def reset_class(cls):
@@ -1772,6 +1789,8 @@ class Line_AC:
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
+        if Line_AC._cable_database is None:
+            Line_AC.load_cable_database()
         Cable_type = Cable_type.replace(' ', '_')
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
@@ -2279,48 +2298,68 @@ class Cable_options:
             line.cable_types = self._cable_types
 
     @classmethod
-    def load_cable_database(cls):
-        """Load cable database from YAML files if not already loaded."""
+    def load_cable_database(cls, cable_database=None):
+        """Load cable database from YAML files if not already loaded, or use provided DataFrame.
+        
+        Parameters
+        ----------
+        cable_database : pd.DataFrame, optional
+            If provided, use this DataFrame as the cable database instead of loading from YAML files.
+            The DataFrame should have cable names as index and cable specifications as columns.
+        """
         if cls._cable_database is None:
-            # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent
-            cable_dir = module_dir / 'Cable_database'
-            
-            data_dict = {}
-            # Read all YAML files in the directory
-            for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r', encoding='latin-1') as f:
-                    cable_data = yaml.safe_load(f)
-                    if cable_data:
-                        # Each file has one cable
-                        cable_name = list(cable_data.keys())[0]
-                        specs = cable_data[cable_name]
-                        
-                        # Only include AC cables
-                        if specs.get('Type', 'AC') == 'AC':
-                            data_dict[cable_name] = specs
-            
-            if data_dict:
-                # Convert to pandas DataFrame
-                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+            if cable_database is not None:
+                # Use provided DataFrame
+                cls._cable_database = cable_database.copy()
+            else:
+                # Load from YAML files
+                # Get the path to the Cable_database directory
+                module_dir = Path(__file__).parent
+                cable_dir = module_dir / 'Cable_database'
+                
+                data_dict = {}
+                # Read all YAML files in the directory
+                for yaml_file in cable_dir.glob('*.yaml'):
+                    with open(yaml_file, 'r', encoding='latin-1') as f:
+                        cable_data = yaml.safe_load(f)
+                        if cable_data:
+                            # Each file has one cable
+                            cable_name = list(cable_data.keys())[0]
+                            specs = cable_data[cable_name]
+                            
+                            # Only include AC cables
+                            if specs.get('Type', 'AC') == 'AC':
+                                data_dict[cable_name] = specs
+                
+                if data_dict:
+                    # Convert to pandas DataFrame
+                    cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
     
-    def __init__(self, cable_types: list, name=None):
+    def __init__(self, cable_types: list = None, name=None, cable_database=None):
         self.Cable_options_num = Cable_options.Cable_options_num
         Cable_options.Cable_options_num += 1
         
-        # Load database if not already loaded
+        # Load database if not already loaded, or use provided database
         if Cable_options._cable_database is None:
-            Cable_options.load_cable_database()
+            Cable_options.load_cable_database(cable_database=cable_database)
+        elif cable_database is not None:
+            # Override existing database with provided one
+            Cable_options._cable_database = cable_database.copy()
         
-        self._cable_types = cable_types
-        self.lines = []
-        self.active_config = None
-        # Efficiently calculate MVA ratings in one pass
-        self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+        # If cable_types is None or empty, create empty cable option
+        if cable_types is None or len(cable_types) == 0:
+            self._cable_types = []
+            self.MVA_ratings = []
+        else:
+            self._cable_types = cable_types
+            self.lines = []
+            self.active_config = None
+            # Efficiently calculate MVA ratings in one pass
+            self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+            
+            # Sort by capacity (smallest to largest)
+            self.sort_cable_types_by_capacity()
         
-        # Sort by capacity (smallest to largest)
-        self.sort_cable_types_by_capacity()
-    
         if name is None:
             self.name = str(self.Cable_options_num)
         else:
@@ -2441,33 +2480,50 @@ class Line_DC:
 
     
     @classmethod
-    def load_cable_database(cls):
-        """Load cable database from YAML files if not already loaded."""
+    def load_cable_database(cls, cable_database=None):
+        """Load cable database from YAML files if not already loaded, or use provided DataFrame.
+        
+        Parameters
+        ----------
+        cable_database : pd.DataFrame, optional
+            If provided, use this DataFrame as the cable database instead of loading from YAML files.
+            The DataFrame should have cable names as index and cable specifications as columns.
+            Only DC cables will be used (filtered by Type='DC' if Type column exists).
+        """
         if cls._cable_database is None:
-            # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent
-            cable_dir = module_dir / 'Cable_database'
-            
-            data_dict = {}
-            # Read all YAML files in the directory
-            for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r', encoding='latin-1') as f:
-                    cable_data = yaml.safe_load(f)
-                    if cable_data:
-                        # Each file has one cable
-                        cable_name = list(cable_data.keys())[0]
-                        specs = cable_data[cable_name]
-                        
-                        # Only include DC cables
-                        if specs.get('Type', 'DC') == 'DC':
-                            data_dict[cable_name] = specs
-            
-            if data_dict:
-                # Convert to pandas DataFrame
-                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
-                #print(f"Loaded {len(data_dict)} DC cables into database")
+            if cable_database is not None:
+                # Use provided DataFrame, but filter for DC cables if Type column exists
+                if 'Type' in cable_database.columns:
+                    cls._cable_database = cable_database[cable_database['Type'] == 'DC'].copy()
+                else:
+                    # Assume all are DC if no Type column
+                    cls._cable_database = cable_database.copy()
             else:
-                print("No DC cable data found in any YAML files")
+                # Load from YAML files
+                # Get the path to the Cable_database directory
+                module_dir = Path(__file__).parent
+                cable_dir = module_dir / 'Cable_database'
+                
+                data_dict = {}
+                # Read all YAML files in the directory
+                for yaml_file in cable_dir.glob('*.yaml'):
+                    with open(yaml_file, 'r', encoding='latin-1') as f:
+                        cable_data = yaml.safe_load(f)
+                        if cable_data:
+                            # Each file has one cable
+                            cable_name = list(cable_data.keys())[0]
+                            specs = cable_data[cable_name]
+                            
+                            # Only include DC cables
+                            if specs.get('Type', 'DC') == 'DC':
+                                data_dict[cable_name] = specs
+                
+                if data_dict:
+                    # Convert to pandas DataFrame
+                    cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+                    #print(f"Loaded {len(data_dict)} DC cables into database")
+                else:
+                    print("No DC cable data found in any YAML files")
 
     @classmethod
     def reset_class(cls):
@@ -2498,6 +2554,8 @@ class Line_DC:
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
+        if Line_DC._cable_database is None:
+            Line_DC.load_cable_database()
         Cable_type = Cable_type.replace(' ', '_')
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
@@ -3361,6 +3419,3 @@ class inv_periods:
             self._name = name
 
         inv_periods.names.add(self.name)
-
-Line_AC.load_cable_database()
-Line_DC.load_cable_database()
