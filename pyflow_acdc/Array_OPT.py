@@ -461,7 +461,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                       enable_cable_types=enable_cable_types,
                                       t_MW=t_MW,
                                       cab_types_allowed=cab_types_allowed,
-                                      min_turbines_per_string=min_turbines_per_string)
+                                      min_turbines_per_string=min_turbines_per_string,
+                                      fixed_substation_connections=fixed_substation_connections)
     elif backend.lower() != 'pyomo':
         raise ValueError(f"Unknown backend: {backend}. Must be 'pyomo' or 'ortools'")
     
@@ -549,7 +550,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         print("✗ MIP model failed")
         return False, None, None, feasible_solutions
 
-def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None, enable_cable_types=False, t_MW=None, cab_types_allowed=None,min_turbines_per_string=None):
+def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None, enable_cable_types=False, t_MW=None, cab_types_allowed=None, min_turbines_per_string=None, fixed_substation_connections=None):
     """Solve the master MIP problem using OR-Tools CP-SAT solver."""
     if not ORTOOLS_AVAILABLE:
         raise ImportError(
@@ -559,12 +560,14 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
     from ortools.sat.python import cp_model
     
     # Get min_turbines_per_string from grid if available, otherwise default to 1
-    min_turbines_per_string = getattr(grid, 'min_turbines_per_string', None)
     if min_turbines_per_string is None:
-        min_turbines_per_string = 1
+        min_turbines_per_string = getattr(grid, 'min_turbines_per_string', None)
+        if min_turbines_per_string is None:
+            min_turbines_per_string = 1
     
     # Create model
-    model, vars_dict = _create_master_problem_ortools(grid, crossings, max_flow, min_turbines_per_string, length_scale, enable_cable_types, t_MW, cab_types_allowed)
+    model, vars_dict = _create_master_problem_ortools(grid, crossings, max_flow, min_turbines_per_string, length_scale, 
+                                                       enable_cable_types, t_MW, cab_types_allowed, fixed_substation_connections)
     
     feasible_solutions = []
     feasible_solution_found = False
@@ -727,14 +730,46 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             max_flow = len(grid.nodes_AC) - 1
         if min_turbines_per_string is None:
             min_turbines_per_string = 1
+
+        # Feasibility check: only valid if ALL substations have ct_limit defined
+        # If any substation has ct_limit = None, it has unlimited connections, so check is invalid
+        slack_nodes_with_limit = [node for node in grid.slack_nodes if node.ct_limit is not None]
+        all_slack_have_limit = len(slack_nodes_with_limit) == len(grid.slack_nodes)
+        
+        if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
+            # Calculate total connections across all substations
+            n_s_connections = sum(node.ct_limit for node in slack_nodes_with_limit)
+            min_capacity = min_turbines_per_string * n_s_connections
+            nT = grid.nn_AC - len(grid.slack_nodes)
+            nS = len(grid.slack_nodes)
+            if min_capacity > nT:
+                raise ValueError(
+                    f"Not feasible to connect {nT} turbines with {nS} substations, "
+                    f"{n_s_connections} total connections, "
+                    f"and minimum {min_turbines_per_string} turbines per connection. "
+                    f"Minimum required: {min_capacity} > {nT} turbines. "
+                    f"Decrease min_turbines_per_string or increase connections."
+                )
+
         if fixed_substation_connections is not None:
-            nT  = grid.nn_AC - len(grid.slack_nodes)
-            nS  = len(grid.slack_nodes) 
+            
             min_turbines_per_string = math.floor(nT/(nS*fixed_substation_connections))
 
             for node in grid.slack_nodes:
                 node.ct_limit = fixed_substation_connections
-
+            
+            # Feasibility check: total maximum capacity must be >= number of turbines
+            # Each substation has fixed_substation_connections connections
+            # Each connection can carry at most max_flow turbines
+            # Total capacity = max_flow * fixed_substation_connections * nS
+            total_max_capacity = max_flow * fixed_substation_connections * nS
+            if total_max_capacity < nT:
+                raise ValueError(
+                    f"Not feasible to connect {nT} turbines with {nS} substations, "
+                    f"{fixed_substation_connections} connections per substation, "
+                    f"and max flow of {max_flow} per connection. "
+                    f"Total capacity: {total_max_capacity} < {nT} turbines"
+                )
         # Create model
         model = pyo.ConcreteModel()
         
@@ -1077,7 +1112,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
 
 
 def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turbines_per_string=None, length_scale=1000,
-                                   enable_cable_types=False, t_MW=None, cab_types_allowed=None):
+                                   enable_cable_types=False, t_MW=None, cab_types_allowed=None, fixed_substation_connections=None):
     """
     OR-Tools version of _create_master_problem_pyomo(grid, crossings=True, max_flow=None)
 
@@ -1136,6 +1171,45 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     nT = num_nodes - len(sink_nodes)
     nS = len(sink_nodes)
 
+    # Feasibility check: only valid if ALL substations have ct_limit defined
+    # If any substation has ct_limit = None, it has unlimited connections, so check is invalid
+    slack_nodes = [grid.nodes_AC[n] for n in nodes if getattr(grid.nodes_AC[n], "type", None) == "Slack"]
+    slack_nodes_with_limit = [node for node in slack_nodes if getattr(node, "ct_limit", None) is not None]
+    all_slack_have_limit = len(slack_nodes_with_limit) == len(slack_nodes) if slack_nodes else False
+    
+    if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
+        # Calculate total connections across all substations
+        n_s_connections = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
+        min_capacity = min_turbines_per_string * n_s_connections
+        if min_capacity > nT:
+            raise ValueError(
+                f"Not feasible to connect {nT} turbines with {nS} substations, "
+                f"{n_s_connections} total connections, "
+                f"and minimum {min_turbines_per_string} turbines per connection. "
+                f"Minimum required: {min_capacity} > {nT} turbines. "
+                f"Decrease min_turbines_per_string or increase connections."
+            )
+
+    if fixed_substation_connections is not None:
+        min_turbines_per_string = math.floor(nT / (nS * fixed_substation_connections))
+        
+        # Set ct_limit for all slack nodes
+        for node in slack_nodes:
+            node.ct_limit = fixed_substation_connections
+        
+        # Feasibility check: total maximum capacity must be >= number of turbines
+        # Each substation has fixed_substation_connections connections
+        # Each connection can carry at most max_flow turbines
+        # Total capacity = max_flow * fixed_substation_connections * nS
+        total_max_capacity = max_flow * fixed_substation_connections * nS
+        if total_max_capacity < nT:
+            raise ValueError(
+                f"Not feasible to connect {nT} turbines with {nS} substations, "
+                f"{fixed_substation_connections} connections per substation, "
+                f"and max flow of {max_flow} per connection. "
+                f"Total capacity: {total_max_capacity} < {nT} turbines"
+            )
+
     # --------------------
     # Initialize cable type capacities (if enabled) - needed for min_connections calculation
     # --------------------
@@ -1154,17 +1228,21 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
             ct_flow_capacity[ct] = int(mva_rating / t_MW)
 
     # Minimum connections for sink nodes (same formula as Pyomo version)
-    # ceil(non_sink_nodes / (total_sink_capacity))
-    if enable_cable_types and ct_flow_capacity:
-        max_ct_flow = max(ct_flow_capacity.values())
-        capacity_for_calc = max_ct_flow
+    # If fixed_substation_connections is set, use that; otherwise calculate based on capacity
+    if fixed_substation_connections is not None:
+        min_connections_per_sink = fixed_substation_connections
     else:
-        capacity_for_calc = max_flow
-    
-    if nS > 0:
-        min_connections_per_sink = math.ceil(nT / (nS * capacity_for_calc))
-    else:
-        min_connections_per_sink = 0
+        # Calculate based on capacity
+        if enable_cable_types and ct_flow_capacity:
+            max_ct_flow = max(ct_flow_capacity.values())
+            capacity_for_calc = max_ct_flow
+        else:
+            capacity_for_calc = max_flow
+        
+        if nS > 0:
+            min_connections_per_sink = math.ceil(nT / (nS * capacity_for_calc))
+        else:
+            min_connections_per_sink = 0
 
     # --------------------
     # Precompute line incidence and bounds
