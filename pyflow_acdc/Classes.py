@@ -76,7 +76,9 @@ class Grid:
         self.crossing_groups = []
         self.MIP_time = None
         self.MIP_check = False
-        
+        self.act_gen = False
+
+
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
             if not hasattr(conv, 'basekA'):
@@ -2055,6 +2057,9 @@ class Size_selection(Line_AC):
         """Set cable types and recalculate parameters if the list changes."""
         if value != self._cable_types:
             self._cable_types = value
+            # Ensure database is loaded before validation
+            if Line_AC._cable_database is None:
+                Line_AC.load_cable_database()
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
                 if cable_type not in self._cable_database.index:
@@ -2110,6 +2115,9 @@ class Size_selection(Line_AC):
         
         # If cable types are provided, validate and calculate parameters
         if self._cable_types:
+            # Ensure database is loaded before validation
+            if Line_AC._cable_database is None:
+                Line_AC.load_cable_database()
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
                 if cable_type not in self._cable_database.index:
@@ -2231,6 +2239,9 @@ class Size_selection(Line_AC):
 
     def add_cable_type(self, cable_type):
         """Add a new cable type to the array."""
+        # Ensure database is loaded
+        if Line_AC._cable_database is None:
+            Line_AC.load_cable_database()
         if cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{cable_type}' not found in database")
         self._cable_types.append(cable_type)
@@ -2249,6 +2260,9 @@ class Size_selection(Line_AC):
         self._calculate_all_parameters()
 
     def get_cost_parameter(self,cable_type):
+        # Ensure database is loaded
+        if Line_AC._cable_database is None:
+            Line_AC.load_cable_database()
         return self._cable_database.loc[cable_type, 'Cost_per_km'] if 'Cost_per_km' in self._cable_database.columns else 1
     
     def set_no_cable(self):

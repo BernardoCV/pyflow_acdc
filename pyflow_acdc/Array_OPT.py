@@ -1,6 +1,7 @@
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 import numpy as np
 import math
 import pyomo.environ as pyo
@@ -33,9 +34,28 @@ __all__ = [
 ]
 
 
+@dataclass
+class MIPConfig:
+    """
+    Lightweight container for MIP / path-graph options.
+
+    This lets us avoid threading a long list of flags between
+    sequential_CSS, min_sub_connections and MIP_path_graph,
+    while keeping the public function signatures unchanged.
+    """
+    solver_name: str = 'glpk'
+    backend: str = 'pyomo'
+    crossings: bool = False
+    tee: bool = False
+    callback: bool = False
+    MIP_gap: float | None = None
+    min_turbines_per_string: bool | int = False
+    fixed_substation_connections: int | None = None
+
+
 def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
                    MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,
-                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=None,fixed_substation_connections=None):
+                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=False,fixed_substation_connections=None):
     
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
@@ -76,6 +96,19 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
 
     flag = True
 
+    # Bundle MIP / path-graph options in a small config object so that
+    # we don't have to pass a long list of flags through every call.
+    mip_cfg = MIPConfig(
+        solver_name=MIP_solver,
+        backend=backend,
+        crossings=limit_crossings,
+        tee=tee,
+        callback=fs,
+        MIP_gap=MIP_gap,
+        min_turbines_per_string=min_turbines_per_string,
+        fixed_substation_connections=fixed_substation_connections,
+    )
+
     if tee:
         print(f'Starting sequential CSS for {grid.name}')
 
@@ -86,11 +119,16 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         if sub_min_connections:
             if tee and i==0:
                 print(f'Using min sub connections iterationfor sequential CSS')
-            flag, high_flow,model_MIP,feasible_solutions_MIP ,ns, sub_iter , path_time = min_sub_connections(grid, max_flow,solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend)
+            # Use the shared MIPConfig for internal calls
+            flag, high_flow,model_MIP,feasible_solutions_MIP ,ns, sub_iter , path_time = min_sub_connections(
+                grid, max_flow, mip_cfg=mip_cfg
+            )
         else:
             if tee and i==0:
                 print(f'Using user defined substation limit path graph for sequential CSS')
-            flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name=MIP_solver, crossings=limit_crossings, tee=tee,callback=fs,MIP_gap=MIP_gap,backend=backend,min_turbines_per_string=min_turbines_per_string,fixed_substation_connections=fixed_substation_connections)
+            flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(
+                grid, max_flow, mip_cfg=mip_cfg
+            )
             sub_iter = 1
         
         t2 = time.perf_counter()
@@ -385,7 +423,22 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     
 
 
-def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, callback=False,MIP_gap=None, backend='pyomo'):
+def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False,
+                        callback=False, MIP_gap=None, backend='pyomo',
+                        min_turbines_per_string=False, mip_cfg: MIPConfig | None = None):
+    # If a MIPConfig is provided, let it override the individual flags.
+    if mip_cfg is not None:
+        solver_name = mip_cfg.solver_name
+        crossings = mip_cfg.crossings
+        tee = mip_cfg.tee
+        callback = mip_cfg.callback
+        backend = mip_cfg.backend
+        # Allow explicit function arguments to override the config where given
+        if MIP_gap is None:
+            MIP_gap = mip_cfg.MIP_gap
+        if min_turbines_per_string is False and mip_cfg.min_turbines_per_string is not False:
+            min_turbines_per_string = mip_cfg.min_turbines_per_string
+
     tn = grid.n_ren
     sn = grid.nn_AC - grid.n_ren
 
@@ -404,7 +457,22 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
                 node.ct_limit = ns
 
         t0 = time.perf_counter()
-        flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(grid, max_flow, solver_name, crossings, tee,callback,MIP_gap,backend)
+        # Use MIP_path_graph with the same configuration; pass mip_cfg so
+        # internal routing/solver options remain consistent.
+        flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(
+            grid,
+            max_flow,
+            solver_name,
+            crossings,
+            tee,
+            callback,
+            MIP_gap,
+            backend,
+            min_turbines_per_string=min_turbines_per_string,
+            min_sub_connections=True,
+            sub_k_max=ns,
+            mip_cfg=mip_cfg,
+        )
         t1 = time.perf_counter()
         path_time = t1 - t0
         i+=1
@@ -422,8 +490,12 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
 
 
 
-def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False, MIP_gap=None, backend='pyomo',
-                   enable_cable_types=False, t_MW=None, cab_types_allowed=None,min_turbines_per_string=None,fixed_substation_connections=None):
+def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False,
+                   callback=False, MIP_gap=None, backend='pyomo',
+                   enable_cable_types=False, t_MW=None, cab_types_allowed=None,
+                   min_turbines_per_string=False, fixed_substation_connections=None,
+                   min_sub_connections=False, sub_k_max=None,
+                   mip_cfg: MIPConfig | None = None):
     """
     Solve the master MIP problem and track feasible solutions over time.
     
@@ -451,6 +523,20 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     feasible_solutions : list
         List of (time, objective_value, gap) tuples if callback=True
     """
+    # If a MIPConfig is provided, prefer its values unless explicitly overridden
+    if mip_cfg is not None:
+        solver_name = mip_cfg.solver_name
+        backend = mip_cfg.backend
+        crossings = mip_cfg.crossings
+        tee = mip_cfg.tee
+        callback = mip_cfg.callback
+        if MIP_gap is None:
+            MIP_gap = mip_cfg.MIP_gap
+        if min_turbines_per_string is False and mip_cfg.min_turbines_per_string is not False:
+            min_turbines_per_string = mip_cfg.min_turbines_per_string
+        if fixed_substation_connections is None and mip_cfg.fixed_substation_connections is not None:
+            fixed_substation_connections = mip_cfg.fixed_substation_connections
+
     # Route to appropriate backend
     if backend.lower() == 'ortools':
         if not ORTOOLS_AVAILABLE:
@@ -464,7 +550,9 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                       t_MW=t_MW,
                                       cab_types_allowed=cab_types_allowed,
                                       min_turbines_per_string=min_turbines_per_string,
-                                      fixed_substation_connections=fixed_substation_connections)
+                                      fixed_substation_connections=fixed_substation_connections,
+                                      min_sub_connections=min_sub_connections,
+                                      sub_k_max=sub_k_max)
     elif backend.lower() != 'pyomo':
         raise ValueError(f"Unknown backend: {backend}. Must be 'pyomo' or 'ortools'")
     
@@ -474,7 +562,9 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                          t_MW=t_MW,
                                          cab_types_allowed=cab_types_allowed,
                                          min_turbines_per_string=min_turbines_per_string,
-                                         fixed_substation_connections=fixed_substation_connections)
+                                         fixed_substation_connections=fixed_substation_connections,
+                                         min_sub_connections=min_sub_connections,
+                                         sub_k_max=sub_k_max)
     # Build solver options based on solver and grid attributes
     solver_options = {}
     time_limit = getattr(grid, "MIP_time", None)
@@ -552,7 +642,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         print("✗ MIP model failed")
         return False, None, None, feasible_solutions
 
-def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None, enable_cable_types=False, t_MW=None, cab_types_allowed=None, min_turbines_per_string=None, fixed_substation_connections=None):
+def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None, enable_cable_types=False, t_MW=None, cab_types_allowed=None, min_turbines_per_string=False, fixed_substation_connections=None,min_sub_connections=False,sub_k_max=None):
     """Solve the master MIP problem using OR-Tools CP-SAT solver."""
     if not ORTOOLS_AVAILABLE:
         raise ImportError(
@@ -561,15 +651,9 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
     length_scale = 1000
     from ortools.sat.python import cp_model
     
-    # Get min_turbines_per_string from grid if available, otherwise default to 1
-    if min_turbines_per_string is None:
-        min_turbines_per_string = getattr(grid, 'min_turbines_per_string', None)
-        if min_turbines_per_string is None:
-            min_turbines_per_string = 1
-    
-    # Create model
+    # Create model (calculation will be done inside _create_master_problem_ortools)
     model, vars_dict = _create_master_problem_ortools(grid, crossings, max_flow, min_turbines_per_string, length_scale, 
-                                                       enable_cable_types, t_MW, cab_types_allowed, fixed_substation_connections)
+                                                       enable_cable_types, t_MW, cab_types_allowed, fixed_substation_connections,min_sub_connections,sub_k_max)
     
     feasible_solutions = []
     feasible_solution_found = False
@@ -710,12 +794,167 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
         print("✗ MIP model failed (OR-Tools)")
         return False, None, None, feasible_solutions
 
+
+def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_string=False,
+                                       enable_cable_types=False, t_MW=None, num_nodes=None,
+                                       fixed_substation_connections=None,min_sub_connections=False,sub_k_max=None):
+    """
+    Helper function to prepare capacity calculations and min_turbines_per_string.
+    
+    This function extracts common logic for:
+    - Calculating cable type flow capacities
+    - Determining max_ct_flow (max cable capacity or max_flow)
+    - Calculating min_turbines_per_string based on grid topology
+    - Performing feasibility checks
+    - Handling fixed_substation_connections
+    
+    Parameters:
+    -----------
+    grid : Grid object
+        The grid to analyze
+    max_flow : int, optional
+        Maximum flow per connection. If None, defaults to num_nodes - 1
+    min_turbines_per_string : bool or int, optional
+        Minimum turbines per string constraint (default: False):
+        - False: Set to 1 (minimum constraint)
+        - True: Calculate automatically based on grid topology
+        - int: Use the specified value directly
+    enable_cable_types : bool, optional
+        If True, enable cable type capacity calculations
+    t_MW : float, optional
+        Turbine MW rating (needed when enable_cable_types=True)
+    num_nodes : int, optional
+        Number of nodes in the grid. If None, uses len(grid.nodes_AC)
+    fixed_substation_connections : int, optional
+        If provided, sets ct_limit for all slack nodes and performs feasibility check
+    
+    Returns:
+    --------
+    min_turbines_per_string : int
+        The calculated or provided min_turbines_per_string value
+    max_ct_flow : int
+        The capacity to use for calculations (max cable capacity or max_flow)
+    ct_flow_capacity : dict
+        Dictionary mapping cable type indices to flow capacities (empty if not enabled)
+    nT : int
+        Number of turbines (non-sink nodes)
+    nS : int
+        Number of substations (sink nodes)
+    """
+    # Validate inputs
+    if enable_cable_types and ct_flow_capacity:
+        max_ct_flow = max(ct_flow_capacity.values())
+        min_ct_flow = min(ct_flow_capacity.values())
+    else:
+        max_ct_flow = max_flow
+        min_ct_flow = max_flow
+
+    if min_turbines_per_string is True:
+        if max_ct_flow is None:
+            raise ValueError("max_flow must be provided when min_turbines_per_string=True")
+    
+    # Set default max_flow
+    if num_nodes is None:
+        num_nodes = len(grid.nodes_AC)
+    if max_flow is None:
+        max_flow = num_nodes - 1
+    
+    # Initialize cable type capacities (if enabled) - needed for capacity calculation
+    ct_flow_capacity = {}
+    if enable_cable_types:
+        if grid.Cable_options is None or len(grid.Cable_options) == 0:
+            raise ValueError("enable_cable_types=True but no Cable_options found in grid")
+        if t_MW is None:
+            raise ValueError("t_MW must be provided when enable_cable_types=True")
+        
+        # Calculate flow capacity for each cable type (in turbine units)
+        # Flow capacity = int(MVA_rating / t_MW)
+        ct_set_temp = list(range(len(grid.Cable_options[0]._cable_types)))
+        for ct in ct_set_temp:
+            mva_rating = grid.Cable_options[0].MVA_ratings[ct]
+            ct_flow_capacity[ct] = int(mva_rating / t_MW)
+    
+    
+    
+    # Calculate nT and nS
+    nT = len([n for n in grid.nodes_AC if n not in grid.slack_nodes])
+    nS = len(grid.slack_nodes)
+    
+    # Handle min_turbines_per_string: can be bool or int, default is False
+    if min_turbines_per_string is False:
+        min_turbines_per_string = 1
+    elif min_turbines_per_string is True:
+        if min_sub_connections is False:
+            # Calculate using formula - use max_ct_flow instead of max_flow
+            min_s_connections = math.ceil(nT / (nS * min_ct_flow))
+            min_turbines_per_string = math.floor(nT / (nS * min_s_connections))
+        else:
+            max_s_connections = sub_k_max
+            min_turbines_per_string = math.floor(nT / (nS * max_s_connections))   
+    # If it's an int, validate and correct if needed
+    elif isinstance(min_turbines_per_string, int):
+        # If provided value is greater than capacity, recalculate
+        if min_turbines_per_string > max_ct_flow:
+            print(f"min_turbines_per_string {min_turbines_per_string} must be less than capacity {max_ct_flow}")
+            min_s_connections = math.ceil(nT / (nS * max_ct_flow))
+            min_turbines_per_string = math.floor(nT / (nS * min_s_connections))
+    
+    # Get slack nodes (handle both direct access and getattr for compatibility)
+    if hasattr(grid, 'slack_nodes'):
+        slack_nodes = grid.slack_nodes
+    else:
+        slack_nodes = [n for n in grid.nodes_AC if getattr(n, "type", None) == "Slack"]
+    
+    # Feasibility check: only valid if ALL substations have ct_limit defined
+    # If any substation has ct_limit = None, it has unlimited connections, so check is invalid
+    slack_nodes_with_limit = [node for node in slack_nodes 
+                              if getattr(node, "ct_limit", None) is not None]
+    all_slack_have_limit = len(slack_nodes_with_limit) == len(slack_nodes) if slack_nodes else False
+    
+    if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
+        # Calculate total connections across all substations
+        n_s_connections = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
+        min_capacity = min_turbines_per_string * n_s_connections
+        if min_capacity > nT:
+            raise ValueError(
+                f"Not feasible to connect {nT} turbines with {nS} substations, "
+                f"{n_s_connections} total connections, "
+                f"and minimum {min_turbines_per_string} turbines per connection. "
+                f"Minimum required: {min_capacity} > {nT} turbines. "
+                f"Decrease min_turbines_per_string or increase connections."
+            )
+    
+    # Handle fixed_substation_connections
+    if fixed_substation_connections is not None:
+        # Recalculate min_turbines_per_string based on fixed connections
+        min_turbines_per_string = math.floor(nT / (nS * fixed_substation_connections))
+        
+        # Set ct_limit for all slack nodes
+        for node in slack_nodes:
+            node.ct_limit = fixed_substation_connections
+        
+        # Feasibility check: total maximum capacity must be >= number of turbines
+        # Each substation has fixed_substation_connections connections
+        total_max_capacity = max_ct_flow * fixed_substation_connections * nS
+        if total_max_capacity < nT:
+            raise ValueError(
+                f"Not feasible to connect {nT} turbines with {nS} substations, "
+                f"{fixed_substation_connections} connections per substation, "
+                f"and max flow of {max_ct_flow} per connection. "
+                f"Total capacity: {total_max_capacity} < {nT} turbines"
+            )
+    
+    return min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS
+
+
 def _create_master_problem_pyomo(grid,crossings=True, max_flow=None, 
                                   enable_cable_types=False, 
                                   t_MW=None,
                                   cab_types_allowed=None,
-                                  min_turbines_per_string=None,
-                                  fixed_substation_connections=None):
+                                  min_turbines_per_string=False,
+                                  fixed_substation_connections=None,
+                                  min_sub_connections=False,
+                                  sub_k_max=None):
         """Create master problem using Pyomo
         
         Parameters:
@@ -726,68 +965,31 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             Turbine MW rating (needed to calculate flow capacity from MVA ratings)
         cab_types_allowed : int, optional
             Maximum number of cable types that can be used (linking constraint)
+        min_turbines_per_string : bool or int, optional
+            Minimum turbines per string constraint (default: False):
+            - False: Set to 1 (minimum constraint)
+            - True: Calculate automatically based on grid topology
+            - int: Use the specified value directly
         """
+        min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS = _prepare_capacity_and_min_turbines(
+            grid, max_flow=max_flow, min_turbines_per_string=min_turbines_per_string,
+            enable_cable_types=enable_cable_types, t_MW=t_MW, num_nodes=len(grid.nodes_AC),
+            fixed_substation_connections=fixed_substation_connections, 
+            min_sub_connections=min_sub_connections,
+            sub_k_max=sub_k_max
+        )
         
-        if max_flow is None:
-            max_flow = len(grid.nodes_AC) - 1
-        if min_turbines_per_string is None:
-            min_turbines_per_string = 1
-
-        # Feasibility check: only valid if ALL substations have ct_limit defined
-        # If any substation has ct_limit = None, it has unlimited connections, so check is invalid
-        slack_nodes_with_limit = [node for node in grid.slack_nodes if node.ct_limit is not None]
-        all_slack_have_limit = len(slack_nodes_with_limit) == len(grid.slack_nodes)
-        
-        if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
-            # Calculate total connections across all substations
-            n_s_connections = sum(node.ct_limit for node in slack_nodes_with_limit)
-            min_capacity = min_turbines_per_string * n_s_connections
-            nT = grid.nn_AC - len(grid.slack_nodes)
-            nS = len(grid.slack_nodes)
-            if min_capacity > nT:
-                raise ValueError(
-                    f"Not feasible to connect {nT} turbines with {nS} substations, "
-                    f"{n_s_connections} total connections, "
-                    f"and minimum {min_turbines_per_string} turbines per connection. "
-                    f"Minimum required: {min_capacity} > {nT} turbines. "
-                    f"Decrease min_turbines_per_string or increase connections."
-                )
-
-        if fixed_substation_connections is not None:
-            
-            min_turbines_per_string = math.floor(nT/(nS*fixed_substation_connections))
-
-            for node in grid.slack_nodes:
-                node.ct_limit = fixed_substation_connections
-            
-            # Feasibility check: total maximum capacity must be >= number of turbines
-            # Each substation has fixed_substation_connections connections
-            # Each connection can carry at most max_flow turbines
-            # Total capacity = max_flow * fixed_substation_connections * nS
-            total_max_capacity = max_flow * fixed_substation_connections * nS
-            if total_max_capacity < nT:
-                raise ValueError(
-                    f"Not feasible to connect {nT} turbines with {nS} substations, "
-                    f"{fixed_substation_connections} connections per substation, "
-                    f"and max flow of {max_flow} per connection. "
-                    f"Total capacity: {total_max_capacity} < {nT} turbines"
-                )
-        # Create model
         model = pyo.ConcreteModel()
-        
-        # Sets
         model.lines = pyo.Set(initialize=range(len(grid.lines_AC_ct)))
         model.nodes = pyo.Set(initialize=range(len(grid.nodes_AC)))
         
-        # Find sink nodes (nodes with generators) and source nodes (nodes with renewable resources)
         sink_nodes = []
         source_nodes = []
-        
         for node in model.nodes:
             nAC = grid.nodes_AC[node]
-            if nAC.connected_gen:  # Node has generator (sink)
+            if nAC.connected_gen:
                 sink_nodes.append(node)
-            if nAC.connected_RenSource:  # Node has renewable resources (source)
+            if nAC.connected_RenSource:
                 source_nodes.append(node)
         
         if not sink_nodes:
@@ -796,13 +998,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
         model.source_nodes = pyo.Set(initialize=source_nodes)
         model.sink_nodes = pyo.Set(initialize=sink_nodes)
         
-
-        
-        # Variables
-        # Binary variables: one per line (used or not)
         model.line_used = pyo.Var(model.lines, domain=pyo.Binary)
-        
-        # Cable type selection (if enabled)
         if enable_cable_types:
             if grid.Cable_options is None or len(grid.Cable_options) == 0:
                 raise ValueError("enable_cable_types=True but no Cable_options found in grid")
@@ -820,49 +1016,28 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 ct_flow_capacity[ct] = int(mva_rating / t_MW)
             model.ct_flow_capacity = pyo.Param(model.ct_set, initialize=ct_flow_capacity)
             
-            # Cable type selection: ct_branch[line, ct] = 1 if cable type ct selected for line
             model.ct_branch = pyo.Var(model.lines, model.ct_set, domain=pyo.Binary)
-            
-            # Optional: Global cable type indicator (Z_k style from image)
-            # ct_types[ct] = 1 if cable type ct is used anywhere
             model.ct_types = pyo.Var(model.ct_set, domain=pyo.Binary)
-            
-            # LINKING: line_used and ct_branch are linked via cable_type_selection_rule constraint:
-            # sum(ct_branch[line, ct]) == line_used[line]
-            # This ensures:
-            # - If line_used[line] = 1: exactly one ct_branch[line, ct] = 1 (one cable type selected)
-            # - If line_used[line] = 0: all ct_branch[line, ct] = 0 (no cable type selected)
         
         def line_flow_bounds(model, line):
             line_obj = grid.lines_AC_ct[line]
             from_node = line_obj.fromNode
             to_node = line_obj.toNode
-            
-            # Check if either endpoint is a slack node (substation)
             from_is_slack = from_node.type == 'Slack'
             to_is_slack = to_node.type == 'Slack'
             
-            # If cable types enabled, use max capacity from all cable types
             if enable_cable_types:
-                max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
-                # If line connects to slack node (substation): use full capacity
-                # Note: substations are always toNode, so to_is_slack is true for substation-turbine edges
-                # Bounds allow 0 (when line not used) and constraints enforce min_turbines_per_string when used
                 if to_is_slack and not from_is_slack:
-                    return (0, max_ct_flow)  # Allow 0 when line_used=0, constraint enforces min when used
+                    return (0, max_ct_flow)
                 elif from_is_slack and not to_is_slack:
-                    return (-max_ct_flow, 0)  # Allow 0 when line_used=0, constraint enforces min when used
+                    return (-max_ct_flow, 0)
                 else:
-                    # If line connects PQ-PQ (turbine-turbine) or both slack: use reduced capacity
                     return (-(max_ct_flow - 1), max_ct_flow - 1)
             else:
-                # Original bounds (no cable type selection)
-                # Note: substations are always toNode, so to_is_slack is true for substation-turbine edges
-                # Bounds allow 0 (when line not used) and constraints enforce min_turbines_per_string when used
                 if to_is_slack and not from_is_slack:
-                    return (0, max_flow)  # Allow 0 when line_used=0, constraint enforces min when used
+                    return (0, max_flow)
                 elif from_is_slack and not to_is_slack:
-                    return (-max_flow, 0)  # Allow 0 when line_used=0, constraint enforces min when used
+                    return (-max_flow, 0)
                 else:
                     # If line connects PQ-PQ (turbine-turbine) or both slack: use reduced capacity
                     return (-(max_flow - 1), max_flow - 1)
@@ -922,8 +1097,6 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                     min_connections = fixed_substation_connections
                 
                 elif enable_cable_types:
-                    # Use max cable type capacity for sink capacity calculation
-                    max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
                     min_connections = math.ceil(nT/(nS*max_ct_flow))
                     
                 else:
@@ -1051,10 +1224,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             else:
                 min_flow = 1
             
-            # If line_used=1 and line_flow_dir=1, then line_flow >= min_flow
-            # If line_used=0 or line_flow_dir=0, this constraint is relaxed
             if enable_cable_types:
-                max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
                 M = max_ct_flow + 1
             else:
                 M = max_flow + 1
@@ -1077,7 +1247,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 min_flow = 1
             
             if enable_cable_types:
-                max_ct_flow = max(model.ct_flow_capacity[ct] for ct in model.ct_set)
+                # Use max_ct_flow (already calculated, same as max cable type capacity)
                 M = max_ct_flow + 1
             else:
                 M = max_flow + 1
@@ -1113,8 +1283,8 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
 
 
 
-def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turbines_per_string=None, length_scale=1000,
-                                   enable_cable_types=False, t_MW=None, cab_types_allowed=None, fixed_substation_connections=None):
+def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turbines_per_string=False, length_scale=1000,
+                                   enable_cable_types=False, t_MW=None, cab_types_allowed=None, fixed_substation_connections=None,min_sub_connections=False,sub_k_max=None):
     """
     OR-Tools version of _create_master_problem_pyomo(grid, crossings=True, max_flow=None)
 
@@ -1147,10 +1317,17 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     lines = range(num_lines)
     nodes = range(num_nodes)
 
+    # Use helper function to prepare capacity and min_turbines_per_string
+    # This also handles feasibility checks and fixed_substation_connections
+    min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS = _prepare_capacity_and_min_turbines(
+        grid, max_flow=max_flow, min_turbines_per_string=min_turbines_per_string,
+        enable_cable_types=enable_cable_types, t_MW=t_MW, num_nodes=num_nodes,
+        fixed_substation_connections=fixed_substation_connections
+    )
+    
+    # Update max_flow for consistency (used later in the function)
     if max_flow is None:
         max_flow = num_nodes - 1
-    if min_turbines_per_string is None:
-        min_turbines_per_string = 1
 
     # Identify sources (renewables) and sinks (generators / substations)
     source_nodes = []
@@ -1169,82 +1346,20 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     source_nodes_set = set(source_nodes)
     sink_nodes_set = set(sink_nodes)
 
-    # Non-sink nodes count
+    # Non-sink nodes count (recalculate based on sink_nodes for consistency)
     nT = num_nodes - len(sink_nodes)
     nS = len(sink_nodes)
-
-    # Feasibility check: only valid if ALL substations have ct_limit defined
-    # If any substation has ct_limit = None, it has unlimited connections, so check is invalid
-    slack_nodes = [grid.nodes_AC[n] for n in nodes if getattr(grid.nodes_AC[n], "type", None) == "Slack"]
-    slack_nodes_with_limit = [node for node in slack_nodes if getattr(node, "ct_limit", None) is not None]
-    all_slack_have_limit = len(slack_nodes_with_limit) == len(slack_nodes) if slack_nodes else False
-    
-    if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
-        # Calculate total connections across all substations
-        n_s_connections = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
-        min_capacity = min_turbines_per_string * n_s_connections
-        if min_capacity > nT:
-            raise ValueError(
-                f"Not feasible to connect {nT} turbines with {nS} substations, "
-                f"{n_s_connections} total connections, "
-                f"and minimum {min_turbines_per_string} turbines per connection. "
-                f"Minimum required: {min_capacity} > {nT} turbines. "
-                f"Decrease min_turbines_per_string or increase connections."
-            )
-
-    if fixed_substation_connections is not None:
-        min_turbines_per_string = math.floor(nT / (nS * fixed_substation_connections))
-        
-        # Set ct_limit for all slack nodes
-        for node in slack_nodes:
-            node.ct_limit = fixed_substation_connections
-        
-        # Feasibility check: total maximum capacity must be >= number of turbines
-        # Each substation has fixed_substation_connections connections
-        # Each connection can carry at most max_flow turbines
-        # Total capacity = max_flow * fixed_substation_connections * nS
-        total_max_capacity = max_flow * fixed_substation_connections * nS
-        if total_max_capacity < nT:
-            raise ValueError(
-                f"Not feasible to connect {nT} turbines with {nS} substations, "
-                f"{fixed_substation_connections} connections per substation, "
-                f"and max flow of {max_flow} per connection. "
-                f"Total capacity: {total_max_capacity} < {nT} turbines"
-            )
-
-    # --------------------
-    # Initialize cable type capacities (if enabled) - needed for min_connections calculation
-    # --------------------
-    ct_flow_capacity = {}
-    if enable_cable_types:
-        if grid.Cable_options is None or len(grid.Cable_options) == 0:
-            raise ValueError("enable_cable_types=True but no Cable_options found in grid")
-        if t_MW is None:
-            raise ValueError("t_MW must be provided when enable_cable_types=True")
-        
-        # Calculate flow capacity for each cable type (in turbine units)
-        # Flow capacity = int(MVA_rating / t_MW)
-        ct_set_temp = list(range(len(grid.Cable_options[0]._cable_types)))
-        for ct in ct_set_temp:
-            mva_rating = grid.Cable_options[0].MVA_ratings[ct]
-            ct_flow_capacity[ct] = int(mva_rating / t_MW)
 
     # Minimum connections for sink nodes (same formula as Pyomo version)
     # If fixed_substation_connections is set, use that; otherwise calculate based on capacity
     if fixed_substation_connections is not None:
         min_connections_per_sink = fixed_substation_connections
     else:
-        # Calculate based on capacity
-        if enable_cable_types and ct_flow_capacity:
-            max_ct_flow = max(ct_flow_capacity.values())
-            capacity_for_calc = max_ct_flow
-        else:
-            capacity_for_calc = max_flow
-        
+        # Calculate based on capacity - use max_ct_flow (already calculated above)
         if nS > 0:
-            min_connections_per_sink = math.ceil(nT / (nS * capacity_for_calc))
+            min_connections_per_sink = math.ceil(nT / (nS * max_ct_flow))
         else:
-            min_connections_per_sink = 0
+            raise ValueError("No substations found!")
 
     # --------------------
     # Precompute line incidence and bounds
@@ -1297,8 +1412,7 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
         # Cable type set (capacities already calculated above)
         ct_set = list(range(len(grid.Cable_options[0]._cable_types)))
         
-        # Update bounds to use max cable type capacity
-        max_ct_flow = max(ct_flow_capacity.values()) if ct_flow_capacity else max_flow
+        # Update bounds to use max_ct_flow (already calculated, same as max cable type capacity)
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
             from_node = line_obj.fromNode
