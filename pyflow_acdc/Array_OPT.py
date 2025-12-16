@@ -264,7 +264,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         
 
         cable_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.lines))
-        weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].weighted_Length_km for line in model_MIP.lines))
+        weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.lines))
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
         total_cost = MIP_obj_value+obj_value

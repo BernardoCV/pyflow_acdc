@@ -2050,7 +2050,7 @@ class Size_selection(Line_AC):
     
     @property
     def installation_cost(self):
-        return self.installation_cost_per_km * self.weighted_Length_km
+        return self.installation_cost_per_km * self.trench_lenght_km
     
     @cable_types.setter
     def cable_types(self, value):
@@ -2110,7 +2110,7 @@ class Size_selection(Line_AC):
         self.network_flow = None    
 
         self.installation_cost_per_km = 1
-        self.weighted_Length_km = self.Length_km
+        self.trench_lenght_km = self.Length_km
 
         
         # If cable types are provided, validate and calculate parameters

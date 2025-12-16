@@ -826,7 +826,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=name,geometry=geo,update_grid=False)
         
         line_obj.installation_cost_per_km = trenching_cost
-        line_obj.weighted_Length_km = w_l
+        line_obj.trench_lenght_km = w_l
         # Store the line object using original graph edge key format for crossing_pairs lookup
         # crossing_pairs uses _generate_edge_key which creates f"{str(u)}_{str(v)}" (original graph order)
         original_edge_key = f'{str(u)}_{str(v)}'
