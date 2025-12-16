@@ -16,7 +16,7 @@ from .Class_editor import analyse_grid
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
-from .ACDC_OPF import OPF_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
+from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
 
 from .Graph_and_plot import save_network_svg
 
@@ -455,7 +455,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     
     # model.obj.pprint()
 
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit,callback=callback)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=callback)
     
     t1 = time.perf_counter()
     if export:
@@ -510,7 +510,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
    
     # model.obj.pprint()
     t3 = time.perf_counter()
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit,callback=fs)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=fs)
     
     if model_results is None:
         return None, None, None, None
@@ -586,7 +586,7 @@ def alpha_paretto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=8760,discount_rate=0
         # Reset model variables to initial values
         reset_to_initialize(model, initial_values)
         model.alpha.set_value(a)
-        model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+        model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit)
         
         row = {
             'alpha': a,
@@ -658,7 +658,7 @@ def rate_sensitivity(grid,steps,ObjRule,min_rate=0.0,max_rate=0.1,NPV=True,n_yea
         # Reset model variables to initial values
         reset_to_initialize(model, initial_values)
         model.discount_rate.set_value(rate)
-        model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+        model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit)
         
         row = {
             'rate': rate,
@@ -714,7 +714,7 @@ def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_
         # Reset model variables to initial values
         reset_to_initialize(model, initial_values)
         model.kappa.set_value(kappa)
-        model_results,solver_stats = OPF_solve(model,grid,solver,tee,time_limit)
+        model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit)
         
         row = {
             'kappa': kappa,
@@ -817,7 +817,7 @@ def comprehensive_sensitivity_analysis(
                 
                 
                 # Solve
-                model_results, solver_stats = OPF_solve(model, grid, solver, tee, time_limit)
+                model_results, solver_stats = pyomo_model_solve(model, grid, solver, tee, time_limit)
                 
                 # Store results
                 row = {
@@ -929,7 +929,7 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
     t_modelcreate = t2-t1
     if tee : 
         print('Model loaded') 
-    model_results,solver_stats = OPF_solve(model,grid,solver,tee,callback=callback)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
     TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   

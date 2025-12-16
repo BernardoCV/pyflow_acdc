@@ -1119,7 +1119,7 @@ def create_geometries(grid):
                     x, y = pos[node]
                     gen.geometry = Point(x, y)
 
-def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False,poly=None,linestrings=None,coloring=None):
+def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False,poly=None,linestrings=None,coloring=None, poly_size=None):
     """Save the network as SVG file
     
     Parameters:
@@ -1127,6 +1127,10 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
     square_ratio : bool
         If True, forces both x and y axes to have the same range (uses the largest range needed)
         so that one step in x equals one step in y in the coordinate space.
+    poly_size : tuple or None
+        If provided and poly is not None, specifies the target size (width, height) in pixels
+        for the polygon. Everything else will be scaled to fit this polygon size.
+        Format: (target_width, target_height) in pixels.
     """
     try:
         import svgwrite
@@ -1204,9 +1208,22 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 for o in obj:
                     yield from _iter_polys(o)  # Recursively handle nested structures
 
+        # Calculate polygon bounds separately if poly_size is specified
+        poly_bounds = None
         if poly is not None:
+            poly_bounds_list = []
             for geom in _iter_polys(poly):
-                all_bounds.append(geom.bounds)
+                bounds = geom.bounds
+                poly_bounds_list.append(bounds)
+                all_bounds.append(bounds)
+            
+            if poly_bounds_list:
+                poly_bounds = (
+                    min(bound[0] for bound in poly_bounds_list),
+                    min(bound[1] for bound in poly_bounds_list),
+                    max(bound[2] for bound in poly_bounds_list),
+                    max(bound[3] for bound in poly_bounds_list)
+                )
         
         
         # Calculate overall bounds
@@ -1220,36 +1237,68 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             return
 
         # Calculate scaling factors
+        # If poly_size is specified, determine scale from polygon FIRST, then use for everything
+        if poly_size is not None and poly_bounds is not None:
+            target_poly_width, target_poly_height = poly_size
+            poly_minx, poly_miny, poly_maxx, poly_maxy = poly_bounds
+            
+            poly_x_range = poly_maxx - poly_minx
+            poly_y_range = poly_maxy - poly_miny
+            
+            if poly_x_range == 0 or poly_y_range == 0:
+                print("Warning: Polygon has zero width or height, cannot scale")
+                # Fall through to normal scaling
+                poly_size = None
+            else:
+                # Calculate scale factors for polygon to fit target size
+                # Use minimum to maintain uniform scaling (circles stay circular)
+                scale_x_poly = target_poly_width / poly_x_range
+                scale_y_poly = target_poly_height / poly_y_range
+                scale = min(scale_x_poly, scale_y_poly)  # Uniform scale for everything
+                
+                padding = 25
+                
+                # Calculate the overall bounds in scaled coordinates
+                overall_x_range = (maxx - minx) * scale
+                overall_y_range = (maxy - miny) * scale
+                
+                # Adjust width and height to accommodate everything
+                width = int(overall_x_range + 2 * padding)
+                height = int(overall_y_range + 2 * padding)
+                
+                # Update the SVG drawing size
+                dwg = svgwrite.Drawing(f"{name}.svg", size=(f'{width}px', f'{height}px'), profile='tiny')
         
-        
-        if square_ratio:
-            padding = 10
-            # For square ratio: make both axes have the same range
-            x_range = maxx - minx
-            y_range = maxy - miny
-            max_range = max(x_range, y_range)
-            
-            # Expand the smaller dimension to match the larger one
-            if x_range < max_range:
-                center_x = (minx + maxx) / 2
-                minx = center_x - max_range / 2
-                maxx = center_x + max_range / 2
-            
-            if y_range < max_range:
-                center_y = (miny + maxy) / 2
-                miny = center_y - max_range / 2
-                maxy = center_y + max_range / 2
-            
-            # Now both ranges are equal, so use the same scale for both axes
-            available_width = width - 2*padding
-            available_height = height - 2*padding
-            scale = min(available_width, available_height) / max_range
-        else:
-            padding = 25  # pixels of padding
-            # Original scaling logic
-            scale_x = (width - 2*padding) / (maxx - minx)
-            scale_y = (height - 2*padding) / (maxy - miny)
-            scale = min(scale_x, scale_y)
+        # If poly_size was not set or failed, use normal scaling logic
+        if poly_size is None or poly_bounds is None:
+            if square_ratio:
+                padding = 10
+                # For square ratio: make both axes have the same range
+                x_range = maxx - minx
+                y_range = maxy - miny
+                max_range = max(x_range, y_range)
+                
+                # Expand the smaller dimension to match the larger one
+                if x_range < max_range:
+                    center_x = (minx + maxx) / 2
+                    minx = center_x - max_range / 2
+                    maxx = center_x + max_range / 2
+                
+                if y_range < max_range:
+                    center_y = (miny + maxy) / 2
+                    miny = center_y - max_range / 2
+                    maxy = center_y + max_range / 2
+                
+                # Now both ranges are equal, so use the same scale for both axes
+                available_width = width - 2*padding
+                available_height = height - 2*padding
+                scale = min(available_width, available_height) / max_range
+            else:
+                padding = 25  # pixels of padding
+                # Original scaling logic
+                scale_x = (width - 2*padding) / (maxx - minx)
+                scale_y = (height - 2*padding) / (maxy - miny)
+                scale = min(scale_x, scale_y)
         
         def transform_coords(x, y):
             """Transform coordinates to SVG space"""

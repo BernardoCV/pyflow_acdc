@@ -496,8 +496,22 @@ def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r
 
 "Zones"
 
-def add_cable_option(grid, cable_types: list,name=None):
-    cable_option = Cable_options(cable_types,name)
+def add_cable_option(grid, cable_types: list = None, name=None, cable_database=None):
+    """Add cable option to grid.
+    
+    Parameters
+    ----------
+    grid : Grid
+        The grid object
+    cable_types : list, optional
+        List of cable type names. If None, creates empty cable option.
+    name : str, optional
+        Name for the cable option
+    cable_database : pd.DataFrame, optional
+        Custom cable database DataFrame. If provided, uses this instead of loading from YAML.
+        If None and cable_type_ini == "pyflow_acdc", loads from YAML database.
+    """
+    cable_option = Cable_options(cable_types, name, cable_database=cable_database)
     grid.Cable_options.append(cable_option)
     return cable_option
 

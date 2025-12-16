@@ -717,9 +717,11 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_database=None,cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
     from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
     from .Graph_and_plot import save_network_svg
+    from .Classes import Cable_options, Line_AC, Line_DC
+
     try:
         from .Array_OPT import MIP_path_graph
         mip_check_av =True
@@ -735,7 +737,28 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         grid.name = name
     res = Results(grid)
 
-    cable_option = add_cable_option(grid,cable_types)
+    # Handle cable_types and cable_database:
+    # - If cable_database is provided: load it for all classes, extract cable_types from index if empty
+    # - If cable_types is provided (no cable_database): use with default pyflow database
+    # - If both empty: don't create cable_option
+    
+    if cable_database is not None:
+        # User provided custom database - use it for all classes
+        Cable_options.load_cable_database(cable_database=cable_database)
+        Line_AC.load_cable_database(cable_database=cable_database)
+        Line_DC.load_cable_database(cable_database=cable_database)
+        
+        # Extract cable types from database index if not provided
+        if len(cable_types) == 0:
+            cable_types = list(cable_database.index)
+        
+        cable_option = add_cable_option(grid, cable_types, cable_database=cable_database)
+    elif len(cable_types) == 0:
+        # No database and no cable_types - don't create cable_option
+        cable_option = None
+    else:
+        # cable_types provided - use default pyflow database (lazy loaded when needed)
+        cable_option = add_cable_option(grid, cable_types)
     t_MW = turbines_df.iloc[0].MW_rating
     if max_turbines_per_string is not None:
         
@@ -779,10 +802,22 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     line_objects = {}  # Dictionary to store line objects by their name
     
     for u,v, attrs in array_graph.edges(data=True):
+        # Ensure substations are always toNode so positive flow goes towards them
+        # Note: In the graph, substation-turbine edges always have substation as u (from add_substation_paths_to_graph)
+        u_is_substation = array_graph.nodes[u].get('point_type') == 'substation'
+        v_is_substation = array_graph.nodes[v].get('point_type') == 'substation'
         
-        fromnode = str(u)
-        tonode = str(v)
-        name= f'{str(u)}_{str(v)}'
+        # If u is substation and v is not, swap them (substation becomes toNode)
+        # This is the common case for substation-turbine edges
+        # If both or neither are substations, keep original order
+        if u_is_substation and not v_is_substation:
+            fromnode = str(v)
+            tonode = str(u)
+            name= f'{str(v)}_{str(u)}'
+        else:
+            fromnode = str(u)
+            tonode = str(v)
+            name= f'{str(u)}_{str(v)}'
 
         l = attrs['length']/1000
         geo= attrs['geometry']
@@ -792,9 +827,10 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         
         line_obj.installation_cost_per_km = trenching_cost
         line_obj.weighted_Length_km = w_l
-        # Store the line object with its name for later reference
-        edge_key = f'{fromnode}_{tonode}'
-        line_objects[edge_key] = line_obj
+        # Store the line object using original graph edge key format for crossing_pairs lookup
+        # crossing_pairs uses _generate_edge_key which creates f"{str(u)}_{str(v)}" (original graph order)
+        original_edge_key = f'{str(u)}_{str(v)}'
+        line_objects[original_edge_key] = line_obj
     
     # Add the complete crossing groups as line numbers to the grid
     grid.crossing_groups = []
