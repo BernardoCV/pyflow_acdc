@@ -76,7 +76,9 @@ class Grid:
         self.crossing_groups = []
         self.MIP_time = None
         self.MIP_check = False
-        
+        self.act_gen = False
+
+
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
             if not hasattr(conv, 'basekA'):

@@ -842,6 +842,20 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
         Number of substations (sink nodes)
     """
     # Validate inputs
+    ct_flow_capacity = {}
+    if enable_cable_types:
+        if grid.Cable_options is None or len(grid.Cable_options) == 0:
+            raise ValueError("enable_cable_types=True but no Cable_options found in grid")
+        if t_MW is None:
+            raise ValueError("t_MW must be provided when enable_cable_types=True")
+        
+        # Calculate flow capacity for each cable type (in turbine units)
+        # Flow capacity = int(MVA_rating / t_MW)
+        ct_set_temp = list(range(len(grid.Cable_options[0]._cable_types)))
+        for ct in ct_set_temp:
+            mva_rating = grid.Cable_options[0].MVA_ratings[ct]
+            ct_flow_capacity[ct] = int(mva_rating / t_MW)
+    
     if enable_cable_types and ct_flow_capacity:
         max_ct_flow = max(ct_flow_capacity.values())
         min_ct_flow = min(ct_flow_capacity.values())
@@ -860,19 +874,7 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
         max_flow = num_nodes - 1
     
     # Initialize cable type capacities (if enabled) - needed for capacity calculation
-    ct_flow_capacity = {}
-    if enable_cable_types:
-        if grid.Cable_options is None or len(grid.Cable_options) == 0:
-            raise ValueError("enable_cable_types=True but no Cable_options found in grid")
-        if t_MW is None:
-            raise ValueError("t_MW must be provided when enable_cable_types=True")
-        
-        # Calculate flow capacity for each cable type (in turbine units)
-        # Flow capacity = int(MVA_rating / t_MW)
-        ct_set_temp = list(range(len(grid.Cable_options[0]._cable_types)))
-        for ct in ct_set_temp:
-            mva_rating = grid.Cable_options[0].MVA_ratings[ct]
-            ct_flow_capacity[ct] = int(mva_rating / t_MW)
+    
     
     
     
@@ -912,16 +914,37 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
     all_slack_have_limit = len(slack_nodes_with_limit) == len(slack_nodes) if slack_nodes else False
     
     if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
-        # Calculate total connections across all substations
-        n_s_connections = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
-        min_capacity = min_turbines_per_string * n_s_connections
-        if min_capacity > nT:
+        # All substations have an explicit connection limit -> we can perform
+        # a meaningful global feasibility check.
+
+        # Two necessary conditions for feasibility:
+        #   1) Minimum-turbines constraint must not exceed the number of turbines:
+        #        min_turbines_per_string * min_s_conn <= nT
+        #   2) Total capacity must be able to host all turbines:
+        #        max_ct_flow * max_s_conn >= nT
+        max_s_conn = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
+        min_s_conn = math.ceil(nT / (nS * min_ct_flow))
+
+        # Condition 1: lower bound from min_turbines_per_string
+        min_required_turbines = min_turbines_per_string * min_s_conn
+        if min_required_turbines > nT:
             raise ValueError(
                 f"Not feasible to connect {nT} turbines with {nS} substations, "
-                f"{n_s_connections} total connections, "
-                f"and minimum {min_turbines_per_string} turbines per connection. "
-                f"Minimum required: {min_capacity} > {nT} turbines. "
+                f"{min_s_conn} total connections, and minimum "
+                f"{min_turbines_per_string} turbines per connection. "
+                f"Minimum required: {min_required_turbines} > {nT} turbines. "
                 f"Decrease min_turbines_per_string or increase connections."
+            )
+
+        # Condition 2: upper bound from connection capacity
+        max_total_capacity = max_ct_flow * max_s_conn
+        if max_total_capacity < nT:
+            raise ValueError(
+                f"Not feasible to connect {nT} turbines with {nS} substations, "
+                f"{max_s_conn} total connections, and maximum "
+                f"{max_ct_flow} turbines per connection. "
+                f"Total capacity: {max_total_capacity} < {nT} turbines. "
+                f"Increase connections or cable capacity."
             )
     
     # Handle fixed_substation_connections
