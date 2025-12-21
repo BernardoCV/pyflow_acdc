@@ -777,7 +777,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
     
     for i, attrs in array_graph.nodes(data=True):
         if attrs['point_type'] == 'access_point':
-            pass
+            continue  # Skip access_point nodes - they're routing points, not AC nodes
         elif attrs['point_type'] == 'turbine':
             kV=   turbines_df.loc[attrs['original_idx']].kV_rating
             geo = turbines_df.loc[attrs['original_idx']].geometry

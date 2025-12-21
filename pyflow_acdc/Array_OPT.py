@@ -452,6 +452,12 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
     while not flag and i<max_iters:
         if tee:
             print(f'Iteration sub-{i} starting min sub connections')
+            if min_turbines_per_string:
+                min_t_s = math.floor(tn / (sn * ns))   
+            else:
+                min_t_s = min_turbines_per_string
+            print(f'Connecting {tn} turbines to {sn} substations')    
+            print(f'max connection to substations: {ns}, max turbines per connection: {max_flow}, min turbines per string: {min_t_s}')
         for node in grid.nodes_AC:
             if node.type == 'Slack':
                 node.ct_limit = ns
