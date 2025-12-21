@@ -807,9 +807,13 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
         u_is_substation = array_graph.nodes[u].get('point_type') == 'substation'
         v_is_substation = array_graph.nodes[v].get('point_type') == 'substation'
         
+        u_is_access_point = array_graph.nodes[u].get('point_type') == 'access_point'
+        v_is_access_point = array_graph.nodes[v].get('point_type') == 'access_point'
         # If u is substation and v is not, swap them (substation becomes toNode)
         # This is the common case for substation-turbine edges
         # If both or neither are substations, keep original order
+        if u_is_access_point or v_is_access_point:
+            continue
         if u_is_substation and not v_is_substation:
             fromnode = str(v)
             tonode = str(u)
