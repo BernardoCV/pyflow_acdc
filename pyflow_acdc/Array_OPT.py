@@ -443,6 +443,12 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
     sn = grid.nn_AC - grid.n_ren
 
     ns = math.ceil(tn/(sn* max_flow))
+    
+    # If the minimum required ns already exceeds max_ns, the problem is infeasible
+    if max_ns is not None and ns > max_ns:
+        if tee:
+            print(f'Infeasible: minimum ns={ns} exceeds max_ns={max_ns}')
+        return False, None, None, None, ns, 0, 0.0
 
     flag=False
     i =0
