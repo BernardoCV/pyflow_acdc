@@ -484,7 +484,7 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
         i+=1
         if not flag:
             if ns is not None:
-                if max_ns is not None and ns > max_ns:
+                if max_ns is not None and ns >= max_ns:
                     if tee:
                         print(f'Iteration sub-{i} ns increased to {ns} (max_ns reached), breaking loop')
                     break
