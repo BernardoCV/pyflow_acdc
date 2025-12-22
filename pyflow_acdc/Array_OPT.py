@@ -55,7 +55,7 @@ class MIPConfig:
 
 def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
                    MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,
-                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=False,fixed_substation_connections=None):
+                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
     
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
@@ -121,13 +121,13 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
                 print(f'Using min sub connections iterationfor sequential CSS')
             # Use the shared MIPConfig for internal calls
             flag, high_flow,model_MIP,feasible_solutions_MIP ,ns, sub_iter , path_time = min_sub_connections(
-                grid, max_flow, mip_cfg=mip_cfg
+                grid, max_flow, mip_cfg=mip_cfg, max_ns=max_ns
             )
         else:
             if tee and i==0:
                 print(f'Using user defined substation limit path graph for sequential CSS')
             flag, high_flow,model_MIP,feasible_solutions_MIP = MIP_path_graph(
-                grid, max_flow, mip_cfg=mip_cfg
+                grid, max_flow, mip_cfg=mip_cfg,sub_k_max=max_ns
             )
             sub_iter = 1
         
@@ -423,7 +423,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     
 
 
-def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False,
+def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, max_ns=None,
                         callback=False, MIP_gap=None, backend='pyomo',
                         min_turbines_per_string=False, mip_cfg: MIPConfig | None = None):
     # If a MIPConfig is provided, let it override the individual flags.
@@ -484,7 +484,12 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
         i+=1
         if not flag:
             if ns is not None:
+                if max_ns is not None and ns > max_ns:
+                    if tee:
+                        print(f'Iteration sub-{i} ns increased to {ns} (max_ns reached), breaking loop')
+                    break
                 ns+=1
+                
             if tee:
                 print(f'Iteration sub-{i} ns increased to {ns}')
 
