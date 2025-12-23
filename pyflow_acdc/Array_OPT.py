@@ -64,7 +64,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     else:
         # If save_path is None or not a directory, create "sequential_CSS" in current working directory
         save_dir = 'sequential_CSS'
-    
+    if MIP_solver == 'ortools':
+        backend = 'ortools'
     # Create the directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
