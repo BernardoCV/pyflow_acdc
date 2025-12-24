@@ -217,12 +217,12 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_AC_CT, grid.lines_AC_ct)
 
-            
+            CSS_solver = CSS_NL_solver if NL else CSS_L_solver
             # Save SVG in the sequential_CSS folder
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             if not os.path.exists(intermediate_dir):
                 os.makedirs(intermediate_dir)
-            save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_{CSS_L_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
+            save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_{CSS_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
         
         if model_results['Solver'][0]['Status'] == 'ok':
             obj_value = pyo.value(model.obj)
@@ -263,9 +263,18 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         
        
         
-
-        cable_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.lines))
-        weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.lines))
+        # Check if it's Pyomo or OR-Tools MockModel
+        if hasattr(model_MIP, 'line_used') and hasattr(model_MIP, 'lines'):
+            # Pyomo model
+            cable_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.lines))
+            weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.lines))
+        elif hasattr(model_MIP, 'line_used_vals'):
+            # OR-Tools MockModel
+            cable_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.line_used_vals.keys())
+            weighted_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.line_used_vals.keys())
+        else:
+            raise AttributeError("model_MIP must have either Pyomo attributes ('line_used', 'lines') or OR-Tools attribute ('line_used_vals')")
+        
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
         total_cost = MIP_obj_value+obj_value
