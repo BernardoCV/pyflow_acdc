@@ -1829,10 +1829,7 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
             model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch,mutable=True)
         
         if grid.CT_AC:
-            if not grid.Array_opf:
-                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini,mutable=True)
-            else:
-                model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=0,mutable=True)
+            model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini,mutable=True)
     if grid.DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         P_lineDC_limit,NP_lineDC    = DC_lines_info
