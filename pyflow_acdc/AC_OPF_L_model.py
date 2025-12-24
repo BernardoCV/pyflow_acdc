@@ -206,7 +206,7 @@ def AC_variables(model,grid,AC_info):
     
     def set_based_bounds(model, line, cab_type):
         # Check if this is a fixed route with no cable selected
-        if not grid.Array_opf and grid.lines_AC_ct[line].active_config < 0:
+        if  grid.lines_AC_ct[line].active_config < 0:
             return (0, 0)  # Force z variables to zero
         
         # Original logic for variable bounds
@@ -223,13 +223,7 @@ def AC_variables(model,grid,AC_info):
         model.z_to = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds,initialize=0)
         model.z_from = pyo.Var(model.lines_AC_ct, model.ct_set, bounds=set_based_bounds,initialize=0)   
     
-        # Network flow variables for MIP integration (only for Array_opf)
-        if grid.Array_opf:
-            # Calculate max flow for bounds
-            max_flow = grid.max_turbines_per_string if hasattr(grid, 'max_turbines_per_string') else len(lista_nodos_AC)
-            
-            model.network_flow = pyo.Var(model.lines_AC_ct, bounds=(-max_flow, max_flow), initialize=0)
-            model.node_net_flow = pyo.Var(model.nodes_AC, bounds=(-len(lista_nodos_AC), 1), initialize=0)
+
 
 def AC_constraints(model,grid,AC_info):
     
@@ -455,14 +449,14 @@ def AC_constraints(model,grid,AC_info):
     def P_to_AC_line_ct(model,line,ct):   
         l = grid.lines_AC_ct[line]
         Pto,B = calculate_P(model,l,'to',idx=ct)
-        if l.active_config < 0 and not grid.Array_opf:
+        if l.active_config < 0:
             return model.ct_PAC_to[line,ct] == 0
         return model.ct_PAC_to[line,ct] == Pto
     
     def P_from_AC_line_ct(model,line,ct):       
        l = grid.lines_AC_ct[line]
        Pfrom,B = calculate_P(model,l,'from',idx=ct)
-       if l.active_config < 0 and not grid.Array_opf:
+       if l.active_config < 0:
             return model.ct_PAC_from[line,ct] == 0
        return model.ct_PAC_from[line,ct] == Pfrom
     
@@ -496,14 +490,9 @@ def AC_constraints(model,grid,AC_info):
 
     
     if grid.CT_AC:   
-        if not grid.Array_opf:
-            model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
-            model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
-        else:
-            model.ct_Pto_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_upper)
-            model.ct_Pto_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct_lower)
-            model.ct_Pfrom_AC_line_constraint_upper = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_upper)
-            model.ct_Pfrom_AC_line_constraint_lower = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct_lower)
+        
+        model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
+        model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
     
     
     "AC inequality constraints"
@@ -549,78 +538,6 @@ def AC_constraints(model,grid,AC_info):
         model.rec_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear_neg)
     
    
-    if grid.CT_AC and grid.Array_opf:
-            # Find source and sink nodes
-            source_nodes = []
-            sink_nodes = []
-            
-            for node in model.nodes_AC:
-                nAC = grid.nodes_AC[node]
-                if nAC.connected_RenSource:  # Node has renewable resources (source)
-                    source_nodes.append(node)
-                if nAC.connected_gen:  # Node has generator (sink)
-                    sink_nodes.append(node)
-            
-            if not source_nodes:
-                raise ValueError("No renewable source nodes found!")
-            if not sink_nodes:
-                raise ValueError("No generator nodes found!")
-            
-            # Flow conservation for all nodes
-            def flow_conservation_rule(model, node):
-                # Calculate net flow out of this node
-                net_flow = 0
-                
-                for line in model.lines_AC_ct:
-                    line_obj = grid.lines_AC_ct[line]
-                    from_node = line_obj.fromNode.nodeNumber
-                    to_node = line_obj.toNode.nodeNumber
-                    
-                    if from_node == node:
-                        # Flow leaving this node (positive)
-                        net_flow += model.network_flow[line]
-                    elif to_node == node:
-                        # Flow entering this node (negative, so we add it to net_flow)
-                        net_flow -= model.network_flow[line]
-                
-                return model.node_net_flow[node] == net_flow
-            
-            model.flow_conservation = pyo.Constraint(model.nodes_AC, rule=flow_conservation_rule)
-            
-            # Source nodes: net flow out = 1 (supply)
-            def source_node_rule(model, node):
-                return model.node_net_flow[node] == 1
-            
-            model.source_node = pyo.Constraint(source_nodes, rule=source_node_rule)
-            
-            # Sink nodes: total net flow out = -num_sources (demand)
-            def total_sink_absorption_rule(model):
-                return sum(model.node_net_flow[node] for node in sink_nodes) == -len(source_nodes)
-            
-            model.total_sink_absorption = pyo.Constraint(rule=total_sink_absorption_rule)
-            
-            # Intermediate nodes: net flow = 0 (conservation)
-            def intermediate_node_rule(model, node):
-                if node not in source_nodes and node not in sink_nodes:
-                    return model.node_net_flow[node] == 0
-                else:
-                    return pyo.Constraint.Skip
-            
-            model.intermediate_node = pyo.Constraint(model.nodes_AC, rule=intermediate_node_rule)
-            
-            
-            max_flow = grid.max_turbines_per_string 
-            
-            def flow_investment_link_upper_rule(model, line):
-                return model.network_flow[line] <= max_flow * sum(model.ct_branch[line, ct] for ct in model.ct_set)
-            
-            def flow_investment_link_lower_rule(model, line):
-                return model.network_flow[line] >= -max_flow * sum(model.ct_branch[line, ct] for ct in model.ct_set)
-            
-            model.flow_investment_link_upper = pyo.Constraint(model.lines_AC_ct, rule=flow_investment_link_upper_rule)
-            model.flow_investment_link_lower = pyo.Constraint(model.lines_AC_ct, rule=flow_investment_link_lower_rule)
-
-    s=1
     
 def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
     
@@ -644,11 +561,8 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
         model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch)
     
     if grid.CT_AC:
-        if not grid.Array_opf:
-            model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
-        else:
-            model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=0)
-            
+        model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini)
+       
 
 
 

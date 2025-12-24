@@ -352,8 +352,11 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
         model.rec_PAC_line_loss = pyo.Var(model.lines_AC_rec,initialize=0)
     
     def set_based_bounds(model, line, cab_type):
-         max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)  # Use cab_types_set instead of model.ct_set
-         return (-max_min, max_min)
+        # Check if this is a fixed route with no cable selected (inactive line)
+        if grid.lines_AC_ct[line].active_config < 0:
+            return (0, 0)  # Force variables to zero for inactive lines
+        max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)  # Use cab_types_set instead of model.ct_set
+        return (-max_min, max_min)
        
     
     if grid.CT_AC:
@@ -750,21 +753,33 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
     
     def P_to_AC_line_ct(model,line,ct):   
         l = grid.lines_AC_ct[line]
+        # Check if this is a fixed route with no cable selected (inactive line)
+        if l.active_config < 0:
+            return model.ct_PAC_to[line,ct] == 0
         Pto = calculate_P(model,l,'to',idx=ct)
         return model.ct_PAC_to[line,ct] == Pto
     
     def P_from_AC_line_ct(model,line,ct):       
        l = grid.lines_AC_ct[line]
+       # Check if this is a fixed route with no cable selected (inactive line)
+       if l.active_config < 0:
+           return model.ct_PAC_from[line,ct] == 0
        Pfrom = calculate_P(model,l,'from',idx=ct)
        return model.ct_PAC_from[line,ct] == Pfrom
     
     def Q_to_AC_line_ct(model,line,ct):   
         l = grid.lines_AC_ct[line]
+        # Check if this is a fixed route with no cable selected (inactive line)
+        if l.active_config < 0:
+            return model.ct_QAC_to[line,ct] == 0
         Qto = calculate_Q(model,l,'to',idx=ct)
         return model.ct_QAC_to[line,ct] == Qto
     
     def Q_from_AC_line_ct(model,line,ct):       
        l = grid.lines_AC_ct[line]
+       # Check if this is a fixed route with no cable selected (inactive line)
+       if l.active_config < 0 :
+           return model.ct_QAC_from[line,ct] == 0
        Qfrom = calculate_Q(model,l,'from',idx=ct)
        return model.ct_QAC_from[line,ct] == Qfrom
    
