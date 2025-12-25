@@ -174,6 +174,11 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         iter_cab_available= grid.Cable_options[0].cable_types.copy()
         t3 = time.perf_counter()
         #print(f'DEBUG: Iteration {i}')
+        if NL:
+            from .Graph_and_plot import save_network_svg
+            intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
+            save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_preCSS', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
+        
         model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee,fs=fs)
         feasible_solutions_CSS = solver_stats['feasible_solutions']
         t4 = time.perf_counter()
