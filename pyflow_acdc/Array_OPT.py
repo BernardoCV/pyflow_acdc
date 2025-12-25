@@ -51,6 +51,7 @@ class MIPConfig:
     MIP_gap: float | None = None
     min_turbines_per_string: bool | int = False
     fixed_substation_connections: int | None = None
+    t_MW: float | None = None
 
 
 def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
@@ -108,6 +109,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         MIP_gap=MIP_gap,
         min_turbines_per_string=min_turbines_per_string,
         fixed_substation_connections=fixed_substation_connections,
+        t_MW=t_MW,
     )
 
     if tee:
@@ -272,11 +274,19 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             # OR-Tools MockModel
             cable_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.line_used_vals.keys())
             weighted_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.line_used_vals.keys())
+
         else:
             raise AttributeError("model_MIP must have either Pyomo attributes ('line_used', 'lines') or OR-Tools attribute ('line_used_vals')")
         
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
+        if obj_value is None:
+            # Calculate cable cost from line.active_config selections (where active_config >= 0)
+            obj_value = sum(
+                line.base_cost[line.active_config] 
+                for line in grid.lines_AC_ct 
+                if line.active_config >= 0 and hasattr(line, 'base_cost') and line.active_config < len(line.base_cost)
+            )
         total_cost = MIP_obj_value+obj_value
         # Create a dictionary for this iteration's results
         iteration_result = {
@@ -435,7 +445,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
 
 def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, max_ns=None,
                         callback=False, MIP_gap=None, backend='pyomo',
-                        min_turbines_per_string=False, mip_cfg: MIPConfig | None = None):
+                        min_turbines_per_string=False, mip_cfg: MIPConfig | None = None,t_MW=None):
     # If a MIPConfig is provided, let it override the individual flags.
     if mip_cfg is not None:
         solver_name = mip_cfg.solver_name
@@ -448,6 +458,8 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
             MIP_gap = mip_cfg.MIP_gap
         if min_turbines_per_string is False and mip_cfg.min_turbines_per_string is not False:
             min_turbines_per_string = mip_cfg.min_turbines_per_string
+        if t_MW is None:
+            t_MW = mip_cfg.t_MW
 
     tn = grid.n_ren
     sn = grid.nn_AC - grid.n_ren
@@ -563,6 +575,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
             min_turbines_per_string = mip_cfg.min_turbines_per_string
         if fixed_substation_connections is None and mip_cfg.fixed_substation_connections is not None:
             fixed_substation_connections = mip_cfg.fixed_substation_connections
+        if t_MW is None:
+            t_MW = mip_cfg.t_MW
 
     # Route to appropriate backend
     if backend.lower() == 'ortools':
@@ -659,9 +673,31 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                     last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
                     ct_line.active_config = last_cable_type_index
             else:
-                # No cable type selection: use last cable type as default
-                last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
-                ct_line.active_config = last_cable_type_index
+                # No cable type selection: calculate minimum required cable type if t_MW is available
+                if t_MW is not None:
+                    # Calculate MW flow for this line: flow in turbines * MW per turbine
+                    flow_turbines = abs(pyo.value(model.line_flow[line]))
+                    mw_flow = flow_turbines * t_MW
+                    
+                    # Find minimum cable type that can handle this MW flow
+                    cable_options = grid.Cable_options[0]
+                    selected_ct = None
+                    # Cable types are sorted by capacity (smallest to largest)
+                    for ct_idx in range(len(cable_options._cable_types)):
+                        mva_rating = cable_options.MVA_ratings[ct_idx]
+                        if mva_rating >= mw_flow:
+                            selected_ct = ct_idx
+                            break
+                    
+                    # If no cable type can handle the flow, use the largest one
+                    if selected_ct is None:
+                        selected_ct = len(cable_options._cable_types) - 1
+                    
+                    ct_line.active_config = selected_ct
+                else:
+                    # Fallback: use last cable type as default
+                    last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1 if grid.Cable_options and len(grid.Cable_options) > 0 else -1
+                    ct_line.active_config = last_cable_type_index
 
         return True, high_flow, model, feasible_solutions
 
@@ -768,10 +804,53 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
         high_flow = max(flows) if flows else 0
         
         # Update grid with solution
-        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
         for l in line_used_vals:
             ct_line = grid.lines_AC_ct[l]
-            ct_line.active_config = last_cable_type_index if line_used_vals[l] > 0 else -1
+            if line_used_vals[l] > 0:
+                if enable_cable_types and "ct_branch" in vars_dict:
+                    # Read selected cable type from ct_branch
+                    selected_ct = None
+                    for ct in vars_dict["ct_set"]:
+                        if solver.Value(vars_dict["ct_branch"][(l, ct)]) > 0:
+                            selected_ct = ct
+                            break
+                    if selected_ct is not None:
+                        ct_line.active_config = selected_ct
+                    else:
+                        # Fallback: use last cable type if no selection found
+                        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1
+                        ct_line.active_config = last_cable_type_index
+                else:
+                    # Calculate MW flow for this line
+                    flow_turbines = abs(line_flow_vals[l])
+                    
+                    if t_MW is not None:
+                        # Calculate MW flow: flow in turbines * MW per turbine
+                        mw_flow = flow_turbines * t_MW
+                        
+                        # Find minimum cable type that can handle this MW flow
+                        cable_options = grid.Cable_options[0]
+                        selected_ct = None
+                        
+                        # Cable types are sorted by capacity (smallest to largest)
+                        for ct_idx in range(len(cable_options._cable_types)):
+                            mva_rating = cable_options.MVA_ratings[ct_idx]
+                            if mva_rating >= mw_flow:
+                                selected_ct = ct_idx
+                                break
+                        
+                        # If no cable type can handle the flow, use the largest one
+                        if selected_ct is None:
+                            selected_ct = len(cable_options._cable_types) - 1
+                        
+                        ct_line.active_config = selected_ct
+                    
+                    else:
+                        # Fallback: use last cable type if t_MW not available
+                        last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1 if grid.Cable_options and len(grid.Cable_options) > 0 else -1
+                        ct_line.active_config = last_cable_type_index
+            else:
+                ct_line.active_config = -1
         
         # Create SolutionInfo for final solution
         objective = solver.ObjectiveValue()
