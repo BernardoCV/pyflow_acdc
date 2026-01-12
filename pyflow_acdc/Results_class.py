@@ -872,8 +872,8 @@ class Results:
         table.field_names = ["Generator","Node" ,"Power (MW)", "Reactive power (MVAR)","Quadratic Price €/MWh^2","Linear Price €/MWh","Fixed Cost €","Loading %","Cost k€"]
         for gen in self.Grid.Generators:
           if gen.np_gen>0.001:  
-            Pgi=gen.PGen #+node.PGi_ren*node.curtailment
-            Qgi=gen.QGen
+            Pgi=gen.PGen*self.Grid.S_base #+node.PGi_ren*node.curtailment
+            Qgi=gen.QGen*self.Grid.S_base
             S= np.sqrt(Pgi**2+Qgi**2)
 
             load=gen.loading
