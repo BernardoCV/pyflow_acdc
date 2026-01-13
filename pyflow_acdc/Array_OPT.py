@@ -1277,6 +1277,28 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             return sum(model.node_flow[n] for n in model.sink_nodes) == -len(model.source_nodes)
         model.total_sink_absorption = pyo.Constraint(rule=sink_absorption_rule)
         
+        def sink_power_limit_rule(model, node):
+            pu_limit = grid.nodes_AC[node].pu_power_limit
+            # Check for None, NaN, or non-finite values
+            if pu_limit is None:
+                return pyo.Constraint.Skip
+            # Check if it's a number and if it's finite (not NaN, not inf)
+            if isinstance(pu_limit, (int, float)) and (math.isnan(pu_limit) or not math.isfinite(pu_limit)):
+                return pyo.Constraint.Skip
+            return model.node_flow[node] >= -pu_limit
+        
+        # Only create constraint if at least one node has a valid (non-None, finite) pu_power_limit
+        def is_valid_pu_limit(node):
+            pu_limit = grid.nodes_AC[node].pu_power_limit
+            if pu_limit is None:
+                return False
+            if isinstance(pu_limit, (int, float)):
+                return not (math.isnan(pu_limit) or not math.isfinite(pu_limit))
+            return True
+        
+        if any(is_valid_pu_limit(node) for node in model.sink_nodes):
+            model.sink_power_limit = pyo.Constraint(model.sink_nodes, rule=sink_power_limit_rule)
+
         # Intermediate nodes: net flow = 0 (conservation)
         def intermediate_node_rule(model, node):
             if node not in model.source_nodes and node not in model.sink_nodes:

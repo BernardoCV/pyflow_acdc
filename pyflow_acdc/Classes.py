@@ -1464,8 +1464,11 @@ class Node_AC:
         self.Num_conv_connected=0
         self.connected_conv=set()
     
+
+        #Used for turbine array optimisation
         self.ct_limit=None
         self.max_turbines_per_string=99
+        self.pu_power_limit=None
         self.curtailment=1
 
         # self.Max_pow_gen=0

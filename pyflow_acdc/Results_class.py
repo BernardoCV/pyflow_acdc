@@ -1214,7 +1214,7 @@ class Results:
                 tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
         
 
-        
+        SC = self.Grid.TEP_res['SC']
         weight = self.Grid.TEP_res['weights']
         price = self.Grid.TEP_res['price']
         OBJ_res = self.Grid.TEP_res['OBJ_res']

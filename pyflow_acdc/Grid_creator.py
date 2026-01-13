@@ -797,7 +797,8 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],ca
             node.type = 'Slack'
             node.V_ini = 1
             node.theta_ini = 0
-    
+            if 'turbine_limit' in substations_df.columns:
+                node.pu_power_limit = substations_df.loc[attrs['original_idx']].turbine_limit
     # First pass: add all lines
     line_objects = {}  # Dictionary to store line objects by their name
     
