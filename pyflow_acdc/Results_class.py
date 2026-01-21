@@ -70,8 +70,9 @@ class Results:
         if self.Grid.TEP_run:    
             self.TEP_N()
             if self.Grid.TEP_res is not None:
-                self.TEP_TS_norm()
-                self.TEP_ts_res()
+                #self.TEP_TS_norm()
+                #self.TEP_ts_res()
+                s=1
             else:
                 self.TEP_norm()
         if self.Grid.MP_TEP_run:
@@ -169,7 +170,8 @@ class Results:
             
             for node in self.Grid.nodes_AC:
                 if not self.Grid.OPF_run and node.type == 'Slack':
-                      PGi = node.P_INJ-(node.P_s.item())+node.PLi
+                      ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
+                      PGi = node.P_INJ-ps+node.PLi
                 else:
                       PGi = P_AC[node.nodeNumber].item()
                 generation += PGi*self.Grid.S_base      
@@ -536,7 +538,8 @@ class Results:
                             QGi = Q_AC[node.nodeNumber].item()
                             if not self.Grid.OPF_run:
                                 if node.type == 'Slack':
-                                    PGi = (node.P_INJ-node.P_s + node.PLi).item()
+                                    ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
+                                    PGi = node.P_INJ-ps + node.PLi
                                     QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
 
                                 if node.type == 'PV':
@@ -624,10 +627,8 @@ class Results:
 
                     i_to = line.i_to*I_base/np.sqrt(3)
                     
-                    Sfrom = abs(line.fromS)*self.Grid.S_base
-                    Sto   = abs(line.toS)*self.Grid.S_base
 
-                    load = max(Sfrom, Sto)/line.MVA_rating*100
+                    load = line.loading
                     if line.name == 'ICL4':
                         s=1
                     tablei.add_row([
@@ -687,10 +688,7 @@ class Results:
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
 
-                        Sfrom = abs(line.fromS)*self.Grid.S_base
-                        Sto   = abs(line.toS)*self.Grid.S_base
-
-                        load = max(Sfrom, Sto)/(line.MVA_rating*line.np_line)*100
+                        load = line.loading
 
                         tablep.add_row([
                             line.name, 
@@ -720,13 +718,7 @@ class Results:
                         Ploss = np.real(line.loss)*self.Grid.S_base
                         Qloss = np.imag(line.loss)*self.Grid.S_base
 
-                        Sfrom = abs(line.fromS)*self.Grid.S_base
-                        Sto   = abs(line.toS)*self.Grid.S_base
-
-                        if line.rec_branch:
-                            load = max(Sfrom, Sto)/(line.MVA_rating_new)*100
-                        else:
-                            load = max(Sfrom, Sto)/(line.MVA_rating)*100
+                        load = line.loading
 
                         tablep.add_row([
                             line.name, 
@@ -760,7 +752,7 @@ class Results:
                         Sto   = abs(line.toS)*self.Grid.S_base
 
                         chosen_line = line.active_config
-                        load = max(Sfrom, Sto)/(line.MVA_rating_list[chosen_line])*100
+                        load = line.loading
 
 
                         tablep.add_row([
@@ -880,17 +872,11 @@ class Results:
         table.field_names = ["Generator","Node" ,"Power (MW)", "Reactive power (MVAR)","Quadratic Price €/MWh^2","Linear Price €/MWh","Fixed Cost €","Loading %","Cost k€"]
         for gen in self.Grid.Generators:
           if gen.np_gen>0.001:  
-            Pgi=gen.PGen #+node.PGi_ren*node.curtailment
-            Qgi=gen.QGen
+            Pgi=gen.PGen*self.Grid.S_base #+node.PGi_ren*node.curtailment
+            Qgi=gen.QGen*self.Grid.S_base
             S= np.sqrt(Pgi**2+Qgi**2)
-            Pgi*=self.Grid.S_base
-            Qgi*=self.Grid.S_base
-            if gen.Max_S is None:
-                base=np.sqrt(gen.Max_pow_gen**2+max(abs(gen.Min_pow_genR),gen.Max_pow_genR)**2)
-            else:
-                base=gen.Max_S
-            base *= gen.np_gen
-            load=S/base*100
+
+            load=gen.loading
             fc=gen.fc*gen.np_gen
             cost=(Pgi**2*gen.qf+Pgi*gen.lf+fc)/1000
            
@@ -904,15 +890,13 @@ class Results:
             Qtot+=Qgi
             Stot+=S
             costtot+=cost
-            Ltot+=base
+            Ltot+=gen.capacity_MVA
 
         for gen in self.Grid.Generators_DC:
           if gen.np_gen>0.001:  
             Pgi=gen.PGen*self.Grid.S_base
             
-            base=gen.Max_pow_gen*self.Grid.S_base
-            base *= gen.np_gen
-            load=Pgi/base*100
+            load=gen.loading
             fc=gen.fc*gen.np_gen
             cost=(Pgi**2*gen.qf+Pgi*gen.lf+fc)/1000
            
@@ -926,7 +910,7 @@ class Results:
             
             Stot+=Pgi
             costtot+=cost
-            Ltot+=base
+            Ltot+=gen.capacity_MW
 
         if Ltot !=0:
             load=Stot/Ltot*100
@@ -940,7 +924,7 @@ class Results:
         print('--------------')
         print('Renewable energy sources')
         table = pt()
-        table.field_names = ["Bus", "Base Power (MW)", "Curtailment %","Power Injected (MW)","Reactive Power Injected (MVAR)","Price €/MWh","Cost k€","Curtailment Cost [k€]"]
+        table.field_names = ["Name","Bus", "Base Power (MW)", "Curtailment %","Power Injected (MW)","Reactive Power Injected (MVAR)","Price €/MWh","Cost k€","Curtailment Cost [k€]"]
         bp=0
         tcur=0
         totcost=0
@@ -971,7 +955,7 @@ class Results:
                     curcost=0
                 else:    
                     curcost= (Pgi-PGicur)*node.price*(self.Grid.sigma)/1000
-                table.add_row([rs.name, np.round(Pgi, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec),np.round(QGi, decimals=self.dec),np.round(price, decimals=self.dec),np.round(cost, decimals=0),np.round(curcost, decimals=0)])
+                table.add_row([rs.name, rs.Node, np.round(Pgi, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec),np.round(QGi, decimals=self.dec),np.round(price, decimals=self.dec),np.round(cost, decimals=0),np.round(curcost, decimals=0)])
                 totcost+=cost
                 totcurcost+=curcost
         
@@ -980,15 +964,20 @@ class Results:
         PGicur=bp-tcur
         cur=(tcur)/bp*100
         
-        table.add_row(['Total', np.round(bp, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec), "","",np.round(totcost, decimals=0),np.round(totcurcost, decimals=0)])
+        table.add_row(['Total', '', np.round(bp, decimals=self.dec), np.round(cur, decimals=self.dec),  np.round(PGicur, decimals=self.dec), "","",np.round(totcost, decimals=0),np.round(totcurcost, decimals=0)])
 
         print(table)    
     
     def TEP_ts_res(self):
        
-        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price,pgen,qgen= self.Grid.TEP_res
         
-        
+        PN=self.Grid.TEP_res['PN']
+        SC=self.Grid.TEP_res['SC']
+        curt=self.Grid.TEP_res['curtailment']
+        lines=self.Grid.TEP_res['lines']
+        conv=self.Grid.TEP_res['converters']
+        price=self.Grid.TEP_res['price']
+       
         table = pt()
         # Add columns to the PrettyTable
         data = PN.fillna('')
@@ -1099,9 +1088,9 @@ class Results:
                     tot+=cost
                     table.add_row([element, "AC Upgrade" ,"", "","",np.round(pr, decimals=0).astype(int), f"{cost:,.2f}".replace(',', ' ')])
         for l in self.Grid.lines_AC_ct:
-            if l.array_opf:
+            if l.array_opf and l.active_config >=0:
                 element= l.name
-                ini= l.cable_types[l.ini_active_config]
+                ini= l.cable_types[l.ini_active_config] if l.ini_active_config >= 0 else ""
                 max=l.cable_types[l.max_active_config]
                 ct=l.active_config
                 type=l.cable_types[ct]
@@ -1225,8 +1214,11 @@ class Results:
                 tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
         
 
-        curt_used,curt_n,PN,GEN, SC , curt, curt_per, lines,conv,price,pgen,qgen= self.Grid.TEP_res
-        weight = SC.loc['Weight']
+        SC = self.Grid.TEP_res['SC']
+        weight = self.Grid.TEP_res['weights']
+        price = self.Grid.TEP_res['price']
+        OBJ_res = self.Grid.TEP_res['OBJ_res']
+       
         table=pt()
         table.field_names = ["Price_Zone", "Normalized Cost Generation[k€/h]", "Average price [€/MWh]","Present Value Cost Gen [M€]"]
         
@@ -1235,9 +1227,9 @@ class Results:
         for m in self.Grid.Price_Zones:
             if type(m) is Price_Zone:
                 price_zone_weighted = SC.loc[m.name]
-                weighted_total = price_zone_weighted * weight
+                weighted_total = price_zone_weighted * weight.loc['Weight']
                 weighted_total = weighted_total.sum()
-                weighted_price = price.loc[m.name]* weight
+                weighted_price = price.loc[m.name]* weight.loc['Weight']
                 weighted_price = weighted_price.sum()
                 present_value=0
                 for year in range(1, n_years + 1):
@@ -1480,7 +1472,7 @@ class Results:
             Ploss_tf = np.round(conv.P_loss_tf*self.Grid.S_base, decimals=self.dec)
             S = np.sqrt(P_s**2+Q_s**2)
             
-            loading= np.round(max(S,abs(P_DC))/(conv.MVA_max*conv.NumConvP)*100, decimals=self.dec)
+            loading= np.round(conv.loading, decimals=self.dec)
             table.add_row([conv.name, conv.Node_AC.name,
                           conv.Node_DC.name, P_s,Q_s ,P_c, P_DC, Q_c, P_loss, Ploss_tf])
             table2.add_row([conv.name, conv.AC_type, conv.type,loading,int(conv.MVA_max*conv.NumConvP)])

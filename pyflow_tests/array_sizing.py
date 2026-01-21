@@ -89,17 +89,17 @@ def array_sizing(combinations):
 
 
         cable_option = pyf.add_cable_option(grid,[
-            'ABB_Cu_XLPE_95mm2_66kV', #0
-            'ABB_Cu_XLPE_120mm2_66kV', #1
-            'ABB_Cu_XLPE_150mm2_66kV', #2
-            'ABB_Cu_XLPE_185mm2_66kV', #3
-            'ABB_Cu_XLPE_240mm2_66kV', #4
-            'ABB_Cu_XLPE_300mm2_66kV', #5
-            'ABB_Cu_XLPE_400mm2_66kV', #6
-            'ABB_Cu_XLPE_500mm2_66kV', #7
-            'ABB_Cu_XLPE_630mm2_66kV', #8
-            'ABB_Cu_XLPE_800mm2_66kV', #9
-            'ABB_Cu_XLPE_1000mm2_66kV'],'PEI')
+            '66kV_95mm2_sub_CU_ABB_XLPE',
+            '66kV_120mm2_sub_CU_ABB_XLPE',
+            '66kV_150mm2_sub_CU_ABB_XLPE',
+            '66kV_185mm2_sub_CU_ABB_XLPE',
+            '66kV_240mm2_sub_CU_ABB_XLPE',
+            '66kV_300mm2_sub_CU_ABB_XLPE',
+            '66kV_400mm2_sub_CU_ABB_XLPE',
+            '66kV_500mm2_sub_CU_ABB_XLPE',
+            '66kV_630mm2_sub_CU_ABB_XLPE',
+            '66kV_800mm2_sub_CU_ABB_XLPE',
+            '66kV_1000mm2_sub_CU_ABB_XLPE'],'PEI')
 
         pyf.add_line_sizing(grid,T8,T7,cable_option=cable_option.name,active_config=0,Length_km=LT8_T7,name='T8_T7',update_grid=False)
         pyf.add_line_sizing(grid,T7,T6,cable_option=cable_option.name,active_config=0,Length_km=LT7_T6,name='T7_T6',update_grid=False)
@@ -131,7 +131,7 @@ def array_sizing(combinations):
             res.OBJ_res()
         
         elif opt_type == 'FLH':
-            model, model_results , timing_info, solver_stats= pyf.transmission_expansion(grid,NPV=True,Hy=FLH,discount_rate=WACC,ObjRule=obj)
+            model, model_results , timing_info, solver_stats= pyf.transmission_expansion(grid,NPV=True,Hy=FLH,discount_rate=WACC,ObjRule=obj,tee=True)
             res.TEP_N()
             res.TEP_norm()
             model.obj.display()
@@ -160,10 +160,10 @@ def run_test():
         return
 
     combinations = [
-        {'opt_type': 'OPF', 'Nc': 1},
-        {'opt_type': 'OPF', 'Nc': 2},
-        {'opt_type': 'OPF', 'Nc': 3},
-        {'opt_type': 'OPF', 'Nc': 4},
+        {'opt_type': 'FLH', 'Nc': 1},
+        {'opt_type': 'FLH', 'Nc': 2},
+        {'opt_type': 'FLH', 'Nc': 3},
+        {'opt_type': 'FLH', 'Nc': 4},
     ]
     array_sizing(combinations)
 

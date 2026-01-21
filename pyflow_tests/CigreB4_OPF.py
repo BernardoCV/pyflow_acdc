@@ -16,7 +16,7 @@ from pathlib import Path
 def CigreB4_OPF():
 
 
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     S_base=100 #MVAres
     
@@ -56,7 +56,7 @@ def CigreB4_OPF():
     print(timing_info)
     model.obj.display()
 
-    end_time = time.time()
+    end_time = time.perf_counter()
     elapsed_time = end_time - start_time
 
     print ('------')

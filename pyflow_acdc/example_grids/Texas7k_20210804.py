@@ -4,7 +4,7 @@ import pyflow_acdc as pyf
 import pandas as pd
 
 
-def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3):    
+def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=1):    
     
     S_base=100
     
@@ -16537,6 +16537,8 @@ def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3):
     
     
     if TEP==True:
+
+        lines_AC['Cost MUSD'] = lines_AC['Cost MUSD'] * kappa/0.5
         exp_dict = {item[0]: item[1] for item in exp} if exp != 'All' else {}
         lines_AC.set_index('Line_id', inplace=True)
         if exp == 'All':

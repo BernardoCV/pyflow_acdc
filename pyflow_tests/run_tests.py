@@ -47,7 +47,9 @@ ALL_CASES = [
     #CT
     'array_sizing.py',
     #time series and dash
-    'ts_dash.py'
+    'ts_dash.py',
+    #wind farm array
+    'sequential_array.py'
 ]
 
 # Quick tests (basic functionality only)
@@ -93,18 +95,18 @@ def run_test_case(case: str, show_output: bool = False) -> tuple[bool, str, List
             # Run the module directly to see all output
             spec.loader.exec_module(module)
             # Call the standardized test function
-            start_time = time.time()
+            start_time = time.perf_counter()
             module.run_test()
-            elapsed_time = time.time() - start_time
+            elapsed_time = time.perf_counter() - start_time
         else:
             # Capture stdout to check for warning messages
             stdout_capture = StringIO()
             with contextlib.redirect_stdout(stdout_capture):
                 spec.loader.exec_module(module)
                 # Call the standardized test function
-                start_time = time.time()
+                start_time = time.perf_counter()
                 module.run_test()
-                elapsed_time = time.time() - start_time
+                elapsed_time = time.perf_counter() - start_time
             
             # Check stdout for explicit warning messages
             for line in stdout_capture.getvalue().split('\n'):

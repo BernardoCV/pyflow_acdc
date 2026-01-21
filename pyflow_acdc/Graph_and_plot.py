@@ -3,21 +3,40 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import logging
 import itertools
 import base64
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import os
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString,Polygon,MultiPolygon
 
 from .Classes import Node_AC
+
+
+def _loading_colormap(value, vmin=0, vmax=100):
+    """
+    Map a value to a color (green -> yellow -> red) for loading visualization.
+    Replaces branca.colormap.LinearColormap.
+    """
+    # Clamp value to range
+    normalized = max(0, min(1, (value - vmin) / (vmax - vmin)))
+    
+    # Create colormap: green (0) -> yellow (0.5) -> red (1)
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        'loading', ['green', 'yellow', 'red']
+    )
+    rgba = cmap(normalized)
+    # Return as hex color string
+    return mcolors.to_hex(rgba)
 
 
 __all__ = ['plot_Graph',
            'Time_series_prob',
            'plot_neighbour_graph',
            'plot_TS_res',
+           'plot_model_feasebility',
            'save_network_svg']
 
 def update_ACnode_hovertext(node,S_base,text):
@@ -109,7 +128,7 @@ def update_lineAC_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS, decimals=dec)
         Sto = np.round(line.toS, decimals=dec)
-        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=dec)
         Line_tf = 'Transformer' if line.isTf else 'Line'
         cable = line.Cable_type
@@ -124,7 +143,7 @@ def update_lineAC_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS*S_base, decimals=0)
         Sto = np.round(line.toS*S_base, decimals=0)
-        load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/line.MVA_rating*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         Line_tf = 'Transformer' if line.isTf else 'Line'
         cable = line.Cable_type
@@ -174,10 +193,7 @@ def update_lineDC_hovertext(line,S_base,text):
         Pfrom= np.round(line.fromP*S_base, decimals=0).astype(int)
         Pto = np.round(line.toP*S_base, decimals=0).astype(int)
         np_line = np.round(line.np_line, decimals=1)
-        if np_line == 0:
-            load = 0
-        else:
-            load = max(np.abs(Pfrom), np.abs(Pto))/(line.MW_rating*line.np_line)*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         
         if Pfrom > 0:
@@ -211,10 +227,7 @@ def update_lineACexp_hovertext(line,S_base,text):
         Sfrom= np.round(line.fromS, decimals=dec)
         Sto = np.round(line.toS, decimals=dec)
         np_line = np.round(line.np_line, decimals=1)
-        if np_line == 0:
-            load = 0
-        else:
-            load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/(line.MVA_rating*line.np_line)*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)    
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -229,10 +242,7 @@ def update_lineACexp_hovertext(line,S_base,text):
         Sfrom= np.round(line.fromS*S_base, decimals=0)
         Sto = np.round(line.toS*S_base, decimals=0)
         np_line = np.round(line.np_line, decimals=1)
-        if np_line == 0:
-            load = 0
-        else:
-            load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/(line.MVA_rating*line.np_line)*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -263,7 +273,7 @@ def update_lineACrec_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS, decimals=dec)
         Sto = np.round(line.toS, decimals=dec)
-        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)    
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -277,7 +287,7 @@ def update_lineACrec_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS*S_base, decimals=0)
         Sto = np.round(line.toS*S_base, decimals=0)
-        load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/(line.MVA_rating*line.np_line)*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -288,7 +298,10 @@ def update_lineACrec_hovertext(line,S_base,text):
 
 def update_lineACct_hovertext(line,S_base,text):
     dec=2
-    line.direction = 'from' if line.fromS >= 0 else 'to'
+    line.direction = 'from' if np.real(line.fromS) >= 0 else 'to'
+    active_config = line.active_config
+    if active_config == -1:
+        return
     if text =='data':
         name = line.name
         fromnode = line.fromNode.name
@@ -308,7 +321,7 @@ def update_lineACct_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS, decimals=dec)
         Sto = np.round(line.toS, decimals=dec)
-        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)    
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -322,7 +335,7 @@ def update_lineACct_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS*S_base, decimals=0)
         Sto = np.round(line.toS*S_base, decimals=0)
-        load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/(line.MVA_rating*line.np_line)*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -355,7 +368,7 @@ def update_tf_hovertext(line,S_base,text):
          tonode = line.toNode.name
          Sfrom= np.round(line.fromS, decimals=dec)
          Sto = np.round(line.toS, decimals=dec)
-         load = max(np.abs(Sfrom), np.abs(Sto))*S_base/line.MVA_rating*100
+         load = max(line.loading,line.ts_max_loading)
          Loading = np.round(load, decimals=dec)
          if np.real(Sfrom) > 0:
              line_string = f"{fromnode} -> {tonode}"
@@ -368,7 +381,7 @@ def update_tf_hovertext(line,S_base,text):
         tonode = line.toNode.name
         Sfrom= np.round(line.fromS*S_base, decimals=0)
         Sto = np.round(line.toS*S_base, decimals=0)
-        load = max(np.abs(line.fromS), np.abs(line.toS))*S_base/line.MVA_rating*100
+        load = max(line.loading,line.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         if np.real(Sfrom) > 0:
             line_string = f"{fromnode} -> {tonode}"
@@ -391,7 +404,7 @@ def update_conv_hovertext(conv,S_base,text):
          tonode = conv.Node_AC.name
          Sfrom= np.round(conv.P_DC, decimals=0)
          Sto = np.round(np.sqrt(conv.P_AC**2 + conv.Q_AC**2) * np.sign(conv.P_AC), decimals=0)
-         load = max(np.abs(Sfrom), np.abs(Sto))*S_base/conv.MVA_max*100
+         load = max(conv.loading,conv.ts_max_loading)
          Loading = np.round(load, decimals=0).astype(int)
          if np.real(Sfrom) > 0:
              conv_string = f"{fromnode} -> {tonode}"
@@ -405,7 +418,7 @@ def update_conv_hovertext(conv,S_base,text):
         tonode = conv.Node_AC.name
         Sfrom= np.round(conv.P_DC*S_base, decimals=0)
         Sto = np.round(np.sqrt(conv.P_AC**2+conv.Q_AC**2)*S_base*(conv.P_AC/np.abs(conv.P_AC)), decimals=0)
-        load = max(np.abs(Sfrom), np.abs(Sto))*S_base/conv.MVA_max*100
+        load = max(conv.loading,conv.ts_max_loading)
         Loading = np.round(load, decimals=0).astype(int)
         if np.real(Sfrom) > 0:
             conv_string = f"{fromnode} -> {tonode}"
@@ -417,29 +430,16 @@ def update_gen_hovertext(gen,S_base,text):
      if text =='data':
          name= gen.name
          node = gen.Node_AC 
-         if gen.Max_S is None:
-            if gen.Max_pow_gen !=0:
-                rating = gen.Max_pow_gen
-            else:
-                rating = max(gen.Max_pow_genR,abs(gen.Min_pow_genR))
-         else:
-            rating = gen.Max_S
+         rating = gen.capacity_MVA*gen.np_gen
          rating = np.round(rating,decimals=0)
          
-         gen.hover_text = f"Generator: {name}<br>AC node: {node}<br>Rating: {rating}<br>Fuel: {gen.gen_type}"    
+         gen.hover_text = f"Generator: {name}<br>AC node: {node}<br>Rating: {rating}MVA<br>Fuel: {gen.gen_type}"    
          
      elif text =='inPu':
          name= gen.name
          Pto = np.round(gen.PGen, decimals=0)
          Qto = np.round(gen.QGen, decimals=0)
-         if gen.Max_S is None:
-            if gen.Max_pow_gen !=0:
-                rating = gen.Max_pow_gen
-            else:
-                rating = max(gen.Max_pow_genR,abs(gen.Min_pow_genR))
-         else:
-            rating = gen.Max_S
-         load = np.sqrt(Pto**2+Qto**2)/rating*100
+         load = gen.loading
          Loading = np.round(load, decimals=0).astype(int)
          
          gen.hover_text = f"Generator: {name}<br> P gen: {Pto}<br>Q Gen: {Qto}<br>Loading: {Loading}%"   
@@ -447,14 +447,7 @@ def update_gen_hovertext(gen,S_base,text):
         name= gen.name
         Pto = np.round(gen.PGen*S_base, decimals=0)
         Qto = np.round(gen.QGen*S_base, decimals=0)
-        if gen.Max_S is None:
-            if gen.Max_pow_gen !=0:
-                rating = gen.Max_pow_gen
-            else:
-                rating = max(gen.Max_pow_genR,abs(gen.Min_pow_genR))
-        else:
-            rating = gen.Max_S
-        load = np.sqrt(Pto**2+Qto**2)/rating*100
+        load = gen.loading
         Loading = np.round(load, decimals=0).astype(int)
         
         gen.hover_text = f"Generator: {name}<br> P gen: {Pto*S_base}MW<br>Q Gen: {Qto*S_base}MVAR<br>Loading: {Loading}%"    
@@ -463,7 +456,7 @@ def update_renSource_hovertext(renSource,S_base,text):
      if text =='data':
          name= renSource.name
          node = renSource.Node
-         rating = renSource.PGi_ren_base
+         rating = renSource.capacity_MVA
          rating = np.round(rating,decimals=0)
          renSource.hover_text = f"Ren Source: {name}<br>AC node: {node}<br>Rating: {rating}<br>Tech: {renSource.rs_type}"    
          
@@ -530,6 +523,7 @@ def update_hovertexts(grid,text):
             except Exception as e:
                 print(f"Error in thread: {e}")
         
+            
 def initialize_positions(Grid):
     """Initialize positions for the grid nodes."""
     return Grid.node_positions if Grid.node_positions is not None else {}
@@ -1034,7 +1028,7 @@ def create_subgraph_color_dict(G):
     
     color_palette_1 = itertools.cycle([
      'darkviolet', 'green',  'red',
-    'darkoragne', 'hotpink', 'lightseagreen'
+    'darkorange', 'hotpink', 'lightseagreen'
     ])
     
     color_palette_2 = itertools.cycle([
@@ -1125,8 +1119,19 @@ def create_geometries(grid):
                     x, y = pos[node]
                     gen.geometry = Point(x, y)
 
-def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True):
-    """Save the network as SVG file"""
+def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=True, legend=True, square_ratio=False,poly=None,linestrings=None,coloring=None, poly_size=None):
+    """Save the network as SVG file
+    
+    Parameters:
+    -----------
+    square_ratio : bool
+        If True, forces both x and y axes to have the same range (uses the largest range needed)
+        so that one step in x equals one step in y in the coordinate space.
+    poly_size : tuple or None
+        If provided and poly is not None, specifies the target size (width, height) in pixels
+        for the polygon. Everything else will be scaled to fit this polygon size.
+        Format: (target_width, target_height) in pixels.
+    """
     try:
         import svgwrite
         
@@ -1162,7 +1167,10 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             # Convert 88mm to pixels (assuming 96 DPI)
             width = int(88 * 96 / 25.4)  # 25.4mm = 1 inch
             # Maintain aspect ratio
-            height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
+            if square_ratio:
+                height = width 
+            else:
+                height = int(width * 0.8)  # Using 0.8 as a common aspect ratio for journal figures
 
         print(f"Current working directory: {os.getcwd()}")
         print(f"Will save as: {os.path.abspath(f'{name}.svg')}")
@@ -1187,6 +1195,37 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             if hasattr(gen, 'geometry') and gen.geometry:
                 all_bounds.append(gen.geometry.bounds)
         
+        # Add polygon bounds if provided
+        def _iter_polys(obj):
+            if obj is None:
+                return
+            if isinstance(obj, Polygon):
+                yield obj
+            elif isinstance(obj, MultiPolygon):
+                for poly in obj.geoms:
+                    yield poly
+            elif isinstance(obj, (list, tuple)):
+                for o in obj:
+                    yield from _iter_polys(o)  # Recursively handle nested structures
+
+        # Calculate polygon bounds separately if poly_size is specified
+        poly_bounds = None
+        if poly is not None:
+            poly_bounds_list = []
+            for geom in _iter_polys(poly):
+                bounds = geom.bounds
+                poly_bounds_list.append(bounds)
+                all_bounds.append(bounds)
+            
+            if poly_bounds_list:
+                poly_bounds = (
+                    min(bound[0] for bound in poly_bounds_list),
+                    min(bound[1] for bound in poly_bounds_list),
+                    max(bound[2] for bound in poly_bounds_list),
+                    max(bound[3] for bound in poly_bounds_list)
+                )
+        
+        
         # Calculate overall bounds
         if all_bounds:
             minx = min(bound[0] for bound in all_bounds)
@@ -1198,10 +1237,68 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             return
 
         # Calculate scaling factors
-        padding = 50  # pixels of padding
-        scale_x = (width - 2*padding) / (maxx - minx)
-        scale_y = (height - 2*padding) / (maxy - miny)
-        scale = min(scale_x, scale_y)
+        # If poly_size is specified, determine scale from polygon FIRST, then use for everything
+        if poly_size is not None and poly_bounds is not None:
+            target_poly_width, target_poly_height = poly_size
+            poly_minx, poly_miny, poly_maxx, poly_maxy = poly_bounds
+            
+            poly_x_range = poly_maxx - poly_minx
+            poly_y_range = poly_maxy - poly_miny
+            
+            if poly_x_range == 0 or poly_y_range == 0:
+                print("Warning: Polygon has zero width or height, cannot scale")
+                # Fall through to normal scaling
+                poly_size = None
+            else:
+                # Calculate scale factors for polygon to fit target size
+                # Use minimum to maintain uniform scaling (circles stay circular)
+                scale_x_poly = target_poly_width / poly_x_range
+                scale_y_poly = target_poly_height / poly_y_range
+                scale = min(scale_x_poly, scale_y_poly)  # Uniform scale for everything
+                
+                padding = 25
+                
+                # Calculate the overall bounds in scaled coordinates
+                overall_x_range = (maxx - minx) * scale
+                overall_y_range = (maxy - miny) * scale
+                
+                # Adjust width and height to accommodate everything
+                width = int(overall_x_range + 2 * padding)
+                height = int(overall_y_range + 2 * padding)
+                
+                # Update the SVG drawing size
+                dwg = svgwrite.Drawing(f"{name}.svg", size=(f'{width}px', f'{height}px'), profile='tiny')
+        
+        # If poly_size was not set or failed, use normal scaling logic
+        if poly_size is None or poly_bounds is None:
+            if square_ratio:
+                padding = 10
+                # For square ratio: make both axes have the same range
+                x_range = maxx - minx
+                y_range = maxy - miny
+                max_range = max(x_range, y_range)
+                
+                # Expand the smaller dimension to match the larger one
+                if x_range < max_range:
+                    center_x = (minx + maxx) / 2
+                    minx = center_x - max_range / 2
+                    maxx = center_x + max_range / 2
+                
+                if y_range < max_range:
+                    center_y = (miny + maxy) / 2
+                    miny = center_y - max_range / 2
+                    maxy = center_y + max_range / 2
+                
+                # Now both ranges are equal, so use the same scale for both axes
+                available_width = width - 2*padding
+                available_height = height - 2*padding
+                scale = min(available_width, available_height) / max_range
+            else:
+                padding = 25  # pixels of padding
+                # Original scaling logic
+                scale_x = (width - 2*padding) / (maxx - minx)
+                scale_y = (height - 2*padding) / (maxy - miny)
+                scale = min(scale_x, scale_y)
         
         def transform_coords(x, y):
             """Transform coordinates to SVG space"""
@@ -1226,7 +1323,60 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             12: 'salmon', 
             13: 'olive'
         }
-        
+    
+     
+        # Draw background polygon(s) if provided (behind lines/nodes)
+                
+        if poly is not None:
+            for geom in _iter_polys(poly):
+                if isinstance(geom, Polygon):
+                    poly_list = [geom]
+                elif isinstance(geom, MultiPolygon):
+                    poly_list = list(geom.geoms)
+                else:
+                    poly_list = []
+                for pg in poly_list:
+                    rings = [list(pg.exterior.coords)] + [list(r.coords) for r in pg.interiors]
+                    d = ""
+                    for coords in rings:
+                        pts = [transform_coords(x, y) for (x, y) in coords]
+                        d += "M " + " L ".join(f"{x},{y}" for (x, y) in pts) + " Z "
+                    dwg.add(dwg.path(
+                        d=d,
+                        fill='#ADD8E6',
+                        stroke='#ADD8E6',
+                        stroke_width=2,
+                        fill_rule='evenodd',
+                        fill_opacity=0.15
+                    ))
+                    
+                    # Draw contour lines (exterior and interior rings)
+                    for coords in rings:
+                        pts = [transform_coords(x, y) for (x, y) in coords]
+                        contour_d = "M " + " L ".join(f"{x},{y}" for (x, y) in pts) + " Z"
+                        dwg.add(dwg.path(
+                            d=contour_d,
+                            fill='none',
+                            stroke='blue',
+                            stroke_width=1
+                        ))
+        # Draw LineStrings if provided
+        if linestrings is not None:
+            for linestring in linestrings:
+                if hasattr(linestring, 'geometry') and linestring.geometry:
+                    coords = list(linestring.geometry.coords)
+                elif hasattr(linestring, 'coords'):
+                    coords = list(linestring.coords)
+                else:
+                    continue
+                    
+                path_data = "M "
+                for x, y in coords:
+                    svg_x, svg_y = transform_coords(x, y)
+                    path_data += f"{svg_x},{svg_y} L "
+                path_data = path_data[:-2]
+                dwg.add(dwg.path(d=path_data, stroke='black', stroke_width=2, fill='none'))
+
         # Draw AC lines
         for line in grid.lines_AC + grid.lines_AC_tf + grid.lines_AC_rec + grid.lines_AC_ct:
             if hasattr(line, 'geometry') and line.geometry:
@@ -1236,13 +1386,27 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     svg_x, svg_y = transform_coords(x, y)
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]  # Remove last "L "
-                
-                if line in grid.lines_AC_rec and line.rec_branch:
-                    color = "green"
-                elif line in grid.lines_AC_ct:
-                     color = cable_type_colors.get(line.active_config, "black")  
+                if coloring in ['loading','ts_max_loading','ts_avg_loading']:
+                    if coloring == 'ts_max_loading':
+                        load_show  = line.ts_max_loading
+                    elif coloring == 'ts_avg_loading':
+                        load_show  = line.ts_avg_loading
+                    else:
+                        load_show  = line.loading
+                    if int(load_show) > 100:
+                        color = 'blue'
+                    else:
+                        color = _loading_colormap(load_show)
+                        color, opacity = _svg_color_and_opacity(color)
                 else:
-                    color = "red" if getattr(line, 'isTf', False) else "black"  # Original logic for other lines
+                    if line in grid.lines_AC_rec and line.rec_branch:
+                        color = "green"
+                    elif line in grid.lines_AC_ct:
+                        if line.active_config <0:
+                            continue
+                        color = cable_type_colors.get(line.active_config, "black")  
+                    else:
+                        color = "red" if getattr(line, 'isTf', False) else "black"  # Original logic for other lines
                 
                 dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2, fill='none'))
         
@@ -1255,10 +1419,14 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     svg_x, svg_y = transform_coords(x, y)
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]
-                if line.np_line - line.np_line_b > 0.001:
-                    color = "orange"
+                if coloring == 'loading':
+                    map_color = _loading_colormap(min(max(line.loading,line.ts_max_loading),100))
+                    color, opacity = _svg_color_and_opacity(map_color)
                 else:
-                    color = "black"
+                    if line.np_line - line.np_line_b > 0.001:
+                        color = "orange"
+                    else:
+                        color = "black"
 
                 dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2*line.np_line, fill='none'))
 
@@ -1291,7 +1459,7 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                 x, y = node.geometry.x, node.geometry.y
                 svg_x, svg_y = transform_coords(x, y)
                 color = "black" if isinstance(node, Node_AC) else "purple"
-                dwg.add(dwg.circle(center=(svg_x, svg_y), r=3, 
+                dwg.add(dwg.circle(center=(svg_x, svg_y), r=1, 
                                  fill=color, stroke=color))
                 
         if grid.nct_AC != 0 and hasattr(grid.lines_AC_ct[0], 'cable_types'):
@@ -1300,26 +1468,50 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
             legend_spacing = 20  # Space between legend items
             
             # Add legend title
-            dwg.add(dwg.text("Cable Types", 
-                            insert=(legend_x, legend_y - 10),
-                            font_size=15,
-                            font_family="NewComputerModernSans"))
+            
             
             # Add legend items
             if legend:
-                for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
-                    color = cable_type_colors.get(i, "black")
-                    # Add colored line
-                    dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
-                                end=(legend_x + 30, legend_y + i * legend_spacing),
-                                stroke=color,
-                                stroke_width=2))
-                    # Add text
-                    dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
-                                    insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
-                                    font_size=12,
-                                    font_family="NewComputerModernSans",
-                                    fill=color))
+
+                dwg.add(dwg.text("Cable Types", 
+                            insert=(legend_x, legend_y - 10),
+                            font_size=15,
+                            font_family="NewComputerModernSans"))
+
+                if grid.Cable_options[0].active_config is not None:
+                # Only show cable types that are active (>0.9)
+                    space = 0
+                    for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                        if grid.Cable_options[0].active_config[i] > 0.9:
+                            space += 1
+                            color = cable_type_colors.get(i, "black")
+                            # Add colored line
+                            dwg.add(dwg.line(start=(legend_x, legend_y + space * legend_spacing),
+                                        end=(legend_x + 30, legend_y + space * legend_spacing),
+                                        stroke=color,
+                                        stroke_width=2))
+                            # Add text
+                            dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                            insert=(legend_x + 40, legend_y + space * legend_spacing + 5),
+                                            font_size=12,
+                                            font_family="NewComputerModernSans",
+                                            fill=color))
+                
+                else:
+                    
+                    for i, cable_type in enumerate(grid.lines_AC_ct[0].cable_types):
+                        color = cable_type_colors.get(i, "black")
+                        # Add colored line
+                        dwg.add(dwg.line(start=(legend_x, legend_y + i * legend_spacing),
+                                    end=(legend_x + 30, legend_y + i * legend_spacing),
+                                    stroke=color,
+                                    stroke_width=2))
+                        # Add text
+                        dwg.add(dwg.text(f"{grid.lines_AC_ct[0].cable_types[i]}",
+                                        insert=(legend_x + 40, legend_y + i * legend_spacing + 5),
+                                        font_size=12,
+                                        font_family="NewComputerModernSans",
+                                        fill=color))
         
         # Save the SVG file
         dwg.save()
@@ -1332,3 +1524,134 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
 
 
     
+def plot_model_feasebility(solver_stats,sol='all', x_axis='time', y_axis= 'objective', normalize = False,show=True, save_path=None, width_mm=None):
+    import matplotlib.pyplot as plt
+    # Respect optional width in millimeters for journal-style figures
+    fig = None
+    if width_mm is not None:
+        fig_w_in = width_mm / 25.4
+        fig_h_in = fig_w_in  # square by default
+        fig = plt.figure(figsize=(fig_w_in, fig_h_in))
+    #feasible_solutions.append((time_sec, objective, iterations))
+    if sol == 'all':
+        # [time_sec, objective, cumulative_iterations, nlp_call_num, is_feasible]
+        solutions = solver_stats['all_solutions']
+
+        if normalize:
+            # Only consider objectives that have feasible flag set to True
+            feasible_objectives = [objective for _, objective, _, _, is_feasible in solutions if is_feasible]
+            if feasible_objectives:
+                min_objective = min(feasible_objectives)
+            else:
+                min_objective = min(objective for _, objective, _, _, _ in solutions)
+            solutions = [ [time_sec, (objective/min_objective-1)*100, cumulative_iterations, nlp_call_num, is_feasible] for time_sec, objective, cumulative_iterations, nlp_call_num, is_feasible in solutions]
+    
+
+        if x_axis == 'time':
+            x_data = [time_sec for time_sec, _, _, _, _ in solutions]
+        elif x_axis == 'iterations':
+            x_data = [cumulative_iterations for _, _, cumulative_iterations, _, _ in solutions]
+
+        if y_axis == 'objective':
+            y_axis = 'objective [%]' if normalize else 'objective'
+            y_data = [objective for _, objective, _, _, _ in solutions]
+        elif y_axis == 'iterations':
+            y_data = [cumulative_iterations for _, _, cumulative_iterations, _, _ in solutions]
+
+        # Separate feasible and non-feasible points
+        feasible_x = []
+        feasible_y = []
+        regular_x = []
+        regular_y = []
+        
+        for i, solution in enumerate(solutions):
+            if solution[4]:  # is_feasible is True
+                feasible_x.append(x_data[i])
+                feasible_y.append(y_data[i])
+                regular_x.append(x_data[i])
+                regular_y.append(y_data[i])
+            else:
+                regular_x.append(x_data[i])
+                regular_y.append(y_data[i])
+
+        # Plot regular points in default color
+        if regular_x:
+            plt.plot(regular_x, regular_y, 'o-', color='blue', label='NLP Progress')
+        
+        # Plot feasible points in red
+        if feasible_x:
+            plt.plot(feasible_x, feasible_y, 'o', color='red', markersize=8, label='Feasible Solutions')
+        
+        plt.xlabel(x_axis)
+        plt.ylabel(y_axis)
+        plt.grid(True)
+        plt.legend()
+        if show:
+            plt.show()
+        if save_path is not None:
+            plt.savefig(save_path, bbox_inches='tight')
+        if not show and fig is not None:
+            plt.close(fig)
+        return
+
+    else:
+        # [time_sec, objective, iterations]
+        solutions = solver_stats['feasible_solutions']
+
+        if normalize:
+            min_objective = min(objective for _, objective, _ in solutions)
+            solutions = [ (time_sec, objective/min_objective, iterations) for time_sec, objective, iterations in solutions]
+
+        if x_axis == 'time':
+            x_data = [time_sec for time_sec, _, _ in solutions]
+        elif x_axis == 'iterations':
+            x_data = [iterations for _, _, iterations in solutions]
+
+        if y_axis == 'objective':
+            y_data = [objective for _, objective, _ in solutions]
+        elif y_axis == 'iterations':
+            y_data = [iterations for _, _, iterations in solutions]
+
+        plt.plot(x_data, y_data, 'o-')
+        plt.xlabel(x_axis)
+        plt.ylabel(y_axis)
+        plt.grid(True)
+        if show:
+            plt.show()
+        if save_path is not None:
+            plt.savefig(save_path, bbox_inches='tight')
+        if not show and fig is not None:
+            plt.close(fig)
+        plt.close(fig)
+        return
+
+
+def _svg_color_and_opacity(color):
+    # Return (svg_color, opacity_or_None)
+    # Accepts '#RRGGBB', '#RRGGBBAA', (r,g,b), (r,g,b,a), 'rgba(r,g,b,a)'
+    if isinstance(color, (list, tuple)):
+        if len(color) == 4:
+            r, g, b, a = color
+            # handle 0..1 floats or 0..255 ints
+            if max(r, g, b) <= 1:
+                r, g, b = int(r*255), int(g*255), int(b*255)
+            if a > 1:
+                a = a/255.0
+            return f"rgb({int(r)},{int(g)},{int(b)})", float(a)
+        if len(color) == 3:
+            r, g, b = color
+            if max(r, g, b) <= 1:
+                r, g, b = int(r*255), int(g*255), int(b*255)
+            return f"rgb({int(r)},{int(g)},{int(b)})", None
+    if isinstance(color, str):
+        s = color.strip()
+        if s.startswith('#') and len(s) == 9:  # #RRGGBBAA
+            rgb = s[:7]
+            a = int(s[7:9], 16) / 255.0
+            return rgb, a
+        if s.lower().startswith('rgba(') and s.endswith(')'):
+            parts = [p.strip() for p in s[5:-1].split(',')]
+            r, g, b = [int(float(x)) for x in parts[:3]]
+            a = float(parts[3])
+            return f"rgb({r},{g},{b})", a
+    return color, None

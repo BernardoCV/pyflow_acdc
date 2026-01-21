@@ -4,10 +4,16 @@ def case39acdc_OPF():
 
     grid,res = pyf.case39_acdc()
 
-    pyf.Optimal_PF(grid)
+    model, model_res , timing_info, solver_stats=pyf.Optimal_PF(grid,ObjRule={'Energy_cost': 1})
 
     res.All()
-
+    
+    model.display()
+    
+    model.obj.display()
+    model.obj.pprint()
+    print(timing_info)
+    #model.PGi_gen.display()
 def run_test():
     """Test case39 AC/DC optimal power flow."""
     try:

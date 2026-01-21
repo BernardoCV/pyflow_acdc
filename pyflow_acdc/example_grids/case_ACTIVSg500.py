@@ -4,7 +4,7 @@ import pyflow_acdc as pyf
 import pandas as pd
 
 
-def case_ACTIVSg500(TEP=False,exp='All',N_b=1,N_i=1,N_max=5):      
+def case_ACTIVSg500(TEP=False,exp='All',N_b=1,N_i=1,N_max=5,kappa=0.5):      
     
     S_base=100
     
@@ -1188,6 +1188,7 @@ def case_ACTIVSg500(TEP=False,exp='All',N_b=1,N_i=1,N_max=5):
     # Add Renewable Source Zones
 
     if TEP==True:
+        lines_AC['Cost MUSD'] = lines_AC['Cost MUSD'] * kappa/0.5
         lines_AC.set_index('Line_id', inplace=True)
         if exp == 'All':
             for line in list(grid.lines_AC):  # Create a copy of the list

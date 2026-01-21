@@ -384,5 +384,5 @@ def create_dash_app(grid):
 
 def run_dash(grid):
     app = create_dash_app(grid)
-    app.run_server(debug=True)
+    app.run(debug=True)
 

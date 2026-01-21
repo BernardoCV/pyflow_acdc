@@ -73,7 +73,12 @@ class Grid:
         self.Cable_options=[]
         self.lines_AC_ct=[]
         self.cab_types_allowed=3
-        
+        self.crossing_groups = []
+        self.MIP_time = None
+        self.MIP_check = False
+        self.act_gen = False
+
+
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
             if not hasattr(conv, 'basekA'):
@@ -150,6 +155,7 @@ class Grid:
         self.MixedBinCont = False
         self.TEP_n_years = 25
         self.TEP_discount_rate =0.02
+        self.Array_opf = False
         
         self.name = 'Grid'
         
@@ -179,6 +185,9 @@ class Grid:
         self.Time_series = []
         self.Time_series_dic ={}
         
+        self.inv_series = []
+        self.inv_series_dic ={}
+
         self.Price_Zones =[]
         self.Price_Zones_dic ={}
       
@@ -261,6 +270,11 @@ class Grid:
         self._droop_nodes = None
         self._slackDC_nodes = None
         self._nodes_dict_DC = None        
+    
+
+    @property
+    def n_ren(self):
+        return len(self.RenSources) if self.RenSources is not None else 0
     
     @property
     def n_gen(self):
@@ -710,19 +724,19 @@ class Grid:
             line = self.lines_AC_ct[k]
             fromNode = line.fromNode.nodeNumber
             toNode = line.toNode.nodeNumber
+            if line.active_config >=0:
+                branch_ff = line.Ybus_list[line.active_config][0, 0]
+                branch_ft = line.Ybus_list[line.active_config][0, 1]
+                branch_tf = line.Ybus_list[line.active_config][1, 0]
+                branch_tt = line.Ybus_list[line.active_config][1, 1]
 
-            branch_ff = line.Ybus_list[line.active_config][0, 0]
-            branch_ft = line.Ybus_list[line.active_config][0, 1]
-            branch_tf = line.Ybus_list[line.active_config][1, 0]
-            branch_tt = line.Ybus_list[line.active_config][1, 1]
-
-            self.Ybus_AC_full[toNode, fromNode]+=branch_tf
-            self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+                self.Ybus_AC_full[toNode, fromNode]+=branch_tf
+                self.Ybus_AC_full[fromNode, toNode]+=branch_ft
+                
+                
+                Ybus_nn_full[fromNode] += branch_ff
+                Ybus_nn_full[toNode] += branch_tt
             
-            
-            Ybus_nn_full[fromNode] += branch_ff
-            Ybus_nn_full[toNode] += branch_tt
-        
         for m in range(self.nn_AC):
             node = self.nodes_AC[m]
 
@@ -839,7 +853,8 @@ class Grid:
             
         # Process configurable transmission lines
         for line in self.lines_AC_ct:
-            self._calculate_line_power_flow(line, V_cart, use_configurable=True)
+            if line.active_config >=0:
+              self._calculate_line_power_flow(line, V_cart, use_configurable=True)
     
     def _initialize_voltage_cartesian(self):
         """
@@ -972,13 +987,59 @@ class Gen_AC:
         return self._name
 
     @property
+    def S_base(self):
+        return self._S_base
+    
+    @property
     def life_time_hours(self):
         return self.life_time *8760
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        
+        old_S_base = getattr(self, "_S_base", None)
+        if old_S_base is not None and old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.Max_pow_gen *= rate
+                self.Max_pow_genR *= rate
+                self.Min_pow_gen *= rate
+                self.Min_pow_genR *= rate
+                self.PGen *= rate
+                self.QGen *= rate
+                self.Pset *= rate
+                self.Qset *= rate
+                self.Max_S *= rate
+        self._S_base = new_S_base
     
-    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other',installation_cost:float=0):
+    @property
+    def capacity_MVA(self):
+        maxMVAR = max(abs(self.Max_pow_genR),abs(self.Min_pow_genR))
+        if self.Max_S is not None:
+            return self.Max_S *self.S_base
+        elif self.Max_pow_gen >0:
+            return (self.Max_pow_gen**2+maxMVAR**2)**0.5*self.S_base
+        else:
+            return maxMVAR*self.S_base
+    
+    @property
+    def loading(self):
+        return self.apparent_MVA/(self.capacity_MVA*self.np_gen)*100 if self.np_gen >0 else 0
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.PGen), abs(self.QGen)) * self.S_base
+
+
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type='Other',installation_cost:float=0,S_base:float=100):
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
+        self.S_base = S_base
+        self.S_base_i = S_base
+        
         self.Node_AC=node.name
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
         self.geometry= node.geometry
         self.kV_base = node.kV_base
         self.PZ = node.PZ
@@ -988,14 +1049,20 @@ class Gen_AC:
         self.Min_pow_gen=Min_pow_gen
         self.Max_pow_genR=Max_pow_genR
         self.Min_pow_genR=Min_pow_genR
-        
+
         self.Max_S= S_rated
+        
+        node.S_rating += self.capacity_MVA
         
         self.np_gen_i = 1
         self.np_gen_b = 1
         self.np_gen = 1
         self.np_gen_max=3
         self.np_gen_opf = False
+        self.np_gen_dynamic = [self.np_gen]
+
+        self.activate_gen_opf = False
+        self.gen_active = 1 
 
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
@@ -1053,13 +1120,44 @@ class Gen_DC:
         return self._name
 
     @property
+    def S_base(self):
+        return self._S_base
+    
+    @property
     def life_time_hours(self):
         return self.life_time *8760
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        
+        old_S_base = getattr(self, "_S_base", None)
+        if old_S_base is not None and old_S_base != new_S_base:  
+                rate = old_S_base / new_S_base
+                self.Max_pow_gen *= rate
+                self.PGen *= rate
+                self.Pset *= rate
+        self._S_base = new_S_base
+    @property
+    def capacity_MW(self):
+        return self.Max_pow_gen*self.S_base
     
-    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type='Other',installation_cost:float=0):
+    @property
+    def loading(self):
+        return self.PGen/(self.capacity_MW*self.np_gen)*100 if self.np_gen >0 else 0
+   
+
+    def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type='Other',installation_cost:float=0,S_base:float=100):
         self.genNumber_DC = Gen_DC.genNumber_DC
         Gen_DC.genNumber_DC += 1
+
+        self.S_base = S_base
+        self.S_base_i = S_base
+
         self.Node_DC=node.name
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
         self.geometry= node.geometry
         self.kV_base = node.kV_base
         self.PZ = node.PZ
@@ -1118,8 +1216,41 @@ class Ren_Source:
     def name(self):
         return self._name
 
+    @property
+    def S_base(self):
+        return self._S_base
     
-    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind'):
+    @property
+    def life_time_hours(self):
+        return self.life_time *8760
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        old_S_base = getattr(self, "_S_base", None)
+        if old_S_base is not None and old_S_base != new_S_base:  
+            rate = old_S_base / new_S_base
+            self.Max_S *= rate
+            self.PGi_ren_base *= rate
+            self.QGi_ren *= rate
+            self.Qmin *= rate
+            self.Qmax *= rate
+        self._S_base = new_S_base
+    
+    @property
+    def capacity_MVA(self):
+       
+        return self.PGi_ren_base*self.S_base
+    
+    @property
+    def loading(self):
+        return self.apparent_MVA/self.capacity_MVA*100
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.PGen), abs(self.QGen)) * self.S_base
+    
+    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100):
         self.rsNumber = Ren_Source.rsNumber
         Ren_Source.rsNumber += 1
         
@@ -1128,22 +1259,35 @@ class Ren_Source:
         
         self.curtailable= True
        
+        self.life_time = 30
+        self.S_base = S_base
+        self.S_base_i = S_base
         
         self.Node=node.name
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
+
+        node.S_rating += PGi_ren_base
         
         self.geometry= node.geometry
         self.kV_base = node.kV_base
         self.PZ = node.PZ
         
-        self.PGi_ren_base=PGi_ren_base
+        
         self.PGi_ren = 0 
+        self._PGi_ren_base=PGi_ren_base
         self._PRGi_available=1
+        self._PRGi_inv_factor =1
         
         
         self.TS_dict = {
             'PRGi_available': None
         }
         
+        self.inv_dic ={
+            'PRGi_base' : None
+        }
+
         self.PGRi_linked=False
         self.Ren_source_zone=None
         
@@ -1155,7 +1299,7 @@ class Ren_Source:
         self.Qmax=0
         self.Qmin=0
         
-        self.Max_S= PGi_ren_base
+        self.Max_S= PGi_ren_base*1.05
             
         node.connected_RenSource.append(self)
         node.RenSource=True
@@ -1178,6 +1322,25 @@ class Ren_Source:
         Ren_Source.names.add(self.name)
         
         self.hover_text = None
+    
+    @property
+    def PGi_ren_base(self):
+        return self._PGi_ren_base
+    
+    @PGi_ren_base.setter
+    def PGi_ren_base(self, value):
+        self._PGi_ren_base = value
+        self.update_PGi_ren()
+
+    @property
+    def PRGi_inv_factor(self):
+        return self._PRGi_inv_factor
+    
+    @PRGi_inv_factor.setter
+    def PRGi_inv_factor(self, value):
+        self._PRGi_inv_factor = value
+        self.update_PGi_ren()
+
     @property
     def PRGi_available(self):
         return self._PRGi_available
@@ -1188,7 +1351,7 @@ class Ren_Source:
         self.update_PGi_ren()
      
     def update_PGi_ren(self):
-        self.PGi_ren = self.PGi_ren_base * self._PRGi_available
+        self.PGi_ren = self._PGi_ren_base * self._PRGi_available * self._PRGi_inv_factor
    
     
 class Node_AC:  
@@ -1256,16 +1419,24 @@ class Node_AC:
         self.RenSource=False
         # self.PGRi_linked=False
         # self.Ren_source_zone=None
+        self.S_rating = 0
         
-        self.PLi_linked= True
         self.PLi= Power_load
-        self.PLi_base = Power_load
+
+        self._PLi_base = Power_load
+
+        self.PLi_linked= True
         self._PLi_factor =1
+        self._PLi_inv_factor=1
         
         self.TS_dict = {
             'Load' : None,
             'price': None,
             }
+        
+        self.inv_dic ={
+            'Load' : None
+        }
         
         self.QGi = Reactive_Gained
         self.QGi_opt =0
@@ -1292,8 +1463,12 @@ class Node_AC:
         self.price = 0.0
         self.Num_conv_connected=0
         self.connected_conv=set()
-   
-        
+    
+
+        #Used for turbine array optimisation
+        self.ct_limit=None
+        self.max_turbines_per_string=99
+        self.pu_power_limit=None
         self.curtailment=1
 
         # self.Max_pow_gen=0
@@ -1336,7 +1511,15 @@ class Node_AC:
 
         Node_AC.names.add(self.name)
   
-            
+    @property
+    def PLi_base(self):
+        return self._PLi_base
+    
+    @PLi_base.setter
+    def PLi_base(self, value):
+        self._PLi_base = value
+        self.update_PLi()
+
     @property
     def PLi_factor(self):
         return self._PLi_factor
@@ -1345,9 +1528,18 @@ class Node_AC:
     def PLi_factor(self, value):
         self._PLi_factor = value
         self.update_PLi()        
-       
+    
+    @property
+    def PLi_inv_factor(self):
+        return self._PLi_inv_factor
+    
+    @PLi_inv_factor.setter
+    def PLi_inv_factor(self, value):
+        self._PLi_inv_factor = value
+        self.update_PLi()
+
     def update_PLi(self):
-        self.PLi = self.PLi_base * self._PLi_factor
+        self.PLi = self._PLi_base * self._PLi_factor * self._PLi_inv_factor
         
 class Node_DC:
     """
@@ -1396,14 +1588,20 @@ class Node_DC:
         self.PGi = Power_Gained
         self.PLi_linked= True
         self.PLi= Power_load
-        self.PLi_base = Power_load
-        self._PLi_factor =1
+
+        self._PLi_base = Power_load
+        self._PLi_factor =1  # 0-1 value used for time series or scenario management
+        self._PLi_inv_factor=1 # value used for investment period load increase
         
+        self.S_rating = 0
         self.TS_dict = {
             'Load' : None,
             'price': None,
             }
         
+        self.inv_dic ={
+            'Load' : None
+        }
         
         self.V = np.copy(self.V_ini)
         self.P_INJ = 0
@@ -1449,6 +1647,24 @@ class Node_DC:
         Node_DC.names.add(self.name)
 
     @property
+    def PLi_base(self):
+        return self._PLi_base
+    
+    @PLi_base.setter
+    def PLi_base(self, value):
+        self._PLi_base = value
+        self.update_PLi()
+
+    @property
+    def PLi_inv_factor(self):
+        return self._PLi_inv_factor
+    
+    @PLi_inv_factor.setter
+    def PLi_inv_factor(self, value):
+        self._PLi_inv_factor = value
+        self.update_PLi()
+
+    @property
     def PLi_factor(self):
          return self._PLi_factor
 
@@ -1458,7 +1674,7 @@ class Node_DC:
          self.update_PLi()        
         
     def update_PLi(self):
-         self.PLi = self.PLi_base * self._PLi_factor
+         self.PLi = self._PLi_base * self._PLi_factor * self._PLi_inv_factor
          
 class Line_AC:
     """
@@ -1503,33 +1719,50 @@ class Line_AC:
     _cable_database = None
     
     @classmethod
-    def load_cable_database(cls):
-        """Load cable database from YAML files if not already loaded."""
+    def load_cable_database(cls, cable_database=None):
+        """Load cable database from YAML files if not already loaded, or use provided DataFrame.
+        
+        Parameters
+        ----------
+        cable_database : pd.DataFrame, optional
+            If provided, use this DataFrame as the cable database instead of loading from YAML files.
+            The DataFrame should have cable names as index and cable specifications as columns.
+            Only AC cables will be used (filtered by Type='AC' if Type column exists).
+        """
         if cls._cable_database is None:
-            # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent
-            cable_dir = module_dir / 'Cable_database'
-            
-            data_dict = {}
-            # Read all YAML files in the directory
-            for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r', encoding='latin-1') as f:
-                    cable_data = yaml.safe_load(f)
-                    if cable_data:
-                        # Each file has one cable
-                        cable_name = list(cable_data.keys())[0]
-                        specs = cable_data[cable_name]
-                        
-                        # Only include AC cables
-                        if specs.get('Type', 'AC') == 'AC':
-                            data_dict[cable_name] = specs
-            
-            if data_dict:
-                # Convert to pandas DataFrame
-                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
-                #print(f"Loaded {len(data_dict)} AC cables into database")
+            if cable_database is not None:
+                # Use provided DataFrame, but filter for AC cables if Type column exists
+                if 'Type' in cable_database.columns:
+                    cls._cable_database = cable_database[cable_database['Type'] == 'AC'].copy()
+                else:
+                    # Assume all are AC if no Type column
+                    cls._cable_database = cable_database.copy()
             else:
-                print("No AC cable data found in any YAML files")
+                # Load from YAML files
+                # Get the path to the Cable_database directory
+                module_dir = Path(__file__).parent
+                cable_dir = module_dir / 'Cable_database'
+                
+                data_dict = {}
+                # Read all YAML files in the directory
+                for yaml_file in cable_dir.glob('*.yaml'):
+                    with open(yaml_file, 'r', encoding='latin-1') as f:
+                        cable_data = yaml.safe_load(f)
+                        if cable_data:
+                            # Each file has one cable
+                            cable_name = list(cable_data.keys())[0]
+                            specs = cable_data[cable_name]
+                            
+                            # Only include AC cables
+                            if specs.get('Type', 'AC') == 'AC':
+                                data_dict[cable_name] = specs
+                
+                if data_dict:
+                    # Convert to pandas DataFrame
+                    cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+                    #print(f"Loaded {len(data_dict)} AC cables into database")
+                else:
+                    print("No AC cable data found in any YAML files")
 
     @classmethod
     def reset_class(cls):
@@ -1539,7 +1772,19 @@ class Line_AC:
     @property
     def name(self):
         return self._name
-        
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.fromS), abs(self.toS)) * self.S_base
+
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating
+
+    @property
+    def loading(self):
+        cap = self.capacity_MVA
+        return 0.0 if cap == 0 else (self.apparent_MVA / cap) * 100.0 
+
     def remove(self):
         """Method to handle line removal from the class-level attributes."""
         Line_AC.lineNumber -= 1  # Decrement the line number counter
@@ -1549,6 +1794,8 @@ class Line_AC:
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
+        if Line_AC._cable_database is None:
+            Line_AC.load_cable_database()
         Cable_type = Cable_type.replace(' ', '_')
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
@@ -1589,6 +1836,8 @@ class Line_AC:
         self.shift = shift
         self.tap= self.m * np.exp(1j*self.shift)  
         
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
         # Set Cable_type
         self._Cable_type = Cable_type
         
@@ -1641,7 +1890,8 @@ class Line_AC:
             rate = old_S_base / new_S_base
             if self.Ybus_branch is not None and old_S_base != new_S_base:
                 self.Ybus_branch /= rate
-        self._S_base = new_S_base        
+        self._S_base = new_S_base
+
     @property
     def Cable_type(self):
         return self._Cable_type
@@ -1679,7 +1929,10 @@ class Line_AC:
         self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
         
 class Exp_Line_AC(Line_AC):
-    
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating * self.np_line
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
@@ -1696,14 +1949,22 @@ class Exp_Line_AC(Line_AC):
         self.np_line_b=0  #N_b base attribute
         self.np_line_i= 0 #N_i initial guess
         self.np_line_max = 1 #N_max max number of lines
+        self.np_dynamic = [self.np_line]   
+
         self.np_line_opf=True
         self.hover_text = None
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
         
         self.toNode.connected_toExpLine.append(self)
         self.fromNode.connected_fromExpLine.append(self)
 
 class rec_Line_AC(Line_AC):
     
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating_new if getattr(self, 'rec_branch', False) else self.MVA_rating
 
     def __init__(self,r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1724,7 +1985,10 @@ class rec_Line_AC(Line_AC):
         self.G_new = g_new
         self.B_new = b_new
         self.MVA_rating_new = MVA_rating_new
-        
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         # Calculate new Ybus_branch
         self._calculate_Ybus_branch_new()
 
@@ -1762,7 +2026,7 @@ class rec_Line_AC(Line_AC):
                                         [branch_tf_new, branch_tt_new]])
 
 
-class Line_sizing(Line_AC):
+class Size_selection(Line_AC):
     lineNumber = 0
     names = set()
 
@@ -1783,12 +2047,22 @@ class Line_sizing(Line_AC):
     def life_time_hours(self):
         return self.life_time *8760
     
-
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating_list[self._active_config]
+    
+    @property
+    def installation_cost(self):
+        return self.installation_cost_per_km * self.trench_lenght_km
+    
     @cable_types.setter
     def cable_types(self, value):
         """Set cable types and recalculate parameters if the list changes."""
         if value != self._cable_types:
             self._cable_types = value
+            # Ensure database is loaded before validation
+            if Line_AC._cable_database is None:
+                Line_AC.load_cable_database()
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
                 if cable_type not in self._cable_database.index:
@@ -1800,8 +2074,8 @@ class Line_sizing(Line_AC):
 
     def __init__(self, fromNode: Node_AC, toNode: Node_AC, cable_types: list = None, active_config: int = 0, Length_km:float=1.0, S_base:float=100, name=None,geometry=None):       
         # Initialize basic line parameters
-        self.lineNumber = Line_sizing.lineNumber
-        Line_sizing.lineNumber += 1
+        self.lineNumber = Size_selection.lineNumber
+        Size_selection.lineNumber += 1
         
         self.Length_km = Length_km
         self.S_base = S_base
@@ -1816,7 +2090,7 @@ class Line_sizing(Line_AC):
         self._cable_types = cable_types if cable_types is not None else []
         self.ini_active_config = active_config
         self._active_config = active_config
-     
+        self.direction = 'from'
         # Initialize parameter lists
         self.R_list = []
         self.X_list = []
@@ -1828,12 +2102,25 @@ class Line_sizing(Line_AC):
 
         self.life_time = 25
 
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         self.geometry = geometry
         self.fromS = 0
         self.toS = 0
         self.loss = 0
-        # If cablez types are provided, validate and calculate parameters
+        self.P_loss =0
+        self.network_flow = None    
+
+        self.installation_cost_per_km = 1
+        self.trench_lenght_km = self.Length_km
+
+        
+        # If cable types are provided, validate and calculate parameters
         if self._cable_types:
+            # Ensure database is loaded before validation
+            if Line_AC._cable_database is None:
+                Line_AC.load_cable_database()
             # Validate all cable types exist in database
             for cable_type in self._cable_types:
                 if cable_type not in self._cable_database.index:
@@ -1841,7 +2128,9 @@ class Line_sizing(Line_AC):
             
             # Calculate parameters for all configurations
             self._calculate_all_parameters()
-
+        else:
+            # No cable types provided - set default zero parameters
+            self._set_zero_parameters()
             
         # Add array-specific attributes
         self.array_opf = True  # Flag for optimization
@@ -1861,24 +2150,39 @@ class Line_sizing(Line_AC):
     
     @active_config.setter
     def active_config(self, value):
-        if not 0 <= value < len(self._cable_types):
-            raise ValueError(f"Configuration index must be between 0 and {len(self._cable_types)-1}")
+        if not -1 <= value < len(self._cable_types):
+            raise ValueError(f"Configuration index must be between -1 and {len(self._cable_types)-1}")
         self._active_config = value
         self._update_active_parameters()
         
     def _update_active_parameters(self):
         """Update the line parameters based on the active configuration."""
-        self.R = self.R_list[self._active_config]
-        self.X = self.X_list[self._active_config]
-        self.G = self.G_list[self._active_config]
-        self.B = self.B_list[self._active_config]
-        self.MVA_rating = self.MVA_rating_list[self._active_config]
-        self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
-        self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
+        if self._active_config == -1 or not self._cable_types:
+            # No cable selected or no cable types available
+            self._set_zero_parameters()
+        else:
+            if self._active_config >= len(self.R_list):
+                self._active_config = len(self.R_list) - 1
+            self.R = self.R_list[self._active_config]
+            self.X = self.X_list[self._active_config]
+            self.G = self.G_list[self._active_config]
+            self.B = self.B_list[self._active_config]
+            self.MVA_rating = self.MVA_rating_list[self._active_config]
+            self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
+            self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
+        
+    def _set_zero_parameters(self):
+        """Set all parameters to zero (no cable selected)."""
+        self.R = 0
+        self.X = 0
+        self.G = 0
+        self.B = 0
+        self.MVA_rating = 0
+        self.Ybus_branch = np.zeros((2, 2), dtype=complex)  # Zero Ybus matrix
         
     def _calculate_all_parameters(self):
         """Calculate and store parameters for all configurations."""
-            # Initialize parameter lists
+        # Initialize parameter lists
         self.R_list = []
         self.X_list = []
         self.G_list = []
@@ -1938,6 +2242,9 @@ class Line_sizing(Line_AC):
 
     def add_cable_type(self, cable_type):
         """Add a new cable type to the array."""
+        # Ensure database is loaded
+        if Line_AC._cable_database is None:
+            Line_AC.load_cable_database()
         if cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{cable_type}' not found in database")
         self._cable_types.append(cable_type)
@@ -1956,49 +2263,143 @@ class Line_sizing(Line_AC):
         self._calculate_all_parameters()
 
     def get_cost_parameter(self,cable_type):
+        # Ensure database is loaded
+        if Line_AC._cable_database is None:
+            Line_AC.load_cable_database()
         return self._cable_database.loc[cable_type, 'Cost_per_km'] if 'Cost_per_km' in self._cable_database.columns else 1
     
+    def set_no_cable(self):
+        """Set the line to have no cable selected (zero Ybus matrix)."""
+        self._active_config = -1
+        self._update_active_parameters()
+    
+    def has_cable_selected(self):
+        """Check if a cable is currently selected."""
+        return self._active_config >= 0 and self._cable_types
+
 class Cable_options:
     Cable_options_num = 0
     names = set()
+    _cable_database = None  
     
-    @classmethod
-    def reset_class(cls):
-        cls.Cable_options_num = 0
-        cls.names = set()
-    
-    @property
-    def name(self):
-        return self._name
-    
-    @property
-    def cable_types(self):
-        return self._cable_types
+    def _calculate_MVA_ratings(self,cable_types):
+        mva_ratings = []
+        for cable_type in cable_types:
+            # Get MVA rating directly from database
+            if cable_type in self._cable_database.index:
+                cable_data = self._cable_database.loc[cable_type]
+                # Calculate MVA rating: A_rating * kV_base * sqrt(3) / 1000
+                A_rating = cable_data['A_rating']
+                kV_base = cable_data['Nominal_voltage_kV'] 
+                MVA_rating = A_rating * kV_base * np.sqrt(3) / 1000
+                mva_ratings.append(MVA_rating)
+            else:
+                raise ValueError(f"Cable type '{cable_type}' not found in database")
+        return mva_ratings
 
-    @cable_types.setter
-    def cable_types(self, value):
-        self._cable_types = value
-        if hasattr(self, 'lines'):
-            for line in self.lines:
-                line.cable_types = value
+    
+    def sort_cable_types_by_capacity(self):
+        """Sort cable types by MVA rating (smallest to largest)"""
+        # Create list of tuples (cable_type, mva_rating)
+        cable_ratings = list(zip(self._cable_types, self.MVA_ratings))
         
+        # Sort by MVA rating (ascending order)
+        cable_ratings.sort(key=lambda x: x[1])
+        
+        # Update cable types and ratings
+        self._cable_types = [cable for cable, _ in cable_ratings]
+        self.MVA_ratings = [rating for _, rating in cable_ratings]
+        
+        # Update all linked lines
+        for line in self.lines:
+            line.cable_types = self._cable_types
 
-    def __init__(self,cable_types:list,name=None):
+    @classmethod
+    def load_cable_database(cls, cable_database=None):
+        """Load cable database from YAML files if not already loaded, or use provided DataFrame.
+        
+        Parameters
+        ----------
+        cable_database : pd.DataFrame, optional
+            If provided, use this DataFrame as the cable database instead of loading from YAML files.
+            The DataFrame should have cable names as index and cable specifications as columns.
+        """
+        if cls._cable_database is None:
+            if cable_database is not None:
+                # Use provided DataFrame
+                cls._cable_database = cable_database.copy()
+            else:
+                # Load from YAML files
+                # Get the path to the Cable_database directory
+                module_dir = Path(__file__).parent
+                cable_dir = module_dir / 'Cable_database'
+                
+                data_dict = {}
+                # Read all YAML files in the directory
+                for yaml_file in cable_dir.glob('*.yaml'):
+                    with open(yaml_file, 'r', encoding='latin-1') as f:
+                        cable_data = yaml.safe_load(f)
+                        if cable_data:
+                            # Each file has one cable
+                            cable_name = list(cable_data.keys())[0]
+                            specs = cable_data[cable_name]
+                            
+                            # Only include AC cables
+                            if specs.get('Type', 'AC') == 'AC':
+                                data_dict[cable_name] = specs
+                
+                if data_dict:
+                    # Convert to pandas DataFrame
+                    cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+    
+    def __init__(self, cable_types: list = None, name=None, cable_database=None):
         self.Cable_options_num = Cable_options.Cable_options_num
         Cable_options.Cable_options_num += 1
         
-        self.cable_types = cable_types
-        self.lines = []
-        if name is None:
-            self._name = str(self.Cable_options_num)
+        # Load database if not already loaded, or use provided database
+        if Cable_options._cable_database is None:
+            Cable_options.load_cable_database(cable_database=cable_database)
+        elif cable_database is not None:
+            # Override existing database with provided one
+            Cable_options._cable_database = cable_database.copy()
+        
+        # If cable_types is None or empty, create empty cable option
+        if cable_types is None or len(cable_types) == 0:
+            self._cable_types = []
+            self.MVA_ratings = []
         else:
-            self._name = name
+            self._cable_types = cable_types
+            self.lines = []
+            self.active_config = None
+            # Efficiently calculate MVA ratings in one pass
+            self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
+            
+            # Sort by capacity (smallest to largest)
+            self.sort_cable_types_by_capacity()
+        
+        if name is None:
+            self.name = str(self.Cable_options_num)
+        else:
+            self.name = name
             
         Cable_options.names.add(self.name)
         
+    @property
+    def cable_types(self):
+        return self._cable_types
     
-    
+    @cable_types.setter
+    def cable_types(self, new_cable_types):
+        """Set cable types and update all linked lines"""
+        self._cable_types = new_cable_types
+        
+        # Recalculate MVA ratings
+        self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
 
+        
+        # Update all linked lines
+        for line in self.lines:
+            line.cable_types = self._cable_types
 
 class TF_Line_AC:
     trafNumber = 0
@@ -2028,7 +2429,10 @@ class TF_Line_AC:
         self.Y = self.G + self.B * 1j
         self.kV_base = kV_base
         self.MVA_rating = MVA_rating
-        
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         self.m =m
         self.shift = shift
         
@@ -2090,35 +2494,53 @@ class Line_DC:
     lineNumber = 0
     names = set()
     _cable_database = None
+
     
     @classmethod
-    def load_cable_database(cls):
-        """Load cable database from YAML files if not already loaded."""
+    def load_cable_database(cls, cable_database=None):
+        """Load cable database from YAML files if not already loaded, or use provided DataFrame.
+        
+        Parameters
+        ----------
+        cable_database : pd.DataFrame, optional
+            If provided, use this DataFrame as the cable database instead of loading from YAML files.
+            The DataFrame should have cable names as index and cable specifications as columns.
+            Only DC cables will be used (filtered by Type='DC' if Type column exists).
+        """
         if cls._cable_database is None:
-            # Get the path to the Cable_database directory
-            module_dir = Path(__file__).parent
-            cable_dir = module_dir / 'Cable_database'
-            
-            data_dict = {}
-            # Read all YAML files in the directory
-            for yaml_file in cable_dir.glob('*.yaml'):
-                with open(yaml_file, 'r', encoding='latin-1') as f:
-                    cable_data = yaml.safe_load(f)
-                    if cable_data:
-                        # Each file has one cable
-                        cable_name = list(cable_data.keys())[0]
-                        specs = cable_data[cable_name]
-                        
-                        # Only include DC cables
-                        if specs.get('Type', 'DC') == 'DC':
-                            data_dict[cable_name] = specs
-            
-            if data_dict:
-                # Convert to pandas DataFrame
-                cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
-                #print(f"Loaded {len(data_dict)} DC cables into database")
+            if cable_database is not None:
+                # Use provided DataFrame, but filter for DC cables if Type column exists
+                if 'Type' in cable_database.columns:
+                    cls._cable_database = cable_database[cable_database['Type'] == 'DC'].copy()
+                else:
+                    # Assume all are DC if no Type column
+                    cls._cable_database = cable_database.copy()
             else:
-                print("No DC cable data found in any YAML files")
+                # Load from YAML files
+                # Get the path to the Cable_database directory
+                module_dir = Path(__file__).parent
+                cable_dir = module_dir / 'Cable_database'
+                
+                data_dict = {}
+                # Read all YAML files in the directory
+                for yaml_file in cable_dir.glob('*.yaml'):
+                    with open(yaml_file, 'r', encoding='latin-1') as f:
+                        cable_data = yaml.safe_load(f)
+                        if cable_data:
+                            # Each file has one cable
+                            cable_name = list(cable_data.keys())[0]
+                            specs = cable_data[cable_name]
+                            
+                            # Only include DC cables
+                            if specs.get('Type', 'DC') == 'DC':
+                                data_dict[cable_name] = specs
+                
+                if data_dict:
+                    # Convert to pandas DataFrame
+                    cls._cable_database = pd.DataFrame.from_dict(data_dict, orient='index')
+                    #print(f"Loaded {len(data_dict)} DC cables into database")
+                else:
+                    print("No DC cable data found in any YAML files")
 
     @classmethod
     def reset_class(cls):
@@ -2132,11 +2554,25 @@ class Line_DC:
     @property
     def name(self):
         return self._name
+    @property
+    def power_MW(self):
+        return max(abs(self.fromP), abs(self.toP)) * self.S_base
+
+    @property
+    def capacity_MW(self):
+        return self.MW_rating * self.np_line
+
+    @property
+    def loading(self):
+        cap = self.capacity_MW
+        return 0.0 if cap == 0 else (self.power_MW / cap) * 100.0
 
     def get_cable_parameters(self, Cable_type, S_base, Length_km, N_cables,kV_base):
         from .Class_editor import Cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
+        if Line_DC._cable_database is None:
+            Line_DC.load_cable_database()
         Cable_type = Cable_type.replace(' ', '_')
         if Cable_type not in self._cable_database.index:
             raise ValueError(f"Cable type '{Cable_type}' not found in database")
@@ -2179,6 +2615,7 @@ class Line_DC:
         self.np_line_i= N_cables
         self.np_line_max = N_cables
         self.np_line_opf=False
+        self.np_dynamic = [self.np_line]   
 
         self.R = r
         self.MW_rating = MW_rating
@@ -2195,6 +2632,9 @@ class Line_DC:
         self.direction = 'from'
  
         self.loss =0
+
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
         
         self.base_cost = 0
         self.life_time = 25
@@ -2340,18 +2780,97 @@ class AC_DC_converter:
         
     @property
     def life_time_hours(self):
-        return self.life_time *8760       
-            
-    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, name=None):
+        return self.life_time *8760  
+
+    @property
+    def capacity_MVA(self):
+        # Treat non-positive as 0; NumConvP may be 0 before sizing
+        return max(self.MVA_max * getattr(self, 'NumConvP', 1), 0.0)
+
+    @property
+    def loading(self):
+        cap = self.capacity_MVA
+        return 0.0 if cap == 0 else (self.apparent_MVA / cap) * 100.0
+
+    @property
+    def apparent_MVA(self):
+        return max(abs(getattr(self, 'P_AC', 0.0)), abs(getattr(self, 'P_DC', 0.0))) * self.S_base
+    
+    @property
+    def S_base(self):
+        return self._S_base
+    
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):  
+            old_S_base = self._S_base
+            rate = old_S_base / new_S_base
+            if self.R is not None and old_S_base != new_S_base:
+                self.R_t *= rate
+                self.X_t *= rate
+                self.PR_R *= rate
+                self.PR_X *= rate
+                self.Bf *= rate
+                self.P_DC *= rate
+                self.P_AC *= rate
+                self.Q_AC *= rate
+                self.Z_Y_parameters()
+    
+        self._S_base = new_S_base     
+
+    
+    def Z_Y_parameters(self):
+            self.Ztf = self.R_t+1j*self.X_t
+            self.Zc = self.PR_R+1j*self.PR_X
+            if self.Bf != 0:
+                self.Zf = 1/(1j*self.Bf)
+            else:
+                self.Zf = 0
+
+            if self.R_t != 0:
+                self.Y_tf = 1/self.Ztf
+                self.Gtf = np.real(self.Y_tf)
+                self.Btf = np.imag(self.Y_tf)
+            else:
+                self.Gtf = 0
+                self.Btf = 0
+
+            if self.PR_R != 0:
+                self.Y_c = 1/self.Zc
+                self.Gc = np.real(self.Y_c)
+                self.Bc = np.imag(self.Y_c)
+            else:
+                self.Gc = 0
+                self.Bc = 0
+                
+            self.Z1 = 0
+            self.Z2 = 0
+            self.Z3 = 0
+            if self.Zf != 0:
+                self.Z2 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zf
+            if self.Zc != 0:
+                self.Z1 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zc
+            if self.Ztf != 0:
+                self.Z3 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Ztf
+
+
+        
+
+    def __init__(self, AC_type: str, DC_type: str, AC_node: Node_AC, DC_node: Node_DC,P_AC: float=0, Q_AC: float=0, P_DC: float=0, Transformer_resistance: float=0, Transformer_reactance: float=0, 
+            Phase_Reactor_R: float=0, Phase_Reactor_X: float=0, Filter: float=0, Droop: float=0, kV_base: float=345, MVA_max: float = 1.05,nConvP: float =1,polarity: int =1 ,
+            lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, S_base:float=100, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
         AC_DC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
-        
+        self.S_base = S_base
         self._NumConvP= nConvP
 
         self.NumConvP_b= nConvP
         self.NumConvP_i= nConvP
         self.NumConvP_max = nConvP
+        self.np_dynamic = [self.NumConvP]
         
         self.NUmConvP_opf=False
         self.base_cost = 0
@@ -2382,7 +2901,8 @@ class AC_DC_converter:
         #     # print(name)mm
         #     self.type='PAC'
 
-        
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
 
 
         self.type = DC_type
@@ -2457,39 +2977,7 @@ class AC_DC_converter:
         self.Qc = 0
         self.Pc = 0
 
-        self.Ztf = self.R_t+1j*self.X_t
-        self.Zc = self.PR_R+1j*self.PR_X
-        if self.Bf != 0:
-            self.Zf = 1/(1j*self.Bf)
-        else:
-            self.Zf = 0
-
-        if self.R_t != 0:
-            self.Y_tf = 1/self.Ztf
-            self.Gtf = np.real(self.Y_tf)
-            self.Btf = np.imag(self.Y_tf)
-        else:
-            self.Gtf = 0
-            self.Btf = 0
-
-        if self.PR_R != 0:
-            self.Y_c = 1/self.Zc
-            self.Gc = np.real(self.Y_c)
-            self.Bc = np.imag(self.Y_c)
-        else:
-            self.Gc = 0
-            self.Bc = 0
-            
-        self.Z1 = 0
-        self.Z2 = 0
-        self.Z3 = 0
-        if self.Zf != 0:
-            self.Z2 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zf
-        if self.Zc != 0:
-            self.Z1 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Zc
-        if self.Ztf != 0:
-            self.Z3 = (self.Ztf*self.Zc+self.Zc*self.Zf+self.Zf*self.Ztf)/self.Ztf
-
+        self.Z_Y_parameters()
 
         self.hover_text = None
         self.geometry = None
@@ -2528,7 +3016,9 @@ class DCDC_converter:
         # type: (1=P, 2=droop, 3=Slack)
         # self.type = element_type
 
-        
+        self.ts_max_loading = 0
+        self.ts_avg_loading = 0
+
         self.fromNode = fromNode
         self.toNode = toNode
         self.Pset = Pset
@@ -2571,16 +3061,32 @@ class Ren_source_zone:
         for ren_source in self.RenSources:
                 ren_source.PRGi_available=value
                 ren_source.Ren_source_zone = self.name
-       
+
+    @property
+    def PRGi_inv_factor(self):
+        return self._PRGi_inv_factor
+    
+    @PRGi_inv_factor.setter
+    def PRGi_inv_factor(self, value):
+        self._PRGi_inv_factor = value
+        for ren_source in self.RenSources:
+            ren_source.PRGi_inv_factor=value
+
+
     def __init__(self,name=None):
            self.ren_source_num = Ren_source_zone.ren_source_num
            Ren_source_zone.ren_source_num += 1
            
            self.RenSources=[]
            self._PRGi_available=1
+           self._PRGi_inv_factor=1
            
            self.TS_dict = {
                'PRGi_available': None
+           }
+
+           self.inv_dict = {
+               'PRGi_inv_factor': None
            }
            
            if name is None:
@@ -2621,8 +3127,88 @@ class Price_Zone:
         # If this price_zone has a linked price_zone, update the linked price_zone's price
         if self.linked_price_zone is not None:
             self.linked_price_zone.price = value  # This will trigger the price setter of the offshore price_zone
-
+    @property
+    def a_base(self):
+        return self._a_base
     
+    @a_base.setter
+    def a_base(self, value):
+        self._a_base = value
+        self.update_a()
+
+    @property
+    def elasticity(self):
+        return self._elasticity
+
+    @elasticity.setter
+    def elasticity(self, value):
+        self._elasticity = value
+        self.update_a()
+
+    @property
+    def b(self):
+        return self._b
+
+    @b.setter
+    def b(self, value):
+        self._b = value
+        self.calc_import_expand()
+
+    @property
+    def PGL_min_base(self):
+        return self._PGL_min_base
+
+    @PGL_min_base.setter
+    def PGL_min_base(self, value):
+        self._PGL_min_base = value
+        if self.expand_import:
+            self.calc_import_expand()
+        else:
+            self.calc_elasticity_effect()
+        
+    def update_a(self):
+        if self.expand_import:
+            self.calc_import_expand()
+        else:
+            self.calc_elasticity_effect()
+            
+    @property
+    def import_expand(self):
+        return self._import_expand
+
+    @import_expand.setter
+    def import_expand(self, value):
+        self._import_expand = value
+        self.calc_import_expand()
+       
+    def calc_elasticity_effect(self):
+        self.a = self._a_base*self._elasticity
+        if self.b >0 and self.a != 0 and self._elasticity != 1:
+            self.PGL_min = -self.b/(self.a*2)
+        else:
+            self.PGL_min = self._PGL_min_base
+            
+    def calc_import_expand(self):
+        if self.b > 0 and self.expand_import:
+            self.PGL_min = self.PGL_min_base - self._import_expand
+            a = -self.b / (2 * self.PGL_min * self.S_base) 
+            self.a = a*self._elasticity
+       
+
+    @property
+    def PLi_inv_factor(self):
+        return self._PLi_inv_factor
+    
+    @PLi_inv_factor.setter
+    def PLi_inv_factor(self, value):
+        self._PLi_inv_factor = value
+        for node in self.nodes_AC:
+            if node.PLi_linked:
+                node.PLi_inv_factor=value
+        for node in self.nodes_DC:
+            if node.PLi_linked:
+                node.PLi_inv_factor=value
+
     @property
     def PLi_factor(self):
         return self._PLi_factor
@@ -2637,24 +3223,37 @@ class Price_Zone:
             if node.PLi_linked:
                 node.PLi_factor=value        
 
-    def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,name=None):
+    def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,elasticity=1,S_base:float=100,name=None):
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
         
+        self.expand_import = False
+        self._import_expand = import_expand
+        self._a_base = a
+        self._elasticity = elasticity
+        
         self.import_pu_L=import_pu_L
         self.export_pu_G=export_pu_G
+
+        self.S_base=S_base
+
         self.nodes_AC=[]
         self.nodes_DC=[]
         self.ConvACDC=[]
         
         self._price=price
         self.a=a
-        self.b=b
+        self._b=b
         self.c=c
-        self.PGL_min=-np.inf
+        self.PGL_min_base=-np.inf
+
+        self.PGL_min=self.PGL_min_base
         self.PGL_max=np.inf
         
         self.PN= 0
+        
+        
+        
         
         
         self.TS_dict = {
@@ -2672,9 +3271,8 @@ class Price_Zone:
         self.mtdc_price_zones=[]
         
         self._PLi_factor=1
+        self._PLi_inv_factor=1
         
-        self.ImportExpand_og=import_expand
-        self.ImportExpand=import_expand
         if name is None:
             self._name = str(self.price_zone_num)
         else:
@@ -2809,6 +3407,32 @@ class TimeSeries:
 
         TimeSeries.names.add(self.name)
 
+class inv_periods:
+    inv_periods_num = 0
+    names = set()
+    
+    @classmethod
+    def reset_class(cls):
+        cls.inv_periods_num = 0
+        cls.names = set()
+    
+    @property
+    def name(self):
+        return self._name
 
-Line_AC.load_cable_database()
-Line_DC.load_cable_database()
+    def __init__(self, element_type: str, element_name:str, data: float, name=None):
+        self.inv_periods_num = inv_periods.inv_periods_num
+        inv_periods.inv_periods_num += 1
+        
+        
+        self.type = element_type
+        self.element_name=element_name
+        self.data = data
+        
+        s = 1
+        if name is None:
+            self._name = str(self.inv_periods_num)
+        else:
+            self._name = name
+
+        inv_periods.names.add(self.name)

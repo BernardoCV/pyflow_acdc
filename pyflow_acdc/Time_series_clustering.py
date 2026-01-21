@@ -23,6 +23,7 @@ __all__ = ['cluster_TS',
            'cluster_OPTICS',
            'cluster_Spectral',
            'cluster_HDBSCAN',
+           'cluster_analysis',
            'run_clustering_analysis_and_plot',
            'identify_correlations']
 
@@ -112,7 +113,9 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
                 'WPP',      # Wind Power Plant availability
                 'OWPP',     # Offshore Wind Power Plant availability
                 'SF',       # Solar Farm availability
-                'REN'       # Generic Renewable source availability
+                'REN' ,      # Generic Renewable source availability
+                'Wind',
+                'Solar'
             ]
     if central_market == [] or central_market is  None:
         central_market = set(grid.Price_Zones_dic.keys())
@@ -220,157 +223,160 @@ def  identify_correlations(grid,time_series=[], correlation_threshold=0,cv_thres
     """
   
     data_scaled,scaler, data = filter_data(grid,time_series,cv_threshold,central_market,print_details)
-    
-    if correlation_threshold > 0:
-    # Calculate correlation matrix
-        corr_matrix = data_scaled.corr()
-        
-        
-        high_corr = []
-        
-        corr_stack = corr_matrix.stack()
-        
-        upper_triangle = corr_stack[corr_stack.index.get_level_values(0) < corr_stack.index.get_level_values(1)]
-        
-        high_corr_filtered = upper_triangle[abs(upper_triangle) > correlation_threshold]
+    groups = []
+    high_corr = []
+    corr_matrix = None
 
-        
-        high_corr = [(var1, var2, abs(corr)) for (var1, var2), corr in high_corr_filtered.items()]
-        
-        
-        groups = []
-        used_vars = set()
-        
-        for var1, var2, corr in high_corr:
-            # Find if any existing group contains either variable
-            found_group = False
-            for group in groups:
-                if var1 in group or var2 in group:
-                    group.add(var1)
-                    group.add(var2)
-                    found_group = True
-                    break
+    if correlation_decisions is not None and (not correlation_decisions or correlation_decisions[0]):
+
+
+        if correlation_threshold > 0:
+        # Calculate correlation matrix
+            corr_matrix = data_scaled.corr()
             
-            # If no existing group found, create new group
-            if not found_group:
-                groups.append({var1, var2})
             
-            used_vars.add(var1)
-            used_vars.add(var2)
-    
-        # Print results
-        if print_details:
-            print(f"\nHighly correlated variables (|correlation| > {correlation_threshold}):")
+            high_corr = []
+            
+            corr_stack = corr_matrix.stack()
+            
+            upper_triangle = corr_stack[corr_stack.index.get_level_values(0) < corr_stack.index.get_level_values(1)]
+            
+            high_corr_filtered = upper_triangle[abs(upper_triangle) > correlation_threshold]
+
+            
+            high_corr = [(var1, var2, abs(corr)) for (var1, var2), corr in high_corr_filtered.items()]
+            
+            
+            groups = []
+            used_vars = set()
+            
             for var1, var2, corr in high_corr:
-                print(f"{var1:20} - {var2:20}: {corr:.3f}")
+                # Find if any existing group contains either variable
+                found_group = False
+                for group in groups:
+                    if var1 in group or var2 in group:
+                        group.add(var1)
+                        group.add(var2)
+                        found_group = True
+                        break
+                
+                # If no existing group found, create new group
+                if not found_group:
+                    groups.append({var1, var2})
+                
+                used_vars.add(var1)
+                used_vars.add(var2)
         
-        if print_details:
-            print("\nCorrelated groups:")
-            for i, group in enumerate(groups, 1):
-                print(f"Group {i}: {', '.join(sorted(group))}")
-
-        #ask user if want to clean correlation groups
-        if correlation_decisions == []:
-            clean_groups = input("Do you want to clean correlation groups? (y/n): ")
-            if clean_groups == 'y':
-                clean_groups = True
-                method = input("Choose method (1: highest variance, 2: PCA with new components, 3: PCA representative): ")
-                scale_groups = input("Scale by group size to maintain group influence? (y/n): ")
-                if scale_groups == 'y':
-                    scale_groups = True
-                else:
-                    scale_groups = False
-        else:
-            clean_groups = correlation_decisions[0]
-            method = correlation_decisions[1]
-            scale_groups = correlation_decisions[2]
-        columns_to_drop = []
-
-        if clean_groups:    
-            if method == '1' or method == 1:
-                
-                for group in groups:
-                    group_list = list(group)
-                    group_variances = data[group_list].var()
-                    max_var_col = group_variances.idxmax()
-                    if print_details:
-                        print("\nUsing highest variance method:")
-                        print(f"\nGroup: {group_list}")
-                        print(f"Variances: {group_variances}")
-                        print(f"Keeping: {max_var_col} (variance: {group_variances[max_var_col]:.2f})")
-                    
-                    if scale_groups:
-                        scaling_factor = np.sqrt(len(group_list))
-                        print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
-                        data_scaled[max_var_col] *= scaling_factor
-                    
-                    columns_to_drop.extend([col for col in group_list if col != max_var_col])
+            # Print results
+            if print_details:
+                print(f"\nHighly correlated variables (|correlation| > {correlation_threshold}):")
+                for var1, var2, corr in high_corr:
+                    print(f"{var1:20} - {var2:20}: {corr:.3f}")
             
-            elif method == '2' or method == 2:
-                
-                for group in groups:
-                    group_list = list(group)
-                    group_data = data_scaled[group_list]
+            if print_details:
+                print("\nCorrelated groups:")
+                for i, group in enumerate(groups, 1):
+                    print(f"Group {i}: {', '.join(sorted(group))}")
+
+            #ask user if want to clean correlation groups
+            if correlation_decisions == []:
+                clean_groups = input("Do you want to clean correlation groups? (y/n): ")
+                if clean_groups == 'y':
+                    clean_groups = True
+                    method = input("Choose method (1: highest variance, 2: PCA with new components, 3: PCA representative): ")
+                    scale_groups = input("Scale by group size to maintain group influence? (y/n): ")
+                    if scale_groups == 'y':
+                        scale_groups = True
+                    else:
+                        scale_groups = False
+            else:
+                clean_groups = correlation_decisions[0]
+                method = correlation_decisions[1]
+                scale_groups = correlation_decisions[2]
+            columns_to_drop = []
+
+            if clean_groups:    
+                if method == '1' or method == 1:
                     
-                    # Apply PCA
-                    pca = PCA(n_components=1)
-                    pc1 = pca.fit_transform(group_data)
-                    
-                    # Create new column name
-                    new_col = f"PC1_{'_'.join(group_list)}"
-                    if print_details:
-                        print("\nUsing PCA with new components:")
-                        print(f"\nGroup: {group_list}")
-                        print(f"Creating new component: {new_col}")
-                        print(f"Explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
-                    
-                    # Scale PC if requested
-                    if scale_groups:
-                        scaling_factor = np.sqrt(len(group_list))
+                    for group in groups:
+                        group_list = list(group)
+                        group_variances = data[group_list].var()
+                        max_var_col = group_variances.idxmax()
                         if print_details:
+                            print("\nUsing highest variance method:")
+                            print(f"\nGroup: {group_list}")
+                            print(f"Variances: {group_variances}")
+                            print(f"Keeping: {max_var_col} (variance: {group_variances[max_var_col]:.2f})")
+                        
+                        if scale_groups:
+                            scaling_factor = np.sqrt(len(group_list))
                             print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
-                        pc1 *= scaling_factor
-                    
-                    data_scaled[new_col] = pc1.ravel()
-                    columns_to_drop.extend(group_list)
-            
-            elif method == '3' or method == 3:
+                            data_scaled[max_var_col] *= scaling_factor
+                        
+                        columns_to_drop.extend([col for col in group_list if col != max_var_col])
                 
-                for group in groups:
-                    group_list = list(group)
-                    group_data = data_scaled[group_list]
+                elif method == '2' or method == 2:
                     
+                    for group in groups:
+                        group_list = list(group)
+                        group_data = data_scaled[group_list]
+                        
+                        # Apply PCA
+                        pca = PCA(n_components=1)
+                        pc1 = pca.fit_transform(group_data)
+                        
+                        # Create new column name
+                        new_col = f"PC1_{'_'.join(group_list)}"
+                        if print_details:
+                            print("\nUsing PCA with new components:")
+                            print(f"\nGroup: {group_list}")
+                            print(f"Creating new component: {new_col}")
+                            print(f"Explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
+                        
+                        # Scale PC if requested
+                        if scale_groups:
+                            scaling_factor = np.sqrt(len(group_list))
+                            if print_details:
+                                print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
+                            pc1 *= scaling_factor
+                        
+                        data_scaled[new_col] = pc1.ravel()
+                        columns_to_drop.extend(group_list)
+                
+                elif method == '3' or method == 3:
                     
-                    # Apply PCA
-                    pca = PCA(n_components=1)
-                    pc1 = pca.fit_transform(group_data)
-                    
-                    # Find variable most correlated with PC1
-                    correlations = [np.corrcoef(pc1.ravel(), group_data[col])[0,1] for col in group_list]
-                    max_cor_idx = np.argmax(np.abs(correlations))
-                    max_cor_col = group_list[max_cor_idx]
-                    
-                    if print_details:
-                        print("\nUsing PCA representative method:")
-                        print(f"\nGroup: {group_list}")
-                        print(f"PC1 explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
-                        print(f"Correlations with PC1: {dict(zip(group_list, correlations))}")
-                        print(f"Keeping: {max_cor_col} (correlation: {correlations[max_cor_idx]:.2f})")
-                    
-                    if scale_groups:
-                        scaling_factor = np.sqrt(len(group_list))
-                        print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
-                        data_scaled[max_cor_col] *= scaling_factor
-                    
-                    columns_to_drop.extend([col for col in group_list if col != max_cor_col])
-            
-            print(f"\nDropping {len(columns_to_drop)} columns from scaled data: {columns_to_drop}")
-            data_scaled = data_scaled.drop(columns=columns_to_drop)
+                    for group in groups:
+                        group_list = list(group)
+                        group_data = data_scaled[group_list]
+                        
+                        
+                        # Apply PCA
+                        pca = PCA(n_components=1)
+                        pc1 = pca.fit_transform(group_data)
+                        
+                        # Find variable most correlated with PC1
+                        correlations = [np.corrcoef(pc1.ravel(), group_data[col])[0,1] for col in group_list]
+                        max_cor_idx = np.argmax(np.abs(correlations))
+                        max_cor_col = group_list[max_cor_idx]
+                        
+                        if print_details:
+                            print("\nUsing PCA representative method:")
+                            print(f"\nGroup: {group_list}")
+                            print(f"PC1 explained variance ratio: {pca.explained_variance_ratio_[0]:.2%}")
+                            print(f"Correlations with PC1: {dict(zip(group_list, correlations))}")
+                            print(f"Keeping: {max_cor_col} (correlation: {correlations[max_cor_idx]:.2f})")
+                        
+                        if scale_groups:
+                            scaling_factor = np.sqrt(len(group_list))
+                            print(f"Scaling by sqrt({len(group_list)}) = {scaling_factor:.2f}")
+                            data_scaled[max_cor_col] *= scaling_factor
+                        
+                        columns_to_drop.extend([col for col in group_list if col != max_cor_col])
+                
+                print(f"\nDropping {len(columns_to_drop)} columns from scaled data: {columns_to_drop}")
+                data_scaled = data_scaled.drop(columns=columns_to_drop)
+    
         
-    else:
-        groups = []
-        high_corr = []
-        corr_matrix = None
     
     return  [data_scaled,scaler, data], {
         'correlation_matrix': corr_matrix,
@@ -475,7 +481,7 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
 
 def cluster_TS(grid, n_clusters, time_series=[], central_market=[], algorithm='Kmeans', 
               cv_threshold=0, correlation_threshold=0.8, print_details=False, 
-              correlation_decisions=[], **kwargs):
+              correlation_decisions=[], critical_idx=[], base_critical_ratio=0.5, **kwargs):
     """
     Main clustering function with enhanced parameter support.
     
@@ -491,7 +497,7 @@ def cluster_TS(grid, n_clusters, time_series=[], central_market=[], algorithm='K
         - For hdbscan: min_cluster_size, min_samples, cluster_selection_method
     """
     algorithm = algorithm.lower()
-    valid_algorithms = {'kmeans','ward','dbscan','optics','spectral','hdbscan','pam_hierarchical','kmedoids'}
+    valid_algorithms = {'kmeans','kmeans_medoids','ward','dbscan','optics','spectral','hdbscan','pam_hierarchical','kmedoids'}
 
     if algorithm not in valid_algorithms:
         print(f"Algorithm {algorithm} not found, using Kmeans")
@@ -504,34 +510,103 @@ def cluster_TS(grid, n_clusters, time_series=[], central_market=[], algorithm='K
                                                         print_details=print_details,
                                                         correlation_decisions=correlation_decisions)
   
-    if algorithm == 'kmeans':
-        clusters, returns, data_info = cluster_Kmeans(grid, n_clusters, data, [data_scaled, scaler], 
-                                                     print_details=print_details, **kwargs)
-    elif algorithm == 'ward':
-        clusters, returns, data_info = cluster_Ward(grid, n_clusters, data, [data_scaled, scaler], 
-                                                   print_details=print_details, **kwargs)
-    elif algorithm == 'kmedoids':
-        clusters, returns, data_info = cluster_Kmedoids(grid, n_clusters, data, [data_scaled, scaler], 
-                                                       print_details=print_details, **kwargs)
-    elif algorithm == 'pam_hierarchical':
-        clusters, returns, data_info = cluster_PAM_Hierarchical(grid, n_clusters, data, [data_scaled, scaler], 
-                                                               print_details=print_details, **kwargs)
-    elif algorithm == 'spectral':
-        clusters, returns, data_info = cluster_Spectral(grid, n_clusters, data, [data_scaled, scaler], 
-                                                       print_details=print_details, **kwargs)
-    elif algorithm == 'dbscan':
-        n_clusters, clusters, returns, data_info = cluster_DBSCAN(grid, n_clusters, data, [data_scaled, scaler], 
-                                                                 print_details=print_details, **kwargs)
-    elif algorithm == 'optics':
-        n_clusters, clusters, returns, data_info = cluster_OPTICS(grid, n_clusters, data, [data_scaled, scaler], 
-                                                                 print_details=print_details, **kwargs)    
-    elif algorithm == 'hdbscan':
-        n_clusters, clusters, returns, data_info = cluster_HDBSCAN(grid, n_clusters, data, [data_scaled, scaler], 
-                                                                  print_details=print_details, **kwargs)
+    if critical_idx and n_clusters > 1:
+        idx_all = data.index
+        crit_rows = [i for i in critical_idx if i in idx_all]
+        rest_rows = [i for i in idx_all if i not in crit_rows]
+        if isinstance(base_critical_ratio, int):
+            n_crit = base_critical_ratio
+            n_rest = n_clusters - n_crit
+        else:
+            n_crit = max(1, min(int(round(n_clusters * base_critical_ratio)), len(crit_rows)))
+            n_rest = max(1, min(n_clusters - n_crit, len(rest_rows)))
+            if n_rest < 1 and len(rest_rows) > 0:
+                n_rest, n_crit = 1, max(1, min(n_clusters - 1, len(crit_rows)))
+
+
+        data_crit = data.loc[crit_rows, :]
+        data_rest = data.loc[rest_rows, :]
+
+        data_scaled_crit = data_scaled.loc[crit_rows, :]
+        data_scaled_rest = data_scaled.loc[rest_rows, :]
+
+        n_crit,crit_clusters, crit_returns, crit_info = _run_clustering_algorithm(grid, n_crit, data_crit, data_scaled_crit, scaler, print_details, algorithm, **kwargs)
+        
+        if n_rest > 0 :
+            n_rest,rest_clusters, rest_returns, rest_info = _run_clustering_algorithm(grid, n_rest, data_rest, data_scaled_rest, scaler, print_details, algorithm, **kwargs)
+        
+        
+            n_clusters = n_crit + n_rest
+            
+            clusters = pd.concat([crit_clusters, rest_clusters],ignore_index=True)
     
-    data_scaled, labels = data_info
+    
+            returns = crit_returns + rest_returns
+    
+    
+            _, labels_crit = crit_info
+            _, labels_rest = rest_info
+    
+            labels_rest_off = labels_rest + n_crit
+            labels = np.empty(len(data), dtype=labels_rest.dtype)
+            labels[crit_rows] = labels_crit
+            labels[rest_rows] = labels_rest_off
+            clusters['Weight'] = clusters['Cluster Count'].astype(float) / (len(crit_rows)+len(rest_rows))
+        else:
+            n_clusters,clusters, returns, data_info=n_crit,crit_clusters, crit_returns, crit_info
+            data_scaled, labels = data_info
+        
+    else:
+        n_clusters,clusters, returns, data_info = _run_clustering_algorithm(grid, n_clusters, data, data_scaled, scaler, print_details, algorithm, **kwargs)
+        data_scaled, labels = data_info
+    grid.Clusters[n_clusters] = {}
+    grid.Clusters[n_clusters]['Weight'] = clusters['Weight'].to_numpy(dtype=float)
+    grid.Clusters[n_clusters]['Cluster Count'] = clusters['Cluster Count'].values
+    
+    
+    cluster_idx = {k: np.where(labels == k)[0].tolist() for k in np.unique(labels)}
+    grid.Clusters[n_clusters]['Cluster idx'] = cluster_idx
+    grid.Clusters[n_clusters]['Labels'] = labels
+
+    for ts in grid.Time_series:
+        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
+            ts.data_clustered = {}
+        name = ts.name
+        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
+   
     data_info = [data, data_scaled, labels]
     return n_clusters, clusters, returns, data_info
+
+def _run_clustering_algorithm(grid, n_clusters, data, data_scaled, scaler, print_details, algorithm, **kwargs):
+    if algorithm == 'kmeans':
+        use_medoids = kwargs.pop('use_medoids', False)
+        clusters, returns, data_info = cluster_Kmeans(grid, n_clusters, data, [data_scaled, scaler], 
+                                                    print_details=print_details, use_medoids=use_medoids, **kwargs)
+    elif algorithm == 'kmeans_medoids':
+        clusters, returns, data_info = cluster_Kmeans(grid, n_clusters, data, [data_scaled, scaler], 
+                                                    print_details=print_details, use_medoids=True, **kwargs)
+    elif algorithm == 'ward':
+        clusters, returns, data_info = cluster_Ward(grid, n_clusters, data, [data_scaled, scaler], 
+                                                print_details=print_details, **kwargs)
+    elif algorithm == 'kmedoids':
+        clusters, returns, data_info = cluster_Kmedoids(grid, n_clusters, data, [data_scaled, scaler], 
+                                                    print_details=print_details, **kwargs)
+    elif algorithm == 'pam_hierarchical':
+        clusters, returns, data_info = cluster_PAM_Hierarchical(grid, n_clusters, data, [data_scaled, scaler], 
+                                                            print_details=print_details, **kwargs)
+    elif algorithm == 'spectral':
+        clusters, returns, data_info = cluster_Spectral(grid, n_clusters, data, [data_scaled, scaler], 
+                                                    print_details=print_details, **kwargs)
+    elif algorithm == 'dbscan':
+        n_clusters, clusters, returns, data_info = cluster_DBSCAN(grid, n_clusters, data, [data_scaled, scaler], 
+                                                                print_details=print_details, **kwargs)
+    elif algorithm == 'optics':
+        n_clusters, clusters, returns, data_info = cluster_OPTICS(grid, n_clusters, data, [data_scaled, scaler], 
+                                                                print_details=print_details, **kwargs)    
+    elif algorithm == 'hdbscan':
+        n_clusters, clusters, returns, data_info = cluster_HDBSCAN(grid, n_clusters, data, [data_scaled, scaler], 
+                                                                print_details=print_details, **kwargs)
+    return n_clusters,clusters, returns, data_info
 
 def _process_clusters(grid, data, cluster_centers):
     """
@@ -565,20 +640,22 @@ def _process_clusters(grid, data, cluster_centers):
     clusters.insert(0, 'Cluster Count', cluster_counts.values)
     clusters.insert(1, 'Weight', cluster_weights.values)
     
-    # Update grid with cluster weights
-    grid.Clusters[n_clusters] = clusters['Weight'].to_numpy(dtype=float)
     
+    # Update grid with cluster weights
+    # grid.Clusters['Weight'][n_clusters] = clusters['Weight'].to_numpy(dtype=float)
+    # grid.Clusters['Cluster Count'][n_clusters] = cluster_counts.values
+    # grid.Clusters['Cluster idx'][n_clusters] = clusters['Cluster'].values
     # Update time series with clustered data
-    for ts in grid.Time_series:
-        if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
-            ts.data_clustered = {}
-        name = ts.name
-        ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
+    #for ts in grid.Time_series:
+    #    if not hasattr(ts, 'data_clustered') or not isinstance(ts.data_clustered, dict):
+    #        ts.data_clustered = {}
+    #    name = ts.name
+    #    ts.data_clustered[n_clusters] = clusters[name].to_numpy(dtype=float)
     
     return clusters
 
 
-def cluster_Kmedoids(grid, n_clusters, data, scaling_data =None, method='alternate', 
+def cluster_Kmedoids(grid, n_clusters, data, scaling_data =None, method='fasterpam', 
                     init='build', max_iter=MAX_ITERATIONS, print_details=False, 
                     random_state=None, metric='euclidean'):
     """
@@ -608,7 +685,8 @@ def cluster_Kmedoids(grid, n_clusters, data, scaling_data =None, method='alterna
         Distance metric ('euclidean', 'manhattan', 'cosine', etc.)
     """
     data_scaled, scaler = _prepare_scaled_data(data, scaling_data)
-    
+    data_scaled = np.asarray(data_scaled)  # single-point coercion
+   
     # Fit KMedoids on scaled data
     kmedoids = KMedoids(
         n_clusters=n_clusters,
@@ -646,7 +724,7 @@ def cluster_Kmedoids(grid, n_clusters, data, scaling_data =None, method='alterna
     return processed_results, [CoV, kmedoids.inertia_], [data_scaled, labels]
 
 
-def cluster_Kmeans(grid, n_clusters, data, scaling_data=None, print_details=False):
+def cluster_Kmeans(grid, n_clusters, data, scaling_data=None, print_details=False, use_medoids=False):
     """
     Perform K-means clustering on the data.
     
@@ -660,10 +738,11 @@ def cluster_Kmeans(grid, n_clusters, data, scaling_data=None, print_details=Fals
         Data to cluster (filtered columns only)
     scaling_data : tuple, optional
         (scaled_data, scaler) if already scaled
-    ts_types : list
-        List of time series types
     print_details : bool
         Whether to print clustering details
+    use_medoids : bool, default=False
+        If True, use actual data points (medoids) as cluster centers
+        If False, use means (centroids) as cluster centers
     """
     data_scaled, scaler = _prepare_scaled_data(data, scaling_data)
     
@@ -674,27 +753,39 @@ def cluster_Kmeans(grid, n_clusters, data, scaling_data=None, print_details=Fals
     all_centers = []
     for i in range(n_clusters):
         cluster_mask = labels == i
-        cluster_means = data[cluster_mask].mean()
-        all_centers.append(cluster_means)
+        cluster_data = data[cluster_mask]
+        
+        if use_medoids:
+            # Use medoid (actual data point closest to cluster center)
+            from sklearn.metrics import pairwise_distances
+            distances = pairwise_distances(cluster_data)
+            medoid_idx = distances.sum(axis=1).argmin()
+            cluster_center = cluster_data.iloc[medoid_idx]
+            all_centers.append(cluster_center.values)
+        else:
+            # Use mean (centroid)
+            cluster_means = cluster_data.mean()
+            all_centers.append(cluster_means.values)
     
     cluster_centers = np.array(all_centers)
     
     # Print clustering results
+    cluster_label = "K-means-medoids" if use_medoids else "K-means"
     if print_details:
         cluster_sizes = pd.Series(labels).value_counts().sort_index().values
         specific_info = {
             "Cluster sizes": cluster_sizes,
             "Inertia": kmeans.inertia_,
-            "n_iter": kmeans.n_iter_
+            "n_iter": kmeans.n_iter_,
+            "Center type": "medoids" if use_medoids else "means"
         }
-        CoV = print_clustering_results("K-means", n_clusters, specific_info)
+        CoV = print_clustering_results(cluster_label, n_clusters, specific_info)
     else:
         cluster_sizes = pd.Series(labels).value_counts().values
         CoV = np.std(cluster_sizes)/np.mean(cluster_sizes)
 
     data['Cluster'] = labels
     processed_results = _process_clusters(grid, data, cluster_centers)
-
 
     return processed_results, [CoV, kmeans.inertia_, kmeans.n_iter_], [data_scaled, labels]
 
@@ -858,7 +949,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
         for n in n_clusters_list:
             print(f"  Clusters: {n}")
             
-            start_time = time.time()
+            start_time = time.perf_counter()
             try:
                 
                 n_clusters,_,CoV,data_info = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=ts_options[0],algorithm=algo, cv_threshold=ts_options[1] ,correlation_threshold=ts_options[2],print_details=print_details,correlation_decisions=correlation_decisions)
@@ -869,7 +960,7 @@ def run_clustering_analysis(grid, save_path='clustering_results',algorithms = ['
                     CoV, inertia = CoV
                 else:
                     inertia = 0
-                time_taken = time.time() - start_time
+                time_taken = time.perf_counter() - start_time
 
                 
                 metrics = evaluate_clustering(data_scaled, labels)
@@ -1536,11 +1627,11 @@ def compare_kmedoids_methods(grid, n_clusters, data, scaling_data=None,
     
     for method in methods:
         try:
-            start_time = time.time()
+            start_time = time.perf_counter()
             method_results = cluster_Kmedoids(grid, n_clusters, data, scaling_data, 
                                             method=method, metric=metric, 
                                             print_details=False)
-            time_taken = time.time() - start_time
+            time_taken = time.perf_counter() - start_time
             
             results[method] = {
                 'CoV': method_results[1][0],
@@ -1563,5 +1654,40 @@ def compare_kmedoids_methods(grid, n_clusters, data, scaling_data=None,
     
     return results
 
+def cluster_analysis(grid,clustering_options):
+    clustering = False
+    if clustering_options is not None:
+        """
+        clustering_options = {
+            'n_clusters': 1,
+            'time_series': [],
+            'central_market': [],
+            'thresholds': [cv_threshold,correlation_threshold],
+            'print_details': True/False,
+            'correlation_decisions': [correlation_cleaning = True/False,method = '1/2/3',scale_groups = True/False],
+            'cluster_algorithm': 'Kmeans/Ward/DBSCAN/OPTICS/Kmedoids/Spectral/HDBSCAN/PAM_Hierarchical'
+            'critical_idx': [], # List of indices of the time series to be considered as critical
+            'base_critical_ratio': 0.5 # Ratio of the critical time series to the total time series a value of 0.75 in 8  clusters means
+                                        or int means directly the number of clusters to be created for the critical time series.
+             that the critical time series will be clustered into 6 clusters and the rest of the time series will be clustered into 2 clusters.
+        }
+        """
+        n        = clustering_options['n_clusters'] 
+        time_series = clustering_options['time_series'] if 'time_series' in clustering_options else []
+        central_market = clustering_options['central_market'] if 'central_market' in clustering_options else []
+        thresholds = clustering_options['thresholds'] if 'thresholds' in clustering_options else [0,0.8]
+        print_details = clustering_options['print_details'] if 'print_details' in clustering_options else False
+        correlation_decisions = clustering_options['correlation_decisions'] if 'correlation_decisions' in clustering_options else [False,'1',False]
+        algo = clustering_options['cluster_algorithm'] if 'cluster_algorithm' in clustering_options else 'Kmeans'
+        critical_idx = clustering_options['critical_idx'] if 'critical_idx' in clustering_options else []
+        base_critical_ratio = clustering_options['base_critical_ratio'] if 'base_critical_ratio' in clustering_options else 0.5
+
+        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[0] ,correlation_threshold=thresholds[1],print_details=print_details,correlation_decisions=correlation_decisions,critical_idx=critical_idx,base_critical_ratio=base_critical_ratio)
+                
+        clustering = True
+    else:
+        n_clusters = len(grid.Time_series[0].data)
+
+    return n_clusters,clustering
 
 

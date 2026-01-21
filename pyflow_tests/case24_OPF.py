@@ -11,7 +11,7 @@ import sys
 
 def case24_OPF():
 
-    t1=time.time()
+    t1=time.perf_counter()
 
     S_base=100
 
@@ -194,7 +194,7 @@ def case24_OPF():
     print(model_res)
     print(timing_info)
     model.obj.display()
-    t2= time.time()
+    t2= time.perf_counter()
     print(f'Total time :{t2-t1}')
 
 

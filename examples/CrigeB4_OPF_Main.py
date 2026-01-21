@@ -12,7 +12,7 @@ import pandas as pd
 import pyflow_acdc as pyf
 import os
 from pathlib import Path
-start_time = time.time()
+start_time = time.perf_counter()
 
 S_base=100 #MVAres
  
@@ -40,15 +40,17 @@ for conv in grid.Converters_ACDC:
 pyf.add_extGrid(grid, 'BaA0')
 pyf.add_extGrid(grid, 'BaB0')
 
+
+
 for conv in DCDC_data.itertuples():
     pyf.add_DCDC_converter(grid,conv.fromNode,conv.toNode,P_MW=conv.P_MW,R_Ohm=conv.R_Ohm,MW_rating=conv.MW_rating)
 
 
-# pyf.ACDC_sequential(grid)
+#pyf.ACDC_sequential(grid)
 model, model_res , timing_info, solver_stats=pyf.Optimal_PF(grid)
 
 res.All()
-end_time = time.time()
+end_time = time.perf_counter()
 elapsed_time = end_time - start_time
 
 print ('------')

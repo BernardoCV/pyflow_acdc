@@ -14,7 +14,48 @@ agreement No 101073554.
 
 This project is experimental and under active development. Issue reports and contributions are very welcome.
 
+
+## Citation
+
+If you use this package in your research, please cite the appropriate publication(s):
+
+**General usage:**
+```
+B. C. Valerio, V. A. Lacerda, M. Cheah-Mane, P. Gebraad and O. Gomis-Bellmunt, 
+"An Optimal Power Flow Tool for AC/DC Systems, Applied to the Analysis of the 
+North Sea Grid for Offshore Wind Integration," in IEEE Transactions on Power Systems, 
+vol. 40, no. 5, pp. 4278-4291, Sept. 2025, doi: 10.1109/TPWRS.2025.3533889.
+```
+
+**For market integration into optimal power flow:**
+```
+Valerio B C, Lacerda V A, Cheah-Ma˜ne M, Gebraad P and Gomis-Bellmunt O 2025
+Optimizing offshore wind integration through multi-terminal dc grids: a market-based opf
+framework for the north sea interconnectors IET Conference Proceedings 2025(6) 150–155
+URL https://digital-library.theiet.org/doi/abs/10.1049/icp.2025.1198
+```
+
+**For transmission expansion planning:**
+```
+[Citation to be added]
+```
+
+**For array optimization:**
+```
+[Citation to be added]
+```
+
+
 ## Installation
+
+### Basic Installation
+
+Install from PyPI:
+```bash
+pip install pyflow-acdc
+```
+
+**Requirements:** Python 3.9 or higher
 
 ### For Users
 To run examples, download the folder to your repository including the csv folders.
@@ -63,51 +104,110 @@ git pull origin main
 
 To merge your changes into the main branch please contact the repository owner.
 
-For mapping you will need to install the following packages:
+### Optional Dependencies
+
+You can install pyflow_acdc with optional dependencies using pip:
+
 ```bash
-pip install folium
+# Install with all optional dependencies
+pip install pyflow-acdc[All]
+
+# Or install specific optional dependency groups:
+pip install pyflow-acdc[mapping]      # For mapping features (folium, branca)
+pip install pyflow-acdc[OPF]          # For optimal power flow (pyomo)
+pip install pyflow-acdc[Dash]         # For Dash web applications
+pip install pyflow-acdc[Array_OPT]    # For array optimization (ortools, pyomo)
+pip install pyflow-acdc[TEP_pymoo]    # For TEP with pymoo (pymoo, pyomo)
+pip install pyflow-acdc[Gurobi]       # For Gurobi solver (requires license)
+pip install pyflow-acdc[plotting]     # For static image export (kaleido)
 ```
 
-For OPF you will need to install the following packages:
-```bash
+Or install individual packages manually:
 
+**For mapping:**
+```bash
+pip install folium branca
+```
+
+**For OPF:**
+```bash
 pip install pyomo
 conda install -c conda-forge ipopt
-
 ```
 
-**Note:** `ipopt` is not available on PyPI and must be installed via conda-forge.
+**For Array Optimization:**
+```bash
+pip install ortools pyomo
+pip install highs  # Optional: for HiGHS solver
+```
 
-For OPF run in Linux for the TEP:
+**For TEP with pymoo:** (still in development)
+```bash
+pip install pymoo pyomo
+```
+**Note:** Both `pymoo` (for outer optimization) and `pyomo` (for inner OPF subproblems) are required.
+
+**For static image export (plotly):**
+```bash
+pip install kaleido
+```
+
+pyflow_acdc has callback capabilities and has been tested with the following pyomo linked solvers:
+
 ```bash
 
-sudo apt update
-sudo apt install coinor-libbonmin-dev
+ipopt
 conda install -c conda-forge ipopt
+
+highs
+pip install highs
+
+gurobi (requires external licensing)
+pip install gurobipy
+
+
+glpk
+pip install glpk
+
+cbc
+conda install -c conda-forge coincbc
+
+bonmin
 conda install -c conda-forge coin-or-bonmin
 
+
+
 ```
 
 
-For Dash you will need to install the following packages:
+**Note:** `ipopt` and `bonmin` are not available on PyPI and must be installed via conda-forge.
+
+**For Bonmin (Linux only):**
+```bash
+# First install system package:
+sudo apt update
+sudo apt install coinor-libbonmin-dev
+
+# Then install Python interface:
+conda install -c conda-forge coin-or-bonmin
+```
+
+**For Dash:**
 ```bash
 pip install dash
-
 ```
 ## Test
 
+Run the test suite:
 ```bash
-pyflow-acdc-test       
+pyflow-acdc-test
 ```
-Flags
-```bash      
---quick      # Quick tests only
---tep        #TEP tests only
 
-
---show-output # All tests with output
-
-
+**Test Flags:**
+```bash
+--quick         # Quick tests only
+--tep           # TEP tests only
+--show-output    # All tests with output
 ```
 ## Documentation
 Online documentation can be found at:
@@ -120,7 +220,9 @@ To build the documentation:
 ```bash
 cd docs
 pip install -r requirements.txt
-.\make html
+make html
 ```
+
+**Note:** On Windows, you may need to use `make.bat html` or install `make` (e.g., via Chocolatey or WSL).
 
 The documentation will be available in `docs/_build/html/index.html`

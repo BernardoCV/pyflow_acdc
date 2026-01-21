@@ -2,6 +2,7 @@ from scipy.io import loadmat
 import pandas as pd
 import numpy as np
 import copy
+import networkx as nx
 from shapely.geometry import Polygon, Point
 from shapely.wkt import loads
 
@@ -9,30 +10,46 @@ from .Results_class import*
 from .Classes import*
 from .Class_editor import Cable_parameters, Converter_parameters, add_gen
 
+import pickle
+import gzip
+
+try:
+    import dill  # optional fallback
+    _dill = dill
+except Exception:
+    _dill = None
+
+
 __all__ = [ # Grid Creation and Import
     'Create_grid_from_data',
     'Create_grid_from_mat',
+    'Create_grid_from_turbine_graph',
     'Extend_grid_from_data',
-    'initialize_pyflowacdc'
+    'initialize_pyflowacdc',
+    'Create_grid_from_pickle'
 ]
 
 def initialize_pyflowacdc():
     Node_AC.reset_class()
-    Node_DC.reset_class()
     Line_AC.reset_class()
-    Line_sizing.reset_class()
-   
+    Size_selection.reset_class()
+    TF_Line_AC.reset_class()
+    
+    Node_DC.reset_class()
     Line_DC.reset_class()
-    TF_Line_AC.reset_class()  # Add this
-    AC_DC_converter.reset_class()
     DCDC_converter.reset_class()
+
+    AC_DC_converter.reset_class()
+
     TimeSeries.reset_class()
-    Ren_source_zone.reset_class()  # Add this
-    # Add these classes:
-    Gen_AC.reset_class()
-    Ren_Source.reset_class()
+    inv_periods.reset_class()
+      
+    Ren_source_zone.reset_class()
     Price_Zone.reset_class()
   
+    Gen_AC.reset_class()
+    Ren_Source.reset_class()
+    
     
 def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real'):
     
@@ -229,7 +246,12 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             shift        = AC_line_data.at[index, 'shift']        if 'shift'        in AC_line_data.columns else 0
 
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
-            isTF = True if  'transformer_id' in AC_line_data.columns else False
+            if 'is_transformer' in AC_line_data.columns:
+                isTF = AC_line_data.at[index, 'is_transformer'] == 1
+            elif 'transformer_id' in AC_line_data.columns:
+                isTF = True
+            else:
+                isTF = False 
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
                                          Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
             if geometry is not None:
@@ -263,7 +285,12 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             shift        = AC_line_data.at[index, 'shift']        if 'shift'        in AC_line_data.columns else 0
 
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
-            isTF = True if  'transformer_id' in AC_line_data.columns else False
+            if 'is_transformer' in AC_line_data.columns:
+                isTF = AC_line_data.at[index, 'is_transformer'] == 1
+            elif 'transformer_id' in AC_line_data.columns:
+                isTF = True
+            else:
+                isTF = False
             
             if A_rating is not None:
                 N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
@@ -279,7 +306,10 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             
             
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
-                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name))
+                                         Reactance, Conductance, Susceptance, MVA_rating,km,m,shift ,name=str(var_name),S_base=S_base)
+            
+            
+            
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -311,11 +341,17 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
             N_cables = AC_line_data.at[index, 'N_cables']  if 'N_cables'   in AC_line_data.columns else 1
             m    = AC_line_data.at[index, 'm']             if 'm'            in AC_line_data.columns else 1
             shift= AC_line_data.at[index, 'shift']         if 'shift'        in AC_line_data.columns else 0
-                
+           
+            if 'is_transformer' in AC_line_data.columns:
+                isTF = AC_line_data.at[index, 'is_transformer'] == 1
+            elif 'transformer_id' in AC_line_data.columns:
+                isTF = True
+            else:
+                isTF = False    
             [Resistance, Reactance, Conductance, Susceptance, MVA_rating] = Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables=N_cables)
             
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
-            isTF = True if  'transformer_id' in AC_line_data.columns else False
+           
             AC_lines[var_name] = Line_AC(fromNode, toNode, Resistance,
                                          Reactance, Conductance, Susceptance, MVA_rating, km,m,shift,name=str(var_name),S_base=S_base)
             if geometry is not None:
@@ -535,7 +571,9 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 
             geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
                      
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,arm_res=arm_res, name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, 
+                    MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,arm_res=arm_res, 
+                    name=str(var_name),S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -597,7 +635,8 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             PR_X_pu = Phase_Reactor_X/Z_base
             Filter_pu = Filter*Z_base
 
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base,
+             MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name),S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str): 
                      geometry = loads(geometry)  
@@ -656,7 +695,8 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
             
            
             Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC,
-                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax ,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name))
+                                                   P_DC, T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax ,
+                                                   lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv,arm_res=arm_res, name=str(var_name),S_base=S_base)
         
             if geometry is not None:
                 if isinstance(geometry, str): 
@@ -677,7 +717,178 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
+def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=[],cable_database=None,cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_check=False,MIP_solver='glpk',MIP_time=None,MIP_tee=False,svg=True,name=None):
+    from .Class_editor import add_AC_node, add_line_sizing, add_RenSource, add_extGrid, add_cable_option
+    from .Graph_and_plot import save_network_svg
+    from .Classes import Cable_options, Line_AC, Line_DC
 
+    try:
+        from .Array_OPT import MIP_path_graph
+        mip_check_av =True
+    except:    
+        mip_check_av =False
+    turbines_df = Data["turbine"]
+    substations_df = Data["offshore_substation"] if 'offshore_substation' in Data else Data['transformer_station']
+    
+
+    initialize_pyflowacdc()
+    grid = Grid(S_base)
+    if name is not None:
+        grid.name = name
+    res = Results(grid)
+
+    # Handle cable_types and cable_database:
+    # - If cable_database is provided: load it for all classes, extract cable_types from index if empty
+    # - If cable_types is provided (no cable_database): use with default pyflow database
+    # - If both empty: don't create cable_option
+    
+    if cable_database is not None:
+        # User provided custom database - use it for all classes
+        Cable_options.load_cable_database(cable_database=cable_database)
+        Line_AC.load_cable_database(cable_database=cable_database)
+        Line_DC.load_cable_database(cable_database=cable_database)
+        
+        # Extract cable types from database index if not provided
+        if len(cable_types) == 0:
+            cable_types = list(cable_database.index)
+        
+        cable_option = add_cable_option(grid, cable_types, cable_database=cable_database)
+    elif len(cable_types) == 0:
+        # No database and no cable_types - don't create cable_option
+        cable_option = None
+    else:
+        # cable_types provided - use default pyflow database (lazy loaded when needed)
+        cable_option = add_cable_option(grid, cable_types)
+    t_MW = turbines_df.iloc[0].MW_rating
+    if max_turbines_per_string is not None:
+        
+        max_power_per_string = t_MW*max_turbines_per_string 
+        first_index_to_comply = next((i for i, rating in enumerate(cable_option.MVA_ratings) if rating >= max_power_per_string), len(cable_option.MVA_ratings) - 1)
+        cable_option._cable_types = cable_option._cable_types[:first_index_to_comply + 1]
+        cable_option.MVA_ratings = cable_option.MVA_ratings[:first_index_to_comply + 1]
+
+    else:
+    
+        max_cable_capacity = max(cable_option.MVA_ratings)
+        max_turbines_per_string = int(max_cable_capacity / t_MW)
+        # Store it in the grid for later use
+        grid.max_turbines_per_string = max_turbines_per_string
+        
+    
+    for i, attrs in array_graph.nodes(data=True):
+        if attrs['point_type'] == 'access_point':
+            continue  # Skip access_point nodes - they're routing points, not AC nodes
+        elif attrs['point_type'] == 'turbine':
+            kV=   turbines_df.loc[attrs['original_idx']].kV_rating
+            geo = turbines_df.loc[attrs['original_idx']].geometry
+        else: 
+            kV=   substations_df.loc[attrs['original_idx']].kV_rating
+            geo = substations_df.loc[attrs['original_idx']].geometry
+
+        node = add_AC_node(grid, kV, node_type='PQ',geometry=geo,name=str(i))
+
+        if attrs['point_type'] == 'turbine':
+            add_RenSource(grid,node,turbines_df.loc[attrs['original_idx']].MW_rating,ren_type='Wind',min_gamma=1-curtailment_allowed,Qrel=0)
+            node.ct_limit = turbines_df.loc[attrs['original_idx']].connections
+            
+        if attrs['point_type'] == 'substation':
+            add_extGrid(grid,node,MVAmax=99999,Allow_sell=True,lf=LCoE)
+            node.ct_limit = substations_df.loc[attrs['original_idx']].connections
+            node.type = 'Slack'
+            node.V_ini = 1
+            node.theta_ini = 0
+            if 'turbine_limit' in substations_df.columns:
+                node.pu_power_limit = substations_df.loc[attrs['original_idx']].turbine_limit
+    # First pass: add all lines
+    line_objects = {}  # Dictionary to store line objects by their name
+    
+    for u,v, attrs in array_graph.edges(data=True):
+        # Ensure substations are always toNode so positive flow goes towards them
+        # Note: In the graph, substation-turbine edges always have substation as u (from add_substation_paths_to_graph)
+        u_is_substation = array_graph.nodes[u].get('point_type') == 'substation'
+        v_is_substation = array_graph.nodes[v].get('point_type') == 'substation'
+        
+        u_is_access_point = array_graph.nodes[u].get('point_type') == 'access_point'
+        v_is_access_point = array_graph.nodes[v].get('point_type') == 'access_point'
+        # If u is substation and v is not, swap them (substation becomes toNode)
+        # This is the common case for substation-turbine edges
+        # If both or neither are substations, keep original order
+        if u_is_access_point or v_is_access_point:
+            continue
+        if u_is_substation and not v_is_substation:
+            fromnode = str(v)
+            tonode = str(u)
+            name= f'{str(v)}_{str(u)}'
+        else:
+            fromnode = str(u)
+            tonode = str(v)
+            name= f'{str(u)}_{str(v)}'
+
+        l = attrs['length']/1000
+        geo= attrs['geometry']
+        w_l = attrs['weight']/1000
+        
+        line_obj = add_line_sizing(grid,fromnode,tonode,cable_option=cable_option.name,active_config=0,Length_km=l,name=name,geometry=geo,update_grid=False)
+        
+        line_obj.installation_cost_per_km = trenching_cost
+        line_obj.trench_lenght_km = w_l
+        # Store the line object using original graph edge key format for crossing_pairs lookup
+        # crossing_pairs uses _generate_edge_key which creates f"{str(u)}_{str(v)}" (original graph order)
+        original_edge_key = f'{str(u)}_{str(v)}'
+        line_objects[original_edge_key] = line_obj
+    
+    # Add the complete crossing groups as line numbers to the grid
+    grid.crossing_groups = []
+
+    
+    if 'crossing_pairs' in Data and Data['crossing_pairs']:
+        limit_crossings=True
+        for crossing_group in Data['crossing_pairs']:
+            line_numbers_group = []
+            for edge_key in crossing_group:
+                if edge_key in line_objects:
+                    line_numbers_group.append(line_objects[edge_key].lineNumber)
+            if len(line_numbers_group) > 1:  # Only add groups with more than one line
+                grid.crossing_groups.append(line_numbers_group)
+    
+        
+    grid.Update_Graph_AC()
+    grid.create_Ybus_AC()
+    grid.Array_opf = True  
+    grid.cab_types_allowed = cable_types_allowed
+    grid.max_turbines_per_string = max_turbines_per_string
+    
+    grid.MIP_time = MIP_time
+    
+    # Enable crossings if there are crossing groups
+    
+    
+    if MIP_check and mip_check_av:
+        grid.MIP_time=MIP_time
+        flag,high_flow,_ = MIP_path_graph(grid,max_flow=max_turbines_per_string,solver_name=MIP_solver,crossings=limit_crossings,tee=MIP_tee)
+        
+
+        if not flag:
+            return None, None
+        if  high_flow < max_turbines_per_string:
+            
+            t_MW = turbines_df.iloc[0].MW_rating
+            max_power_per_string = t_MW*high_flow 
+            first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
+            for line in grid.lines_AC_ct:
+                if line.active_config > 0:
+                    line.active_config = first_index_to_comply
+
+            #grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
+        
+            
+            grid.max_turbines_per_string = high_flow
+  
+        if svg:
+            save_network_svg(grid, name='MIP_solve')
+
+        grid.MIP_check = True
+    return grid, res
 
 def Create_grid_from_mat(matfile):
     if not matfile.endswith('.mat'):
@@ -1044,7 +1255,8 @@ def Create_grid_from_mat(matfile):
             LossCrec        = Converter_data.at[index, 'LossCrec']
             LossCinv        = Converter_data.at[index, 'LossCinv']
         
-            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,name=str(var_name))
+            Converters[var_name] = AC_DC_converter(AC_type, DC_type, AC_nodes[AC_node], DC_nodes[DC_node], P_AC, Q_AC, P_DC, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, 
+            MVA_max=MVA_max,nConvP=n,polarity=pol,Ucmin=Ucmin,Ucmax=Ucmax,lossa=LossA,lossb=LossB,losscrect=LossCrec ,losscinv=LossCinv ,name=str(var_name),S_base=S_base)
 
             if Converter_data.at[index, 'cost'] >= 0:
                 Converters[var_name].NUmConvP_opf = True
@@ -1160,13 +1372,30 @@ def Create_grid_from_mat(matfile):
     return [G, res]
 
 
+def Create_grid_from_pickle(path,use_dill=True):
+    initialize_pyflowacdc()
+
+    grid = load_pickle(path,use_dill)
+
+    res = Results(grid, decimals=3)
+    return [grid, res]
+
+def load_pickle(path,use_dill=True):
+    lib = _dill if (use_dill and _dill is not None) else pickle
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rb") as f:
+        return lib.load(f)
+
 def change_S_base(grid,Sbase_new):
     
     Sbase_old = grid.S_base
     rate = Sbase_old/Sbase_new
     for line in grid.lines_AC:
         line.S_base = Sbase_new
-        
+    for line in grid.lines_DC:
+        line.S_base = Sbase_new
+    for conv in grid.Converters:
+        conv.S_base = Sbase_new
     for node in grid.nodes_AC:
         node.PGi *= rate 
         node.PLi *= rate 

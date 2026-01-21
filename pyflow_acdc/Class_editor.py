@@ -43,6 +43,9 @@ __all__ = [
     # Add Time Series
     'add_TimeSeries',
     
+    #Add investment series
+    'add_inv_series',
+    
     # Line Modifications
     'change_line_AC_to_expandable',
     'change_line_AC_to_reconducting',
@@ -63,6 +66,10 @@ __all__ = [
     'cart2pol',
     'pol2cartz',
     'cartz2pol',
+
+    # Analysis
+    'analyse_grid',
+    'grid_state',
 ]
 
 def pol2cart(r, theta):
@@ -285,7 +292,7 @@ def change_line_AC_to_expandable(grid, line_name,update_grid=True):
         grid.create_Ybus_AC()
     return expandable_line    
 
-def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost):
+def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,update_grid=True):
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -314,7 +321,8 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
         }
         rec_line = rec_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
         grid.lines_AC_rec.append(rec_line)
-        grid.Update_Graph_AC()
+        if update_grid:
+            grid.Update_Graph_AC()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
@@ -322,7 +330,8 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
     
     for i, line in enumerate(grid.lines_AC_rec):
         line.lineNumber = i 
-    grid.create_Ybus_AC()    
+    if update_grid:
+        grid.create_Ybus_AC()    
     return rec_line  
 
 def change_line_AC_to_tap_transformer(grid, line_name):
@@ -368,7 +377,7 @@ def add_line_sizing(grid, fromNode, toNode,cable_types: list=[], active_config: 
     if isinstance(toNode, str):
         toNode = next((node for node in grid.nodes_AC if node.name == toNode), None)
     
-    line = Line_sizing(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
+    line = Size_selection(fromNode, toNode,cable_types, active_config,Length_km,S_base,name)
     grid.lines_AC_ct.append(line)
     if cable_option is not None:
         assign_lineToCable_options(grid,line.name,cable_option)
@@ -448,7 +457,7 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
     else:
         ra = 0.001
 
-    conv = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_resistance, Transformer_reactance, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max,nConvP,polarity ,lossa,lossb,losscrect,losscinv,Ucmin, Ucmax, ra,name)
+    conv = AC_DC_converter(AC_type, DC_type, AC_node, DC_node, P_AC, Q_AC, P_DC, Transformer_resistance, Transformer_reactance, Phase_Reactor_R, Phase_Reactor_X, Filter, Droop, kV_base, MVA_max,nConvP,polarity ,lossa,lossb,losscrect,losscinv,Ucmin, Ucmax, ra, grid.S_base, name)
     if geometry is not None:
         if isinstance(geometry, str): 
              geometry = loads(geometry)  
@@ -487,8 +496,22 @@ def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r
 
 "Zones"
 
-def add_cable_option(grid, cable_types: list,name=None):
-    cable_option = Cable_options(cable_types,name)
+def add_cable_option(grid, cable_types: list = None, name=None, cable_database=None):
+    """Add cable option to grid.
+    
+    Parameters
+    ----------
+    grid : Grid
+        The grid object
+    cable_types : list, optional
+        List of cable type names. If None, creates empty cable option.
+    name : str, optional
+        Name for the cable option
+    cable_database : pd.DataFrame, optional
+        Custom cable database DataFrame. If provided, uses this instead of loading from YAML.
+        If None and cable_type_ini == "pyflow_acdc", loads from YAML database.
+    """
+    cable_option = Cable_options(cable_types, name, cable_database=cable_database)
     grid.Cable_options.append(cable_option)
     return cable_option
 
@@ -502,12 +525,12 @@ def add_RenSource_zone(Grid,name):
     return RSZ
 
 
-def add_price_zone(Grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand_pu=0):
+def add_price_zone(Grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand_pu=0,elasticity=1):
 
     if b==1:
         b= price
     
-    M = Price_Zone(price,import_pu_L,export_pu_G,a,b,c,import_expand_pu,name)
+    M = Price_Zone(price,import_pu_L,export_pu_G,a,b,c,import_expand_pu,elasticity,Grid.S_base,name)
     Grid.Price_Zones.append(M)
     Grid.Price_Zones_dic[name]=M.price_zone_num
     
@@ -532,23 +555,28 @@ def add_offshore_price_zone(Grid,main_price_zone,name):
 
 "Components for optimal power flow"
 
-def add_generators(Grid,Gen_csv):
+def add_generators(Grid,Gen_csv,curtailmet_allowed=1):
     if isinstance(Gen_csv, pd.DataFrame):
         Gen_data = Gen_csv
     else:
         Gen_data = pd.read_csv(Gen_csv)
-   
-    Gen_data = Gen_data.set_index('Gen')
+    if 'Gen' in Gen_data.columns:
+        Gen_data = Gen_data.set_index('Gen')
     
     
     for index, row in Gen_data.iterrows():
         var_name = Gen_data.at[index, 'Gen_name'] if 'Gen_name' in Gen_data.columns else index
-        node_name = str(Gen_data.at[index, 'Node'])
+        if 'Node' in Gen_data.columns:
+            node_name = str(Gen_data.at[index, 'Node'])
+        elif 'node' in Gen_data.columns:
+            node_name = str(Gen_data.at[index, 'node'])
+        else:
+            raise ValueError(f"No 'Node' or 'node' column found in Gen_data for index {index}")
         
         MWmax = Gen_data.at[index, 'MWmax'] if 'MWmax' in Gen_data.columns else None
         MWmin = Gen_data.at[index, 'MWmin'] if 'MWmin' in Gen_data.columns else 0
-        MVArmin = Gen_data.at[index, 'MVArmin'] if 'MVArmin' in Gen_data.columns else 0
-        MVArmax = Gen_data.at[index, 'MVArmax'] if 'MVArmax' in Gen_data.columns else 99999
+        MVArmin = Gen_data.at[index, 'MVARmin'] if 'MVARmin' in Gen_data.columns else None
+        MVArmax = Gen_data.at[index, 'MVARmax'] if 'MVARmax' in Gen_data.columns else None
         
         PsetMW = Gen_data.at[index, 'PsetMW']  if 'PsetMW'  in Gen_data.columns else 0
         QsetMVA= Gen_data.at[index, 'QsetMVA'] if 'QsetMVA' in Gen_data.columns else 0
@@ -556,12 +584,17 @@ def add_generators(Grid,Gen_csv):
         qf = Gen_data.at[index, 'Quadratic factor'] if 'Quadratic factor' in Gen_data.columns else 0
         fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
+        Ren_zone = Gen_data.at[index, 'Ren_zone'] if 'Ren_zone' in Gen_data.columns else None
         price_zone_link = False
         
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
         if fuel_type.lower() in ["wind", "solar"]:
-            add_RenSource(Grid,node_name, MWmax,ren_source_name=var_name ,geometry=geo,ren_type=fuel_type)
+            add_RenSource(Grid,node_name, MWmax,ren_source_name=var_name ,geometry=geo,ren_type=fuel_type,Qmin=MVArmin,Qmax=MVArmax,min_gamma=(1-curtailmet_allowed),zone=Ren_zone)
         else:
+            if MVArmax is None:
+                MVArmax = 9999
+            if MVArmin is None:
+                MVArmin = -9999
             add_gen(Grid, node_name,var_name, price_zone_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo)  
         
 def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=99999,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type='Other',geometry= None,installation_cost:float=0,np_gen:int=1):
@@ -583,14 +616,16 @@ def add_gen(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,
     for node in Grid.nodes_AC:
    
         if node_name == node.name:
-             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,fc,Pset,Qset,Smax,installation_cost)
+             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,fc,Pset,Qset,Smax,installation_cost,S_base=Grid.S_base)
              node.PGi = 0
              node.QGi = 0
              if fuel_type not in [
              "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
-             "Solid Biomass",  "Other", "Waste", "Biogas", "Geothermal"
+             "Solid Biomass",  "Other", "Waste", "Biogas", "Geothermal","CCGT"
              ]:
                  fuel_type = 'Other'
+             elif fuel_type == 'Gas':
+                 fuel_type = 'Natural Gas'
              gen.gen_type = fuel_type
              gen.np_gen = np_gen
              if geometry is not None:
@@ -623,7 +658,7 @@ def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc
     for node in Grid.nodes_DC:
    
         if node_name == node.name:
-             gen = Gen_DC(gen_name, node,Max_pow_gen,Min_pow_gen,qf,lf,fc,Pset,installation_cost)
+             gen = Gen_DC(gen_name, node,Max_pow_gen,Min_pow_gen,qf,lf,fc,Pset,installation_cost,S_base=Grid.S_base)
              node.PGi = 0
              if fuel_type not in [
              "Nuclear", "Hard Coal", "Hydro", "Oil", "Lignite", "Natural Gas",
@@ -653,15 +688,24 @@ def add_gen_DC(Grid, node_name,gen_name=None, price_zone_link=False,lf=0,qf=0,fc
     return gen
 
 
-def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MVArmin=None,MVArmax=None,Allow_sell=True):
-    
-    
+def add_extGrid(Grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=99999,MWmax=None,MVArmin=None,MVArmax=None,Allow_sell=True):
+    if isinstance(node, str):
+        node_name = node
+        # Search in AC nodes first, then DC nodes
+        node = next((n for n in Grid.nodes_AC if n.name == node_name), None)
+        
+        if node is None:
+            print(f'Node {node_name} does not exist')
+            sys.exit()
+    if MWmax is None:
+        MWmax=MVAmax
+
     if MVArmin is None:
         MVArmin=-MVAmax
     if MVArmax is None:
         MVArmax=MVAmax
     
-    Max_pow_gen=MVAmax/Grid.S_base
+    Max_pow_gen=MWmax/Grid.S_base
  
     Max_pow_genR=MVArmax/Grid.S_base
     Min_pow_genR=MVArmin/Grid.S_base
@@ -669,92 +713,100 @@ def add_extGrid(Grid, node_name, gen_name=None,price_zone_link=False,lf=0,qf=0,M
         Min_pow_gen=-MVAmax/Grid.S_base
     else:
         Min_pow_gen=0
-    found=False 
-    for node in Grid.nodes_AC:
-        if node_name == node.name:
-             gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf)
-             node.PGi = 0
-             node.QGi = 0
-             found=True
-             break
-    if not found:
-        print(f'Node {node_name} does not exist')
-        sys.exit()
+    rating = MVAmax/ Grid.S_base
+    gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,S_rated=rating)
+    node.PGi = 0
+    node.QGi = 0
+    
     gen.price_zone_link=price_zone_link
     if price_zone_link:
         gen.qf= 0
         gen.lf= node.price
+
+    # Iterate over all AC nodes to see if any is already 'Slack'
+    has_slack = any(n.type == 'Slack' for n in Grid.nodes_AC)
+    if not has_slack:
+        node.type = 'Slack'
     Grid.Generators.append(gen)
 
-def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=None,price_zone=None, Offshore=False,MTDC=None,geometry= None,ren_type='Wind',min_gamma=0,Qrel=0):
+def add_RenSource(Grid, node, base, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0,Qmin=None,Qmax=None):
     
+    # Handle string input by finding the node
+    if isinstance(node, str):
+        node_name = node
+        # Search in AC nodes first, then DC nodes
+        node = next((n for n in Grid.nodes_AC if n.name == node_name), None)
+        if node is None:
+            node = next((n for n in Grid.nodes_DC if n.name == node_name), None)
+        if node is None:
+            print(f'Node {node_name} does not exist')
+            sys.exit()
     
+    # Set default ren_source_name if not provided
     if ren_source_name is None:
-        ren_source_name= node_name
-    found=False 
-    for node in Grid.nodes_AC:
-        if node_name == node.name:
-            rensource= Ren_Source(ren_source_name,node,base/Grid.S_base)    
-            rensource.PRGi_available=available
-            rensource.connected= 'AC'
-            ACDC='AC'
-            rensource.rs_type= ren_type
-            if geometry is not None:
-                if isinstance(geometry, str): 
-                     geometry = loads(geometry)  
-                rensource.geometry= geometry
-            rensource.min_gamma = min_gamma
+        ren_source_name = node.name
+    
+    # Create renewable source
+    rensource = Ren_Source(ren_source_name, node, base/Grid.S_base,S_base=Grid.S_base)    
+    rensource.PRGi_available = available
+    rensource.rs_type = ren_type
+    rensource.min_gamma = min_gamma
+    
+    # Determine connection type and set appropriate attributes
+    if node in Grid.nodes_AC:
+        rensource.connected = 'AC'
+        ACDC = 'AC'
+        if Qmax is not None:
+            rensource.Qmax = Qmax/Grid.S_base
+        else:
             rensource.Qmax = base*Qrel/Grid.S_base
+        if Qmin is not None:    
+            rensource.Qmin = Qmin/Grid.S_base
+        else:
             rensource.Qmin = -base*Qrel/Grid.S_base
-            Grid.rs2node['AC'][rensource.rsNumber]=node.nodeNumber
-            found = True
-            break
-    for node in Grid.nodes_DC:
-        if node_name == node.name:
-            rensource= Ren_Source(ren_source_name,node,base/Grid.S_base)    
-            rensource.PGi_available=available
-            rensource.connected= 'DC'
-            ACDC='DC'
-            rensource.rs_type= ren_type
-            if geometry is not None:
-                if isinstance(geometry, str): 
-                     geometry = loads(geometry)  
-                rensource.geometry= geometry
-            rensource.min_gamma = min_gamma
-            Grid.rs2node['DC'][rensource.rsNumber]=node.nodeNumber
-            found = True
-            break    
-
-    if not found:
-           print(f'Node {node_name} does not exist')
-           sys.exit()
-   
+        Grid.rs2node['AC'][rensource.rsNumber] = node.nodeNumber
+    elif node in Grid.nodes_DC:
+        rensource.connected = 'DC'
+        ACDC = 'DC'
+        Grid.rs2node['DC'][rensource.rsNumber] = node.nodeNumber
+    else:
+        print(f'Node {node.name} is not in AC or DC nodes')
+        sys.exit()
+    
+    # Handle geometry
+    if geometry is not None:
+        if isinstance(geometry, str): 
+            geometry = loads(geometry)  
+        rensource.geometry = geometry
+    
+    # Add to grid
     Grid.RenSources.append(rensource)
     
-    
+    # Handle zone assignment
     if zone is not None:
-        rensource.zone=zone
-        assign_RenToZone(Grid,ren_source_name,zone)
+        rensource.zone = zone
+        assign_RenToZone(Grid, ren_source_name, zone)
     
+    # Handle price zone assignment
     if price_zone is not None:
-        rensource.price_zone=price_zone
+        rensource.price_zone = price_zone
         if MTDC is not None:
-            rensource.MTDC=MTDC
+            rensource.MTDC = MTDC
             main_price_zone = next((M for M in Grid.Price_Zones if price_zone == M.name), None)
             if main_price_zone is not None:
                 # Find or create the MTDC price_zone
                 MTDC_price_zone = next((mdc for mdc in Grid.Price_Zones if MTDC == mdc.name), None)
 
                 if MTDC_price_zone is None:
-                    # Create the offshore price_zone using the OffshorePrice_Zone class
-                    MTDC_price_zone= add_MTDC_price_zone(Grid,MTDC)
+                    # Create the MTDC price_zone using the MTDCPrice_Zone class
+                    MTDC_price_zone = add_MTDC_price_zone(Grid, MTDC)
             
             MTDC_price_zone.add_linked_price_zone(main_price_zone)
-            main_price_zone.ImportExpand += base / Grid.S_base
+            main_price_zone.import_expand += base / Grid.S_base
             assign_nodeToPrice_Zone(Grid, node_name,MTDC, ACDC)
             # Additional logic for MTDC can be placed here
         elif Offshore:
-            rensource.Offshore=True
+            rensource.Offshore = True
             # Create an offshore price_zone by appending 'o' to the main price_zone's name
             oprice_zone_name = f'o_{price_zone}'
 
@@ -767,19 +819,19 @@ def add_RenSource(Grid,node_name, base,ren_source_name=None , available=1,zone=N
 
                 if oprice_zone is None:
                     # Create the offshore price_zone using the OffshorePrice_Zone class
-                    oprice_zone= add_offshore_price_zone(Grid,main_price_zone,oprice_zone_name)
+                    oprice_zone = add_offshore_price_zone(Grid, main_price_zone, oprice_zone_name)
 
                 # Assign the node to the offshore price_zone
-                assign_nodeToPrice_Zone(Grid, node_name,oprice_zone_name,ACDC)
+                assign_nodeToPrice_Zone(Grid, node.name, oprice_zone_name, ACDC)
                 # Link the offshore price_zone to the main price_zone
                 main_price_zone.link_price_zone(oprice_zone)
                 # Expand the import capacity in the main price_zone
-                main_price_zone.ImportExpand += base / Grid.S_base
+                main_price_zone.import_expand += base / Grid.S_base
         else:
             # Assign the node to the main price_zone
-            assign_nodeToPrice_Zone(Grid, node_name, price_zone,ACDC)
-
-
+            assign_nodeToPrice_Zone(Grid, node.name, price_zone, ACDC)
+    
+    return rensource
 
 "Time series data "
 
@@ -833,7 +885,7 @@ def time_series_dict(grid, ts):
                 node.TS_dict[typ] = ts.TS_num
                 break  # Stop after assigning to the correct node
                 
-    elif typ in ['WPP', 'OWPP', 'SF', 'REN']:
+    elif typ in ['WPP', 'OWPP', 'SF', 'REN', 'Solar']:
         for zone in grid.RenSource_zones:
             if ts.element_name == zone.name:
                 zone.TS_dict['PRGi_available'] = ts.TS_num
@@ -843,7 +895,43 @@ def time_series_dict(grid, ts):
                 rs.TS_dict['PRGi_available'] = ts.TS_num
                 break  # Stop after assigning to the correct node
 
+def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
+    if not isinstance(inv_data, pd.DataFrame):
+        inv = pd.DataFrame(inv_data, columns=[name])
+    else:
+        inv = inv_data
 
+    for col in inv.columns:
+        if associated is not None and inv_type is not None:
+            element_name = associated
+            element_type = inv_type
+            data = inv.loc[0:, col].astype(float).to_numpy()  
+            name = col
+            
+        elif associated is not None: 
+            element_name = associated
+            element_type = inv.at[0, col]
+            data = inv.loc[1:, col].astype(float).to_numpy()  
+            name = col
+        
+        elif inv_type is not None:
+            element_name = inv.at[0, col]
+            element_type = inv_type
+            data = inv.loc[1:, col].astype(float).to_numpy()   
+            name = col
+        
+        else: 
+            element_name = inv.at[0, col]
+            element_type = inv.at[1, col]
+            data = inv.loc[2:, col].astype(float).to_numpy()   
+            name = col 
+
+    inv_period = inv_periods(element_type, element_name, inv_data,name)
+    grid.inv_series.append(inv_period)
+    grid.inv_series_dic[name]=inv_period.inv_periods_num
+    
+    
+        
 def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,name=None):
     # Check if Time_Series_data is a numpy array and convert to pandas DataFrame if needed
     if not isinstance(Time_Series_data, pd.DataFrame):
@@ -861,7 +949,6 @@ def add_TimeSeries(Grid, Time_Series_data,associated=None,TS_type=None,name=None
             data = TS.loc[0:, col].astype(float).to_numpy()  
             name = col
             
-        
         elif associated is not None: 
             element_name = associated
             element_type = TS.at[0, col]
@@ -1064,7 +1151,7 @@ def assign_lineToCable_options(Grid,line_name, new_cable_option_name):
     # Add line to the new cable_option
     if line_to_reassign not in new_cable_option.lines:
         new_cable_option.lines.append(line_to_reassign) 
-        line_to_reassign.cable_types = new_cable_option.cable_types
+        line_to_reassign.cable_types = new_cable_option._cable_types
 
 
 
@@ -1172,8 +1259,36 @@ def expand_cable_database(data, format='yaml', save_yalm=False):
     print(f"Added {len(new_cables_ac)} new cables to AC and {len(new_cables_dc)} new cables to DC database")
 
 
+def grid_state(grid):
+    Total_load = 0
+    min_generation = 0
+    max_generation = 0
+    for node in grid.nodes_AC:
+        Total_load += node.PLi
+    for node in grid.nodes_DC:
+        Total_load += node.PLi
+    for gen in grid.Generators:
+        min_generation += gen.Min_pow_gen*gen.np_gen if not gen.activate_gen_opf else 0
+        max_generation += gen.Max_pow_gen*gen.np_gen 
+    
+    for ren in grid.RenSources:
+        min_generation += ren.PGi_ren*ren.min_gamma
+        max_generation += ren.PGi_ren
+    return Total_load, min_generation, max_generation
 
+def analyse_grid(grid):
+    
+    # Perform the analysis and store directly on grid
+    grid.ACmode = grid.nn_AC != 0       #AC nodes present
+    grid.DCmode = grid.nn_DC != 0       #DC nodes present
+    grid.TEP_AC = grid.nle_AC != 0 #AC expansion lines present
+    grid.REC_AC = grid.nlr_AC != 0 #AC reconductoring lines present
+    grid.TAP_tf = grid.nttf != 0    #AC transformer lines present
+    grid.CT_AC  = grid.nct_AC!= 0 #AC conductor size selection lines present
+    grid.CFC = grid.ncfc_DC != 0 #DC variable voltage converter lines present
+    grid.CDC = grid.ncdc_DC != 0 #DC-DC converter lines present
+    grid.GPR = any(gen.np_gen_opf for gen in grid.Generators)
 
-
+    return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
     
 

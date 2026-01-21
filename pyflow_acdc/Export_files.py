@@ -10,9 +10,21 @@ import pandas as pd
 import os
 from .Classes import MTDCPrice_Zone, OffshorePrice_Zone
 
+import os
+import pickle
+import gzip
+
+try:
+    import dill  # optional fallback
+    _dill = dill
+except Exception:
+    _dill = None
+
 __all__ = [
     'save_grid_to_file',
-    'save_grid_to_matlab'
+    'save_grid_to_matlab',
+    'save_pickle'
+
 ]
 
 def generate_dataframe_code_from_dict(data_list, var_name):
@@ -446,6 +458,20 @@ def {file_name}():
     return main_code
     
     
+
+
+def save_pickle(grid, path, compress=True, use_dill=True):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    lib = _dill if (use_dill and _dill is not None) else pickle
+    protocol = pickle.HIGHEST_PROTOCOL
+
+    if compress:
+        with gzip.open(path, "wb") as f:
+            lib.dump(grid, f, protocol=protocol)
+    else:
+        with open(path, "wb") as f:
+            lib.dump(grid, f, protocol=protocol)
+
 
 
 def save_grid_to_file(grid, file_name,folder_name=None):
