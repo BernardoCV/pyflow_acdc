@@ -37,12 +37,20 @@ URL https://digital-library.theiet.org/doi/abs/10.1049/icp.2025.1198
 
 **For transmission expansion planning:**
 ```
-[Citation to be added]
+B. C. Valerio, M. Cheah-Mane, V. A. Lacerda, P. Gebraad, and O. Gomis-
+Bellmunt, “Transmission expansion planning for hybrid AC/DC grids using
+a mixed-integer non-linear programming approach,” International Journal of
+Electrical Power & Energy Systems, vol. 174, p. 111459, 2026. [Online]. Available:
+https://www.sciencedirect.com/science/article/pii/S0142061525010075 
 ```
 
 **For array optimization:**
 ```
-[Citation to be added]
+B. C. Valerio, P. M. Gebraad, M. Cheah-Mane, V. Lacerda, and O. Gomis-
+Bellmunt, “Strategies for wind park inter-array optimisation through mixed in-
+teger linear programming,” in Proceedings of the TORQUE 2026 Conference,
+2026, to be published in Journal of Physics: Conference Series [under review].
+
 ```
 
 
