@@ -208,7 +208,7 @@ class Grid:
     # Setter for AC nodes that updates the dictionary
     @nodes_AC.setter
     def nodes_AC(self, new_nodes_AC):
-        self._nodes_AC = new_nodes_AC
+        self._nodes_AC = new_nodes_AC if new_nodes_AC is not None else []
         self._invalidate_node_caches()
 
     # Property for DC nodes
@@ -219,7 +219,7 @@ class Grid:
     # Setter for DC nodes that updates the dictionary
     @nodes_DC.setter
     def nodes_DC(self, new_nodes_DC):
-        self._nodes_DC = new_nodes_DC
+        self._nodes_DC = new_nodes_DC if new_nodes_DC is not None else []
         self._invalidate_DC_caches()  # Invalidate cache when nodes change
         
     # Property to return dictionary of AC nodes
@@ -3407,7 +3407,7 @@ class TimeSeries:
 
         TimeSeries.names.add(self.name)
 
-class inv_periods:
+class investment_periods:
     inv_periods_num = 0
     names = set()
     
@@ -3421,8 +3421,8 @@ class inv_periods:
         return self._name
 
     def __init__(self, element_type: str, element_name:str, data: float, name=None):
-        self.inv_periods_num = inv_periods.inv_periods_num
-        inv_periods.inv_periods_num += 1
+        self.inv_periods_num = investment_periods.inv_periods_num
+        investment_periods.inv_periods_num += 1
         
         
         self.type = element_type
@@ -3435,4 +3435,4 @@ class inv_periods:
         else:
             self._name = name
 
-        inv_periods.names.add(self.name)
+        investment_periods.names.add(self.name)

@@ -8,15 +8,18 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
 from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective
-from .ACDC_Static_TEP import get_TEP_variables,initialize_links,create_scenarios
+from .ACDC_Static_TEP import get_TEP_variables,_initialize_MS_STEP_sets_model,create_scenarios
 from .Class_editor import analyse_grid
 from .Time_series import _modify_parameters
 from .Graph_and_plot import save_network_svg, create_geometries
 
+
+
 __all__ = [
     'dynamic_transmission_expansion',
     'multi_period_MS_TEP',
-    'save_MP_TEP_period_svgs'
+    'save_MP_TEP_period_svgs',
+    'export_and_save_inv_period_svgs'
 ]
 
 def pack_variables(*args):
@@ -61,44 +64,28 @@ def _update_grid_investment_period(grid,inv,i):
                 rs.PRGi_inv_factor = inv.data[idx]
                 break  # Stop after assigning to the correct node
 
-def MP_TEP_variables(model,grid):
+
+def _MP_TEP_constraints(model,grid):
     
-    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
-
     if grid.GPR:
-        np_gen,np_gen_max = gen_var
-
-        model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
-        def np_gen_bounds(model,gen,i):
-            return (np_gen[gen],np_gen_max[gen])
-            
-        model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds)
-
         def MP_gen_lower_bound(model,gen,i):
             if i == 0:
-                return pyo.Constraint.Skip
+                return model.np_gen[gen,i] >= model.np_gen_base[gen]
             else:
-                return model.np_gen[gen,i] >= model.np_gen[gen,i-1]
+                return model.np_gen[gen,i] >= model.np_gen[gen,i-1]- model.decomision_gen[gen,i]
         model.MP_gen_lower_bound_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_lower_bound)
         
         def MP_gen_link(model,gen,i):
             return model.inv_model[i].np_gen[gen] == model.np_gen[gen,i]
         model.MP_gen_link_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_link)
 
-    
     if grid.ACmode:
-        NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
         if grid.TEP_AC:
-            model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
-            def MP_AC_line_bounds(model,l,i):
-                return (NP_lineAC[l],NP_lineAC_max[l])
-            model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds)
-    
             def MP_AC_line_lower_bound(model,l,i):
                 if i == 0:
-                    return pyo.Constraint.Skip
+                    return model.ACLinesMP[l,i] >= model.NumLinesACP_base[l]
                 else:
-                    return model.ACLinesMP[l,i] >= model.ACLinesMP[l,i-1]
+                    return model.ACLinesMP[l,i] >= model.ACLinesMP[l,i-1]- model.decomision_ACline[l,i]
             model.MP_AC_line_lower_bound_constraint = pyo.Constraint(model.lines_AC_exp,model.inv_periods, rule=MP_AC_line_lower_bound)
     
             def MP_AC_line_link(model, l, i):
@@ -106,50 +93,103 @@ def MP_TEP_variables(model,grid):
             model.MP_AC_line_link_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_link)
 
     if grid.DCmode:
-        NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
-        
-        model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
-        def MP_DC_line_bounds(model,l,i):
-            return (NP_lineDC[l],NP_lineDC_max[l])
-        model.DCLinesMP = pyo.Var(model.lines_DC,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_DC_line_bounds)
-
         def MP_DC_line_lower_bound(model,l,i):
             if i == 0:
-                return pyo.Constraint.Skip
+                return model.DCLinesMP[l,i] >= model.NumLinesDCP_base[l]
             else:
-                return model.DCLinesMP[l,i] >= model.DCLinesMP[l,i-1]
+                return model.DCLinesMP[l,i] >= model.DCLinesMP[l,i-1] - model.decomision_DCline[l,i]
         model.MP_DC_line_lower_bound_constraint = pyo.Constraint(model.lines_DC,model.inv_periods, rule=MP_DC_line_lower_bound)
 
         def MP_DC_line_link(model, l, i):
             return model.inv_model[i].NumLinesDCP[l] == model.DCLinesMP[l, i]
         model.MP_DC_line_link_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_link)
 
-
     if grid.ACmode and grid.DCmode:
-        NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
-        model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
-        def MP_Conv_bounds(model,l,i):
-            return (NumConvP[l],NumConvP_max[l])
-        model.ConvMP = pyo.Var(model.conv,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_Conv_bounds)
-
-        def MP_Conv_lower_bound(model,l,i):
+        def MP_Conv_lower_bound(model,c,i):
             if i == 0:
-                return pyo.Constraint.Skip
+                return model.ConvMP[c,i] >= model.NumConvP_base[c]
             else:
-                return model.ConvMP[l,i] >= model.ConvMP[l,i-1]
+                return model.ConvMP[c,i] >= model.ConvMP[c,i-1] - model.decomision_Conv[c,i]
         model.MP_Conv_lower_bound_constraint = pyo.Constraint(model.conv,model.inv_periods, rule=MP_Conv_lower_bound)
 
         def MP_Conv_link(model, l, i):
             return model.inv_model[i].NumConvP[l] == model.ConvMP[l, i]
         model.MP_Conv_link_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_link)
 
-def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True):
+
+def _MP_TEP_variables(model,grid):
+    
+    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
+
+    if grid.GPR:
+        np_gen,np_gen_max,_,_ = gen_var
+
+        model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
+        
+        def np_gen_bounds(model,gen,i):
+            return (0,np_gen_max[gen])
+        def np_gen_i(model, gen, i):
+            return np_gen[gen]
+        model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen_i)
+        model.decomision_gen = pyo.Param(model.gen_AC,model.inv_periods,initialize=0)
+
+    if grid.ACmode:
+        NP_lineAC,_,NP_lineAC_max,_,_,_ = AC_line_var
+        if grid.TEP_AC:
+            model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
+            def MP_AC_line_bounds(model,l,i):
+                return (0,NP_lineAC_max[l])
+            def NP_lineAC_i(model, l, i):
+                return NP_lineAC[l]
+            model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds,initialize=NP_lineAC_i)
+            model.decomision_ACline = pyo.Param(model.lines_AC_exp,model.inv_periods,initialize=0)
+    if grid.DCmode:
+        NP_lineDC,_,NP_lineDC_max,_ = DC_line_var
+        
+        model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
+        def MP_DC_line_bounds(model,l,i):
+            return (0,NP_lineDC_max[l])
+        def NP_lineDC_i(model, l, i):
+            return NP_lineDC[l]
+        model.DCLinesMP = pyo.Var(model.lines_DC,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_DC_line_bounds,initialize=NP_lineDC_i)
+        model.decomision_DCline = pyo.Param(model.lines_DC,model.inv_periods,initialize=0)
+
+    if grid.ACmode and grid.DCmode:
+        NumConvP,_,NumConvP_max,_ = conv_var
+        model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
+        def MP_Conv_bounds(model,l,i):
+            return (0,NumConvP_max[l])
+        def NumConvP_i(model, l, i):
+            return NumConvP[l]
+        model.ConvMP = pyo.Var(model.conv,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_Conv_bounds,initialize=NumConvP_i)
+        model.decomision_Conv = pyo.Param(model.conv,model.inv_periods,initialize=0)
+        
+def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,callback=False):
 
     analyse_grid(grid)
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True,False)
+    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
+    
+    # If inv_periods is provided, create load investment series for all loads
+    if inv_periods:
+        from .Classes import investment_periods
+        load_factors = np.array(inv_periods, dtype=float)
+        
+        # Create investment series for all AC nodes
+        for node in grid.nodes_AC:
+            inv_obj = investment_periods('Load', node.name, load_factors, name=f'Load_{node.name}')
+            grid.inv_series.append(inv_obj)
+            grid.inv_series_dic[inv_obj.name] = inv_obj.inv_periods_num
+        
+        # Create investment series for all DC nodes
+        for node in grid.nodes_DC:
+            inv_obj = investment_periods('Load', node.name, load_factors, name=f'Load_{node.name}')
+            grid.inv_series.append(inv_obj)
+            grid.inv_series_dic[inv_obj.name] = inv_obj.inv_periods_num
+        
+      
                 
     t1=time.time()
 
@@ -176,7 +216,7 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discou
         for inv in grid.inv_series:    
             _update_grid_investment_period(grid,inv,i)
 
-        _modify_parameters(grid,model.inv_model[i],grid.ACmode,grid.DCmode,PZ)
+        _modify_parameters(grid,model.inv_model[i],PZ)
 
         
         obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
@@ -187,25 +227,26 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discou
         
         model.inv_model[i].obj = pyo.Objective(rule=obj_OPF, sense=pyo.minimize)
 
-    initialize_links(model,grid)
-    MP_TEP_variables(model,grid)
+    _initialize_DTEP_sets_model(model,grid)
+    _MP_TEP_variables(model,grid)
+    _MP_TEP_constraints(model,grid)
     
 
-    net_cost = MP_TEP_obj(model,grid,n_years,discount_rate)
+    net_cost = _MP_TEP_obj(model,grid,n_years,discount_rate)
     model.obj = pyo.Objective(rule=net_cost, sense=pyo.minimize)
     
     t2 = time.time()
 
-    model_results,solver_stats = pyomo_model_solve(model,grid,solver)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver,time_limit=time_limit,tee=tee,callback=callback)
     
     t3 = time.time()
-    ExportACDC_NLmodel_toPyflowACDC(model.inv_model[i], grid, PZ,TEP=True)
     
     MINLP = False
     if solver != 'ipopt':
         MINLP = True
     
-    export_MP_TEP_results_toPyflowACDC(model,grid,MINLP)
+    export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=PZ,MINLP=MINLP)
+    _save_inv_models(model,grid)
     t4 = time.time()
 
 
@@ -222,9 +263,18 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=25,Hy=8760,discou
     
     return model, model_results ,timing_info, solver_stats
     
+def _initialize_DTEP_sets_model(model,grid):    
 
+    if grid.DCmode:
+        model.lines_DC = pyo.Set(initialize=list(range(0, grid.nl_DC)))
+    if grid.ACmode and grid.DCmode:
+        model.conv = pyo.Set(initialize=list(range(0, grid.nconv)))
+    if grid.TEP_AC:
+        model.lines_AC_exp = pyo.Set(initialize=list(range(0,grid.nle_AC)))
+    if grid.GPR:
+        model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
 
-def MP_TEP_obj(model,grid,n_years,discount_rate):
+def _MP_TEP_obj(model,grid,n_years,discount_rate):
     
     net_cost = 0
 
@@ -240,7 +290,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
                 if i == 0:
                     inv_gen+=(model.np_gen[g,i]-model.np_gen_base[g])*gen.base_cost
                 else:
-                    inv_gen+=(model.np_gen[g,i]-model.np_gen[g,i-1])*gen.base_cost
+                    inv_gen+=(model.np_gen[g,i]-model.np_gen[g,i-1]+model.decomision_gen[g,i])*gen.base_cost
         else:
             inv_gen=0
 
@@ -253,7 +303,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
                     if i ==0:
                         AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
                     else:
-                        AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1])*line.base_cost
+                        AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1]+model.decomision_ACline[l,i])*line.base_cost
                 
         if grid.DCmode:
             
@@ -262,7 +312,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
                 if i ==0:
                     DC_Inv_lines+=(model.DCLinesMP[l,i]-model.NumLinesDCP_base[l])*line.base_cost
                 else:
-                    DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1])*line.base_cost
+                    DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1]+model.decomision_DCline[l,i])*line.base_cost
             
         if grid.ACmode and grid.DCmode:
             
@@ -271,7 +321,7 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
                 if i ==0:
                     Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP_base[l])*conv.base_cost
                 else:
-                    Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP[l,i-1])*conv.base_cost
+                    Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP[l,i-1]+model.decomision_Conv[l,i])*conv.base_cost
             
 
         inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv
@@ -281,10 +331,28 @@ def MP_TEP_obj(model,grid,n_years,discount_rate):
 
     return net_cost
 
-    
+def export_and_save_inv_period_svgs(grid,Price_Zones=False,folder_name=None):
+    if hasattr(grid, 'inv_models'):
+        grid_name = grid.name
+        grid_name = grid_name.replace(" ", "_")
+        
+        for i in grid.inv_models:
+            save_path = f"{folder_name}/{grid_name}_inv_model_{i}" if folder_name else f'{grid_name}_inv_model_{i}'
+            ExportACDC_NLmodel_toPyflowACDC(grid.inv_models[i],grid,Price_Zones,TEP=True)
+            save_network_svg(
+                grid,
+                name=save_path,
+                journal=True,
+                legend=True,
+            )
 
+    else:
+        print("No inv_models found")
 
-
+def _save_inv_models(model,grid):
+    grid.inv_models = {}
+    for i in model.inv_periods:
+        grid.inv_models[i] = model.inv_model[i]
 
 def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False):
     
@@ -402,8 +470,8 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
             total_row[col] = ""
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
     
-
-    ExportACDC_NLmodel_toPyflowACDC(model.inv_model[-1],grid,Price_Zones,TEP=True)
+    last_i = max(model.inv_periods)
+    ExportACDC_NLmodel_toPyflowACDC(model.inv_model[last_i],grid,Price_Zones,TEP=True)
 
     grid.MP_TEP_results = df  
 
@@ -455,11 +523,11 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
 
     create_scenarios(model.inv_model[i],grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy)
 
-    initialize_links(model,grid)
-    MP_TEP_variables(model,grid)
+    _initialize_MS_STEP_sets_model(model,grid)
+    _MP_TEP_variables(model,grid)
 
     
-    net_cost = MP_TEP_obj(model,grid,n_years,discount_rate)
+    net_cost = _MP_TEP_obj(model,grid,n_years,discount_rate)
     model.obj = pyo.Objective(rule=net_cost, sense=pyo.minimize)
 
 

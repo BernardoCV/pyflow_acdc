@@ -539,7 +539,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     
 
 
-def initialize_links(model,grid):    
+def _initialize_MS_STEP_sets_model(model,grid):    
     if grid.DCmode:
         model.lines_DC    = pyo.Set(initialize=list(range(0, grid.nl_DC)))
     if grid.ACmode and grid.DCmode:
@@ -878,7 +878,7 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
             num_scenario_frames = len(model.scenario_frames)
             w[t]=1/num_scenario_frames
     
-    initialize_links(model,grid)
+    _initialize_MS_STEP_sets_model(model,grid)
     TEP_variables(model,grid)
     
     MS_TEP_constraints(model,grid)

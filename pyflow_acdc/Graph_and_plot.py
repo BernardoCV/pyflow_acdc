@@ -1428,7 +1428,10 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     else:
                         color = "black"
 
-                dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=2*line.np_line, fill='none'))
+                # Ensure stroke width is a plain Python float (svgwrite validator
+                # does not accept NumPy scalar types).
+                stroke_width = float(2 * float(line.np_line))
+                dwg.add(dwg.path(d=path_data, stroke=color, stroke_width=stroke_width, fill='none'))
 
 
         # Draw DC lines
@@ -1440,7 +1443,8 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     svg_x, svg_y = transform_coords(x, y)
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]
-                dwg.add(dwg.path(d=path_data, stroke='blue', stroke_width=2*line.np_line, fill='none'))
+                stroke_width = float(2 * float(line.np_line))
+                dwg.add(dwg.path(d=path_data, stroke='blue', stroke_width=stroke_width, fill='none'))
         
         # Draw converters
         for conv in grid.Converters_ACDC:
@@ -1451,7 +1455,8 @@ def save_network_svg(grid, name='grid_network', width=1000, height=800, journal=
                     svg_x, svg_y = transform_coords(x, y)
                     path_data += f"{svg_x},{svg_y} L "
                 path_data = path_data[:-2]
-                dwg.add(dwg.path(d=path_data, stroke='purple', stroke_width=2*conv.NumConvP, fill='none'))
+                stroke_width = float(2 * float(conv.NumConvP))
+                dwg.add(dwg.path(d=path_data, stroke='purple', stroke_width=stroke_width, fill='none'))
         
         # Draw nodes
         for node in grid.nodes_AC + grid.nodes_DC:

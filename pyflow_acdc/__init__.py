@@ -154,7 +154,7 @@ except ImportError:
 
 try:
     from .ACDC_Dynamic_TEP import *
-    __all__.extend(['multi_period_TEP', 'multi_period_MS_TEP'])
+    __all__.extend(['multi_period_TEP', 'multi_period_MS_TEP', 'export_and_save_inv_period_svgs'])
 except ImportError:
     pass
     

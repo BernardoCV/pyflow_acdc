@@ -557,7 +557,7 @@ def _modify_parameters(grid,model,Price_Zones):
             for idx, val in lf.items():
                 model.lf[idx].set_value(val)
         if DCmode:
-            for idx, val in price_dc.items():
+            for idx, val in price_dc.items():   
                  model.price_dc[idx].set_value(val)    
             for idx, val in lf_DC.items():
                 model.lf_dc[idx].set_value(val)
