@@ -4,7 +4,7 @@ import pandas as pd
 import time
 import math
 from concurrent.futures import ThreadPoolExecutor
-
+import os
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
 from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective,calculate_objective_from_model
@@ -189,7 +189,7 @@ def _MP_TEP_variables(model,grid):
         model.decomision_Conv = pyo.Param(model.conv,model.inv_periods,initialize=0)
         
 def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,callback=False):
-
+    grid.reset_run_flags()
     analyse_grid(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
 
@@ -376,6 +376,8 @@ def _MP_TEP_obj(model,grid,n_years,discount_rate):
     return net_cost
 
 def export_and_save_inv_period_svgs(grid,Price_Zones=False,folder_name=None):
+    if folder_name is not None:
+        os.makedirs(folder_name, exist_ok=True)
     if hasattr(grid, 'inv_models'):
         grid_name = grid.name
         grid_name = grid_name.replace(" ", "_")
@@ -535,6 +537,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
     
     last_i = max(model.inv_periods)
+     
     ExportACDC_NLmodel_toPyflowACDC(model.inv_model[last_i],grid,Price_Zones,TEP=True)
 
     grid.MP_TEP_results = df  

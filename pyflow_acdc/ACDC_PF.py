@@ -54,6 +54,7 @@ def Power_flow(grid,tol_lim=1e-10, maxIter=100):
 
 def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
     time_1 = time.perf_counter()
+    grid.reset_run_flags()
     grid.Update_PQ_AC()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
@@ -66,6 +67,7 @@ def AC_PowerFlow(grid, tol_lim=1e-10, maxIter=100):
     
 def DC_PowerFlow(grid, tol_lim=1e-10, maxIter=100,Droop_PF=True):
     time_1 = time.perf_counter()
+    grid.reset_run_flags()
     grid.Update_P_DC()
     dc_tol =load_flow_DC(grid, tol_lim, maxIter,Droop_PF)
     grid.Update_P_DC()
@@ -76,6 +78,7 @@ def DC_PowerFlow(grid, tol_lim=1e-10, maxIter=100,Droop_PF=True):
 def ACDC_sequential(grid, tol_lim=1e-4, maxIter=100, internal_tol = 1e-8,change_slack2Droop=False, QLimit=False,Droop_PF=True):
     time_1 = time.perf_counter()
     tolerance = 1
+    grid.reset_run_flags()
     grid.iter_num_seq = 0
     
     # Initialize comprehensive tolerance tracker dictionary

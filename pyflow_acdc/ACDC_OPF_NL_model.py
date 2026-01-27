@@ -2067,30 +2067,6 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         with ThreadPoolExecutor() as executor:
             executor.map(process_node_AC, grid.nodes_AC)
         
-        
-        Pf = np.zeros((grid.nn_AC, 1))
-        Qf = np.zeros((grid.nn_AC, 1))
-        
-
-        G = np.real(grid.Ybus_AC)
-        B = np.imag(grid.Ybus_AC)
-        V = grid.V_AC
-        Theta = grid.Theta_V_AC
-        
-        # Compute differences in voltage angles
-        Theta_diff = Theta[:, None] - Theta
-        
-        # Calculate power flow
-        Pf = (V[:, None] * V * (G * np.cos(Theta_diff) + B * np.sin(Theta_diff))).sum(axis=1)
-        Qf = (V[:, None] * V * (G * np.sin(Theta_diff) - B * np.cos(Theta_diff))).sum(axis=1)
-        
-        
-
-        for node in grid.nodes_AC:
-            i = node.nodeNumber
-            node.P_INJ = Pf[i]
-            node.Q_INJ = Qf[i]
-            
         if grid.GPR:
             np_gen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_gen.items()}
             for gen in grid.Generators:
@@ -2191,7 +2167,32 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
 
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_AC_tf, grid.lines_AC_tf)
+        
+        grid.create_Ybus_AC()
+    
+        Pf = np.zeros((grid.nn_AC, 1))
+        Qf = np.zeros((grid.nn_AC, 1))
+        
 
+        G = np.real(grid.Ybus_AC_full)
+        B = np.imag(grid.Ybus_AC_full)
+        V = grid.V_AC
+        Theta = grid.Theta_V_AC
+        
+        # Compute differences in voltage angles
+        Theta_diff = Theta[:, None] - Theta
+        
+        # Calculate power flow
+        Pf = (V[:, None] * V * (G * np.cos(Theta_diff) + B * np.sin(Theta_diff))).sum(axis=1)
+        Qf = (V[:, None] * V * (G * np.sin(Theta_diff) - B * np.cos(Theta_diff))).sum(axis=1)
+        
+        
+
+        for node in grid.nodes_AC:
+            i = node.nodeNumber
+            node.P_INJ = Pf[i]
+            node.Q_INJ = Qf[i]
+                    
         grid.Line_AC_calc()    
     
     if grid.DCmode:

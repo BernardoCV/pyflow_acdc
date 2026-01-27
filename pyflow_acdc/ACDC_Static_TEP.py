@@ -435,7 +435,7 @@ def _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set=False):
     return model, obj_TEP, obj_OPF,weights_def,PZ
 
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None,callback=False):
-    
+    grid.reset_run_flags()
     t1 = time.perf_counter()
     model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set)
     
@@ -459,6 +459,10 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     
     t1 = time.perf_counter()
     if export:
+        if grid.ACmode:
+            grid.create_Ybus_AC()
+        if grid.DCmode:
+            grid.create_Ybus_DC()   
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ,TEP=True)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
@@ -479,6 +483,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     return model, model_results , timing_info, solver_stats
 
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='gurobi',time_limit=300,tee=False,export=True,fs=False):
+    grid.reset_run_flags()
     analyse_grid(grid)
     
     weights_def, _ = obj_w_rule(grid,ObjRule,True)

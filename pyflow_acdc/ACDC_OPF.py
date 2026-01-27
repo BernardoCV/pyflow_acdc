@@ -87,6 +87,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False):
+    grid.reset_run_flags()
     analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -163,6 +164,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     return model, model_res , timing_info, solver_stats
 
 def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False):
+    grid.reset_run_flags()
     analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
@@ -239,6 +241,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
 
 
 def TS_parallel_OPF(grid,idx,current_range,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,print_step=False):
+    grid.reset_run_flags()
     from .Time_series import update_grid_data,_modify_parameters
     
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)

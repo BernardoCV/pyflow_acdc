@@ -125,9 +125,7 @@ class Grid:
        'Renewable_profit': {'w': 0},
        'Gen_set_dev': {'w': 0}
     }
-        self.OPF_run= False
-        self.TEP_run=False
-        self.MP_TEP_run=False
+        self.reset_run_flags()
     
         self.TEP_res=None
         self.MP_TEP_res=None
@@ -200,7 +198,15 @@ class Grid:
         self.OWPP_node_to_ts={}
         # Node type differentiation
         
-    
+    def reset_run_flags(self):
+        """
+        Helper to clear run-type flags before starting a new analysis.
+        Call this before setting one of OPF_run / TEP_run / MP_TEP_run to True.
+        """
+        self.OPF_run = False
+        self.TEP_run = False
+        self.MP_TEP_run = False
+        
     @property
     def nodes_AC(self):
         return self._nodes_AC
