@@ -77,6 +77,7 @@ class Results:
                 self.TEP_norm()
         if self.Grid.MP_TEP_run:
             self.MP_TEP_results()
+            self.MP_TEP_obj_res()
         print('------')
 
     def All_AC(self):
@@ -1269,16 +1270,86 @@ class Results:
 
     def MP_TEP_results(self):
         # Check if the attribute exists and is a DataFrame
+        print('--------------')
+        print('Dynamic Transmission Expansion Problem')
+        print('')
+        print('Investments in elements')
         if hasattr(self.Grid, "MP_TEP_results") and isinstance(self.Grid.MP_TEP_results, pd.DataFrame):
             df = self.Grid.MP_TEP_results
             table = pt()
+            
             table.field_names = list(df.columns)
             for row in df.itertuples(index=False):
-                table.add_row(list(row))
+                row_list = list(row)
+                # Format numeric values with thousand separators (spaces)
+                formatted_row = []
+                for val in row_list:
+                    if pd.isna(val) or (isinstance(val, float) and np.isnan(val)):
+                        formatted_row.append(' ')
+                    elif isinstance(val, (int, float)):
+                        # Round to integer and format with thousand separators (spaces), no decimals
+                        rounded_val = int(round(val))
+                        formatted_val = f"{rounded_val:,}".replace(',', ' ')
+                        formatted_row.append(formatted_val)
+                    else:
+                        formatted_row.append(val)
+                table.add_row(formatted_row)
             print(table)
+            print('')
         else:
             print(self.Grid.MP_TEP_results)
-        
+    def MP_TEP_obj_res(self):
+        print('')
+        print('Dynamic Transmission Expansion Problem')
+        print('')
+        print('Objective results:')
+        print('')
+        table = pt()
+        # Exclude NPV_STEP_Objective from the display
+        columns_to_show = ["Investment_Period", "OPF_Objective","NPV_OPF_Objective","TEP_Objective","STEP_Objective"]
+        # Custom column names for display
+        display_names = ["Investment Period", "Operational Cost [€]", "NPV Operational Cost [€]", "Investment Cost [€]", "Total STEP Cost [€]"]
+        table.field_names = display_names
+        df = self.Grid.MP_TEP_obj_res
+        for _, row in df.iterrows():
+            formatted_row = []
+            for col in columns_to_show:
+                val = row[col]
+                if isinstance(val, (int,float)):
+                    if isinstance(val, int):
+                        rounded_val = val
+                    else:
+                        rounded_val = np.round(val, decimals=self.dec)
+                    # Format with thousand separators (spaces) and decimal places
+                    formatted_val = f"{rounded_val:,.{self.dec}f}".replace(',', ' ')
+                    formatted_row.append(formatted_val)
+                else:
+                    formatted_row.append(val)
+            table.add_row(formatted_row)
+        print(table)
+
+        table=pt()
+        table.field_names = ["Investment_Period", "NPV Cost"]
+        df = self.Grid.MP_TEP_obj_res
+        tot_npv_cost=0
+        for _, row in df.iterrows():
+            inv = row['Investment_Period']
+            npv_cost = row['NPV_STEP_Objective']
+            # Format numeric values with thousand separators (spaces) and decimal places
+            if isinstance(npv_cost, (int, float)):
+                rounded_val = np.round(npv_cost, decimals=self.dec)
+                formatted_npv_cost = f"{rounded_val:,.{self.dec}f}".replace(',', ' ')
+            else:
+                formatted_npv_cost = npv_cost
+            table.add_row([inv, formatted_npv_cost])
+            tot_npv_cost+=npv_cost
+        table.add_row(['',''])    
+        # Format total with thousand separators (spaces) and decimal places
+        formatted_total = f"{np.round(tot_npv_cost, decimals=self.dec):,.{self.dec}f}".replace(',', ' ')
+        table.add_row(['Total', formatted_total])
+        print(table)
+        print('')
+
     def Price_Zone(self):
         print('--------------')
         print('Price_Zone')

@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective
+from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective,calculate_objective_from_model
 from .ACDC_Static_TEP import get_TEP_variables,_initialize_MS_STEP_sets_model,create_scenarios
 from .Class_editor import analyse_grid
 from .Time_series import _modify_parameters
@@ -79,6 +79,24 @@ def _MP_TEP_constraints(model,grid):
             return model.inv_model[i].np_gen[gen] == model.np_gen[gen,i]
         model.MP_gen_link_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_link)
 
+        def MP_gen_decomision(model,gen,i):
+            g = grid.Generators[gen]
+            planned_decomision = g.planned_decomision[i]
+            decomision_period = g.decomision_period
+            if i < decomision_period:
+                return model.decomision_gen[gen,i] == planned_decomision
+            else:
+                return model.decomision_gen[gen,i] == planned_decomision + model.installed_gen[gen,i-decomision_period]
+        model.MP_gen_decomision_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_decomision)
+
+        def MP_gen_installed(model,gen,i):
+            if i == 0:
+                return model.np_gen[gen,i] == model.installed_gen[gen,i]+model.np_gen_base[gen]
+            else:
+                return model.np_gen[gen,i] == model.installed_gen[gen,i]+model.np_gen[gen,i-1]-model.decomision_gen[gen,i]
+            
+        model.MP_gen_installed_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_installed)
+
     if grid.ACmode:
         if grid.TEP_AC:
             def MP_AC_line_lower_bound(model,l,i):
@@ -120,7 +138,9 @@ def _MP_TEP_constraints(model,grid):
 def _MP_TEP_variables(model,grid):
     
     conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
-
+    np_gen_max_install={}
+    for gen in grid.Generators:
+        np_gen_max_install[gen.genNumber] = gen.np_gen_max_install if gen.np_gen_max_install else gen.np_gen_max
     if grid.GPR:
         np_gen,np_gen_max,_,_ = gen_var
 
@@ -128,10 +148,14 @@ def _MP_TEP_variables(model,grid):
         
         def np_gen_bounds(model,gen,i):
             return (0,np_gen_max[gen])
+
+        def np_gen_bounds_install(model,gen,i):
+            return (0,np_gen_max_install[gen])
         def np_gen_i(model, gen, i):
             return np_gen[gen]
         model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen_i)
-        model.decomision_gen = pyo.Param(model.gen_AC,model.inv_periods,initialize=0)
+        model.installed_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_gen_bounds_install)
+        model.decomision_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
 
     if grid.ACmode:
         NP_lineAC,_,NP_lineAC_max,_,_,_ = AC_line_var
@@ -188,7 +212,8 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
             inv_obj = investment_periods('Load', node.name, load_factors, name=f'Load_{node.name}')
             grid.inv_series.append(inv_obj)
             grid.inv_series_dic[inv_obj.name] = inv_obj.inv_periods_num
-        
+        for gen in grid.Generators:
+            gen.planned_decomision = np.zeros(n_years)
       
                 
     t1=time.time()
@@ -208,7 +233,7 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
     for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC: 
         _calculate_decomision_period(element,n_years)
         
-
+    present_value_opf =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
     for i in model.inv_periods:
         base_model_copy = base_model.clone()
         model.inv_model[i].transfer_attributes_from(base_model_copy)
@@ -220,10 +245,8 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
 
         
         obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
-        
-        present_value =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
-        
-        obj_OPF *=present_value
+    
+        obj_OPF *=present_value_opf
         
         model.inv_model[i].obj = pyo.Objective(rule=obj_OPF, sense=pyo.minimize)
 
@@ -249,10 +272,21 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
     _save_inv_models(model,grid)
     t4 = time.time()
 
-
-
-
-   
+    inv_objs, inv_opf_objs = calculate_DTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False)
+    
+    
+    obj_res = pd.DataFrame(columns=['Investment_Period', 'OPF_Objective','NPV_OPF_Objective','TEP_Objective','STEP_Objective','NPV_STEP_Objective'])
+    for i in model.inv_periods:
+        present_value_tep = 1/(1+discount_rate)**(i*n_years)
+        
+        opf_obj = inv_opf_objs[i][0]  # Get first element from the list
+        npv_opf_obj = opf_obj*present_value_opf
+        inv_obj = inv_objs[i]
+        step_obj = inv_obj + npv_opf_obj
+        npv_step_obj = step_obj*present_value_tep
+        new_row = pd.DataFrame({'Investment_Period': [i+1], 'OPF_Objective': [opf_obj], 'NPV_OPF_Objective': [npv_opf_obj], 'TEP_Objective': [inv_obj], 'STEP_Objective': [step_obj], 'NPV_STEP_Objective': [npv_step_obj]})
+        obj_res = pd.concat([obj_res, new_row], ignore_index=True)
+    grid.MP_TEP_obj_res = obj_res
     timing_info = {
     "create": t2-t1,
     "solve": solver_stats['time'],
@@ -274,57 +308,58 @@ def _initialize_DTEP_sets_model(model,grid):
     if grid.GPR:
         model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
 
+def _inv_model_obj(model,grid,i):
+    inv_gen= 0
+    AC_Inv_lines=0
+    DC_Inv_lines=0
+    Conv_Inv=0
+    if grid.GPR:
+        
+        for g in model.gen_AC:
+            gen = grid.Generators[g]
+            inv_gen+=model.installed_gen[g,i]*gen.base_cost
+    else:
+        inv_gen=0
+
+
+    if grid.ACmode:
+        if grid.TEP_AC:
+            
+            for l in model.lines_AC_exp:
+                line = grid.lines_AC_exp[l]
+                if i ==0:
+                    AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
+                else:
+                    AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1]+model.decomision_ACline[l,i])*line.base_cost
+            
+    if grid.DCmode:
+        
+        for l in model.lines_DC:
+            line = grid.lines_DC[l]
+            if i ==0:
+                DC_Inv_lines+=(model.DCLinesMP[l,i]-model.NumLinesDCP_base[l])*line.base_cost
+            else:
+                DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1]+model.decomision_DCline[l,i])*line.base_cost
+        
+    if grid.ACmode and grid.DCmode:
+        
+        for l in model.conv:
+            conv = grid.Converters_ACDC[l]
+            if i ==0:
+                Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP_base[l])*conv.base_cost
+            else:
+                Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP[l,i-1]+model.decomision_Conv[l,i])*conv.base_cost
+        
+
+    inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv
+    return inv_cost
+
 def _MP_TEP_obj(model,grid,n_years,discount_rate):
     
     net_cost = 0
 
     for i in model.inv_periods:
-        inv_gen= 0
-        AC_Inv_lines=0
-        DC_Inv_lines=0
-        Conv_Inv=0
-        if grid.GPR:
-            
-            for g in model.gen_AC:
-                gen = grid.Generators[g]
-                if i == 0:
-                    inv_gen+=(model.np_gen[g,i]-model.np_gen_base[g])*gen.base_cost
-                else:
-                    inv_gen+=(model.np_gen[g,i]-model.np_gen[g,i-1]+model.decomision_gen[g,i])*gen.base_cost
-        else:
-            inv_gen=0
-
-
-        if grid.ACmode:
-            if grid.TEP_AC:
-                
-                for l in model.lines_AC_exp:
-                    line = grid.lines_AC_exp[l]
-                    if i ==0:
-                        AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
-                    else:
-                        AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1]+model.decomision_ACline[l,i])*line.base_cost
-                
-        if grid.DCmode:
-            
-            for l in model.lines_DC:
-                line = grid.lines_DC[l]
-                if i ==0:
-                    DC_Inv_lines+=(model.DCLinesMP[l,i]-model.NumLinesDCP_base[l])*line.base_cost
-                else:
-                    DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1]+model.decomision_DCline[l,i])*line.base_cost
-            
-        if grid.ACmode and grid.DCmode:
-            
-            for l in model.conv:
-                conv = grid.Converters_ACDC[l]
-                if i ==0:
-                    Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP_base[l])*conv.base_cost
-                else:
-                    Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP[l,i-1]+model.decomision_Conv[l,i])*conv.base_cost
-            
-
-        inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv
+        inv_cost = _inv_model_obj(model,grid,i)
         instance_cost = model.inv_model[i].obj.expr + inv_cost
         net_cost += instance_cost/(1+discount_rate)**(i*n_years)
         model.inv_model[i].obj.deactivate()
@@ -366,14 +401,19 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
     if grid.GPR:
         if MINLP:
             gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i])) for (g, i) in model.np_gen}
+            gen_installed_values = {(g, i): int(round(pyo.value(model.installed_gen[g, i]))) for (g, i) in model.installed_gen}
+            gen_decomision_values = {(g, i): int(round(pyo.value(model.decomision_gen[g, i]))) for (g, i) in model.decomision_gen}
         else:
             gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i]),2) for (g, i) in model.np_gen}
+            gen_installed_values = {(g, i): round(pyo.value(model.installed_gen[g, i]),2) for (g, i) in model.installed_gen}
+            gen_decomision_values = {(g, i): round(pyo.value(model.decomision_gen[g, i]),2) for (g, i) in model.decomision_gen}
+            
         for gen in grid.Generators:
             g = gen.genNumber
             gen.np_dynamic = [gen_mp_values[g, i] for i in range(n_periods)]
             row = {'Element': str(gen.name)}
             row['Type'] = 'Generator'
-            row['Initial'] = pyo.value(model.np_gen_base[g])
+            row['Pre Existing'] = pyo.value(model.np_gen_base[g])
             total_cost = 0
             for i in range(n_periods):
                 n_val = gen_mp_values[g, i]
@@ -381,8 +421,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                     cost = (n_val - pyo.value(model.np_gen_base[g])) * gen.base_cost
                 else:
                     cost = (n_val - gen_mp_values[g, i-1]) * gen.base_cost
-                row[f"N_{i}"] = n_val
-                row[f"Cost_{i}"] = cost
+                row[f"Decommissioned_{i+1}"] = gen_decomision_values[g, i]
+                row[f"Installed_{i+1}"] = gen_installed_values[g, i]    
+                row[f"Active_{i+1}"] = n_val                
+                row[f"Cost_{i+1}"] = cost
                 total_cost += cost
             row['Total_Cost'] = total_cost
             rows.append(row)
@@ -391,6 +433,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
         if grid.TEP_AC:
             if MINLP:
                 ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i])) for (l, i) in model.ACLinesMP}   
+            
             else:
                 ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i]),2) for (l, i) in model.ACLinesMP}   
             for line in grid.lines_AC_exp:
@@ -398,16 +441,20 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                 line.np_dynamic = [ac_lines_mp_values[l, i] for i in range(n_periods)]
                 row = {'Element': str(line.name)}
                 row['Type'] = 'AC Line'
-                row['Initial'] = pyo.value(model.NumLinesACP_base[l])
+                row['Pre Existing'] = pyo.value(model.NumLinesACP_base[l])
                 total_cost = 0
                 for i in range(n_periods):
                     n_val = ac_lines_mp_values[l, i]
                     if i == 0:
                         cost = (n_val - pyo.value(model.NumLinesACP_base[l])) * line.base_cost
+                        installed = n_val - pyo.value(model.NumLinesACP_base[l])
                     else:
                         cost = (n_val - ac_lines_mp_values[l, i-1]) * line.base_cost
-                    row[f"N_{i}"] = n_val
-                    row[f"Cost_{i}"] = cost
+                        installed = n_val - ac_lines_mp_values[l, i-1]
+                    row[f"Decommissioned_{i+1}"] = 0
+                    row[f"Installed_{i+1}"] = installed
+                    row[f"Active_{i+1}"] = n_val
+                    row[f"Cost_{i+1}"] = cost
                     total_cost += cost
                 row['Total_Cost'] = total_cost
                 rows.append(row)
@@ -424,16 +471,20 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                 line.np_dynamic = [dc_lines_mp_values[l, i] for i in range(n_periods)]
                 row = {'Element': str(line.name)}
                 row['Type'] = 'DC Line'
-                row['Initial'] = pyo.value(model.NumLinesDCP_base[l])
+                row['Pre Existing'] = pyo.value(model.NumLinesDCP_base[l])
                 total_cost = 0
                 for i in range(n_periods):
                     n_val = dc_lines_mp_values[l, i]
                     if i == 0:
                         cost = (n_val - pyo.value(model.NumLinesDCP_base[l])) * line.base_cost
+                        installed = n_val - pyo.value(model.NumLinesDCP_base[l])
                     else:
                         cost = (n_val - dc_lines_mp_values[l, i-1]) * line.base_cost
-                    row[f"N_{i}"] = n_val
-                    row[f"Cost_{i}"] = cost
+                        installed = n_val - dc_lines_mp_values[l, i-1]
+                    row[f"Decommissioned_{i+1}"] = 0
+                    row[f"Installed_{i+1}"] = installed
+                    row[f"Active_{i+1}"] = n_val
+                    row[f"Cost_{i+1}"] = cost
                     total_cost += cost
                 row['Total_Cost'] = total_cost
                 rows.append(row)
@@ -445,16 +496,20 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
             conv.np_dynamic = [acdc_conv_mp_values[c, i] for i in range(n_periods)]
             row = {'Element': str(conv.name)}
             row['Type'] = 'ACDC Conv'
-            row['Initial'] = pyo.value(model.NumConvP_base[c])
+            row['Pre Existing'] = pyo.value(model.NumConvP_base[c])
             total_cost = 0
             for i in range(n_periods):
                 n_val = acdc_conv_mp_values[c, i]   
                 if i == 0:
                     cost = (n_val - pyo.value(model.NumConvP_base[c])) * conv.base_cost
+                    installed = n_val - pyo.value(model.NumConvP_base[c])
                 else:
                     cost = (n_val - acdc_conv_mp_values[c, i-1]) * conv.base_cost
-                row[f"N_{i}"] = n_val
-                row[f"Cost_{i}"] = cost
+                    installed = n_val - acdc_conv_mp_values[c, i-1]
+                row[f"Decommissioned_{i+1}"] = 0
+                row[f"Installed_{i+1}"] = installed
+                row[f"Active_{i+1}"] = n_val
+                row[f"Cost_{i+1}"] = cost
                 total_cost += cost
             row['Total_Cost'] = total_cost
             rows.append(row)    
@@ -515,7 +570,7 @@ def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760,
     for i in model.inv_periods:
         # Time frames for each investment period
         model.inv_model[i].scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
-        model.inv_model[i].submodel = pyo.Block(model.inv_model[i].scenario_frames)  # Level 2: Time frames
+        model.inv_model[i].scenario_model = pyo.Block(model.inv_model[i].scenario_frames)  # Level 2: Time frames
 
     # 5. Create base model and clone for each period/time frame
     base_model = pyo.ConcreteModel()
@@ -589,4 +644,20 @@ def _calculate_decomision_period(element,n_years):
 
     element.decomision_period = math.ceil(element.life_time/n_years)
 
-    
+def calculate_DTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False):
+    inv_objs = {}
+    inv_opf_objs = {}
+    for i in model.inv_periods:    
+        opf_objs = []
+        if multi_scenario:
+            for t in model.scenario_frames:
+                opf_obj = calculate_objective_from_model(model.inv_model[i].scenario_model[t],grid,weights_def,True)
+                opf_objs.append(opf_obj)
+        else:
+            opf_objs = [calculate_objective_from_model(model.inv_model[i],grid,weights_def,True)]
+
+        tep_obj = _inv_model_obj(model,grid,i)  
+        tep_obj_value = pyo.value(tep_obj)
+        inv_objs[i] = tep_obj_value
+        inv_opf_objs[i] = opf_objs
+    return inv_objs, inv_opf_objs

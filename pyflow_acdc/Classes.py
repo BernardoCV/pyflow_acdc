@@ -128,7 +128,7 @@ class Grid:
         self.OPF_run= False
         self.TEP_run=False
         self.MP_TEP_run=False
-
+    
         self.TEP_res=None
         self.MP_TEP_res=None
         self.time_series_results = {
@@ -1057,7 +1057,8 @@ class Gen_AC:
         self.np_gen_i = 1
         self.np_gen_b = 1
         self.np_gen = 1
-        self.np_gen_max=3
+        self.np_gen_max=3   # maximum number of generators to be present at the same time
+        self.np_gen_max_install = self.np_gen_max #For multi period TEP, maximum number of generators to install in each period
         self.np_gen_opf = False
         self.np_gen_dynamic = [self.np_gen]
 

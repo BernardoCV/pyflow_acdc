@@ -1032,7 +1032,7 @@ def OPF_obj_L(model,grid,ObjRule):
     return AC
     
 
-def OPF_obj(model,grid,ObjRule,OnlyGen=True):
+def OPF_obj(model,grid,weights_def,OnlyGen=True):
    
     # for node in  model.nodes_AC:
     #     nAC=grid.nodes_AC[node]
@@ -1041,12 +1041,12 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
 
    
     def formula_Min_Ext_Gen():
-        if ObjRule['Ext_Gen']['w']==0:
+        if weights_def['Ext_Gen']['w']==0:
             return 0
         return sum((model.PGi_opt[node]*grid.S_base) for node in model.nodes_AC)
 
     def formula_Energy_cost():
-        if ObjRule['Energy_cost']['w']==0:
+        if weights_def['Energy_cost']['w']==0:
             return 0
         
         AC= 0
@@ -1069,7 +1069,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
                    + sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base \
                    + sum(model.P_conv_AC[node]*model.price[node] for node in nodes_with_conv)*grid.S_base
     def formula_AC_losses():
-        if ObjRule['AC_losses']['w']==0:
+        if weights_def['AC_losses']['w']==0:
             return 0
         loss = sum(model.PAC_line_loss[line] for line in model.lines_AC)
         if grid.TAP_tf:
@@ -1083,7 +1083,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         return loss
 
     def formula_DC_losses():
-        if ObjRule['DC_losses']['w']==0:
+        if weights_def['DC_losses']['w']==0:
             return 0
         loss = sum(model.PDC_line_loss[line] for line in model.lines_DC)
         if grid.CDC:
@@ -1091,12 +1091,12 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         return loss
 
     def formula_Converter_Losses():
-        if ObjRule['Converter_Losses']['w']==0:
+        if weights_def['Converter_Losses']['w']==0:
             return 0
         return sum(model.P_conv_loss[conv]+model.P_AC_loss_conv[conv] for conv in model.conv)
 
     def formula_General_Losses():
-        if ObjRule['General_Losses']['w']==0:
+        if weights_def['General_Losses']['w']==0:
             return 0
         load = 0
         if grid.nodes_AC != []:
@@ -1111,7 +1111,7 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         return gen - load
     
     def formula_curtailment_red():
-        if ObjRule['Curtailment_Red']['w']==0:
+        if weights_def['Curtailment_Red']['w']==0:
             return 0
         ac_curt=0
         dc_curt=0
@@ -1121,13 +1121,13 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
             dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
         return ac_curt+dc_curt
     def formula_CG():
-       if ObjRule['PZ_cost_of_generation']['w']==0:
+       if weights_def['PZ_cost_of_generation']['w']==0:
            return 0
        return sum(model.SocialCost[price_zone] for price_zone in model.M)
    
     def formula_Offshoreprofit():
         from .Classes import OffshorePrice_Zone
-        if ObjRule['Renewable_profit']['w']==0:
+        if weights_def['Renewable_profit']['w']==0:
             return 0
         nodes_with_RenSource = []
         convloss=0
@@ -1144,11 +1144,11 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         return -sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base +convloss
    
     def formula_Gen_set_dev():
-        if ObjRule['Gen_set_dev']['w']==0:
+        if weights_def['Gen_set_dev']['w']==0:
             return 0
         return sum((model.PGi_gen[gen.genNumber]-gen.Pset)**2 for gen in grid.Generators)
     s=1
-    for key, entry in ObjRule.items():
+    for key, entry in weights_def.items():
         if key == 'Ext_Gen':
             entry['f'] = formula_Min_Ext_Gen()
         elif key == 'Energy_cost':
@@ -1164,18 +1164,18 @@ def OPF_obj(model,grid,ObjRule,OnlyGen=True):
         elif key == 'Curtailment_Red':   
             entry ['f'] = formula_curtailment_red()
         elif key == 'PZ_cost_of_generation':
-            entry['f']  =formula_CG()
+            entry['f']  =formula_CG()   
         elif key == 'Renewable_profit':
             entry['f']  =formula_Offshoreprofit()    
         elif key == 'Gen_set_dev':
             entry['f']  =formula_Gen_set_dev()  
         
     s=1
-    total_weight = sum(entry['w'] for entry in ObjRule.values())
+    total_weight = sum(entry['w'] for entry in weights_def.values())
     if total_weight== 0:
         weighted_sum=0
     else:
-        weighted_sum = sum(entry['w'] / total_weight * entry['f'] for entry in ObjRule.values())
+        weighted_sum = sum(entry['w'] / total_weight * entry['f'] for entry in weights_def.values())
     
     
     return weighted_sum
@@ -1634,6 +1634,26 @@ def calculate_objective(grid,obj,OnlyGen=True):
         return sum((gen.PGen-gen.Pset)**2 for gen in grid.Generators)
     
     return 0
+
+def calculate_objective_from_model(model, grid, weights_def, OnlyGen=True):
+    """
+    Calculate weighted objective value directly from a solved Pyomo model.
+    Uses OPF_obj() to build the expression, then evaluates it once.
+    
+    Args:
+        model: Solved Pyomo model
+        grid: Grid object (needed for generator properties and grid structure)
+        ObjRule: Dictionary with objective rules (same format as OPF_obj)
+        OnlyGen: Boolean flag for energy cost calculation
+    
+    Returns:
+        Weighted sum of objectives (float)
+    """
+    # Build the objective expression (Pyomo expression)
+    obj = OPF_obj(model, grid, weights_def, OnlyGen)
+    # Evaluate it once
+    obj_value = pyo.value(obj)
+    return obj_value
 
 def export_solver_progress_to_excel(solver_stats, save_path):
     import pandas as pd
