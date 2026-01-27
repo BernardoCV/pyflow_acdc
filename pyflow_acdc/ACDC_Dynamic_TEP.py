@@ -274,8 +274,8 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
 
     inv_objs, inv_opf_objs = calculate_DTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False)
     
-    
-    obj_res = pd.DataFrame(columns=['Investment_Period', 'OPF_Objective','NPV_OPF_Objective','TEP_Objective','STEP_Objective','NPV_STEP_Objective'])
+    # Build list of rows then create DataFrame once to avoid concat-on-empty FutureWarning
+    obj_rows = []
     for i in model.inv_periods:
         present_value_tep = 1/(1+discount_rate)**(i*n_years)
         
@@ -284,8 +284,17 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
         inv_obj = inv_objs[i]
         step_obj = inv_obj + npv_opf_obj
         npv_step_obj = step_obj*present_value_tep
-        new_row = pd.DataFrame({'Investment_Period': [i+1], 'OPF_Objective': [opf_obj], 'NPV_OPF_Objective': [npv_opf_obj], 'TEP_Objective': [inv_obj], 'STEP_Objective': [step_obj], 'NPV_STEP_Objective': [npv_step_obj]})
-        obj_res = pd.concat([obj_res, new_row], ignore_index=True)
+        obj_rows.append({
+            'Investment_Period': i+1,
+            'OPF_Objective': opf_obj,
+            'NPV_OPF_Objective': npv_opf_obj,
+            'TEP_Objective': inv_obj,
+            'STEP_Objective': step_obj,
+            'NPV_STEP_Objective': npv_step_obj
+        })
+    obj_res = pd.DataFrame(obj_rows, columns=['Investment_Period', 'OPF_Objective',
+                                              'NPV_OPF_Objective','TEP_Objective',
+                                              'STEP_Objective','NPV_STEP_Objective'])
     grid.MP_TEP_obj_res = obj_res
     timing_info = {
     "create": t2-t1,

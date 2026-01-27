@@ -51,7 +51,8 @@ dependencies = ["numpy",
                 "shapely",
                 "svgwrite",
                 "scikit-learn",
-                "kmedoids"]
+                "kmedoids",
+                "openpyxl"]
 
 
 [project.optional-dependencies]
