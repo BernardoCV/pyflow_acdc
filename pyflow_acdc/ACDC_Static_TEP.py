@@ -31,7 +31,7 @@ __all__ = [
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
-    'export_TEP_TS_results_to_excel',
+    'export_TEP_multiScenario_results_to_excel',
     'alpha_paretto',
     'rate_sensitivity',
     'kappa_sensitivity',
@@ -434,7 +434,7 @@ def _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set=False):
 
     return model, obj_TEP, obj_OPF,weights_def,PZ
 
-def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None,callback=False):
+def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None,callback=False,solver_options=None):
     grid.reset_run_flags()
     t1 = time.perf_counter()
     model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set)
@@ -455,7 +455,7 @@ def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,O
     
     # model.obj.pprint()
 
-    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=callback)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=callback,solver_options=solver_options)
     
     t1 = time.perf_counter()
     if export:
@@ -870,6 +870,12 @@ def create_scenarios(model,grid,Price_Zones,weights_def,n_clusters,clustering,NP
         
         for ts in grid.Time_series:
             update_grid_scenario_frame(grid,ts,t,n_clusters,clustering)
+        
+        # After all time series are updated, ensure a and PGL_min are recalculated
+        # This is critical because a_base and PGL_min_base setters trigger calculations
+        # that may use stale values if called in the wrong order
+        for price_zone in grid.Price_Zones:
+            price_zone.update_a()
 
         _modify_parameters(grid,model.scenario_model[t],Price_Zones)
         
@@ -937,17 +943,17 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
     model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
-    TEP_TS_res = ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
+    TEP_multiScenario_res = ExportACDC_TEP_MS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
     
-    TEP_TS_res['OPF_obj'] = weights_def
+    TEP_multiScenario_res['OPF_obj'] = weights_def
     
     t2 = time.perf_counter()  
     t_modelexport = t2-t1
         
-    # TEP_TS_res ={}
+    # TEP_multiScenario_res ={}
     
     grid.TEP_run=True
-    grid.TEP_res = TEP_TS_res
+    grid.TEP_multiScenario_res = TEP_multiScenario_res
     grid.OPF_obj = weights_def
     
     timing_info = {
@@ -956,7 +962,7 @@ def multi_scenario_TEP(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clust
     "export": t_modelexport,
     }
     
-    return model, model_results , timing_info, solver_stats , TEP_TS_res
+    return model, model_results , timing_info, solver_stats , TEP_multiScenario_res
 
 
 def TEP_subObj(scenario_model,grid,ObjRule):
@@ -1304,8 +1310,7 @@ def get_gen_data(t, model, grid):
 
 
 
-
-def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones):
+def ExportACDC_TEP_MS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones):
     grid.V_AC =np.zeros(grid.nn_AC)
     grid.Theta_V_AC=np.zeros(grid.nn_AC)
     grid.V_DC=np.zeros(grid.nn_DC)
@@ -1405,9 +1410,9 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     
     Pf = np.zeros((grid.nn_AC, 1))
     Qf = np.zeros((grid.nn_AC, 1))
-
-    G = np.real(grid.Ybus_AC)
-    B = np.imag(grid.Ybus_AC)
+    grid.create_Ybus_AC()
+    G = np.real(grid.Ybus_AC_full)
+    B = np.imag(grid.Ybus_AC_full)
     V = grid.V_AC
     Theta = grid.Theta_V_AC
     # Compute differences in voltage angles
@@ -1545,26 +1550,28 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
 
     # Calculate Total SC and related calculations only if Price_Zones is True
     if Price_Zones:
-        # Calculate Total SC
-        total_sc = np.round(flipped_data_SC.sum(), decimals=2)
+        # Total SC per scenario frame as numeric Series
+        total_sc = flipped_data_SC.sum().astype(float).round(2)
+
+        # Weights as numeric Series aligned with the scenario columns
+        weights_series = pd.Series(
+            [float(w) for w in weights_row],
+            index=flipped_data_SC.columns
+        )
+
+        # Single authoritative weighted SC (per scenario frame)
+        weighted_sc = (total_sc * weights_series).round(2)
         
-        # Calculate Weighted SC
-        weighted_sc = np.round(total_sc * weights_row, decimals=2)
-        
-        # Create additional rows DataFrame
+        # Additional rows using that same weighted_sc
         additional_rows = pd.DataFrame({
             'Total SC': total_sc,
             '': [None] * len(total_sc),  # Blank row
-            'Weight': weights_row,
+            'Weight': weights_series,
             'Weighted SC': weighted_sc
         }).T
         
         # Combine original data with additional rows
         flipped_data_SC = pd.concat([flipped_data_SC, additional_rows])
-        
-        flipped_data_SC.loc['Weight'] = weights_row
-        weighted_SC = flipped_data_SC.loc['Total SC'] * flipped_data_SC.loc['Weight']
-        flipped_data_SC.loc['Weighted SC'] = np.round(weighted_SC, decimals=2)
     else:
         # Create empty DataFrame with the same structure for consistency
         flipped_data_SC = pd.DataFrame()
@@ -1577,15 +1584,15 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
         )
 
     # Pack all variables into the final result
-    TEP_TS_res =     {
+    TEP_multiScenario_res =     {
     'clustering': clustering,
     'n_clusters': n_clusters,
     'weights': weights_df,
 
 
     'PN': flipped_data_PN if flipped_data_PN is not None else None,
-    'PZGEN': flipped_data_PZGEN if flipped_data_PZGEN is not None else None,
-    'SC': flipped_data_SC if flipped_data_SC is not None else None,
+    'PZ_GEN': flipped_data_PZGEN if flipped_data_PZGEN is not None else None,
+    'PZ_cost_of_generation': flipped_data_SC if flipped_data_SC is not None else None,
 
     'curtailment': flipped_data_curt,
     'curtailment_per': flipped_data_curt_per,
@@ -1601,14 +1608,14 @@ def ExportACDC_TEP_TS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)
     grid.Line_AC_calc()
     grid.Line_DC_calc()
     
-    return TEP_TS_res
+    return TEP_multiScenario_res
 
       
 
-def export_TEP_TS_results_to_excel(grid,export):
+def export_TEP_multiScenario_results_to_excel(grid,export):
     
     [clustering,n_clusters,flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
-        flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_TS_res
+        flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_multiScenario_res
            # Define the column names for the DataFrame
     columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]"]
     

@@ -900,6 +900,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         - GLPK: {'tmlim': 3600}
         - IPOPT: {'max_iter': 1000}
         - Bonmin: {'bonmin.time_limit': 3600}
+        - Minotaur: {'specific_solver': 'mglob', 'executable': '/path/to/minotaur', 'time_limit': 3600, ...}
     objective_name : str, optional
         Name of objective function in model (default: tries 'obj' then 'objective')
     
@@ -930,7 +931,17 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         elif solver == 'highs':
             results, feasible_solutions, all_solutions = _solver_progress(model, feasible_solutions, 'highs', time_limit, 'highs.log', tee_console=tee)
     else:
-        opt = pyo.SolverFactory(solver)
+        # For Minotaur, check if executable is specified in solver_options
+        if solver == 'minotaur':
+            
+            if 'specific_solver' not in solver_options or 'executable_folder' not in solver_options:
+                raise ValueError("Minotaur solver requires both 'specific_solver' and 'executable_folder' in solver_options")
+            specific_solver = solver_options.pop('specific_solver')
+            executable_path = solver_options.pop('executable_folder')  # Remove from dict
+            executable = f'{executable_path}/{specific_solver}'
+            opt = pyo.SolverFactory(specific_solver, executable=executable)
+        else:
+            opt = pyo.SolverFactory(solver)
         
         # Set time limit (can be overridden by solver_options)
         if time_limit is not None:
@@ -946,6 +957,8 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
                 opt.options['tmlim'] = time_limit
             elif solver == 'highs':
                 opt.options['time_limit'] = time_limit
+            elif solver == 'minotaur':
+                opt.options['--time_limit'] = time_limit
         
         # Apply custom solver options (overrides time_limit if also specified)
         if solver_options:
@@ -1524,7 +1537,10 @@ def OPF_step_results(model,grid):
             S_AC = np.sqrt(opt_res_P_conv_AC[name]**2 + opt_res_Q_conv_AC[name]**2)
             P_DC = opt_res_P_conv_DC[name]
             
-            opt_res_Loading_conv[name]=max(S_AC, np.abs(P_DC)) * grid.S_base / (conv.MVA_max*conv.NumConvP)
+            if conv.NumConvP == 0:
+                opt_res_Loading_conv[name]=0
+            else:
+                opt_res_Loading_conv[name]=max(S_AC, np.abs(P_DC)) * grid.S_base / (conv.MVA_max*conv.NumConvP)
     
         with ThreadPoolExecutor() as executor:
             executor.map(process_converter, grid.Converters_ACDC)

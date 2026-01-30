@@ -188,7 +188,7 @@ def _MP_TEP_variables(model,grid):
         model.ConvMP = pyo.Var(model.conv,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_Conv_bounds,initialize=NumConvP_i)
         model.decomision_Conv = pyo.Param(model.conv,model.inv_periods,initialize=0)
         
-def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,callback=False):
+def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,callback=False,solver_options=None):
     grid.reset_run_flags()
     analyse_grid(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
@@ -260,7 +260,7 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
     
     t2 = time.time()
 
-    model_results,solver_stats = pyomo_model_solve(model,grid,solver,time_limit=time_limit,tee=tee,callback=callback)
+    model_results,solver_stats = pyomo_model_solve(model,grid,solver,time_limit=time_limit,tee=tee,callback=callback,solver_options=solver_options)
     
     t3 = time.time()
     
