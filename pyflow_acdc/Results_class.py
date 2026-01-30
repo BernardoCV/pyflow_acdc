@@ -62,7 +62,8 @@ class Results:
                 self.export_location = "pyflowacdc_res"
                 os.makedirs(self.export_location, exist_ok=True)
       
-
+        if self.Grid.Clustering_information != {}:
+            self.Clustering_results()
         if self.Grid.nodes_AC != []:
             self.AC_Powerflow()
             self.AC_voltage()
@@ -100,9 +101,9 @@ class Results:
             self.AC_exp_lines_power()
         if self.Grid.TEP_run:    
             self.TEP_N()
-            if self.Grid.TEP_res is not None:
-                #self.TEP_TS_norm()
-                #self.TEP_ts_res()
+            if self.Grid.TEP_multiScenario_res is not None:
+                self.TEP_TS_norm()
+                self.TEP_multiScenario_res()
                 s=1
             else:
                 self.TEP_norm()
@@ -746,30 +747,33 @@ class Results:
                      "i from (kA)", "i to (kA)", "Loading %", "Capacity [MVA]", "Grid"]
         )
 
-        self.tables["AC_lines_current"] = df_all
+        # Skip saving/printing if the table is effectively empty
+        effective_empty = df_all.empty or df_all.drop(columns=["Grid"], errors="ignore").isna().all().all()
+        if not effective_empty:
+            self.tables["AC_lines_current"] = df_all
 
-        if print_table:
-            print('--------------')
-            print('Results AC Lines Currents')
-            for g in range(self.Grid.Num_Grids_AC):
-                df_grid = df_all[df_all["Grid"] == (g+1)]
-                if df_grid.empty:
-                    continue
-                print(f'Grid AC {g+1}')
-                tablei = pt()
-                tablei.field_names = ["Line", "From bus", "To bus",
-                                      "i from (kA)", "i to (kA)", "Loading %", "Capacity [MVA]"]
-                for _, row in df_grid.iterrows():
-                    tablei.add_row([
-                        row["Line"],
-                        row["From bus"],
-                        row["To bus"],
-                        row["i from (kA)"],
-                        row["i to (kA)"],
-                        row["Loading %"],
-                        row["Capacity [MVA]"],
-                    ])
-                print(tablei)
+            if print_table:
+                print('--------------')
+                print('Results AC Lines Currents')
+                for g in range(self.Grid.Num_Grids_AC):
+                    df_grid = df_all[df_all["Grid"] == (g+1)]
+                    if df_grid.empty:
+                        continue
+                    print(f'Grid AC {g+1}')
+                    tablei = pt()
+                    tablei.field_names = ["Line", "From bus", "To bus",
+                                          "i from (kA)", "i to (kA)", "Loading %", "Capacity [MVA]"]
+                    for _, row in df_grid.iterrows():
+                        tablei.add_row([
+                            row["Line"],
+                            row["From bus"],
+                            row["To bus"],
+                            row["i from (kA)"],
+                            row["i to (kA)"],
+                            row["Loading %"],
+                            row["Capacity [MVA]"],
+                        ])
+                    print(tablei)
 
         if self.save_res and self.export_type == "csv":
             csv_filename = f'{self.export_location}/AC_line_current.csv'
@@ -928,35 +932,38 @@ class Results:
             ]
         )
 
-        self.tables["AC_lines_power"] = df_all
+        # Skip saving/printing if the table is effectively empty
+        effective_empty = df_all.empty or df_all.drop(columns=["Grid"], errors="ignore").isna().all().all()
+        if not effective_empty:
+            self.tables["AC_lines_power"] = df_all
 
-        if print_table:
-            print('--------------')
-            print('Results AC Lines power')
-            for g in range(self.Grid.Num_Grids_AC):
-                if isinstance(Grid, int) and Grid != (g+1):
-                    continue
-                df_grid = df_all[df_all["Grid"] == (g+1)]
-                if df_grid.empty:
-                    continue
-                print(f'Grid AC {g+1}')
-                tablep = pt()
-                tablep.field_names = ["Line", "From bus", "To bus",
-                                      "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)",
-                                      "Power loss (MW)", "Q loss (MVAR)"]
-                for _, row in df_grid.iterrows():
-                    tablep.add_row([
-                        row["Line"],
-                        row["From bus"],
-                        row["To bus"],
-                        row["P from (MW)"],
-                        row["Q from (MVAR)"],
-                        row["P to (MW)"],
-                        row["Q to (MW)"],
-                        row["Power loss (MW)"],
-                        row["Q loss (MVAR)"],
-                    ])
-                print(tablep)
+            if print_table:
+                print('--------------')
+                print('Results AC Lines power')
+                for g in range(self.Grid.Num_Grids_AC):
+                    if isinstance(Grid, int) and Grid != (g+1):
+                        continue
+                    df_grid = df_all[df_all["Grid"] == (g+1)]
+                    if df_grid.empty:
+                        continue
+                    print(f'Grid AC {g+1}')
+                    tablep = pt()
+                    tablep.field_names = ["Line", "From bus", "To bus",
+                                          "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)",
+                                          "Power loss (MW)", "Q loss (MVAR)"]
+                    for _, row in df_grid.iterrows():
+                        tablep.add_row([
+                            row["Line"],
+                            row["From bus"],
+                            row["To bus"],
+                            row["P from (MW)"],
+                            row["Q from (MVAR)"],
+                            row["P to (MW)"],
+                            row["Q to (MW)"],
+                            row["Power loss (MW)"],
+                            row["Q loss (MVAR)"],
+                        ])
+                    print(tablep)
 
         if self.save_res and self.export_type == "csv":
             csv_filename = f'{self.export_location}/AC_line_power.csv'
@@ -1171,80 +1178,281 @@ class Results:
             print(table)
 
         return df
+    def Clustering_results(self, print_table=True):
+        self.Clustering_Time_series_statistics()
+        for key in self.Grid.Clustering_information:
+            if key.startswith('technique_'):
+                self.Clustering_technique(key, print_table)
+                
+    def Clustering_technique(self, key, print_table=True):
+        """
+        Display clustering results for a specific technique.
+        
+        Parameters:
+        -----------
+        key : str
+            The key of the clustering technique
+        print_table : bool, default=True
+            If True, print the statistics table
+        """
+        technique = key.split('_')[1]
+        n_clusters = key.split('_')[2]
+        clustering_result = self.Grid.Clustering_information[key]
+        
+        if print_table:
+            # Print in the same format as print_clustering_results
+            algorithm_name = clustering_result.get('algorithm', technique)
+            print(f"\n{algorithm_name} clustering results:")
+            print(f"- Number of clusters: {n_clusters}")
+            
+            # Print time taken if available
+            if 'time taken' in clustering_result:
+                print(f"- Time taken: {np.round(clustering_result['time taken'], decimals=self.dec)} seconds")
+            
+            # Get specific_info and print all key-value pairs
+            specific_info = clustering_result.get('specific_info', {})
+            for key, value in specific_info.items():
+                # Skip derived statistics that are already included
+                if key in ["Cluster sizes average", "Cluster sizes std"]:
+                    continue
+                
+                # Format value based on type
+                if isinstance(value, list):
+                    # Convert numpy types in lists to native Python types
+                    formatted_value = [int(v) if isinstance(v, (np.integer, np.int64, np.int32)) 
+                                      else float(v) if isinstance(v, (np.floating, np.float64, np.float32))
+                                      else v for v in value]
+                    print(f"- {key}: {formatted_value}")
+                elif isinstance(value, (np.integer, np.int64, np.int32)):
+                    print(f"- {key}: {int(value)}")
+                elif isinstance(value, (np.floating, np.float64, np.float32)):
+                    print(f"- {key}: {np.round(float(value), decimals=self.dec)}")
+                elif isinstance(value, float):
+                    print(f"- {key}: {np.round(value, decimals=self.dec)}")
+                elif isinstance(value, dict):
+                    # Handle dict values (like Noise points)
+                    if 'count' in value and 'percentage' in value:
+                        print(f"- {key}: {value['count']} ({value['percentage']:.{self.dec}f}%)")
+                    else:
+                        print(f"- {key}: {value}")
+                else:
+                    print(f"- {key}: {value}")
+        
+        # Store in tables dict for Excel export
+        technique_name = f"Clustering_{technique}_{n_clusters}"
+        rows = []
+        row_data = {
+            "Algorithm": technique,
+            "Number of clusters": n_clusters,
+            "CoV": clustering_result.get('CoV', None)
+        }
+        
+        # Add specific_info to row
+        specific_info = clustering_result.get('specific_info', {})
+        for info_key, info_value in specific_info.items():
+            if info_key == "Cluster sizes":
+                if isinstance(info_value, list):
+                    row_data["Cluster sizes (avg)"] = specific_info.get('Cluster sizes average', np.mean(info_value) if len(info_value) > 0 else None)
+                    row_data["Cluster sizes (std)"] = specific_info.get('Cluster sizes std', np.std(info_value) if len(info_value) > 0 else None)
+            elif info_key not in ["Cluster sizes average", "Cluster sizes std"]:
+                if isinstance(info_value, dict):
+                    row_data[info_key] = str(info_value)
+                else:
+                    row_data[info_key] = info_value
+        
+        rows.append(row_data)
+        df = pd.DataFrame(rows)
+        self.tables[technique_name] = df
+        
+        return clustering_result
+
+    def Clustering_Time_series_statistics(self, print_table=True):
+        """
+        Display time series statistics (Mean, Std, Var, CV) from clustering analysis.
+        
+        Parameters:
+        -----------
+        print_table : bool, default=True
+            If True, print the statistics table
+        """
+        if (not hasattr(self.Grid, 'Clustering_information') or 
+            self.Grid.Clustering_information is None or 
+            'Time_series_statistics' not in self.Grid.Clustering_information):
+            if print_table:
+                print('--------------')
+                print('Time series statistics')
+                print('No time series statistics available. Run clustering analysis first.')
+            return pd.DataFrame()
+        
+        df = self.Grid.Clustering_information['Time_series_statistics'].copy()
+        
+        # Round numeric columns for display
+        numeric_cols = ['Mean', 'Std', 'Var', 'CV']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(lambda x: np.round(x, decimals=self.dec) if isinstance(x, (int, float, np.number)) and pd.notna(x) and np.isfinite(x) else x)
+        
+        self.tables["Time_series_statistics"] = df
+        
+        if print_table:
+            print('--------------')
+            print('Time series statistics (sorted by CV)')
+            table = pt()
+            table.field_names = ["Name", "Mean", "Std", "Var", "CV"]
+            for _, row in df.iterrows():
+                # Check if this is a separator row (has string values)
+                is_separator = isinstance(row['Mean'], str) or row['Name'] in ['---', 'Not']
+                
+                if is_separator:
+                    # For separator row, use values as-is
+                    table.add_row([
+                        row['Name'],
+                        row['Mean'],
+                        row['Std'],
+                        row['Var'],
+                        row['CV'],
+                    ])
+                else:
+                    # Format numeric values for display using self.dec
+                    mean_val = f"{row['Mean']:.{self.dec}f}" if isinstance(row['Mean'], (int, float, np.number)) and pd.notna(row['Mean']) and np.isfinite(row['Mean']) else str(row['Mean'])
+                    std_val = f"{row['Std']:.{self.dec}f}" if isinstance(row['Std'], (int, float, np.number)) and pd.notna(row['Std']) and np.isfinite(row['Std']) else str(row['Std'])
+                    var_val = f"{row['Var']:.{self.dec}f}" if isinstance(row['Var'], (int, float, np.number)) and pd.notna(row['Var']) and np.isfinite(row['Var']) else str(row['Var'])
+                    cv_val = f"{row['CV']:.{self.dec}f}" if isinstance(row['CV'], (int, float, np.number)) and pd.notna(row['CV']) and np.isfinite(row['CV']) else str(row['CV'])
+                    
+                    table.add_row([
+                        row['Name'],
+                        mean_val,
+                        std_val,
+                        var_val,
+                        cv_val,
+                    ])
+            print(table)
+        
+        
+        
+        return df
     
-    def TEP_ts_res(self, print_table=True):
-        if self.Grid.TEP_res is None:
+    def TEP_multiScenario_res(self, print_table=True):
+        if self.Grid.TEP_multiScenario_res is None:
             return None
         
-        PN   = self.Grid.TEP_res['PN']
-        SC   = self.Grid.TEP_res['SC']
-        curt = self.Grid.TEP_res['curtailment']
-        lines= self.Grid.TEP_res['lines']
-        conv = self.Grid.TEP_res['converters']
-        price= self.Grid.TEP_res['price']
+        TEP_multiScenario_res = self.Grid.TEP_multiScenario_res
+        PN   = TEP_multiScenario_res['PN']
+        SC   = TEP_multiScenario_res['PZ_cost_of_generation']
+        curt = TEP_multiScenario_res['curtailment']
+        lines= TEP_multiScenario_res['lines']
+        conv = TEP_multiScenario_res['converters']
+        price= TEP_multiScenario_res['price']
 
-        # Store raw DataFrames for Excel export
-        self.tables["TEP_ts_PN"] = PN
-        self.tables["TEP_ts_SC"] = SC
-        self.tables["TEP_ts_curtailment"] = curt
-        self.tables["TEP_ts_lines"] = lines
-        self.tables["TEP_ts_converters"] = conv
-        self.tables["TEP_ts_price"] = price
+        # Helper to detect "empty" tables (None, empty, or all-NaN)
+        def _is_empty(df):
+            return (df is None) or df.empty or getattr(df, "isna", lambda: False)().all().all()
+
+        # Build DataFrames with the same headers / first column as the PrettyTable printout,
+        # only for non-empty tables, so that Excel exports match the on-screen tables and
+        # we avoid saving completely empty sheets.
+        if not _is_empty(PN):
+            pn_for_excel = PN.fillna('')
+            pn_for_excel = pn_for_excel.copy()
+            pn_for_excel.insert(0, '', pn_for_excel.index)
+            pn_for_excel.columns = [''] + [f'Net price zone power [MW] @ Case:{t}' for t in PN.columns]
+            self.tables["TEP_MS_PN"] = pn_for_excel
+
+        if not _is_empty(SC):
+            sc_for_excel = SC.fillna('')
+            sc_for_excel = sc_for_excel.copy()
+            sc_for_excel.insert(0, '', sc_for_excel.index)
+            sc_for_excel.columns = [''] + [f'Cost of Generation [k€] @ Case:{t}' for t in SC.columns]
+            self.tables["TEP_MS_SC"] = sc_for_excel
+
+        if not _is_empty(price):
+            price_for_excel = price.fillna('')
+            price_for_excel = price_for_excel.copy()
+            price_for_excel.insert(0, '', price_for_excel.index)
+            price_for_excel.columns = [''] + [f'Price Zone Price [€/Mwh] @ Case:{t}' for t in price.columns]
+            self.tables["TEP_MS_price"] = price_for_excel
+
+        if not _is_empty(curt):
+            curt_for_excel = curt.fillna('')
+            curt_for_excel = curt_for_excel.copy()
+            curt_for_excel.insert(0, '', curt_for_excel.index)
+            curt_for_excel.columns = [''] + [f'Curtialment [MW] @ Case:{t}' for t in curt.columns]
+            self.tables["TEP_MS_curtailment"] = curt_for_excel
+
+        if not _is_empty(lines):
+            lines_for_excel = lines.fillna('')
+            lines_for_excel = lines_for_excel.copy()
+            lines_for_excel.insert(0, '', lines_for_excel.index)
+            lines_for_excel.columns = [''] + [f'Line loading [%] @ Case:{t}' for t in lines.columns]
+            self.tables["TEP_MS_lines_loading"] = lines_for_excel
+
+        if not _is_empty(conv):
+            conv_for_excel = conv.fillna('')
+            conv_for_excel = conv_for_excel.copy()
+            conv_for_excel.insert(0, '', conv_for_excel.index)
+            conv_for_excel.columns = [''] + [f'Converter loading [%] @ Case:{t}' for t in conv.columns]
+            self.tables["TEP_MS_converters_loading"] = conv_for_excel
 
         if print_table:
             # PN
-            table = pt()
-            data = PN.fillna('')
-            field_names = [''] + [f'Net price zone power [MW] @ Case:{t}' for t in data.columns]
-            table.field_names = field_names
-            for index, row in data.iterrows():
-                table.add_row([index] + row.tolist())
-            print(table)
+            if not _is_empty(PN):
+                table = pt()
+                data = PN.fillna('')
+                field_names = [''] + [f'Net price zone power [MW] @ Case:{t}' for t in data.columns]
+                table.field_names = field_names
+                for index, row in data.iterrows():
+                    table.add_row([index] + row.tolist())
+                print(table)
             
             # SC
-            table = pt()
-            data_SC = SC.fillna('')
-            field_names = [''] + [f'Social Cost [k€] @ Case:{t}' for t in data_SC.columns]
-            table.field_names = field_names
-            for index, row in data_SC.iterrows():
-                table.add_row([index] + row.tolist())
-            print(table)
+            if not _is_empty(SC):
+                table = pt()
+                data_SC = SC.fillna('')
+                field_names = [''] + [f'Cost of Generation [k€] @ Case:{t}' for t in data_SC.columns]
+                table.field_names = field_names
+                for index, row in data_SC.iterrows():
+                    table.add_row([index] + row.tolist())
+                print(table)
             
             # price
-            table = pt()
-            data_price = price.fillna('')
-            field_names = [''] + [f'Price Zone Price [€/Mwh] @ Case:{t}' for t in data_price.columns]
-            table.field_names = field_names
-            for index, row in data_price.iterrows():
-                table.add_row([index] + row.tolist())
-            print(table)
+            if not _is_empty(price):
+                table = pt()
+                data_price = price.fillna('')
+                field_names = [''] + [f'Price Zone Price [€/Mwh] @ Case:{t}' for t in data_price.columns]
+                table.field_names = field_names
+                for index, row in data_price.iterrows():
+                    table.add_row([index] + row.tolist())
+                print(table)
             
             # curtailment
-            table = pt()
-            data_curt = curt.fillna('')
-            field_names = [''] + [f'Curtialment [MW] @ Case:{t}' for t in data_curt.columns]
-            table.field_names = field_names
-            for index, row in data_curt.iterrows():
-                table.add_row([index] + row.tolist())
-            print(table)
+            if not _is_empty(curt):
+                table = pt()
+                data_curt = curt.fillna('')
+                field_names = [''] + [f'Curtialment [MW] @ Case:{t}' for t in data_curt.columns]
+                table.field_names = field_names
+                for index, row in data_curt.iterrows():
+                    table.add_row([index] + row.tolist())
+                print(table)
             
             # lines
-            table = pt()
-            data_lines = lines.fillna('')
-            field_names = [''] + [f'Line loading [%] @ Case:{t}' for t in data_lines.columns]
-            table.field_names = field_names
-            for index, row in data_lines.iterrows():
-                table.add_row([index] + row.tolist())
-            print(table)
+            if not _is_empty(lines):
+                table = pt()
+                data_lines = lines.fillna('')
+                field_names = [''] + [f'Line loading [%] @ Case:{t}' for t in data_lines.columns]
+                table.field_names = field_names
+                for index, row in data_lines.iterrows():
+                    table.add_row([index] + row.tolist())
+                print(table)
             
             # converters
-            table = pt()
-            data_conv = conv.fillna('')
-            field_names = [''] + [f'Converter loading [%] @ Case:{t}' for t in data_conv.columns]
-            table.field_names = field_names
-            for index, row in data_conv.iterrows():
-                table.add_row([index] + row.tolist())
-            print(table)
+            if not _is_empty(conv):
+                table = pt()
+                data_conv = conv.fillna('')
+                field_names = [''] + [f'Converter loading [%] @ Case:{t}' for t in data_conv.columns]
+                table.field_names = field_names
+                for index, row in data_conv.iterrows():
+                    table.add_row([index] + row.tolist())
+                print(table)
 
         # Return a dict of the underlying DataFrames for convenience
         return {
@@ -1255,6 +1463,7 @@ class Results:
             "converters": conv,
             "price": price,
         }
+
     def TEP_N(self, print_table=True):
         rows = []
         tot=0
@@ -1364,7 +1573,7 @@ class Results:
                     ini,
                     opt,
                     maxn,
-                    int(pr) if pd.notna(pr) else pr,
+                    pr if not isinstance(pr, (int, float)) else int(pr),
                     f"{cost:,.2f}".replace(',', ' ') if pd.notna(cost) else cost,
                 ])
             print(table)
@@ -1430,7 +1639,8 @@ class Results:
         return df
         
     def TEP_TS_norm(self, print_table=True):
-
+        if not self.Grid.OPF_obj['PZ_cost_of_generation']['w'] > 0:
+            return None
         tot = 0
         tot_n = 0
 
@@ -1457,16 +1667,18 @@ class Results:
                 tot+=cost
                 tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
         
-
-        SC = self.Grid.TEP_res['SC']
-        weight = self.Grid.TEP_res['weights']
-        price = self.Grid.TEP_res['price']
-        OBJ_res = self.Grid.TEP_res['OBJ_res']
+        TEP_multiScenario_res = self.Grid.TEP_multiScenario_res
+        SC = TEP_multiScenario_res['PZ_cost_of_generation']
+        weight = TEP_multiScenario_res['weights']
+        price = TEP_multiScenario_res['price']
+        OPF_obj = TEP_multiScenario_res['OPF_obj']
        
         # Per-price-zone normalized costs
         rows_zones = []
         n_years = self.Grid.TEP_n_years
         discount_rate = self.Grid.TEP_discount_rate
+        
+        
         for m in self.Grid.Price_Zones:
             if type(m) is Price_Zone:
                 price_zone_weighted = SC.loc[m.name]

@@ -127,7 +127,7 @@ class Grid:
     }
         self.reset_run_flags()
     
-        self.TEP_res=None
+        self.TEP_multiScenario_res=None
         self.MP_TEP_res=None
         self.time_series_results = {
             'PF_results': pd.DataFrame(),  # Time_series_res
@@ -146,6 +146,8 @@ class Grid:
             'prices_by_zone': pd.DataFrame()  # Time_series_price
             }
         
+        self.Clustering_information = {}
+
         self.VarPrice = False
         self.OnlyGen = True
         self.CurtCost=False
@@ -3159,7 +3161,10 @@ class Price_Zone:
     @b.setter
     def b(self, value):
         self._b = value
-        self.calc_import_expand()
+        if self.expand_import:
+            self.calc_import_expand()
+        else:
+            self.calc_elasticity_effect()
 
     @property
     def PGL_min_base(self):

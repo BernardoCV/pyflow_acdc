@@ -926,7 +926,7 @@ def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
             data = inv.loc[2:, col].astype(float).to_numpy()   
             name = col 
 
-    inv_period = inv_periods(element_type, element_name, inv_data,name)
+    inv_period = investment_periods(element_type, element_name, inv_data,name)
     grid.inv_series.append(inv_period)
     grid.inv_series_dic[name]=inv_period.inv_periods_num
     
