@@ -1583,7 +1583,7 @@ def cluster_DBSCAN(grid, n_clusters, data, scaling_data=None, min_samples=DEFAUL
     return actual_clusters, processed_results, CoV, [data_scaled, best_labels]
 
 
-def cluster_Spectral(grid, n_clusters, data, scaling_data=None, n_init=10, assign_labels='kmeans', affinity='rbf', gamma=1.0, print_details=False, scaler_type='robust'):
+def cluster_Spectral(grid, n_clusters, data, scaling_data=None, n_init=10, assign_labels='kmeans', affinity='nearest_neighbors', gamma=1.0, n_neighbors=10, print_details=False, scaler_type='robust'):
     """
     Perform Spectral clustering on the data.
     
@@ -1599,26 +1599,53 @@ def cluster_Spectral(grid, n_clusters, data, scaling_data=None, n_init=10, assig
         Number of times the k-means algorithm will be run with different centroid seeds
     assign_labels : {'kmeans', 'discretize'}, default='kmeans'
         Strategy to assign labels in the embedding space
-    affinity : {'rbf', 'nearest_neighbors', 'precomputed'}, default='rbf'
-        How to construct the affinity matrix
+    affinity : {'rbf', 'nearest_neighbors', 'precomputed'}, default='nearest_neighbors'
+        How to construct the affinity matrix. Use 'nearest_neighbors' for memory efficiency.
     gamma : float, default=1.0
-        Kernel coefficient for rbf kernel
+        Kernel coefficient for rbf kernel (only used if affinity='rbf')
+    n_neighbors : int, default=10
+        Number of neighbors for nearest_neighbors affinity (only used if affinity='nearest_neighbors')
     """
     data_scaled, scaler = _prepare_scaled_data(data, scaling_data,scaler_type)
     
-    spectral = SpectralClustering(
-        n_clusters=n_clusters,
-        n_init=n_init,
-        assign_labels=assign_labels,
-        affinity=affinity,
-        gamma=gamma,
-        random_state=DEFAULT_RANDOM_STATE
-    )
+    # For large datasets, use nearest_neighbors to avoid memory issues
+    # This creates a sparse matrix instead of a dense one
+    if affinity == 'rbf' and len(data) > 5000:
+        if print_details:
+            print(f"Warning: Large dataset ({len(data)} points). Switching to 'nearest_neighbors' affinity for memory efficiency.")
+        affinity = 'nearest_neighbors'
+    
+    # Configure spectral clustering
+    spectral_kwargs = {
+        'n_clusters': n_clusters,
+        'n_init': n_init,
+        'assign_labels': assign_labels,
+        'affinity': affinity,
+        'random_state': DEFAULT_RANDOM_STATE
+    }
+    
+    # Add affinity-specific parameters
+    if affinity == 'rbf':
+        spectral_kwargs['gamma'] = gamma
+    elif affinity == 'nearest_neighbors':
+        spectral_kwargs['n_neighbors'] = n_neighbors
+    
+    spectral = SpectralClustering(**spectral_kwargs)
     
     # Time only the actual clustering execution
     start_time = time.perf_counter()
-    labels = spectral.fit_predict(data_scaled)
-    time_taken = time.perf_counter() - start_time
+    try:
+        labels = spectral.fit_predict(data_scaled)
+        time_taken = time.perf_counter() - start_time
+    except MemoryError as e:
+        if print_details:
+            print(f"Memory error during spectral clustering: {e}")
+            print("Try using affinity='nearest_neighbors' or reducing n_neighbors")
+        raise
+    except Exception as e:
+        if print_details:
+            print(f"Error during spectral clustering: {e}")
+        raise
     
     # Calculate cluster centers (medoids) from original data
     all_centers = []
@@ -1632,17 +1659,29 @@ def cluster_Spectral(grid, n_clusters, data, scaling_data=None, n_init=10, assig
     
     # Get cluster sizes and affinity info
     cluster_sizes = pd.Series(labels).value_counts().sort_index().values
-    affinity_matrix = spectral.affinity_matrix_
-    connectivity = (affinity_matrix > 0).sum() / (affinity_matrix.shape[0] * affinity_matrix.shape[1])
+    
+    # Try to get affinity matrix info (may not be available for all affinity types)
+    try:
+        affinity_matrix = spectral.affinity_matrix_
+        if hasattr(affinity_matrix, 'toarray'):  # Sparse matrix
+            connectivity = (affinity_matrix > 0).sum() / (affinity_matrix.shape[0] * affinity_matrix.shape[1])
+            avg_affinity = float(affinity_matrix.mean())
+        else:  # Dense matrix
+            connectivity = (affinity_matrix > 0).sum() / (affinity_matrix.shape[0] * affinity_matrix.shape[1])
+            avg_affinity = float(affinity_matrix.mean())
+    except AttributeError:
+        connectivity = "N/A"
+        avg_affinity = "N/A"
     
     specific_info = {
         "Scaler": scaler_type,
         "Cluster sizes": cluster_sizes,
         "Affinity": affinity,
         "Label assignment": assign_labels,
-        "Gamma": gamma,
-        "Connectivity density": f"{connectivity:.2%}",
-        "Average affinity": f"{affinity_matrix.mean():.4f}"
+        "Gamma": gamma if affinity == 'rbf' else "N/A",
+        "N neighbors": n_neighbors if affinity == 'nearest_neighbors' else "N/A",
+        "Connectivity density": f"{connectivity:.2%}" if connectivity != "N/A" else "N/A",
+        "Average affinity": f"{avg_affinity:.4f}" if avg_affinity != "N/A" else "N/A"
     }
     # Calculate CoV from cluster sizes
     CoV = np.std(cluster_sizes)/np.mean(cluster_sizes) if len(cluster_sizes) > 0 else 0
