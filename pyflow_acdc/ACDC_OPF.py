@@ -108,7 +108,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     # pr = cProfile.Profile()
     # pr.enable()
     # Call your function here
-    OPF_create_LModel_ACDC(model,grid)
+    OPF_create_LModel_AC(model,grid)
     # pr.disable()
     
     # s = StringIO()
@@ -1215,7 +1215,7 @@ def Translate_pyf_OPF(grid,Price_Zones=False):
     lista_lineas_AC_ct = list(range(0, grid.nct_AC))
     # Dictionaries for AC variables
     price, V_ini_AC, Theta_ini = {}, {}, {}
-    P_renSource, P_know, Q_know = {}, {}, {}
+    P_renSource, P_know, Q_know,np_rsgen = {}, {}, {}, {}
     S_lineAC_limit,S_lineACexp_limit,S_lineACtf_limit,m_tf_og,NP_lineAC  = {}, {}, {}, {},{}
     S_lineACrec_lim, S_lineACrec_lim_new,REC_AC_act = {}, {}, {}
     lf,qf,fc,np_gen = {}, {}, {}, {}
@@ -1250,12 +1250,14 @@ def Translate_pyf_OPF(grid,Price_Zones=False):
     for rs in grid.RenSources:
         nn_rs+=1
         P_renSource[rs.rsNumber]=rs.PGi_ren
-        
+        np_rsgen[rs.rsNumber] = rs.np_rsgen
+
     lista_rs = list(range(0, nn_rs))
 
+    gen_rs_info = pack_variables(P_renSource,np_rsgen,lista_rs)
     gen_AC_info = pack_variables(lf,qf,fc,np_gen,lista_gen)
     gen_DC_info = pack_variables(lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC)
-    gen_info = pack_variables(gen_AC_info,gen_DC_info,P_renSource,lista_rs)
+    gen_info = pack_variables(gen_AC_info,gen_DC_info,gen_rs_info)
 
     "Price zone info"
    
@@ -1418,8 +1420,14 @@ def Translate_pyf_OPF(grid,Price_Zones=False):
         Conv_Volt = pack_variables(u_c_min, u_c_max, S_limit_conv, P_conv_limit) 
         Conv_info = pack_variables(Conv_Lists, Conv_Volt)
     
-   
-    return pack_variables(AC_info, DC_info, Conv_info, Price_Zone_info,gen_info)
+    # Return as dictionary for easier extension and maintenance
+    return {
+        'AC_info': AC_info,
+        'DC_info': DC_info,
+        'Conv_info': Conv_info,
+        'Price_Zone_info': Price_Zone_info,
+        'gen_info': gen_info
+    }
 
 
 

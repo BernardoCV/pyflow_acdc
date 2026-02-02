@@ -24,7 +24,12 @@ def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_r
     if limit_flow_rate is True:
         limit_flow_rate = 1
     
-    [AC_info,DC_info,Conv_info,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+    opf_data = Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+    AC_info = opf_data['AC_info']
+    DC_info = opf_data['DC_info']
+    Conv_info = opf_data['Conv_info']
+    Price_Zone_info = opf_data['Price_Zone_info']
+    gen_info = opf_data['gen_info']
    
     Generation_variables(model,grid,gen_info,TEP)
 
@@ -60,12 +65,14 @@ def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_r
     
 
 def Generation_variables(model,grid,gen_info,TEP):
-    gen_AC_info,gen_DC_info,P_renSource,lista_rs = gen_info
+    gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
     lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC = gen_DC_info
+    P_renSource, np_rsgen, lista_rs = gen_rs_info
     
     model.ren_sources= pyo.Set(initialize=lista_rs)
     model.P_renSource = pyo.Param(model.ren_sources,initialize=P_renSource,mutable=True)
+    model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen,mutable=True)  
 
     def gamma_bounds(model,rs):
         ren_source= grid.RenSources[rs]
@@ -447,12 +454,12 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
     
     def Gen_PREN_rule(model,node):
        nAC = grid.nodes_AC[node]
-       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber] for rs in nAC.connected_RenSource)                  
+       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)                  
        return  model.PGi_ren[node] ==   P_gen
    
     def Gen_QREN_rule(model,node):
        nAC = grid.nodes_AC[node]
-       Q_gen = sum(model.Q_renSource[rs.rsNumber] for rs in nAC.connected_RenSource)                  
+       Q_gen = sum(model.Q_renSource[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)                  
        return  model.QGi_ren[node] ==   Q_gen
    
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
@@ -1084,7 +1091,7 @@ def DC_constraints(model,grid):
     
     def Gen_PREN_rule_DC(model,node):
        nDC = grid.nodes_DC[node]
-       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber] for rs in nDC.connected_RenSource)                  
+       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nDC.connected_RenSource)                  
        return  model.PGi_ren_DC[node] ==   P_gen
    
     def Gen_P_rule_DC(model,node):
@@ -1565,7 +1572,7 @@ def Converter_constraints(model,grid,Conv_info):
 def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
     
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
-    gen_AC_info,gen_DC_info,P_renSource,lista_rs = gen_info
+    gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
     
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
@@ -1784,7 +1791,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
 def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
     "Price Zone Parameters"
     
-    gen_AC_info,gen_DC_info,P_renSource,lista_rs = gen_info
+    gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     if grid.ACmode:
         AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
         
@@ -1809,19 +1816,44 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
     
     from .ACDC_Static_TEP import get_TEP_variables
 
-    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
+    tep_vars = get_TEP_variables(grid)
 
-    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
-    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
-    np_gen,np_gen_max,np_gen_DC,np_gen_max_DC = gen_var
-
+    # Extract converter variables
+    NumConvP = tep_vars['converters']['NumConvP']
+    NumConvP_i = tep_vars['converters']['NumConvP_i']
+    NumConvP_max = tep_vars['converters']['NumConvP_max']
+    S_limit_conv = tep_vars['converters']['S_limit_conv']
+    
+    # Extract DC line variables
+    P_lineDC_limit = tep_vars['dc_lines']['P_lineDC_limit']
+    NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
+    NP_lineDC_i = tep_vars['dc_lines']['NP_lineDC_i']
+    NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
+    Line_length = tep_vars['dc_lines']['Line_length']
+    
+    # Extract AC line variables
+    NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
+    NP_lineAC_i = tep_vars['ac_lines']['NP_lineAC_i']
+    NP_lineAC_max = tep_vars['ac_lines']['NP_lineAC_max']
+    REC_branch = tep_vars['ac_lines']['REC_branch']
+    ct_ini = tep_vars['ac_lines']['ct_ini']
+    
+    # Extract generator variables
+    np_gen = tep_vars['generators']['np_gen']
+    np_gen_max = tep_vars['generators']['np_gen_max']
+    np_gen_DC = tep_vars['generators']['np_gen_DC']
+    np_gen_max_DC = tep_vars['generators']['np_gen_max_DC']
+    
+    # Extract renewable source variables
+    np_rsgen = tep_vars['ren_sources']['np_rsgen']
+    np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
     
    
 
     if grid.ACmode:
         
         model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen,mutable=True)
+        
         if grid.TEP_AC:    
             model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC,mutable=True)    
 
@@ -1849,12 +1881,33 @@ def TEP_variables(model,grid):
 
     from .ACDC_Static_TEP import get_TEP_variables
 
-    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
+    tep_vars = get_TEP_variables(grid)
 
-    NumConvP,NumConvP_i,NumConvP_max,S_limit_conv = conv_var
-    P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length = DC_line_var
-    NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini = AC_line_var
-    np_gen,np_gen_max,np_gen_DC,np_gen_max_DC = gen_var    
+    # Extract converter variables
+    NumConvP = tep_vars['converters']['NumConvP']
+    NumConvP_i = tep_vars['converters']['NumConvP_i']
+    NumConvP_max = tep_vars['converters']['NumConvP_max']
+    S_limit_conv = tep_vars['converters']['S_limit_conv']
+    
+    # Extract DC line variables
+    P_lineDC_limit = tep_vars['dc_lines']['P_lineDC_limit']
+    NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
+    NP_lineDC_i = tep_vars['dc_lines']['NP_lineDC_i']
+    NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
+    Line_length = tep_vars['dc_lines']['Line_length']
+    
+    # Extract AC line variables
+    NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
+    NP_lineAC_i = tep_vars['ac_lines']['NP_lineAC_i']
+    NP_lineAC_max = tep_vars['ac_lines']['NP_lineAC_max']
+    REC_branch = tep_vars['ac_lines']['REC_branch']
+    ct_ini = tep_vars['ac_lines']['ct_ini']
+    
+    # Extract generator variables
+    np_gen = tep_vars['generators']['np_gen']
+    np_gen_max = tep_vars['generators']['np_gen_max']
+    np_gen_DC = tep_vars['generators']['np_gen_DC']
+    np_gen_max_DC = tep_vars['generators']['np_gen_max_DC']    
 
     
     "TEP variables"

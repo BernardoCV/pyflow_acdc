@@ -137,12 +137,13 @@ def _MP_TEP_constraints(model,grid):
 
 def _MP_TEP_variables(model,grid):
     
-    conv_var,DC_line_var,AC_line_var,gen_var = get_TEP_variables(grid)
+    tep_vars = get_TEP_variables(grid)
     np_gen_max_install={}
     for gen in grid.Generators:
         np_gen_max_install[gen.genNumber] = gen.np_gen_max_install if gen.np_gen_max_install else gen.np_gen_max
     if grid.GPR:
-        np_gen,np_gen_max,_,_ = gen_var
+        np_gen = tep_vars['generators']['np_gen']
+        np_gen_max = tep_vars['generators']['np_gen_max']
 
         model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
         
@@ -158,7 +159,8 @@ def _MP_TEP_variables(model,grid):
         model.decomision_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
 
     if grid.ACmode:
-        NP_lineAC,_,NP_lineAC_max,_,_,_ = AC_line_var
+        NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
+        NP_lineAC_max = tep_vars['ac_lines']['NP_lineAC_max']
         if grid.TEP_AC:
             model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
             def MP_AC_line_bounds(model,l,i):
@@ -168,7 +170,8 @@ def _MP_TEP_variables(model,grid):
             model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds,initialize=NP_lineAC_i)
             model.decomision_ACline = pyo.Param(model.lines_AC_exp,model.inv_periods,initialize=0)
     if grid.DCmode:
-        NP_lineDC,_,NP_lineDC_max,_ = DC_line_var
+        NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
+        NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
         
         model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
         def MP_DC_line_bounds(model,l,i):
@@ -179,7 +182,8 @@ def _MP_TEP_variables(model,grid):
         model.decomision_DCline = pyo.Param(model.lines_DC,model.inv_periods,initialize=0)
 
     if grid.ACmode and grid.DCmode:
-        NumConvP,_,NumConvP_max,_ = conv_var
+        NumConvP = tep_vars['converters']['NumConvP']
+        NumConvP_max = tep_vars['converters']['NumConvP_max']
         model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
         def MP_Conv_bounds(model,l,i):
             return (0,NumConvP_max[l])

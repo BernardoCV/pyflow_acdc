@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from .Class_editor import analyse_grid
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
-from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
+from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
 from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize,calculate_objective_from_model
 
 from .Graph_and_plot import save_network_svg
@@ -356,12 +356,46 @@ def get_TEP_variables(grid):
         np_gen_max_DC[gen.genNumber_DC] = gen.np_gen_max
         np_gen_DC[gen.genNumber_DC] = gen.np_gen
     
-    conv_var=pack_variables(NumConvP,NumConvP_i,NumConvP_max,S_limit_conv)
-    DC_line_var=pack_variables(P_lineDC_limit,NP_lineDC,NP_lineDC_i,NP_lineDC_max,Line_length)
-    AC_line_var=pack_variables(NP_lineAC,NP_lineAC_i,NP_lineAC_max,Line_length,REC_branch,ct_ini)
-    gen_var=pack_variables(np_gen,np_gen_max,np_gen_DC,np_gen_max_DC)
-
-    return conv_var,DC_line_var,AC_line_var,gen_var
+    np_rsgen={}
+    np_rsgen_max={}
+    for rs in grid.RenSources:
+        np_rsgen[rs.rsNumber] = rs.np_rsgen
+        np_rsgen_max[rs.rsNumber] = rs.np_rsgen_max
+    
+    # Return as dictionary for easier extension and maintenance
+    return {
+        'converters': {
+            'NumConvP': NumConvP,
+            'NumConvP_i': NumConvP_i,
+            'NumConvP_max': NumConvP_max,
+            'S_limit_conv': S_limit_conv
+        },
+        'dc_lines': {
+            'P_lineDC_limit': P_lineDC_limit,
+            'NP_lineDC': NP_lineDC,
+            'NP_lineDC_i': NP_lineDC_i,
+            'NP_lineDC_max': NP_lineDC_max,
+            'Line_length': Line_length
+        },
+        'ac_lines': {
+            'NP_lineAC': NP_lineAC,
+            'NP_lineAC_i': NP_lineAC_i,
+            'NP_lineAC_max': NP_lineAC_max,
+            'Line_length': Line_length,
+            'REC_branch': REC_branch,
+            'ct_ini': ct_ini
+        },
+        'generators': {
+            'np_gen': np_gen,
+            'np_gen_max': np_gen_max,
+            'np_gen_DC': np_gen_DC,
+            'np_gen_max_DC': np_gen_max_DC
+        },
+        'ren_sources': {
+            'np_rsgen': np_rsgen,
+            'np_rsgen_max': np_rsgen_max
+        }
+    }
 
 
 def MS_TEP_constraints(model,grid):
@@ -434,6 +468,52 @@ def _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule,PV_set=False):
 
     return model, obj_TEP, obj_OPF,weights_def,PZ
 
+
+def GEN_balance_constraints(model,grid):
+    
+    if all(v == 1 for v in grid.generation_type_limits.values()):
+        return  # All limits are 1, no constraints needed
+    
+    grid.generation_type_limits = {k.lower(): v for k, v in grid.generation_type_limits.items()}
+    model.gen_types = pyo.Set(initialize=list(grid.generation_type_limits.keys()))
+    model.gen_type_limits = pyo.Param(model.gen_types,initialize=grid.generation_type_limits)
+    
+    # Helper function to normalize type names to lowercase
+    def normalize_type(type_name):
+        return type_name.lower() if type_name else None
+    
+    # Calculate max installed capacity for each type
+    def gen_type_max_capacity_rule(model, gen_type):
+        # Sum generator max capacities for this type (normalize gen.gen_type to lowercase)
+        gen_capacity = sum(
+            gen.Max_pow_gen * model.np_gen[gen.genNumber] 
+            for gen in grid.Generators 
+            if normalize_type(gen.gen_type) == gen_type
+        )
+        
+        # Sum renewable source max capacities for this type (normalize rs.rs_type to lowercase)
+        ren_capacity = sum(
+            rs.Max_S * model.np_rsgen[rs.rsNumber]
+            for rs in grid.RenSources
+            if normalize_type(rs.rs_type) == gen_type
+        )
+        
+        return gen_capacity + ren_capacity
+    
+    model.gen_type_max_capacity = pyo.Expression(model.gen_types, rule=gen_type_max_capacity_rule)
+    
+    # Calculate total max capacity across all types
+    def total_max_capacity_rule(model):
+        return sum(model.gen_type_max_capacity[gt] for gt in model.gen_types)
+    
+    model.total_max_capacity = pyo.Expression(rule=total_max_capacity_rule)
+    
+    # Constraint: each type's max capacity <= total_max_capacity * type_limit
+    def gen_type_balance_rule(model, gen_type):
+        return model.gen_type_max_capacity[gen_type] <= model.total_max_capacity * model.gen_type_limits[gen_type]
+    
+    model.gen_type_balance_constraint = pyo.Constraint(model.gen_types, rule=gen_type_balance_rule)
+    
 def transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,export=True,PV_set=False,alpha=None,callback=False,solver_options=None):
     grid.reset_run_flags()
     t1 = time.perf_counter()
@@ -495,7 +575,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
-    OPF_create_LModel_ACDC(model,grid,TEP=True)
+    OPF_create_LModel_AC(model,grid,TEP=True)
     
 
     obj_TEP = TEP_obj(model,grid,NPV)

@@ -511,13 +511,18 @@ def TS_ACDC_OPF_parallel(grid,start=1,end=99999,obj=None ,price_zone_restriction
 
                 
 def _modify_parameters(grid,model,Price_Zones):
-    [AC_info,DC_info,_,Price_Zone_info,gen_info]=Translate_pyf_OPF(grid,Price_Zones=Price_Zones)    
+    opf_data = Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+    AC_info = opf_data['AC_info']
+    DC_info = opf_data['DC_info']
+    Price_Zone_info = opf_data['Price_Zone_info']
+    gen_info = opf_data['gen_info']    
     ACmode = grid.ACmode
     DCmode = grid.DCmode
     AC_Lists, AC_nodes_info, AC_lines_info,EXP_info,REP_info,CT_info = AC_info
     
-    gen_AC_info,gen_DC_info,P_renSource,lista_rs = gen_info
+    gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
+    P_renSource, np_rsgen, lista_rs = gen_rs_info
     
     
     # lista_nodos_AC, lista_lineas_AC,lista_gen,lista_rs, AC_slack, AC_PV = AC_Lists

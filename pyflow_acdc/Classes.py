@@ -182,6 +182,12 @@ class Grid:
         self.rs2node = {'DC': {},
                         'AC': {}}
         
+        self.generation_type_limits = {
+             "nuclear":1, "hard coal":1, "hydro":1, "oil":1, "lignite":1, "natural gas":1,
+             "solid biomass":1,  "other":1, "waste":1, "biogas":1, "geothermal":1,"ccgt":1,"wind":1,"solar":1}
+                
+
+
         self.Time_series = []
         self.Time_series_dic ={}
         
@@ -1068,7 +1074,7 @@ class Gen_AC:
         self.np_gen_max=3   # maximum number of generators to be present at the same time
         self.np_gen_max_install = self.np_gen_max #For multi period TEP, maximum number of generators to install in each period
         self.np_gen_opf = False
-        self.np_gen_dynamic = [self.np_gen]
+        self.np_gen_multi_period = [self.np_gen]
 
         self.activate_gen_opf = False
         self.gen_active = 1 
@@ -1254,7 +1260,7 @@ class Ren_Source:
     
     @property
     def loading(self):
-        return self.apparent_MVA/self.capacity_MVA*100
+        return self.apparent_MVA/(self.capacity_MVA*self.np_rsgen)*100 if self.np_rsgen >0 else 0
     @property
     def apparent_MVA(self):
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
@@ -1286,9 +1292,17 @@ class Ren_Source:
         self.PGi_ren = 0 
         self._PGi_ren_base=PGi_ren_base
         self._PRGi_available=1
-        self._PRGi_inv_factor =1
+        #self._PRGi_inv_factor =1
         
-        
+        self.np_rsgen_i = 1
+        self.np_rsgen_b = 1
+        self.np_rsgen = 1
+        self.np_rsgen_max=3   # maximum number of generators to be present at the same time
+        self.np_rsgen_max_install = self.np_rsgen_max #For multi period TEP, maximum number of generators to install in each period
+        self.np_rsgen_opf = False
+        self.np_rsgen_multi_period = [self.np_rsgen]
+
+
         self.TS_dict = {
             'PRGi_available': None
         }
@@ -1341,14 +1355,14 @@ class Ren_Source:
         self._PGi_ren_base = value
         self.update_PGi_ren()
 
-    @property
-    def PRGi_inv_factor(self):
-        return self._PRGi_inv_factor
+    #@property
+    #def PRGi_inv_factor(self):
+    #    return self._PRGi_inv_factor
     
-    @PRGi_inv_factor.setter
-    def PRGi_inv_factor(self, value):
-        self._PRGi_inv_factor = value
-        self.update_PGi_ren()
+    #@PRGi_inv_factor.setter
+    #def PRGi_inv_factor(self, value):
+    #    self._PRGi_inv_factor = value
+    #    self.update_PGi_ren()
 
     @property
     def PRGi_available(self):
@@ -1360,7 +1374,7 @@ class Ren_Source:
         self.update_PGi_ren()
      
     def update_PGi_ren(self):
-        self.PGi_ren = self._PGi_ren_base * self._PRGi_available * self._PRGi_inv_factor
+        self.PGi_ren = self._PGi_ren_base * self._PRGi_available #* self._PRGi_inv_factor
    
     
 class Node_AC:  
@@ -3072,14 +3086,14 @@ class Ren_source_zone:
                 ren_source.Ren_source_zone = self.name
 
     @property
-    def PRGi_inv_factor(self):
-        return self._PRGi_inv_factor
+    def np_rsgen(self):
+        return self.np_rsgen
     
-    @PRGi_inv_factor.setter
-    def PRGi_inv_factor(self, value):
-        self._PRGi_inv_factor = value
+    @np_rsgen.setter
+    def np_rsgen(self, value):
+        self.np_rsgen = value
         for ren_source in self.RenSources:
-            ren_source.PRGi_inv_factor=value
+            ren_source.np_rsgen=value
 
 
     def __init__(self,name=None):
@@ -3088,14 +3102,14 @@ class Ren_source_zone:
            
            self.RenSources=[]
            self._PRGi_available=1
-           self._PRGi_inv_factor=1
+           self._np_rsgen=1
            
            self.TS_dict = {
                'PRGi_available': None
            }
 
            self.inv_dict = {
-               'PRGi_inv_factor': None
+               'np_rsgen': None
            }
            
            if name is None:
