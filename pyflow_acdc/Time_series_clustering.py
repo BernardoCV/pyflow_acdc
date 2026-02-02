@@ -174,15 +174,22 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
                 'cv': cv
             }
         
+        # Track columns excluded before CV threshold check
+        excluded_before_cv = not_used_in_clustering.copy()
+        
         # Filter based on CV threshold
+        cv_excluded_columns = set()
         if cv_threshold > 0:
             for column, stat in stats.items():
-                if stat['cv'] < cv_threshold:
+                if stat['cv'] > cv_threshold:
                     excluded_ts.append((column, stat['cv']))
                     columns_to_drop.append(column)
                     # Remove from used set if it was there
                     used_in_clustering.discard(column)
                     not_used_in_clustering.add(column)
+                    # Only add to cv_excluded_columns if it wasn't already excluded
+                    if column not in excluded_before_cv:
+                        cv_excluded_columns.add(column)
 
         # Scale the remaining data after filtering
         scaler = StandardScaler()
@@ -197,11 +204,12 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
         # Determine final used columns (those that remain in data_scaled)
         final_used_columns = set(data_scaled.columns) if not data_scaled.empty else set()
         
-        # Create DataFrame from statistics, separated into used and not used
+        # Create DataFrame from statistics, separated into used, cv_excluded, and other_excluded
         stats_rows_used = []
-        stats_rows_not_used = []
+        stats_rows_cv_excluded = []
+        stats_rows_other_excluded = []
         
-        for column, stat in sorted(stats.items(), key=lambda x: x[1]['cv']):
+        for column, stat in stats.items():
             row_data = {
                 'Name': column,
                 'Mean': stat['mean'],
@@ -211,37 +219,76 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
             }
             if column in final_used_columns:
                 stats_rows_used.append(row_data)
+            elif column in cv_excluded_columns:
+                stats_rows_cv_excluded.append(row_data)
             else:
-                stats_rows_not_used.append(row_data)
+                stats_rows_other_excluded.append(row_data)
         
-        # Combine into one DataFrame with separator row
+        # Sort each group separately by CV
+        stats_rows_used.sort(key=lambda x: x['CV'])
+        stats_rows_cv_excluded.sort(key=lambda x: x['CV'])
+        stats_rows_other_excluded.sort(key=lambda x: x['CV'])
+        
+        # Rename for consistency with rest of code
+        cv_excluded_rows = stats_rows_cv_excluded
+        other_excluded_rows = stats_rows_other_excluded
+        
+        # Combine into one DataFrame with separator rows
         all_stats_rows = stats_rows_used.copy()
-        if stats_rows_not_used:
-            # Add separator row
-            all_stats_rows.append({
-                'Name': '---',
-                'Mean': '----',
-                'Std': '--',
-                'Var': '--',
-                'CV': '--'
-            })
-            all_stats_rows.append({
-                'Name': 'Not',
-                'Mean': 'used',
-                'Std': ' in',
-                'Var': ' clustering',
-                'CV': 'analysis'
-            })
-            all_stats_rows.append({
-                'Name': '---',
-                'Mean': '----',
-                'Std': '--',
-                'Var': '--',
-                'CV': '--'
-            })
-            all_stats_rows.extend(stats_rows_not_used)
+
+        if cv_excluded_rows or other_excluded_rows:
+            # Add CV excluded rows first (if any)
+            if cv_excluded_rows:
+                all_stats_rows.append({
+                    'Name': '---',
+                    'Mean': '----',
+                    'Std': '--',
+                    'Var': '--',
+                    'CV': '--'
+                })
+                all_stats_rows.append({
+                    'Name': 'Excluded',
+                    'Mean': 'due',
+                    'Std': ' to',
+                    'Var': ' cv_threshold',
+                    'CV': f'{cv_threshold:.2f}'
+                })
+                all_stats_rows.append({
+                    'Name': '---',
+                    'Mean': '----',
+                    'Std': '--',
+                    'Var': '--',
+                    'CV': '--'
+                })
+                all_stats_rows.extend(cv_excluded_rows)
+            
+            # Add other excluded rows (if any)
+            if other_excluded_rows:
+                all_stats_rows.append({
+                    'Name': '---',
+                    'Mean': '----',
+                    'Std': '--',
+                    'Var': '--',
+                    'CV': '--'
+                })
+                all_stats_rows.append({
+                    'Name': 'Not',
+                    'Mean': 'used',
+                    'Std': ' in',
+                    'Var': ' clustering',
+                    'CV': 'analysis'
+                })
+                all_stats_rows.append({
+                    'Name': '---',
+                    'Mean': '----',
+                    'Std': '--',
+                    'Var': '--',
+                    'CV': '--'
+                })
+                all_stats_rows.extend(other_excluded_rows)
         
         stats_df = pd.DataFrame(all_stats_rows)
+        stats_df.reset_index(drop=True, inplace=True)
         
         # Store in grid object for later access (always save, even if not printed)
         grid.Clustering_information['Time_series_statistics'] = stats_df
@@ -254,13 +301,21 @@ def filter_data(grid, time_series, cv_threshold=0, central_market=[], print_deta
             # Print used time series
             for row in stats_rows_used:
                 print(f"{row['Name']:20} {row['Mean']:12.6f} {row['Std']:12.6f} {row['Var']:12.6f} {row['CV']:12.6f}")
-            # Print separator if there are unused time series
-            if stats_rows_not_used:
+            # Print CV excluded time series
+            if cv_excluded_rows:
+                print("-" * 70)
+                print(f"Excluded due to cv_threshold ({cv_threshold:.2f}):")
+                print(f"{'Name':20} {'Mean':>12} {'Std':>12} {'Var':>12} {'CV':>12}")
+                print("-" * 70)
+                for row in cv_excluded_rows:
+                    print(f"{row['Name']:20} {row['Mean']:12.6f} {row['Std']:12.6f} {row['Var']:12.6f} {row['CV']:12.6f}")
+            # Print other excluded time series
+            if other_excluded_rows:
                 print("-" * 70)
                 print("Time series not used in clustering:")
                 print(f"{'Name':20} {'Mean':>12} {'Std':>12} {'Var':>12} {'CV':>12}")
                 print("-" * 70)
-                for row in stats_rows_not_used:
+                for row in other_excluded_rows:
                     print(f"{row['Name']:20} {row['Mean']:12.6f} {row['Std']:12.6f} {row['Var']:12.6f} {row['CV']:12.6f}")
         
         if columns_to_drop and print_details:
