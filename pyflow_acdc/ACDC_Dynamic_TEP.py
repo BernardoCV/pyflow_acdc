@@ -16,7 +16,7 @@ from .Graph_and_plot import save_network_svg, create_geometries
 
 
 __all__ = [
-    'dynamic_transmission_expansion',
+    'multi_period_transmission_expansion',
     'multi_period_MS_TEP',
     'save_MP_TEP_period_svgs',
     'export_and_save_inv_period_svgs'
@@ -54,85 +54,143 @@ def _update_grid_investment_period(grid,inv,i):
                 price_zone.import_expand = inv.data[idx]
                 break
 
-    if typ in ['WPP', 'OWPP','SF','REN']:
-        for zone in grid.RenSource_zones:
-            if inv.element_name == zone.name:
-                zone.PRGi_inv_factor = inv.data[idx]
-                break  # Stop after assigning to the correct zone
-        for rs in grid.RenSources:
-            if inv.element_name == rs.name:
-                rs.PRGi_inv_factor = inv.data[idx]
-                break  # Stop after assigning to the correct node
+    # WPP/OWPP/SF/REN: renewable capacity is driven by the MP model (np_rsgen, planned_installation_rsgen, opt_installation_rsgen)
+    # and linked to each period submodel. No grid-class update here; inv_series of these types are reserved for future use
+    # (e.g. period-dependent power-per-unit scaling if needed).
 
 
 def _MP_TEP_constraints(model,grid):
-    
-    if grid.GPR:
-        def MP_gen_lower_bound(model,gen,i):
-            if i == 0:
-                return model.np_gen[gen,i] >= model.np_gen_base[gen]
+    if grid.rs_GPR:
+        def MP_rsgen_link(model,rs,i):
+            return model.inv_model[i].np_rsgen[rs] == model.np_rsgen[rs,i]
+        model.MP_rsgen_link_constraint = pyo.Constraint(model.ren_sources,model.inv_periods,rule=MP_rsgen_link)
+
+        def MP_rsgen_decomision(model,rs,i):
+            ren_source = grid.RenSources[rs]
+            planned_decomision = ren_source.planned_decomision[i]
+            decomision_period = ren_source.decomision_period
+            if i < decomision_period:
+                return model.decomision_rsgen[rs,i] == planned_decomision
             else:
-                return model.np_gen[gen,i] >= model.np_gen[gen,i-1]- model.decomision_gen[gen,i]
-        model.MP_gen_lower_bound_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_lower_bound)
-        
-        def MP_gen_link(model,gen,i):
-            return model.inv_model[i].np_gen[gen] == model.np_gen[gen,i]
+                return model.decomision_rsgen[rs,i] == planned_decomision + model.installed_rsgen[rs,i-decomision_period]
+        model.MP_rsgen_decomision_constraint = pyo.Constraint(model.ren_sources,model.inv_periods,rule=MP_rsgen_decomision)
+
+        def MP_rsgen_installation(model,rs,i):
+            return model.installed_rsgen[rs,i] == model.planned_installation_rsgen[rs,i]+model.opt_installation_rsgen[rs,i]
+        model.MP_rsgen_installation_constraint = pyo.Constraint(model.ren_sources,model.inv_periods,rule=MP_rsgen_installation)
+
+        def MP_rsgen_installed(model,rs,i):
+            if i == 0:
+                return model.np_rsgen[rs,i] == model.installed_rsgen[rs,i]+model.np_rsgen_base[rs]
+            else:
+                return model.np_rsgen[rs,i] == model.installed_rsgen[rs,i]+model.np_rsgen[rs,i-1]-model.decomision_rsgen[rs,i]
+        model.MP_rsgen_installed_constraint = pyo.Constraint(model.ren_sources,model.inv_periods,rule=MP_rsgen_installed)
+
+    if grid.GPR:
+        def MP_gen_link(model,g,i):
+            return model.inv_model[i].np_gen[g] == model.np_gen[g,i]
         model.MP_gen_link_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_link)
 
-        def MP_gen_decomision(model,gen,i):
-            g = grid.Generators[gen]
-            planned_decomision = g.planned_decomision[i]
-            decomision_period = g.decomision_period
+        def MP_gen_decomision(model,g,i):
+            gen = grid.Generators[g]
+            planned_decomision = gen.planned_decomision[i]
+            decomision_period = gen.decomision_period
             if i < decomision_period:
-                return model.decomision_gen[gen,i] == planned_decomision
+                return model.decomision_gen[g,i] == planned_decomision
             else:
-                return model.decomision_gen[gen,i] == planned_decomision + model.installed_gen[gen,i-decomision_period]
+                return model.decomision_gen[g,i] == planned_decomision + model.installed_gen[g,i-decomision_period]
         model.MP_gen_decomision_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_decomision)
 
-        def MP_gen_installed(model,gen,i):
+        def MP_gen_installation(model,g,i):
+            return model.installed_gen[g,i] == model.planned_installation_gen[g,i]+model.opt_installation_gen[g,i]
+        model.MP_gen_installation_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_installation)
+
+        def MP_gen_installed(model,g,i):
             if i == 0:
-                return model.np_gen[gen,i] == model.installed_gen[gen,i]+model.np_gen_base[gen]
+                return model.np_gen[g,i] == model.installed_gen[g,i]+model.np_gen_base[g]
             else:
-                return model.np_gen[gen,i] == model.installed_gen[gen,i]+model.np_gen[gen,i-1]-model.decomision_gen[gen,i]
+                return model.np_gen[g,i] == model.installed_gen[g,i]+model.np_gen[g,i-1]-model.decomision_gen[g,i]
             
         model.MP_gen_installed_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_installed)
 
     if grid.ACmode:
         if grid.TEP_AC:
-            def MP_AC_line_lower_bound(model,l,i):
-                if i == 0:
-                    return model.ACLinesMP[l,i] >= model.NumLinesACP_base[l]
-                else:
-                    return model.ACLinesMP[l,i] >= model.ACLinesMP[l,i-1]- model.decomision_ACline[l,i]
-            model.MP_AC_line_lower_bound_constraint = pyo.Constraint(model.lines_AC_exp,model.inv_periods, rule=MP_AC_line_lower_bound)
-    
             def MP_AC_line_link(model, l, i):
                 return model.inv_model[i].NumLinesACP[l] == model.ACLinesMP[l, i]
             model.MP_AC_line_link_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_link)
 
-    if grid.DCmode:
-        def MP_DC_line_lower_bound(model,l,i):
-            if i == 0:
-                return model.DCLinesMP[l,i] >= model.NumLinesDCP_base[l]
-            else:
-                return model.DCLinesMP[l,i] >= model.DCLinesMP[l,i-1] - model.decomision_DCline[l,i]
-        model.MP_DC_line_lower_bound_constraint = pyo.Constraint(model.lines_DC,model.inv_periods, rule=MP_DC_line_lower_bound)
+            def MP_AC_line_decomision(model, l, i):
+                line = grid.lines_AC_exp[l]
+                planned_decomision = line.planned_decomision[i]
+                decomision_period = line.decomision_period
+                if i < decomision_period:
+                    return model.decomision_ACline[l,i] == planned_decomision
+                else:
+                    return model.decomision_ACline[l,i] == planned_decomision + model.installed_ACline[l,i-decomision_period]
+            model.MP_AC_line_decomision_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_decomision)
 
+            def MP_AC_line_installation(model, l, i):
+                return model.installed_ACline[l,i] == model.planned_installation_ACline[l,i] + model.opt_installation_ACline[l,i]
+            model.MP_AC_line_installation_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_installation)
+
+            def MP_AC_line_installed(model, l, i):
+                if i == 0:
+                    return model.ACLinesMP[l,i] == model.installed_ACline[l,i] + model.NumLinesACP_base[l]
+                else:
+                    return model.ACLinesMP[l,i] == model.installed_ACline[l,i] + model.ACLinesMP[l,i-1] - model.decomision_ACline[l,i]
+            model.MP_AC_line_installed_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_installed)
+
+    if grid.DCmode:
         def MP_DC_line_link(model, l, i):
             return model.inv_model[i].NumLinesDCP[l] == model.DCLinesMP[l, i]
         model.MP_DC_line_link_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_link)
 
-    if grid.ACmode and grid.DCmode:
-        def MP_Conv_lower_bound(model,c,i):
-            if i == 0:
-                return model.ConvMP[c,i] >= model.NumConvP_base[c]
+        def MP_DC_line_decomision(model, l, i):
+            line = grid.lines_DC[l]
+            planned_decomision = line.planned_decomision[i]
+            decomision_period = line.decomision_period
+            if i < decomision_period:
+                return model.decomision_DCline[l,i] == planned_decomision
             else:
-                return model.ConvMP[c,i] >= model.ConvMP[c,i-1] - model.decomision_Conv[c,i]
-        model.MP_Conv_lower_bound_constraint = pyo.Constraint(model.conv,model.inv_periods, rule=MP_Conv_lower_bound)
+                return model.decomision_DCline[l,i] == planned_decomision + model.installed_DCline[l,i-decomision_period]
+        model.MP_DC_line_decomision_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_decomision)
 
-        def MP_Conv_link(model, l, i):
-            return model.inv_model[i].NumConvP[l] == model.ConvMP[l, i]
+        def MP_DC_line_installation(model, l, i):
+            return model.installed_DCline[l,i] == model.planned_installation_DCline[l,i] + model.opt_installation_DCline[l,i]
+        model.MP_DC_line_installation_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_installation)
+
+        def MP_DC_line_installed(model, l, i):
+            if i == 0:
+                return model.DCLinesMP[l,i] == model.installed_DCline[l,i] + model.NumLinesDCP_base[l]
+            else:
+                return model.DCLinesMP[l,i] == model.installed_DCline[l,i] + model.DCLinesMP[l,i-1] - model.decomision_DCline[l,i]
+        model.MP_DC_line_installed_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_installed)
+
+    if grid.ACmode and grid.DCmode:
+        def MP_Conv_link(model, c, i):
+            return model.inv_model[i].NumConvP[c] == model.ConvMP[c, i]
         model.MP_Conv_link_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_link)
+
+        def MP_Conv_decomision(model, c, i):
+            conv = grid.Converters_ACDC[c]
+            planned_decomision = conv.planned_decomision[i]
+            decomision_period = conv.decomision_period
+            if i < decomision_period:
+                return model.decomision_Conv[c,i] == planned_decomision
+            else:
+                return model.decomision_Conv[c,i] == planned_decomision + model.installed_Conv[c,i-decomision_period]
+        model.MP_Conv_decomision_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_decomision)
+
+        def MP_Conv_installation(model, c, i):
+            return model.installed_Conv[c,i] == model.planned_installation_Conv[c,i] + model.opt_installation_Conv[c,i]
+        model.MP_Conv_installation_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_installation)
+
+        def MP_Conv_installed(model, c, i):
+            if i == 0:
+                return model.ConvMP[c,i] == model.installed_Conv[c,i] + model.NumConvP_base[c]
+            else:
+                return model.ConvMP[c,i] == model.installed_Conv[c,i] + model.ConvMP[c,i-1] - model.decomision_Conv[c,i]
+        model.MP_Conv_installed_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_installed)
 
 
 def _MP_TEP_variables(model,grid):
@@ -141,21 +199,70 @@ def _MP_TEP_variables(model,grid):
     np_gen_max_install={}
     for gen in grid.Generators:
         np_gen_max_install[gen.genNumber] = gen.np_gen_max_install if gen.np_gen_max_install else gen.np_gen_max
+    np_rsgen_max_install={}
+    for rs in grid.RenSources:
+        np_rsgen_max_install[rs.rsNumber] = rs.np_rsgen_max_install if rs.np_rsgen_max_install else rs.np_rsgen_max
+
+    def planned_installation_rsgen_init(model, rs, i):
+        return grid.RenSources[rs].planned_installation[i]
+    def planned_installation_gen_init(model, g, i):
+        return grid.Generators[g].planned_installation[i]
+    def planned_installation_ACline_init(model, l, i):
+        return grid.lines_AC_exp[l].planned_installation[i]
+    def planned_installation_DCline_init(model, l, i):
+        return grid.lines_DC[l].planned_installation[i]
+    def planned_installation_Conv_init(model, c, i):
+        return grid.Converters_ACDC[c].planned_installation[i]
+
+    if grid.rs_GPR:
+        np_rsgen = tep_vars['ren_sources']['np_rsgen']
+        np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
+
+        model.np_rsgen_base = pyo.Param(model.ren_sources,initialize=np_rsgen)
+        
+        def np_rsgen_bounds(model,rs,i):
+            return (0,np_rsgen_max[rs])
+        def np_rsgen_bounds_install(model,rs,i):
+            return (0,np_rsgen_max_install[rs])
+        def np_rsgen_bounds_install_opt(model,rs,i):
+            ren_source = grid.RenSources[rs]
+            if ren_source.np_rsgen_opf:
+                return (0,np_rsgen_max_install[rs])
+            else:
+                return (0,0)  
+        def np_rsgen_i(model, rs, i):
+            return np_rsgen[rs]
+        model.np_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_rsgen_bounds,initialize=np_rsgen_i)
+        model.installed_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_rsgen_bounds_install)
+        model.planned_installation_rsgen = pyo.Param(model.ren_sources,model.inv_periods,initialize=planned_installation_rsgen_init)
+        model.opt_installation_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_rsgen_bounds_install_opt)
+        
+        model.decomision_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
+    
     if grid.GPR:
         np_gen = tep_vars['generators']['np_gen']
         np_gen_max = tep_vars['generators']['np_gen_max']
 
         model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
         
-        def np_gen_bounds(model,gen,i):
-            return (0,np_gen_max[gen])
+        def np_gen_bounds(model,g,i):
+            return (0,np_gen_max[g])
 
-        def np_gen_bounds_install(model,gen,i):
-            return (0,np_gen_max_install[gen])
-        def np_gen_i(model, gen, i):
-            return np_gen[gen]
+        def np_gen_bounds_install(model,g,i):
+            return (0,np_gen_max_install[g])
+        def np_gen_bounds_install_opt(model,g,i):
+            gen = grid.Generators[g]
+            if gen.np_gen_opf:
+                return (0,np_gen_max_install[g])
+            else:
+                return (0,0)
+        def np_gen_i(model, g, i):
+            return np_gen[g]
         model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen_i)
         model.installed_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_gen_bounds_install)
+        model.planned_installation_gen = pyo.Param(model.gen_AC,model.inv_periods,initialize=planned_installation_gen_init)
+        model.opt_installation_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_gen_bounds_install_opt)
+        
         model.decomision_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
 
     if grid.ACmode:
@@ -165,10 +272,21 @@ def _MP_TEP_variables(model,grid):
             model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
             def MP_AC_line_bounds(model,l,i):
                 return (0,NP_lineAC_max[l])
+            def MP_AC_line_bounds_install(model,l,i):
+                return (0,NP_lineAC_max[l])
+            def MP_AC_line_bounds_install_opt(model,l,i):
+                line = grid.lines_AC_exp[l]
+                if line.np_line_opf:
+                    return (0,NP_lineAC_max[l])
+                else:
+                    return (0,0)
             def NP_lineAC_i(model, l, i):
                 return NP_lineAC[l]
             model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds,initialize=NP_lineAC_i)
-            model.decomision_ACline = pyo.Param(model.lines_AC_exp,model.inv_periods,initialize=0)
+            model.installed_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_AC_line_bounds_install)
+            model.planned_installation_ACline = pyo.Param(model.lines_AC_exp,model.inv_periods,initialize=planned_installation_ACline_init)
+            model.opt_installation_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_AC_line_bounds_install_opt)
+            model.decomision_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
     if grid.DCmode:
         NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
         NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
@@ -176,23 +294,45 @@ def _MP_TEP_variables(model,grid):
         model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
         def MP_DC_line_bounds(model,l,i):
             return (0,NP_lineDC_max[l])
+        def MP_DC_line_bounds_install(model,l,i):
+            return (0,NP_lineDC_max[l])
+        def MP_DC_line_bounds_install_opt(model,l,i):
+            line = grid.lines_DC[l]
+            if line.np_line_opf:
+                return (0,NP_lineDC_max[l])
+            else:
+                return (0,0)
         def NP_lineDC_i(model, l, i):
             return NP_lineDC[l]
         model.DCLinesMP = pyo.Var(model.lines_DC,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_DC_line_bounds,initialize=NP_lineDC_i)
-        model.decomision_DCline = pyo.Param(model.lines_DC,model.inv_periods,initialize=0)
+        model.installed_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_DC_line_bounds_install)
+        model.planned_installation_DCline = pyo.Param(model.lines_DC,model.inv_periods,initialize=planned_installation_DCline_init)
+        model.opt_installation_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_DC_line_bounds_install_opt)
+        model.decomision_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
 
     if grid.ACmode and grid.DCmode:
         NumConvP = tep_vars['converters']['NumConvP']
         NumConvP_max = tep_vars['converters']['NumConvP_max']
         model.NumConvP_base  =pyo.Param(model.conv,initialize=NumConvP)
-        def MP_Conv_bounds(model,l,i):
-            return (0,NumConvP_max[l])
-        def NumConvP_i(model, l, i):
-            return NumConvP[l]
+        def MP_Conv_bounds(model,c,i):
+            return (0,NumConvP_max[c])
+        def MP_Conv_bounds_install(model,c,i):
+            return (0,NumConvP_max[c])
+        def MP_Conv_bounds_install_opt(model,c,i):
+            conv = grid.Converters_ACDC[c]
+            if conv.NUmConvP_opf:
+                return (0,NumConvP_max[c])
+            else:
+                return (0,0)
+        def NumConvP_i(model, c, i):
+            return NumConvP[c]
         model.ConvMP = pyo.Var(model.conv,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_Conv_bounds,initialize=NumConvP_i)
-        model.decomision_Conv = pyo.Param(model.conv,model.inv_periods,initialize=0)
+        model.installed_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_Conv_bounds_install)
+        model.planned_installation_Conv = pyo.Param(model.conv,model.inv_periods,initialize=planned_installation_Conv_init)
+        model.opt_installation_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_Conv_bounds_install_opt)
+        model.decomision_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
         
-def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,callback=False,solver_options=None):
+def multi_period_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin',time_limit=99999,tee=False,callback=False,solver_options=None):
     grid.reset_run_flags()
     analyse_grid(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
@@ -204,6 +344,7 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
     if inv_periods:
         from .Classes import investment_periods
         load_factors = np.array(inv_periods, dtype=float)
+        n_periods_inv = len(load_factors)
         
         # Create investment series for all AC nodes
         for node in grid.nodes_AC:
@@ -217,9 +358,29 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
             grid.inv_series.append(inv_obj)
             grid.inv_series_dic[inv_obj.name] = inv_obj.inv_periods_num
         for gen in grid.Generators:
-            gen.planned_decomision = np.zeros(n_years)
+            gen.planned_decomision = [0] * n_periods_inv
+            gen.planned_installation = [0] * n_periods_inv
+        for ren_source in grid.RenSources:
+            ren_source.planned_decomision = [0] * n_periods_inv
+            ren_source.planned_installation = [0] * n_periods_inv
+        for line in grid.lines_AC_exp:
+            line.planned_decomision = [0] * n_periods_inv
+            line.planned_installation = [0] * n_periods_inv
+        for line in grid.lines_DC:
+            line.planned_decomision = [0] * n_periods_inv
+            line.planned_installation = [0] * n_periods_inv
+        for conv in grid.Converters_ACDC:
+            conv.planned_decomision = [0] * n_periods_inv
+            conv.planned_installation = [0] * n_periods_inv
       
-                
+    grid.GPR = True if any(any(x != 0 for x in gen.planned_installation) for gen in grid.Generators) else grid.GPR
+    grid.rs_GPR = True if any(any(x != 0 for x in ren_source.planned_installation) for ren_source in grid.RenSources) else grid.rs_GPR
+    
+    for gen in grid.Generators:
+        gen.np_gen_mp = gen.np_gen_opf or any(x != 0 for x in gen.planned_installation)
+    for rs in grid.RenSources:
+        rs.np_rsgen_mp = rs.np_rsgen_opf or any(x != 0 for x in rs.planned_installation)
+    
     t1=time.time()
 
     model = pyo.ConcreteModel()
@@ -234,7 +395,7 @@ def dynamic_transmission_expansion(grid,inv_periods=[],n_years=10,Hy=8760,discou
     base_model = pyo.ConcreteModel()
     OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
 
-    for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC: 
+    for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC+grid.RenSources: 
         _calculate_decomision_period(element,n_years)
         
     present_value_opf =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
@@ -320,12 +481,22 @@ def _initialize_DTEP_sets_model(model,grid):
         model.lines_AC_exp = pyo.Set(initialize=list(range(0,grid.nle_AC)))
     if grid.GPR:
         model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
+    if grid.rs_GPR:
+        model.ren_sources = pyo.Set(initialize=list(range(0,grid.n_ren)))
 
 def _inv_model_obj(model,grid,i):
     inv_gen= 0
     AC_Inv_lines=0
     DC_Inv_lines=0
     Conv_Inv=0
+    inv_rs=0
+    if grid.rs_GPR:
+        for rs in model.ren_sources:
+            ren_source = grid.RenSources[rs]
+            inv_rs+=model.installed_rsgen[rs,i]*ren_source.base_cost
+    else:
+        inv_rs=0
+
     if grid.GPR:
         
         for g in model.gen_AC:
@@ -337,34 +508,22 @@ def _inv_model_obj(model,grid,i):
 
     if grid.ACmode:
         if grid.TEP_AC:
-            
             for l in model.lines_AC_exp:
                 line = grid.lines_AC_exp[l]
-                if i ==0:
-                    AC_Inv_lines+=(model.ACLinesMP[l,i]-model.NumLinesACP_base[l])*line.base_cost
-                else:
-                    AC_Inv_lines+=(model.ACLinesMP[l,i]-model.ACLinesMP[l,i-1]+model.decomision_ACline[l,i])*line.base_cost
+                AC_Inv_lines+=model.installed_ACline[l,i]*line.base_cost
             
     if grid.DCmode:
-        
         for l in model.lines_DC:
             line = grid.lines_DC[l]
-            if i ==0:
-                DC_Inv_lines+=(model.DCLinesMP[l,i]-model.NumLinesDCP_base[l])*line.base_cost
-            else:
-                DC_Inv_lines+=(model.DCLinesMP[l,i]-model.DCLinesMP[l,i-1]+model.decomision_DCline[l,i])*line.base_cost
+            DC_Inv_lines+=model.installed_DCline[l,i]*line.base_cost
         
     if grid.ACmode and grid.DCmode:
-        
-        for l in model.conv:
-            conv = grid.Converters_ACDC[l]
-            if i ==0:
-                Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP_base[l])*conv.base_cost
-            else:
-                Conv_Inv+=(model.ConvMP[l,i]-model.ConvMP[l,i-1]+model.decomision_Conv[l,i])*conv.base_cost
+        for c in model.conv:
+            conv = grid.Converters_ACDC[c]
+            Conv_Inv+=model.installed_Conv[c,i]*conv.base_cost
         
 
-    inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv
+    inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv+inv_rs
     return inv_cost
 
 def _MP_TEP_obj(model,grid,n_years,discount_rate):
@@ -443,14 +602,47 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                 total_cost += cost
             row['Total_Cost'] = total_cost
             rows.append(row)
+    if grid.rs_GPR:
+        if MINLP:
+            rs_mp_values = {(rs, i): round(pyo.value(model.np_rsgen[rs, i])) for (rs, i) in model.np_rsgen}
+            rs_installed_values = {(rs, i): int(round(pyo.value(model.installed_rsgen[rs, i]))) for (rs, i) in model.installed_rsgen}
+            rs_decomision_values = {(rs, i): int(round(pyo.value(model.decomision_rsgen[rs, i]))) for (rs, i) in model.decomision_rsgen}
+        else:
+            rs_mp_values = {(rs, i): round(pyo.value(model.np_rsgen[rs, i]),2) for (rs, i) in model.np_rsgen}
+            rs_installed_values = {(rs, i): round(pyo.value(model.installed_rsgen[rs, i]),2) for (rs, i) in model.installed_rsgen}
+            rs_decomision_values = {(rs, i): round(pyo.value(model.decomision_rsgen[rs, i]),2) for (rs, i) in model.decomision_rsgen}
+            
+        for ren_source in grid.RenSources:
+            rs = ren_source.rsNumber
+            ren_source.np_dynamic = [rs_mp_values[rs, i] for i in range(n_periods)]
+            row = {'Element': str(ren_source.name)}
+            row['Type'] = 'Renewable Source'
+            row['Pre Existing'] = pyo.value(model.np_rsgen_base[rs])
+            total_cost = 0
+            for i in range(n_periods):
+                n_val = rs_mp_values[rs, i]
+                if i == 0:
+                    cost = (n_val - pyo.value(model.np_rsgen_base[rs])) * ren_source.base_cost
+                else:
+                    cost = (n_val - rs_mp_values[rs, i-1]) * ren_source.base_cost
+                row[f"Decommissioned_{i+1}"] = rs_decomision_values[rs, i]
+                row[f"Installed_{i+1}"] = rs_installed_values[rs, i]    
+                row[f"Active_{i+1}"] = n_val                
+                row[f"Cost_{i+1}"] = cost
+                total_cost += cost
+            row['Total_Cost'] = total_cost
+            rows.append(row)
 
     if grid.ACmode:
         if grid.TEP_AC:
             if MINLP:
-                ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i])) for (l, i) in model.ACLinesMP}   
-            
+                ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i])) for (l, i) in model.ACLinesMP}
+                ac_line_installed_values = {(l, i): int(round(pyo.value(model.installed_ACline[l, i]))) for (l, i) in model.installed_ACline}
+                ac_line_decomision_values = {(l, i): int(round(pyo.value(model.decomision_ACline[l, i]))) for (l, i) in model.decomision_ACline}
             else:
-                ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i]),2) for (l, i) in model.ACLinesMP}   
+                ac_lines_mp_values = {(l, i): round(pyo.value(model.ACLinesMP[l, i]),2) for (l, i) in model.ACLinesMP}
+                ac_line_installed_values = {(l, i): round(pyo.value(model.installed_ACline[l, i]),2) for (l, i) in model.installed_ACline}
+                ac_line_decomision_values = {(l, i): round(pyo.value(model.decomision_ACline[l, i]),2) for (l, i) in model.decomision_ACline}
             for line in grid.lines_AC_exp:
                 l = line.lineNumber
                 line.np_dynamic = [ac_lines_mp_values[l, i] for i in range(n_periods)]
@@ -462,12 +654,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                     n_val = ac_lines_mp_values[l, i]
                     if i == 0:
                         cost = (n_val - pyo.value(model.NumLinesACP_base[l])) * line.base_cost
-                        installed = n_val - pyo.value(model.NumLinesACP_base[l])
                     else:
                         cost = (n_val - ac_lines_mp_values[l, i-1]) * line.base_cost
-                        installed = n_val - ac_lines_mp_values[l, i-1]
-                    row[f"Decommissioned_{i+1}"] = 0
-                    row[f"Installed_{i+1}"] = installed
+                    row[f"Decommissioned_{i+1}"] = ac_line_decomision_values[l, i]
+                    row[f"Installed_{i+1}"] = ac_line_installed_values[l, i]
                     row[f"Active_{i+1}"] = n_val
                     row[f"Cost_{i+1}"] = cost
                     total_cost += cost
@@ -478,7 +668,14 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
 
 
     if grid.DCmode:
-        dc_lines_mp_values = {(l, i): pyo.value(model.DCLinesMP[l, i]) for (l, i) in model.DCLinesMP}
+        if MINLP:
+            dc_lines_mp_values = {(l, i): round(pyo.value(model.DCLinesMP[l, i])) for (l, i) in model.DCLinesMP}
+            dc_line_installed_values = {(l, i): int(round(pyo.value(model.installed_DCline[l, i]))) for (l, i) in model.installed_DCline}
+            dc_line_decomision_values = {(l, i): int(round(pyo.value(model.decomision_DCline[l, i]))) for (l, i) in model.decomision_DCline}
+        else:
+            dc_lines_mp_values = {(l, i): round(pyo.value(model.DCLinesMP[l, i]),2) for (l, i) in model.DCLinesMP}
+            dc_line_installed_values = {(l, i): round(pyo.value(model.installed_DCline[l, i]),2) for (l, i) in model.installed_DCline}
+            dc_line_decomision_values = {(l, i): round(pyo.value(model.decomision_DCline[l, i]),2) for (l, i) in model.decomision_DCline}
 
         for line in grid.lines_DC:  
             if line.np_line_opf:
@@ -492,12 +689,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                     n_val = dc_lines_mp_values[l, i]
                     if i == 0:
                         cost = (n_val - pyo.value(model.NumLinesDCP_base[l])) * line.base_cost
-                        installed = n_val - pyo.value(model.NumLinesDCP_base[l])
                     else:
                         cost = (n_val - dc_lines_mp_values[l, i-1]) * line.base_cost
-                        installed = n_val - dc_lines_mp_values[l, i-1]
-                    row[f"Decommissioned_{i+1}"] = 0
-                    row[f"Installed_{i+1}"] = installed
+                    row[f"Decommissioned_{i+1}"] = dc_line_decomision_values[l, i]
+                    row[f"Installed_{i+1}"] = dc_line_installed_values[l, i]
                     row[f"Active_{i+1}"] = n_val
                     row[f"Cost_{i+1}"] = cost
                     total_cost += cost
@@ -505,7 +700,14 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                 rows.append(row)
 
     if grid.ACmode and grid.DCmode:
-        acdc_conv_mp_values = {(c, i): pyo.value(model.ACDCConvMP[c, i]) for (c, i) in model.ACDCConvMP}
+        if MINLP:
+            acdc_conv_mp_values = {(c, i): round(pyo.value(model.ConvMP[c, i])) for (c, i) in model.ConvMP}
+            conv_installed_values = {(c, i): int(round(pyo.value(model.installed_Conv[c, i]))) for (c, i) in model.installed_Conv}
+            conv_decomision_values = {(c, i): int(round(pyo.value(model.decomision_Conv[c, i]))) for (c, i) in model.decomision_Conv}
+        else:
+            acdc_conv_mp_values = {(c, i): round(pyo.value(model.ConvMP[c, i]),2) for (c, i) in model.ConvMP}
+            conv_installed_values = {(c, i): round(pyo.value(model.installed_Conv[c, i]),2) for (c, i) in model.installed_Conv}
+            conv_decomision_values = {(c, i): round(pyo.value(model.decomision_Conv[c, i]),2) for (c, i) in model.decomision_Conv}
         for conv in grid.Converters_ACDC:
             c = conv.ConvNumber
             conv.np_dynamic = [acdc_conv_mp_values[c, i] for i in range(n_periods)]
@@ -517,12 +719,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False)
                 n_val = acdc_conv_mp_values[c, i]   
                 if i == 0:
                     cost = (n_val - pyo.value(model.NumConvP_base[c])) * conv.base_cost
-                    installed = n_val - pyo.value(model.NumConvP_base[c])
                 else:
                     cost = (n_val - acdc_conv_mp_values[c, i-1]) * conv.base_cost
-                    installed = n_val - acdc_conv_mp_values[c, i-1]
-                row[f"Decommissioned_{i+1}"] = 0
-                row[f"Installed_{i+1}"] = installed
+                row[f"Decommissioned_{i+1}"] = conv_decomision_values[c, i]
+                row[f"Installed_{i+1}"] = conv_installed_values[c, i]
                 row[f"Active_{i+1}"] = n_val
                 row[f"Cost_{i+1}"] = cost
                 total_cost += cost
@@ -655,6 +855,10 @@ def _set_grid_to_dynamic_state(grid, investment_period):
         line.np_line = line.np_dynamic[investment_period]
     for conv in grid.Converters_ACDC:
         conv.NumConvP = conv.np_dynamic[investment_period]
+    for rs in grid.RenSources:
+        rs.np_rsgen = rs.np_dynamic[investment_period]
+    for gen in grid.Generators:
+        gen.np_gen = gen.np_dynamic[investment_period]
 
 def _calculate_decomision_period(element,n_years):
 

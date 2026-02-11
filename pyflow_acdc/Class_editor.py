@@ -588,7 +588,7 @@ def add_generators(Grid,Gen_csv,curtailmet_allowed=1):
         price_zone_link = False
         
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
-        if fuel_type.lower() in ["wind", "solar"]:
+        if fuel_type.lower() in ["wind", "solar","offshore wind","onshore wind"]:
             add_RenSource(Grid,node_name, MWmax,ren_source_name=var_name ,geometry=geo,ren_type=fuel_type,Qmin=MVArmin,Qmax=MVArmax,min_gamma=(1-curtailmet_allowed),zone=Ren_zone)
         else:
             if MVArmax is None:
@@ -1288,6 +1288,8 @@ def analyse_grid(grid):
     grid.CFC = grid.ncfc_DC != 0 #DC variable voltage converter lines present
     grid.CDC = grid.ncdc_DC != 0 #DC-DC converter lines present
     grid.GPR = any(gen.np_gen_opf for gen in grid.Generators)
+    grid.rs_GPR = any(rs.np_rsgen_opf for rs in grid.RenSources)
+    grid.act_gen = any(gen.activate_gen_opf for gen in grid.Generators)
 
     return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
     

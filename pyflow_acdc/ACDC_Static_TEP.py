@@ -185,6 +185,11 @@ def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_co
            element.np_gen = N_b
        if hasattr(element, 'np_gen_i'):
            element.np_gen_i = N_i
+       if hasattr(element, 'np_rsgen'):
+           element.np_rsgen_b = N_b
+           element.np_rsgen = N_b
+       if hasattr(element, 'np_rsgen_i'):
+           element.np_rsgen_i = N_i
        
    if N_max is not None:
        if hasattr(element, 'np_line_max'):
@@ -193,6 +198,8 @@ def update_attributes(element, N_b,N_i, N_max, Life_time, base_cost, per_unit_co
            element.NumConvP_max = N_max  
        if hasattr(element, 'np_gen_max'):
            element.np_gen_max = N_max     
+       if hasattr(element, 'np_rsgen_max'):
+           element.np_rsgen_max = N_max     
     
    if Life_time is not None:
        element.life_time = Life_time
@@ -242,7 +249,11 @@ def Expand_element(grid,name,N_b=None,N_i=None,N_max=None,Life_time=None,base_co
             gen.np_gen_opf = True
             update_attributes(gen, N_b, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
             continue
-            
+    for rs in grid.RenSources:
+        if name == rs.name:
+            rs.np_rsgen_opf = True
+            update_attributes(rs, N_b, N_i, N_max, Life_time, base_cost, per_unit_cost, exp)
+            continue
 def base_cost_calculation(element):
     from .Classes import Exp_Line_AC 
     if isinstance(element, Exp_Line_AC):
@@ -264,7 +275,9 @@ def base_cost_calculation(element):
             element.base_cost= element.cost_perMVA*element.Max_pow_gen
         else:
             element.base_cost= element.cost_perMVA*element.Max_pow_genR
-
+    from .Classes import Ren_Source
+    if isinstance(element, Ren_Source):
+        element.base_cost= element.cost_perMVA*element.Max_S
 
 def Translate_pd_TEP(grid):
     """Translation of element wise to internal numbering"""
@@ -493,7 +506,7 @@ def GEN_balance_constraints(model,grid):
         
         # Sum renewable source max capacities for this type (normalize rs.rs_type to lowercase)
         ren_capacity = sum(
-            rs.Max_S * model.np_rsgen[rs.rsNumber]
+            rs.PGi_ren_base * model.np_rsgen[rs.rsNumber]
             for rs in grid.RenSources
             if normalize_type(rs.rs_type) == gen_type
         )
@@ -1062,7 +1075,13 @@ def TEP_obj(model,grid,NPV):
             if gen.np_gen_opf:
                 Gen_Inv+=(model.np_gen[g]-model.np_gen_base[g])*gen.base_cost
         return Gen_Inv
-
+    def Renewable_investments():
+        Renewable_Inv=0
+        for rs in model.ren_sources:
+            ren_source = grid.RenSources[rs]
+            if ren_source.np_rsgen_opf:
+                Renewable_Inv+=(model.np_rsgen[rs]-model.np_rsgen_base[rs])*ren_source.base_cost
+        return Renewable_Inv
     def AC_Line_investments():
         AC_Inv_lines=0
         for l in model.lines_AC_exp:
@@ -1128,6 +1147,11 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_gen=0
     
+    if grid.rs_GPR:
+        inv_rs = Renewable_investments()
+    else:
+        inv_rs = 0
+
     if grid.TEP_AC: 
         inv_line_AC = AC_Line_investments()
     else:
@@ -1179,7 +1203,7 @@ def TEP_obj(model,grid,NPV):
     else:
         inv_conv  = 0
 
-    return inv_gen+inv_line_AC+inv_line_AC_rec+inv_cable + inv_conv + inv_array
+    return inv_gen+inv_line_AC+inv_line_AC_rec+inv_cable + inv_conv + inv_array + inv_rs
 
 def weighted_subobj(model,NPV,n_years,discount_rate):
     # Calculate the weighted social cost for each scenario_model (subblock)

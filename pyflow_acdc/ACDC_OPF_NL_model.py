@@ -66,14 +66,13 @@ def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_r
 
 def Generation_variables(model,grid,gen_info,TEP):
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
-    lf,qf,fc,np_gen,lista_gen = gen_AC_info
-    lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC = gen_DC_info
-    P_renSource, np_rsgen, lista_rs = gen_rs_info
+    _,_,_,_,lista_gen = gen_AC_info
+    _,_,_,_,lista_gen_DC = gen_DC_info
+    P_renSource, _, lista_rs = gen_rs_info
     
     model.ren_sources= pyo.Set(initialize=lista_rs)
     model.P_renSource = pyo.Param(model.ren_sources,initialize=P_renSource,mutable=True)
-    model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen,mutable=True)  
-
+    
     def gamma_bounds(model,rs):
         ren_source= grid.RenSources[rs]
         if ren_source.curtailable:
@@ -93,13 +92,6 @@ def Generation_variables(model,grid,gen_info,TEP):
     model.Q_renSource = pyo.Var(model.ren_sources,bounds=Qren_bounds, initialize=0)
     
     
-    grid.GPR = False
-    grid.act_gen = False
-    if any(gen.np_gen_opf for gen in grid.Generators) and TEP:
-        grid.GPR = True
-    if any(gen.activate_gen_opf for gen in grid.Generators):
-        grid.act_gen = True
-    
     def P_Gen_bounds(model, g):
         gen = grid.Generators[g]
         return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
@@ -108,8 +100,8 @@ def Generation_variables(model,grid,gen_info,TEP):
         gen = grid.Generators[g]
         return (gen.Min_pow_genR*gen.np_gen,gen.Max_pow_genR*gen.np_gen)
     
-    def P_gen_ini(model,ngen):
-        gen = grid.Generators[ngen]
+    def P_gen_ini(model,g):
+        gen = grid.Generators[g]
         min_pow_gen = gen.Min_pow_gen * gen.np_gen
         ini=gen.Pset * gen.np_gen
         max_pow_gen = gen.Max_pow_gen * gen.np_gen
@@ -119,8 +111,8 @@ def Generation_variables(model,grid,gen_info,TEP):
             ini=max_pow_gen
         return (ini)
     
-    def Q_gen_ini(model,ngen):
-        gen = grid.Generators[ngen]
+    def Q_gen_ini(model,g):
+        gen = grid.Generators[g]
         min_pow_genR = gen.Min_pow_genR * gen.np_gen
         ini=gen.Qset * gen.np_gen
         max_pow_genR = gen.Max_pow_genR * gen.np_gen
@@ -146,8 +138,8 @@ def Generation_variables(model,grid,gen_info,TEP):
         gen = grid.Generators_DC[g]
         return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
         
-    def P_gen_ini_DC(model,ngen):
-        gen = grid.Generators_DC[ngen]
+    def P_gen_ini_DC(model,g):
+        gen = grid.Generators_DC[g]
         min_pow_gen = gen.Min_pow_gen * gen.np_gen
         ini=gen.Pset * gen.np_gen
         max_pow_gen = gen.Max_pow_gen * gen.np_gen
@@ -897,21 +889,21 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
         model.tf_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_tf, rule=P_loss_AC_rule_tf)
     "AC inequality constraints"
     #AC gen inequality
-    def S_gen_AC_limit_rule(model,ngen):
-        gen = grid.Generators[ngen]
+    def S_gen_AC_limit_rule(model,g):
+        gen = grid.Generators[g]
         if gen.Max_S is None:
             return pyo.Constraint.Skip
-        else:    
-            return model.PGi_gen[ngen]**2+model.QGi_gen[ngen]**2 <= (gen.Max_S*model.np_gen[ngen])**2 
+        else:
+            return model.PGi_gen[g]**2+model.QGi_gen[g]**2 <= (gen.Max_S*model.np_gen[g])**2 
     
     model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
     
     # Fix gen_active to 1 for generators where activate_gen_opf is False
     if grid.act_gen:
-        def gen_active_fix_rule(model, ngen):
-            gen = grid.Generators[ngen]
+        def gen_active_fix_rule(model, g):
+            gen = grid.Generators[g]
             if not gen.activate_gen_opf:
-                return model.gen_active[ngen] == 1
+                return model.gen_active[g] == 1
             else:
                 return pyo.Constraint.Skip
         
@@ -920,7 +912,7 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
     #AC Ren sources inequality
     
     def S_renS_AC_limit_rule(model,rs):
-        ren_source= grid.RenSources[rs]
+        ren_source = grid.RenSources[rs]
         if ren_source.Max_S is None or ren_source.connected =='DC':
             return pyo.Constraint.Skip
         else:    
@@ -1595,18 +1587,18 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
         nM = grid.Price_Zones[price_zone]
         return (nM.PGL_min,nM.PGL_max)
     
-    def lf_bounds(model, ngen):
-        gen = grid.Generators[ngen]
+    def lf_bounds(model, g):
+        gen = grid.Generators[g]
         if gen.price_zone_link:
             return (None,None)
         else:
-            return (lf[ngen],lf[ngen])
-    def lf_bounds_DC(model, ngen):
-        gen = grid.Generators_DC[ngen]
+            return (lf[g],lf[g])
+    def lf_bounds_DC(model, g):
+        gen = grid.Generators_DC[g]
         if gen.price_zone_link:
             return (None,None)
         else:
-            return (lf_DC[ngen],lf_DC[ngen])
+            return (lf_DC[g],lf_DC[g])
 
 
     model.PN = pyo.Var(model.M,bounds=Price_Zone_P_bounds,initialize=0)
@@ -1820,36 +1812,24 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
 
     # Extract converter variables
     NumConvP = tep_vars['converters']['NumConvP']
-    NumConvP_i = tep_vars['converters']['NumConvP_i']
-    NumConvP_max = tep_vars['converters']['NumConvP_max']
-    S_limit_conv = tep_vars['converters']['S_limit_conv']
     
     # Extract DC line variables
-    P_lineDC_limit = tep_vars['dc_lines']['P_lineDC_limit']
     NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
-    NP_lineDC_i = tep_vars['dc_lines']['NP_lineDC_i']
-    NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
-    Line_length = tep_vars['dc_lines']['Line_length']
     
     # Extract AC line variables
     NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
-    NP_lineAC_i = tep_vars['ac_lines']['NP_lineAC_i']
-    NP_lineAC_max = tep_vars['ac_lines']['NP_lineAC_max']
     REC_branch = tep_vars['ac_lines']['REC_branch']
     ct_ini = tep_vars['ac_lines']['ct_ini']
     
     # Extract generator variables
     np_gen = tep_vars['generators']['np_gen']
-    np_gen_max = tep_vars['generators']['np_gen_max']
     np_gen_DC = tep_vars['generators']['np_gen_DC']
-    np_gen_max_DC = tep_vars['generators']['np_gen_max_DC']
-    
     # Extract renewable source variables
     np_rsgen = tep_vars['ren_sources']['np_rsgen']
-    np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
+   
     
    
-
+    model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen,mutable=True)
     if grid.ACmode:
         
         model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen,mutable=True)
@@ -1909,33 +1889,52 @@ def TEP_variables(model,grid):
     np_gen_DC = tep_vars['generators']['np_gen_DC']
     np_gen_max_DC = tep_vars['generators']['np_gen_max_DC']    
 
-    
+    np_rsgen = tep_vars['ren_sources']['np_rsgen']
+    np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
+
     "TEP variables"
-    if grid.ACmode:
-        def np_gen_bounds(model,gen):
-            g = grid.Generators[gen]
-            if g.np_gen_opf:
-                return (np_gen[gen],np_gen_max[gen])
+
+    if grid.rs_GPR:
+        def np_rsgen_bounds(model,rs):
+            ren_source = grid.RenSources[rs]
+            if getattr(ren_source, 'np_rsgen_mp', False):
+                return (0, np_rsgen_max[rs])
+            elif ren_source.np_rsgen_opf:
+                return (np_rsgen[rs], np_rsgen_max[rs])
             else:
-                return (np_gen[gen],np_gen[gen])
+                return (np_rsgen[rs], np_rsgen[rs])
+        model.np_rsgen = pyo.Var(model.ren_sources,within=pyo.NonNegativeIntegers,bounds=np_rsgen_bounds,initialize=np_rsgen)
+        model.np_rsgen_base = pyo.Param(model.ren_sources,initialize=np_rsgen)
+    elif hasattr(model,'ren_sources'):
+        model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen)
+
+    if grid.ACmode:
+        def np_gen_bounds(model,g):
+            gen = grid.Generators[g]
+            if getattr(gen, 'np_gen_mp', False):
+                return (0, np_gen_max[g])
+            elif gen.np_gen_opf:
+                return (np_gen[g], np_gen_max[g])
+            else:
+                return (np_gen[g], np_gen[g])
     
         if grid.GPR:
 
-            def P_gen_lower_bound_rule(model, gen):
-                g = grid.Generators[gen]
-                return (g.Min_pow_gen * model.np_gen[gen] <= model.PGi_gen[gen])
+            def P_gen_lower_bound_rule(model, g):
+                gen = grid.Generators[g]
+                return (gen.Min_pow_gen * model.np_gen[g] <= model.PGi_gen[g])
 
-            def Q_gen_lower_bound_rule(model, gen):
-                g = grid.Generators[gen]
-                return (g.Min_pow_genR * model.np_gen[gen] <= model.QGi_gen[gen])
+            def Q_gen_lower_bound_rule(model, g):
+                gen = grid.Generators[g]
+                return (gen.Min_pow_genR * model.np_gen[g] <= model.QGi_gen[g])
 
-            def P_gen_upper_bound_rule(model, gen):
-                g = grid.Generators[gen]
-                return (model.PGi_gen[gen] <= g.Max_pow_gen * model.np_gen[gen])
+            def P_gen_upper_bound_rule(model, g):
+                gen = grid.Generators[g]
+                return (model.PGi_gen[g] <= gen.Max_pow_gen * model.np_gen[g])
 
-            def Q_gen_upper_bound_rule(model, gen):
-                g = grid.Generators[gen]
-                return (model.QGi_gen[gen] <= g.Max_pow_genR * model.np_gen[gen])
+            def Q_gen_upper_bound_rule(model, g):
+                gen = grid.Generators[g]
+                return (model.QGi_gen[g] <= gen.Max_pow_genR * model.np_gen[g])
 
 
             model.np_gen = pyo.Var(model.gen_AC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen)
@@ -1977,21 +1976,21 @@ def TEP_variables(model,grid):
             model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=ct_types_ini)
 
     if grid.DCmode:
-        def np_gen_bounds_DC(model,gen):
-            g = grid.Generators_DC[gen]
-            if g.np_gen_opf:
-                return (np_gen_DC[gen],np_gen_max_DC[gen])
+        def np_gen_bounds_DC(model,g):
+            gen = grid.Generators_DC[g]
+            if gen.np_gen_opf:
+                return (np_gen_DC[g],np_gen_max_DC[g])
             else:
-                return (np_gen_DC[gen],np_gen_DC[gen])
+                return (np_gen_DC[g],np_gen_DC[g])
         
         if grid.GPR:
 
-            def P_gen_DC_lower_bound_rule(model, gen):
-                g = grid.Generators_DC[gen]
-                return (g.Min_pow_gen * model.np_gen_DC[gen] <= model.PGi_gen_DC[gen])
-            def P_gen_DC_upper_bound_rule(model, gen):
-                g = grid.Generators_DC[gen]
-                return (model.PGi_gen_DC[gen] <= g.Max_pow_gen * model.np_gen_DC[gen])
+            def P_gen_DC_lower_bound_rule(model, g):
+                gen = grid.Generators_DC[g]
+                return (gen.Min_pow_gen * model.np_gen_DC[g] <= model.PGi_gen_DC[g])
+            def P_gen_DC_upper_bound_rule(model, g):
+                gen = grid.Generators_DC[g]
+                return (model.PGi_gen_DC[g] <= gen.Max_pow_gen * model.np_gen_DC[g])
 
     
 

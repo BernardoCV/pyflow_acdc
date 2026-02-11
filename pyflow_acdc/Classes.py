@@ -184,7 +184,7 @@ class Grid:
         
         self.generation_type_limits = {
              "nuclear":1, "hard coal":1, "hydro":1, "oil":1, "lignite":1, "natural gas":1,
-             "solid biomass":1,  "other":1, "waste":1, "biogas":1, "geothermal":1,"ccgt":1,"wind":1,"solar":1}
+             "solid biomass":1,  "other":1, "waste":1, "biogas":1, "geothermal":1,"ccgt":1,"wind":1,"solar":1,"offshore wind":1,"onshore wind":1}
                 
 
 
@@ -1068,16 +1068,25 @@ class Gen_AC:
         
         node.S_rating += self.capacity_MVA
         
+        #Variable to activate or deactivate the generator in the OPF
+        self.activate_gen_opf = False
+        self.gen_active = 1
+
+        #Variable to have a variable number of generators in the TEP
+        self.np_gen_opf = False
+        self.np_gen_mp = False  # Multi-period TEP: submodel np_gen driven by master (full bounds)
+
         self.np_gen_i = 1
         self.np_gen_b = 1
         self.np_gen = 1
         self.np_gen_max=3   # maximum number of generators to be present at the same time
+        
+        #used in multi period TEP
         self.np_gen_max_install = self.np_gen_max #For multi period TEP, maximum number of generators to install in each period
-        self.np_gen_opf = False
         self.np_gen_multi_period = [self.np_gen]
-
-        self.activate_gen_opf = False
-        self.gen_active = 1 
+        self.planned_decomision = [0]  #Used only for Multi Period TEP
+        self.planned_installation = [0]  #Used only for Multi Period TEP
+        self.np_dynamic = [self.np_gen]  #Used only for Multi Period TEP
 
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
@@ -1181,12 +1190,15 @@ class Gen_DC:
         self.Max_pow_gen=Max_pow_gen
         self.Min_pow_gen=Min_pow_gen
       
+
+        #Variable to have a variable number of generators in the TEP
+        self.np_gen_opf = False
+
         self.np_gen_i = 1
         self.np_gen_b = 1
         self.np_gen = 1
         self.np_gen_max=3
-        self.np_gen_opf = False
-
+        
         self.lf=linear_cost_factor
         self.qf=quadratic_cost_factor
         self.fc=fixed_cost
@@ -1256,7 +1268,7 @@ class Ren_Source:
     @property
     def capacity_MVA(self):
        
-        return self.PGi_ren_base*self.S_base
+        return self.Max_S*self.S_base
     
     @property
     def loading(self):
@@ -1265,7 +1277,7 @@ class Ren_Source:
     def apparent_MVA(self):
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
     
-    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100):
+    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100,installation_cost:float=0,Max_S_factor:float=1):
         self.rsNumber = Ren_Source.rsNumber
         Ren_Source.rsNumber += 1
         
@@ -1275,7 +1287,7 @@ class Ren_Source:
         self.curtailable= True
        
         self.life_time = 30
-        self.S_base = S_base
+        self._S_base = S_base
         self.S_base_i = S_base
         
         self.Node=node.name
@@ -1294,14 +1306,24 @@ class Ren_Source:
         self._PRGi_available=1
         #self._PRGi_inv_factor =1
         
+
+        #Variable to have a variable number of generators in the TEP
+        self.np_rsgen_opf = False
+        self.np_rsgen_mp = False  # Multi-period TEP: submodel np_rsgen driven by master (full bounds)
+
         self.np_rsgen_i = 1
         self.np_rsgen_b = 1
         self.np_rsgen = 1
         self.np_rsgen_max=3   # maximum number of generators to be present at the same time
-        self.np_rsgen_max_install = self.np_rsgen_max #For multi period TEP, maximum number of generators to install in each period
-        self.np_rsgen_opf = False
-        self.np_rsgen_multi_period = [self.np_rsgen]
 
+        self.np_rsgen_max_install = self.np_rsgen_max #For multi period TEP, maximum number of generators to install in each period
+        self.np_rsgen_multi_period = [self.np_rsgen]
+        self.planned_decomision = [0]  #Used only for Multi Period TEP
+        self.planned_installation = [0]  #Used only for Multi Period TEP
+
+        self.np_dynamic = [self.np_rsgen]  #Used only for Multi Period TEP
+
+        self.base_cost = installation_cost
 
         self.TS_dict = {
             'PRGi_available': None
@@ -1322,7 +1344,10 @@ class Ren_Source:
         self.Qmax=0
         self.Qmin=0
         
-        self.Max_S= PGi_ren_base*1.05
+        self.Max_S= PGi_ren_base*Max_S_factor
+
+        if Max_S_factor is not None:
+            self.cost_perMVA = installation_cost/PGi_ren_base*Max_S_factor*S_base
             
         node.connected_RenSource.append(self)
         node.RenSource=True
@@ -1975,6 +2000,8 @@ class Exp_Line_AC(Line_AC):
         self.np_dynamic = [self.np_line]   
 
         self.np_line_opf=True
+        self.planned_decomision = [0]  #Used only for Multi Period TEP
+        self.planned_installation = [0]  #Used only for Multi Period TEP
         self.hover_text = None
 
         self.ts_max_loading = 0
@@ -2638,6 +2665,8 @@ class Line_DC:
         self.np_line_i= N_cables
         self.np_line_max = N_cables
         self.np_line_opf=False
+        self.planned_decomision = [0]  #Used only for Multi Period TEP
+        self.planned_installation = [0]  #Used only for Multi Period TEP
         self.np_dynamic = [self.np_line]   
 
         self.R = r
@@ -2896,6 +2925,8 @@ class AC_DC_converter:
         self.np_dynamic = [self.NumConvP]
         
         self.NUmConvP_opf=False
+        self.planned_decomision = [0]  #Used only for Multi Period TEP
+        self.planned_installation = [0]  #Used only for Multi Period TEP
         self.base_cost = 0
         self.life_time = 25
         self.exp_inv=1
