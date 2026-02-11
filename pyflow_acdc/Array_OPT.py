@@ -19,7 +19,7 @@ except ImportError:
     ORTOOLS_AVAILABLE = False
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
-from .AC_OPF_L_model import OPF_create_LModel_ACDC,ExportACDC_Lmodel_toPyflowACDC
+from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
 from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
@@ -172,6 +172,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
            
             grid.max_turbines_per_string = high_flow
         iter_cab_available= grid.Cable_options[0].cable_types.copy()
+        print(f'DEBUG: Iteration {i} iter_cab_available: {iter_cab_available}')
         t3 = time.perf_counter()
         #print(f'DEBUG: Iteration {i}')
         if NL:
@@ -2164,7 +2165,7 @@ def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,
 
     grid.Array_opf = False
     if NL:
-        model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export)
+        model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export,PV_set=True,callback=fs)
     else:
         model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export,fs)
 

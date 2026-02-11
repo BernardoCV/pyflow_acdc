@@ -476,7 +476,7 @@ def log_infeasible_constraints_limited(model, max_per_type=5):
     
     print("=" * 80)
 
-def _gurobi_callback(model, feasible_solutions, time_limit=None, solver_options=None):
+def _gurobi_callback(model, feasible_solutions, time_limit=None, solver_options=None, tee=False):
     """
     Gurobi callback function with support for custom solver options.
     
@@ -490,11 +490,16 @@ def _gurobi_callback(model, feasible_solutions, time_limit=None, solver_options=
         Time limit in seconds
     solver_options : dict, optional
         Dictionary of Gurobi parameter names to values (e.g., {'MIPFocus': 2, 'Cuts': 2})
+    tee : bool, default=False
+        Print solver output to console
     """
     from gurobipy import GRB
     opt = pyo.SolverFactory('gurobi_persistent')
     opt.set_instance(model)
     grb_model = opt._solver_model
+
+    if not tee:
+        grb_model.setParam('OutputFlag', 0)
 
     def my_callback(model, where):
         if where == GRB.Callback.MIPSOL:
@@ -921,7 +926,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
 
     if callback:
         if solver == 'gurobi' and GUROBI_AVAILABLE:
-            results, feasible_solutions = _gurobi_callback(model, feasible_solutions, time_limit, solver_options)
+            results, feasible_solutions = _gurobi_callback(model, feasible_solutions, time_limit, solver_options, tee=tee)
             # For Gurobi, all_solutions is the same as feasible_solutions
             all_solutions = feasible_solutions.copy()
         elif solver == 'bonmin':
