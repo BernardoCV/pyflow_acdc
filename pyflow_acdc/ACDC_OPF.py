@@ -831,8 +831,8 @@ def _solver_progress(model, feasible_solutions, solver_name, time_limit, log_pat
         # Keep print_level reasonable for log file, tee controls console
         opt.options['print_level'] = 5
     elif solver_name == 'bonmin':
-        # Bonmin uses CBC which can write to log file
-        opt.options['bonmin.output_file'] = log_path
+        # Bonmin has no reliable log file option across versions; skip it
+        pass
     
     start = time.perf_counter()
     
