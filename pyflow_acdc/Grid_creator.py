@@ -1377,6 +1377,14 @@ def Create_grid_from_pickle(path,use_dill=True):
 
     grid = load_pickle(path,use_dill)
 
+    # Class-level cable databases are not persisted by pickle; reload them.
+    Line_AC._cable_database = None
+    Line_AC.load_cable_database()
+    Cable_options._cable_database = None
+    Cable_options.load_cable_database()
+    Line_DC._cable_database = None
+    Line_DC.load_cable_database()
+
     res = Results(grid, decimals=3)
     return [grid, res]
 
