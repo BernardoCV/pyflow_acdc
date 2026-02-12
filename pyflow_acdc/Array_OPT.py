@@ -396,8 +396,13 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     # Ybus_list has all entries and active_config is not silently clamped
     # to a shorter list (which would cause wrong Ybus and wrong P_INJ).
     grid.Cable_options[0].cable_types = og_cable_types
-    gen_active_config = grid.Cable_options[0].active_config
-    grid.Cable_options[0].active_config = [int(gen_active_config.get(k, 0)) for k in range(len(og_cable_types))]
+
+    # Rebuild active_config from per-line selections (robust, no reliance on global state)
+    used_types = set()
+    for line in grid.lines_AC_ct:
+        if line.active_config >= 0:
+            used_types.add(line.active_config)
+    grid.Cable_options[0].active_config = [1 if k in used_types else 0 for k in range(len(og_cable_types))]
 
     if NL:
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
