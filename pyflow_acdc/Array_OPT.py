@@ -195,48 +195,6 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             if tee:
                 print(f'Iteration {i} saving SVG')
             from .Graph_and_plot import save_network_svg
-            lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-            lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-            lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-            if  NL:
-                lines_AC_CT_fromQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-                lines_AC_CT_toQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-                lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
-            else:
-                lines_AC_CT_fromQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
-                lines_AC_CT_toQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
-                lines_AC_CT_loss = {k: 0.0 for k in model.lines_AC_ct}
-            gen_active_config = {k: np.float64(pyo.value(model.ct_types[k])) for k in model.ct_set}
-           
-            
-            grid.Cable_options[0].active_config = gen_active_config
-
-
-            def process_line_AC_CT(line):
-                l = line.lineNumber
-                ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
-                if any(ct_selected):
-                    line.active_config = np.where(ct_selected)[0][0]
-                    ct = list(model.ct_set)[line.active_config]
-                    Pfrom = lines_AC_CT_fromP[l][ct]
-                    Pto   = lines_AC_CT_toP[l][ct]
-                    Qfrom = lines_AC_CT_fromQ[l][ct]
-                    Qto   = lines_AC_CT_toQ[l][ct]
-                else:
-                    line.active_config = -1
-                    Pfrom = 0
-                    Pto   = 0
-                    Qfrom = 0
-                    Qto   = 0
-                
-                line.fromS = (Pfrom + 1j*Qfrom)
-                line.toS = (Pto + 1j*Qto)
-                line.loss = line.fromS + line.toS
-                line.P_loss = lines_AC_CT_loss[l]
-
-            with ThreadPoolExecutor() as executor:
-                executor.map(process_line_AC_CT, grid.lines_AC_ct)
-
             CSS_solver = CSS_NL_solver if NL else CSS_L_solver
             # Save SVG in the sequential_CSS folder
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
@@ -298,20 +256,34 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
-        if obj_value is None:
-            # Calculate cable cost from line.active_config selections (where active_config >= 0)
-            obj_value = sum(
-                line.base_cost[line.active_config] 
-                for line in grid.lines_AC_ct 
-                if line.active_config >= 0 and hasattr(line, 'base_cost') and line.active_config < len(line.base_cost)
-            )
-        total_cost = MIP_obj_value+obj_value
+        # Compute cable cost matching TEP_obj Array_investments()
+        
+               
+
+        if NL:
+            # NL: compute loss cost from exported grid results
+            present_value_factor = Hy * (1 - (1 + discount_rate) ** -n_years) / discount_rate
+            loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
+            loss_cost = loss_MW * present_value_factor
+            cable_cost = 0
+            for line in grid.lines_AC_ct:
+                if line.active_config >= 0:
+                    cable_cost += line.base_cost[line.active_config]
+        else:
+            # Linear CSS has no losses; obj_value is just cable cost
+            if obj_value is None:
+                obj_value = cable_cost
+            cable_cost = obj_value
+            loss_cost = 0
+
+        total_cost = MIP_obj_value + cable_cost + loss_cost
         # Create a dictionary for this iteration's results
         iteration_result = {
             'cable_length': cable_length,
             'weighted_length': weighted_length,
             'installation_cost': MIP_obj_value,
-            'cable_cost': obj_value,
+            'cable_cost': cable_cost,
+            'loss_cost': loss_cost,
             'total_cost': total_cost,  # Save the objective value
             'cable_options': iter_cab_available,  # Save a copy of the cable list
             'cables_used': used_cable_names,
@@ -360,6 +332,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
         'weighted_length': [result['weighted_length'] for result in results],
         'installation_cost': [result['installation_cost'] for result in results],
         'cable_cost':    [result['cable_cost'] for result in results],
+        'loss_cost':     [result['loss_cost'] for result in results],
         'total_cost':   [result['total_cost'] for result in results],
         'cable_options': [result['cable_options'] for result in results],
         'cables_used':  [result['cables_used'] for result in results],
@@ -2167,6 +2140,12 @@ def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,
     grid.Array_opf = False
     if NL:
         model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export,PV_set=True,callback=fs)
+    elif CSS_L_solver == 'ortools':
+        from .AC_L_CSS_ortools import Optimal_L_CSS_ortools
+        OPEX = ObjRule is not None and ObjRule.get('Energy_cost', 0) != 0
+        model, model_results, timing_info, solver_stats = Optimal_L_CSS_ortools(
+            grid, OPEX=OPEX, NPV=NPV, n_years=n_years, Hy=Hy,
+            discount_rate=discount_rate, tee=tee, time_limit=time_limit)
     else:
         model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export,fs)
 

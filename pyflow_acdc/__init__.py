@@ -181,6 +181,13 @@ except ImportError:
     HAS_AC_L_CSS_GUROBI = False
 
 try:
+    from .AC_L_CSS_ortools import *
+    __all__.extend(['Optimal_L_CSS_ortools'])
+    HAS_AC_L_CSS_ORTOOLS = True
+except ImportError:
+    HAS_AC_L_CSS_ORTOOLS = False
+
+try:
     from .Mapping import *
     HAS_MAPPING = True
 except ImportError:
