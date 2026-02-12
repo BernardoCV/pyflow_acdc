@@ -195,6 +195,9 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            lines_AC_CT_fromQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            lines_AC_CT_toQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+            lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
             gen_active_config = {k: np.float64(pyo.value(model.ct_types[k])) for k in model.ct_set}
            
             
@@ -209,8 +212,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
                     ct = list(model.ct_set)[line.active_config]
                     Pfrom = lines_AC_CT_fromP[l][ct]
                     Pto   = lines_AC_CT_toP[l][ct]
-                    Qfrom = 0.0
-                    Qto   = 0.0
+                    Qfrom = lines_AC_CT_fromQ[l][ct]
+                    Qto   = lines_AC_CT_toQ[l][ct]
                 else:
                     line.active_config = -1
                     Pfrom = 0
@@ -220,8 +223,8 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
                 
                 line.fromS = (Pfrom + 1j*Qfrom)
                 line.toS = (Pto + 1j*Qto)
-                line.loss = 0
-                line.P_loss = 0
+                line.loss = line.fromS + line.toS
+                line.P_loss = lines_AC_CT_loss[l]
 
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_AC_CT, grid.lines_AC_ct)
@@ -407,30 +410,18 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
     best_i = best_result['i']
 
     t5 = time.perf_counter()
+
+    # Restore original cable types BEFORE exporting results, so that
+    # Ybus_list has all entries and active_config is not silently clamped
+    # to a shorter list (which would cause wrong Ybus and wrong P_INJ).
+    grid.Cable_options[0].cable_types = og_cable_types
+    gen_active_config = grid.Cable_options[0].active_config
+    grid.Cable_options[0].active_config = [int(gen_active_config.get(k, 0)) for k in range(len(og_cable_types))]
+
     if NL:
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
     else:
         ExportACDC_Lmodel_toPyflowACDC(model, grid, solver_results=model_results, tee=tee)
-    
-    
-
-    grid.Cable_options[0].cable_types = og_cable_types
-    gen_active_config = grid.Cable_options[0].active_config
-    grid.Cable_options[0].active_config = [int(gen_active_config.get(k, 0)) for k in range(len(og_cable_types))]
-    
-    lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-    
-    def process_line_AC_CT(line):
-        l = line.lineNumber
-        ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
-        if any(ct_selected):
-            line.active_config = np.where(ct_selected)[0][0] 
-        else:
-            line.active_config = -1
-
-
-    with ThreadPoolExecutor() as executor:
-        executor.map(process_line_AC_CT, grid.lines_AC_ct)
 
 
     present_value = Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate

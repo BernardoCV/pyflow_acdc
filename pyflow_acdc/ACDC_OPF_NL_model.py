@@ -783,6 +783,9 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
        return model.ct_QAC_from[line,ct] == Qfrom
    
     def P_loss_AC_rule_ct(model,line):
+        l = grid.lines_AC_ct[line]
+        if l.active_config < 0:
+            return model.ct_PAC_line_loss[line] == 0
         loss = 0
         for ct in model.ct_set:
             loss += (model.ct_PAC_to[line,ct]+model.ct_PAC_from[line,ct])*(model.ct_branch[line,ct])
@@ -2245,8 +2248,8 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             node.P_INJ = Pf[i]
             node.Q_INJ = Qf[i]
                     
-        grid.Line_AC_calc()    
-    
+        grid.Line_AC_calc() 
+        
     if grid.DCmode:
         
         # DC nodes

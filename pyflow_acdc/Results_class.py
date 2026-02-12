@@ -733,6 +733,7 @@ class Results:
                     load = line.loading
                     rows.append({
                         "Line": line.name,
+                        "Line number": line.lineNumber,
                         "From bus": line.fromNode.name,
                         "To bus": line.toNode.name,
                         "i from (kA)": np.round(i_from, decimals=self.dec),
@@ -743,7 +744,7 @@ class Results:
                     })
 
         df_all = pd.DataFrame(rows) if rows else pd.DataFrame(
-            columns=["Line", "From bus", "To bus",
+            columns=["Line", "Line number", "From bus", "To bus",
                      "i from (kA)", "i to (kA)", "Loading %", "Capacity [MVA]", "Grid"]
         )
 
@@ -761,11 +762,12 @@ class Results:
                         continue
                     print(f'Grid AC {g+1}')
                     tablei = pt()
-                    tablei.field_names = ["Line", "From bus", "To bus",
+                    tablei.field_names = ["Line", "Line number", "From bus", "To bus",
                                           "i from (kA)", "i to (kA)", "Loading %", "Capacity [MVA]"]
                     for _, row in df_grid.iterrows():
                         tablei.add_row([
                             row["Line"],
+                            row["Line number"],
                             row["From bus"],
                             row["To bus"],
                             row["i from (kA)"],
@@ -786,6 +788,9 @@ class Results:
         rows = []
 
         for g in range(self.Grid.Num_Grids_AC):
+            loss = 0
+            loading = 0
+            counter = 0
             for line in self.Grid.lines_AC_exp:
                 if line.np_line > 0.01 and self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                     p_from = np.real(line.fromS)*self.Grid.S_base
@@ -797,6 +802,7 @@ class Results:
                     load = line.loading
                     rows.append({
                         "Line": line.name,
+                        "Line number": line.lineNumber,
                         "From bus": line.fromNode.name,
                         "To bus": line.toNode.name,
                         "P from (MW)": np.round(p_from, decimals=self.dec),
@@ -808,7 +814,9 @@ class Results:
                         "Loading %": np.round(load, decimals=self.dec),
                         "Grid": g+1
                     })
-
+                    loss += Ploss
+                    loading += load
+                    counter += 1
             for line in self.Grid.lines_AC_rec:
                 if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                     p_from = np.real(line.fromS)*self.Grid.S_base
@@ -820,6 +828,7 @@ class Results:
                     load = line.loading
                     rows.append({
                         "Line": line.name,
+                        "Line number": line.lineNumber,
                         "From bus": line.fromNode.name,
                         "To bus": line.toNode.name,
                         "P from (MW)": np.round(p_from, decimals=self.dec),
@@ -831,9 +840,11 @@ class Results:
                         "Loading %": np.round(load, decimals=self.dec),
                         "Grid": g+1
                     })
-
+                    loss += Ploss
+                    loading += load
+                    counter += 1
             for line in self.Grid.lines_AC_ct:
-                if self.Grid.Graph_line_to_Grid_index_AC[line] == g:
+                if line.active_config >= 0 and self.Grid.Graph_line_to_Grid_index_AC[line] == g:
                     p_from = np.real(line.fromS)*self.Grid.S_base
                     Q_from = np.imag(line.fromS)*self.Grid.S_base
                     p_to = np.real(line.toS)*self.Grid.S_base
@@ -843,6 +854,7 @@ class Results:
                     load = line.loading
                     rows.append({
                         "Line": line.name,
+                        "Line number": line.lineNumber,
                         "From bus": line.fromNode.name,
                         "To bus": line.toNode.name,
                         "P from (MW)": np.round(p_from, decimals=self.dec),
@@ -854,10 +866,26 @@ class Results:
                         "Loading %": np.round(load, decimals=self.dec),
                         "Grid": g+1
                     })
-
+                    loss += Ploss
+                    loading += load
+                    counter += 1
+            rows.append({
+                        "Line": "Total",
+                        "Line number": "",
+                        "From bus": "",
+                        "To bus": "",
+                        "P from (MW)": "",
+                        "Q from (MVAR)": "",
+                        "P to (MW)": "",
+                        "Q to (MW)": "",
+                        "Power loss (MW)": np.round(loss, decimals=self.dec),
+                        "Q loss (MVAR)": np.round(loss, decimals=self.dec),
+                        "Loading %": np.round(loading/counter, decimals=self.dec),
+                        "Grid": g+1
+                    })
         df_all = pd.DataFrame(rows) if rows else pd.DataFrame(
             columns=[
-                "Line", "From bus", "To bus",
+                "Line", "Line number", "From bus", "To bus",
                 "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)",
                 "Power loss (MW)", "Q loss (MVAR)", "Loading %", "Grid"
             ]
@@ -874,12 +902,13 @@ class Results:
                     continue
                 print(f'Grid AC {g+1}')
                 tablep = pt()
-                tablep.field_names = ["Line", "From bus", "To bus",
+                tablep.field_names = ["Line", "Line number", "From bus", "To bus",
                                       "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)",
                                       "Power loss (MW)", "Q loss (MVAR)", "Loading %"]
                 for _, row in df_grid.iterrows():
                     tablep.add_row([
                         row["Line"],
+                        row["Line number"],
                         row["From bus"],
                         row["To bus"],
                         row["P from (MW)"],
@@ -913,6 +942,7 @@ class Results:
                 Qloss = np.imag(line.loss)*base
                 rows.append({
                     "Line": line.name,
+                    "Line number": line.lineNumber,
                     "From bus": line.fromNode.name,
                     "To bus": line.toNode.name,
                     "P from (MW)": np.round(p_from, decimals=self.dec),
@@ -926,7 +956,7 @@ class Results:
 
         df_all = pd.DataFrame(rows) if rows else pd.DataFrame(
             columns=[
-                "Line", "From bus", "To bus",
+                "Line", "Line number", "From bus", "To bus",
                 "P from (MW)", "Q from (MVAR)", "P to (MW)", "Q to (MW)",
                 "Power loss (MW)", "Q loss (MVAR)", "Grid"
             ]
