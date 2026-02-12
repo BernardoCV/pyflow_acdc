@@ -226,22 +226,33 @@ class Results:
             if self.Grid.OPF_run:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
                                         +sum(gen.PGen for gen in node.connected_gen if gen.PGen >0) for node in self.Grid.nodes_AC])
+
                 Q_AC = np.vstack([node.QGi+sum(gen.QGen for gen in node.connected_gen) for node in self.Grid.nodes_AC])
             else:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
-                                        +sum(gen.Pset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+                                        +sum(gen.Pset for gen in node.connected_gen if gen.Pset >0) for node in self.Grid.nodes_AC])
                 Q_AC = np.vstack([node.QGi+sum(gen.Qset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
             
             for node in self.Grid.nodes_AC:
                 if not self.Grid.OPF_run and node.type == 'Slack':
                       ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
-                      PGi = node.P_INJ-ps+node.PLi
+                      net_power = node.P_INJ-ps+node.PLi
+                      if net_power >0:
+                        PGi = net_power
+                      else:
+                        PGi = 0
+                        grid_loads+=abs(net_power)*self.Grid.S_base
+    
                 else:
                       PGi = P_AC[node.nodeNumber].item()
                 generation += PGi*self.Grid.S_base      
-                grid_loads += (node.PLi-sum(gen.PGen for gen in node.connected_gen if gen.PGen <0))*self.Grid.S_base
+                if self.Grid.OPF_run:
+                    grid_loads += (node.PLi-sum(gen.PGen for gen in node.connected_gen if gen.PGen <0))*self.Grid.S_base
+                else:
+                    grid_loads += (node.PLi-sum(gen.Pset for gen in node.connected_gen if gen.Pset <0))*self.Grid.S_base
 
             self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
+            effective_rating_AC = np.zeros(self.Grid.Num_Grids_AC)
             
             for line in self.Grid.lines_AC:
                 node = line.fromNode
@@ -254,6 +265,7 @@ class Results:
                 load = max(Sfrom, Sto)
                 
                 self.Grid.load_grid_AC[G] += load
+                effective_rating_AC[G] += line.capacity_MVA
                 
                 self.lossP_AC[G] += Ploss
 
@@ -270,8 +282,24 @@ class Results:
                     load = max(Sfrom, Sto)
                     
                     self.Grid.load_grid_AC[G] += load
+                    effective_rating_AC[G] += line.capacity_MVA
                     
                     self.lossP_AC[G] += Ploss
+
+            for line in self.Grid.lines_AC_tf:
+                node = line.fromNode
+                G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
+                Ploss = np.real(line.loss)*self.Grid.S_base
+                
+                Sfrom = abs(line.fromS)*self.Grid.S_base
+                Sto   = abs(line.toS)*self.Grid.S_base
+
+                load = max(Sfrom, Sto)
+                
+                self.Grid.load_grid_AC[G] += load
+                effective_rating_AC[G] += line.capacity_MVA
+                
+                self.lossP_AC[G] += Ploss
 
             for line in (self.Grid.lines_AC_rec + self.Grid.lines_AC_ct):
                 node = line.fromNode
@@ -284,14 +312,15 @@ class Results:
                 load = max(Sfrom, Sto)
                 
                 self.Grid.load_grid_AC[G] += load
+                effective_rating_AC[G] += line.capacity_MVA
                 
                 self.lossP_AC[G] += Ploss
 
            
             
             for g in range(self.Grid.Num_Grids_AC):
-                if self.Grid.rating_grid_AC[g]!=0:
-                    gload=self.Grid.load_grid_AC[g]/self.Grid.rating_grid_AC[g]*100
+                if effective_rating_AC[g]!=0:
+                    gload=self.Grid.load_grid_AC[g]/effective_rating_AC[g]*100
                 else:
                     gload=0
                 rows.append({
@@ -372,7 +401,7 @@ class Results:
         })
         rows.append({
             "Grid": "Efficiency",
-            "Power Loss (MW)": f'{np.round(eff, decimals=0)}%',
+            "Power Loss (MW)": f'{np.round(eff, decimals=self.dec)}%',
             "Load %": ""
         })
 

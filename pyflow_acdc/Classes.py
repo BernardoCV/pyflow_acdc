@@ -596,7 +596,7 @@ class Grid:
 
         for line in self.lines_AC + self.lines_AC_exp + self.lines_AC_rec + self.lines_AC_tf + self.lines_AC_ct:
             g=self.Graph_line_to_Grid_index_AC[line]
-            self.rating_grid_AC[g]+=line.MVA_rating
+            self.rating_grid_AC[g]+=line.capacity_MVA
             self.Graph_number_lines_AC[g]+=1
             
         "Slack identification"
@@ -2099,6 +2099,8 @@ class Size_selection(Line_AC):
     
     @property
     def capacity_MVA(self):
+        if self._active_config == -1:
+            return 0
         return self.MVA_rating_list[self._active_config]
     
     @property
