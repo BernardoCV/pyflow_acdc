@@ -6,6 +6,7 @@ import numpy as np
 import math
 import pyomo.environ as pyo
 import pandas as pd
+import sys
 try:
     import gurobipy
     GUROBI_AVAILABLE = True
@@ -156,23 +157,10 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             # Pyomo model
             MIP_obj_value = pyo.value(model_MIP.objective)
         elif hasattr(model_MIP, 'objective_value'):
-            # OR-Tools MockModel
+            # OR-Tools MockModel – already unscaled in MockModel.__init__
             MIP_obj_value = model_MIP.objective_value
         else:
             raise AttributeError("model_MIP must have either 'objective' (Pyomo) or 'objective_value' (OR-Tools) attribute")
-        
-        # Debug: break down MIP objective
-        if tee:
-            _inst_cost = sum(grid.lines_AC_ct[l].installation_cost for l in range(len(grid.lines_AC_ct))
-                             if (pyo.value(model_MIP.line_used[l]) if hasattr(model_MIP, 'line_used') else False) >= 0.5)
-            print(f'DEBUG MIP obj={MIP_obj_value:.4f}  installation_cost={_inst_cost:.4f}  cable_type_cost={MIP_obj_value - _inst_cost:.4f}')
-            for l in range(len(grid.lines_AC_ct)):
-                line_obj = grid.lines_AC_ct[l]
-                used = pyo.value(model_MIP.line_used[l]) if hasattr(model_MIP, 'line_used') else getattr(model_MIP, '_line_used_val', {}).get(l, 0)
-                if used >= 0.5:
-                    print(f'  line {l} ({line_obj.name}): install_cost={line_obj.installation_cost:.4f}  length_km={line_obj.Length_km:.4f}  cost_per_km={line_obj.installation_cost_per_km:.4f}')
-            print('--------------------------------')
-            print(f'DEBUG: MIP model: {MIP_obj_value}')
         if  high_flow < max_flow:
             
             max_power_per_string = t_MW*high_flow 
@@ -185,7 +173,9 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
            
             grid.max_turbines_per_string = high_flow
         iter_cab_available= grid.Cable_options[0].cable_types.copy()
-        print(f'DEBUG: Iteration {i} iter_cab_available: {iter_cab_available}')
+        if tee:
+            print(f'DEBUG: Iteration {i} iter_cab_available: {iter_cab_available}')
+        
         t3 = time.perf_counter()
         #print(f'DEBUG: Iteration {i}')
         if NL:
@@ -208,9 +198,14 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-            lines_AC_CT_fromQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-            lines_AC_CT_toQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
-            lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
+            if  NL:
+                lines_AC_CT_fromQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+                lines_AC_CT_toQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
+                lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
+            else:
+                lines_AC_CT_fromQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
+                lines_AC_CT_toQ = {k: {ct: 0.0 for ct in model.ct_set} for k in model.lines_AC_ct}
+                lines_AC_CT_loss = {k: 0.0 for k in model.lines_AC_ct}
             gen_active_config = {k: np.float64(pyo.value(model.ct_types[k])) for k in model.ct_set}
            
             
@@ -897,14 +892,15 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
         
         # Create a mock model-like object for compatibility with Pyomo version
         class MockModel:
-            def __init__(self, vars_dict, line_used_vals, line_flow_vals, objective_value):
+            def __init__(self, vars_dict, line_used_vals, line_flow_vals, objective_value, length_scale):
                 self.vars_dict = vars_dict
                 self.line_used_vals = line_used_vals
                 self.line_flow_vals = line_flow_vals
-                self.objective_value = objective_value
+                self.objective_value = objective_value / length_scale
+                self.length_scale = length_scale
              
         
-        mock_model = MockModel(vars_dict, line_used_vals, line_flow_vals, objective)
+        mock_model = MockModel(vars_dict, line_used_vals, line_flow_vals, objective, length_scale)
         
         return True, high_flow, mock_model, feasible_solutions
     else:
@@ -1638,8 +1634,9 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     # --------------------
     coeffs = []
     for l in lines:
-        length_km = grid.lines_AC_ct[l].Length_km
-        coeff = math.ceil(length_km * length_scale)  # Round up to nearest meter
+        # Use installation_cost (= cost_per_km * trench_length_km) to match Pyomo objective
+        install_cost = grid.lines_AC_ct[l].installation_cost
+        coeff = math.ceil(install_cost * length_scale)
         coeffs.append(coeff)
 
     if enable_cable_types:
@@ -1648,7 +1645,6 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
             for ct in ct_set:
-                # Scale base_cost by length_scale to match length scaling
                 base_cost = line_obj.base_cost[ct] if hasattr(line_obj, 'base_cost') and ct < len(line_obj.base_cost) else 0
                 cost_coeff = math.ceil(base_cost * length_scale)
                 cable_type_cost_terms.append(cost_coeff * ct_branch[(l, ct)])
