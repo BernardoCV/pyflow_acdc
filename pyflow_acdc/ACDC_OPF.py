@@ -1101,7 +1101,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
             loss += sum(model.rec_PAC_line_loss[rec] for rec in model.lines_AC_rec)
         if grid.CT_AC:
             loss += sum(model.ct_PAC_line_loss[ct] for ct in model.lines_AC_ct)
-        return loss
+        return loss*grid.LCoE
 
     def formula_DC_losses():
         if weights_def['DC_losses']['w']==0:
@@ -1109,12 +1109,12 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
         loss = sum(model.PDC_line_loss[line] for line in model.lines_DC)
         if grid.CDC:
             loss += sum(model.CDC_loss[conv] for conv in model.DCDC_conv)
-        return loss
+        return loss*grid.LCoE
 
     def formula_Converter_Losses():
         if weights_def['Converter_Losses']['w']==0:
             return 0
-        return sum(model.P_conv_loss[conv]+model.P_AC_loss_conv[conv] for conv in model.conv)
+        return sum(model.P_conv_loss[conv]+model.P_AC_loss_conv[conv] for conv in model.conv)*grid.LCoE
 
     def formula_General_Losses():
         if weights_def['General_Losses']['w']==0:
@@ -1129,7 +1129,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
             gen = sum(model.PGi_gen[gen] for gen in model.gen_AC)
         if grid.RenSources != []:
             gen = sum(model.P_renSource[rs]*model.gamma[rs] for rs in model.ren_sources)
-        return gen - load
+        return (gen - load)*grid.LCoE
     
     def formula_curtailment_red():
         if weights_def['Curtailment_Red']['w']==0:
@@ -1634,21 +1634,21 @@ def calculate_objective(grid,obj,OnlyGen=True):
                 sum(tf.P_loss for tf in grid.lines_AC_tf)+
                 sum(line.P_loss for line in grid.lines_AC_exp)+
                 sum(line.P_loss for line in grid.lines_AC_rec)+
-                sum(line.P_loss for line in grid.lines_AC_ct))*grid.S_base
+                sum(line.P_loss for line in grid.lines_AC_ct))*grid.S_base*grid.LCoE
 
     if obj =='DC_losses':
         return (sum(line.loss for line in grid.lines_DC)+
-                sum(conv.loss for conv in grid.Converters_DCDC))*grid.S_base
+                sum(conv.loss for conv in grid.Converters_DCDC))*grid.S_base*grid.LCoE
 
     if obj =='Converter_Losses':
-        return sum(conv.P_loss for conv in grid.Converters_ACDC)*grid.S_base
+        return sum(conv.P_loss for conv in grid.Converters_ACDC)*grid.S_base*grid.LCoE
 
     if obj =='General_Losses':
         return (sum(line.P_loss for line in grid.lines_AC) +
                 sum(tf.P_loss for tf in grid.lines_AC_tf) +
                 sum(line.P_loss for line in grid.lines_AC_exp) +
                 sum(line.loss for line in grid.lines_DC) +
-                sum(conv.P_loss for conv in grid.Converters_ACDC))*grid.S_base
+                sum(conv.P_loss for conv in grid.Converters_ACDC))*grid.S_base*grid.LCoE
 
     if obj =='Curtailment_Red':
         ac_curt=0

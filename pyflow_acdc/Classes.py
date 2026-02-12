@@ -113,6 +113,7 @@ class Grid:
         self.iter_flow_AC = []
         self.iter_flow_DC = []
 
+        self.LCoE = 1
         self.OPF_obj = {
        'Ext_Gen': {'w': 0},
        'Energy_cost': {'w': 0},

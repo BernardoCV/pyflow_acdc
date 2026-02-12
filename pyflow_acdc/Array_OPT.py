@@ -55,10 +55,12 @@ class MIPConfig:
     t_MW: float | None = None
 
 
-def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
+def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
                    MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,
                    MIP_gap=0.01,backend='pyomo',min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
     
+    if LCoE is not None:
+        grid.LCoE = LCoE
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
         # If save_path is provided and is a directory, create "sequential_CSS" inside it
@@ -264,7 +266,7 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             # NL: compute loss cost from exported grid results
             present_value_factor = Hy * (1 - (1 + discount_rate) ** -n_years) / discount_rate
             loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
-            loss_cost = loss_MW * present_value_factor
+            loss_cost = loss_MW * present_value_factor*grid.LCoE
             cable_cost = 0
             for line in grid.lines_AC_ct:
                 if line.active_config >= 0:
