@@ -160,6 +160,19 @@ def sequential_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=N
             MIP_obj_value = model_MIP.objective_value
         else:
             raise AttributeError("model_MIP must have either 'objective' (Pyomo) or 'objective_value' (OR-Tools) attribute")
+        
+        # Debug: break down MIP objective
+        if tee:
+            _inst_cost = sum(grid.lines_AC_ct[l].installation_cost for l in range(len(grid.lines_AC_ct))
+                             if (pyo.value(model_MIP.line_used[l]) if hasattr(model_MIP, 'line_used') else False) >= 0.5)
+            print(f'DEBUG MIP obj={MIP_obj_value:.4f}  installation_cost={_inst_cost:.4f}  cable_type_cost={MIP_obj_value - _inst_cost:.4f}')
+            for l in range(len(grid.lines_AC_ct)):
+                line_obj = grid.lines_AC_ct[l]
+                used = pyo.value(model_MIP.line_used[l]) if hasattr(model_MIP, 'line_used') else getattr(model_MIP, '_line_used_val', {}).get(l, 0)
+                if used >= 0.5:
+                    print(f'  line {l} ({line_obj.name}): install_cost={line_obj.installation_cost:.4f}  length_km={line_obj.Length_km:.4f}  cost_per_km={line_obj.installation_cost_per_km:.4f}')
+            print('--------------------------------')
+            print(f'DEBUG: MIP model: {MIP_obj_value}')
         if  high_flow < max_flow:
             
             max_power_per_string = t_MW*high_flow 
