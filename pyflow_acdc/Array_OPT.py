@@ -189,7 +189,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         # OPF uses NL solver; False and PF both use linear CSS
         css_NL = (NL == 'OPF')
         model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,css_NL,tee,fs=fs)
-        feasible_solutions_CSS = solver_stats['feasible_solutions']
+        css_ok = model_results is not None and model_results['Solver'][0]['Status'] == 'ok'
+        feasible_solutions_CSS = solver_stats.get('feasible_solutions', []) if solver_stats else []
         t4 = time.perf_counter()
         if tee:
             print(f'Iteration {i} CSS finished in {t4 - t3} seconds')
@@ -206,10 +207,12 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
                 os.makedirs(intermediate_dir)
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_{CSS_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
         
-        if model_results['Solver'][0]['Status'] == 'ok':
+        if css_ok:
             obj_value = pyo.value(model.obj)
         else:
-            obj_value = None  # or some default value
+            if tee:
+                print(f'Iteration {i} CSS solver status not ok, skipping to next cable combo')
+            obj_value = None
 
         
         
@@ -219,7 +222,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         used_cable_names = []
         
         # Analyze which cable types were used in the optimization
-        if model_results['Solver'][0]['Status'] == 'ok':
+        if css_ok:
             # Get the cable types that were actually used
            
             for ct in model.ct_set:
@@ -268,6 +271,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         if obj_value is None:
             cable_cost = None
             loss_cost = None
+            loss_MW = None
             opt_obj = None
             total_cost = None
         else:
@@ -314,6 +318,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             'CSS_model': model,
             'sub_iter': sub_iter,
             'i': i,
+            'css_ok': css_ok,
             'feasible_solutions_MIP': feasible_solutions_MIP,
             'feasible_solutions_CSS': feasible_solutions_CSS
         }
@@ -359,18 +364,21 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         'cable_options': [result['cable_options'] for result in results],
         'cables_used':  [result['cables_used'] for result in results],
         'timing_info':  [result['timing_info'] for result in results],
-        'solver_status':[result['model_results']['Solver'][0]['Status']  for result in results],
+        'solver_status':[result['model_results']['Solver'][0]['Status'] if result['model_results'] is not None else 'failed' for result in results],
         'iteration':    [result['i'] for result in results],
         'sub_iter':     [result['sub_iter'] for result in results],
         'feasible_solutions_MIP': [result['feasible_solutions_MIP'] for result in results],
         'feasible_solutions_CSS': [result['feasible_solutions_CSS'] for result in results]
     }
 
-    # Find best result
-    if len(results) > 1:
-        best_result = min(results, key=lambda x: x['opt_obj'])
+    # Find best result (only among iterations where optimization succeeded)
+    valid_results = [r for r in results if r['opt_obj'] is not None]
+    if len(valid_results) > 1:
+        best_result = min(valid_results, key=lambda x: x['opt_obj'])
+    elif len(valid_results) == 1:
+        best_result = valid_results[0]
     else:
-        best_result = results[0]  # Just return the single result
+        best_result = results[0]  # All failed, return first
     
 
     if fs:
