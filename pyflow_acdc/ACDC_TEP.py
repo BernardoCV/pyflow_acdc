@@ -487,7 +487,7 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
             'central_market': [],
             'thresholds': [cv_threshold,correlation_threshold],
             'print_details': True/False,
-            'corrolation_decisions': [correlation_cleaning = True/False,method = '1/2/3',scale_groups = True/False],
+            'correlation_decisions': [correlation_cleaning = True/False,method = '1/2/3',scale_groups = True/False],
             'cluster_algorithm': 'Kmeans/Ward/DBSCAN/OPTICS/Kmedoids/Spectral/HDBSCAN/PAM_Hierarchical'
         }
         """
@@ -496,10 +496,10 @@ def multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,disc
         central_market = clustering_options['central_market'] if 'central_market' in clustering_options else []
         thresholds = clustering_options['thresholds'] if 'thresholds' in clustering_options else [0,0.8]
         print_details = clustering_options['print_details'] if 'print_details' in clustering_options else False
-        corrolation_decisions = clustering_options['corrolation_decisions'] if 'corrolation_decisions' in clustering_options else [False,'1',False]
+        correlation_decisions = clustering_options['correlation_decisions'] if 'correlation_decisions' in clustering_options else [False,'1',False]
         algo = clustering_options['cluster_algorithm'] if 'cluster_algorithm' in clustering_options else 'Kmeans'
        
-        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[0] ,correlation_threshold=thresholds[1],print_details=print_details,corrolation_decisions=corrolation_decisions)
+        n_clusters,_,_,_ = cluster_TS(grid, n_clusters= n, time_series=time_series,central_market=central_market,algorithm=algo, cv_threshold=thresholds[0] ,correlation_threshold=thresholds[1],print_details=print_details,correlation_decisions=correlation_decisions)
                 
         clustering = True
     else:
