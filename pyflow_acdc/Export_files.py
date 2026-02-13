@@ -460,7 +460,7 @@ def {file_name}():
     
 
 
-def save_pickle(grid, path, compress=True, use_dill=True):
+def save_pickle(grid, path, compress=True, use_dill=False):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     lib = _dill if (use_dill and _dill is not None) else pickle
     protocol = pickle.HIGHEST_PROTOCOL

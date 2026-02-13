@@ -1388,11 +1388,22 @@ def Create_grid_from_pickle(path,use_dill=True):
     res = Results(grid, decimals=3)
     return [grid, res]
 
-def load_pickle(path,use_dill=True):
-    lib = _dill if (use_dill and _dill is not None) else pickle
+def load_pickle(path, use_dill=False):
     opener = gzip.open if path.endswith(".gz") else open
-    with opener(path, "rb") as f:
-        return lib.load(f)
+    # Try pickle first, fall back to dill if it fails (for files saved with dill)
+    if not use_dill:
+        try:
+            with opener(path, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            if _dill is not None:
+                with opener(path, "rb") as f:
+                    return _dill.load(f)
+            raise
+    else:
+        lib = _dill if _dill is not None else pickle
+        with opener(path, "rb") as f:
+            return lib.load(f)
 
 def change_S_base(grid,Sbase_new):
     
