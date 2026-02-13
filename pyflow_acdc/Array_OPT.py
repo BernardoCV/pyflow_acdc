@@ -189,11 +189,16 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         # OPF uses NL solver; False and PF both use linear CSS
         css_NL = (NL == 'OPF')
         model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,css_NL,tee,fs=fs)
-        css_ok = model_results is not None and model_results['Solver'][0]['Status'] == 'ok'
+        css_status_ok = model_results is not None and model_results['Solver'][0]['Status'] == 'ok'
+        css_solution_found = solver_stats.get('solution_found', False) if solver_stats else False
+        css_ok = css_status_ok or css_solution_found
         feasible_solutions_CSS = solver_stats.get('feasible_solutions', []) if solver_stats else []
         t4 = time.perf_counter()
         if tee:
             print(f'Iteration {i} CSS finished in {t4 - t3} seconds')
+            if not css_status_ok and css_solution_found:
+                tc = solver_stats.get('termination_condition', 'unknown') if solver_stats else 'unknown'
+                print(f'  Warning: solver status not ok (termination: {tc}), but feasible solution found — using it')
         timing_info['CSS'] = t4 - t3
         seq_css_time += t4 - t3
         if svg is not None:
@@ -211,7 +216,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             obj_value = pyo.value(model.obj)
         else:
             if tee:
-                print(f'Iteration {i} CSS solver status not ok, skipping to next cable combo')
+                print(f'Iteration {i} CSS solver status not ok and no feasible solution found, skipping to next cable combo')
             obj_value = None
 
         
