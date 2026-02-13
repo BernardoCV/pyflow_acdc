@@ -180,13 +180,15 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         
         t3 = time.perf_counter()
         #print(f'DEBUG: Iteration {i}')
-        if NL:
+        if NL == 'OPF':
             from .Graph_and_plot import save_network_svg
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             os.makedirs(intermediate_dir, exist_ok=True)
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_preCSS', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
         
-        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,NL,tee,fs=fs)
+        # OPF uses NL solver; False and PF both use linear CSS
+        css_NL = (NL == 'OPF')
+        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,css_NL,tee,fs=fs)
         feasible_solutions_CSS = solver_stats['feasible_solutions']
         t4 = time.perf_counter()
         if tee:
@@ -197,7 +199,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             if tee:
                 print(f'Iteration {i} saving SVG')
             from .Graph_and_plot import save_network_svg
-            CSS_solver = CSS_NL_solver if NL else CSS_L_solver
+            CSS_solver = CSS_NL_solver if NL == 'OPF' else CSS_L_solver
             # Save SVG in the sequential_CSS folder
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             if not os.path.exists(intermediate_dir):
@@ -261,32 +263,48 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         # Compute cable cost matching TEP_obj Array_investments()
         
                
+        present_value_factor = Hy * (1 - (1 + discount_rate) ** -n_years) / discount_rate
 
-        if NL:
-            # NL: compute loss cost from exported grid results
-            present_value_factor = Hy * (1 - (1 + discount_rate) ** -n_years) / discount_rate
-            loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
-            loss_cost = loss_MW * present_value_factor*grid.LCoE
-            cable_cost = 0
-            for line in grid.lines_AC_ct:
-                if line.active_config >= 0:
-                    cable_cost += line.base_cost[line.active_config]
+        if obj_value is None:
+            cable_cost = None
+            loss_cost = None
+            opt_obj = None
+            total_cost = None
         else:
-            # Linear CSS has no losses; obj_value is just cable cost
-            if obj_value is None:
-                obj_value = cable_cost
-            cable_cost = obj_value
-            loss_cost = 0
-
-        total_cost = MIP_obj_value + cable_cost + loss_cost
+            if NL == 'OPF':
+                # OPF: losses from NL solver export
+                loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
+                loss_cost = loss_MW * present_value_factor*grid.LCoE
+                cable_cost = 0
+                for line in grid.lines_AC_ct:
+                    if line.active_config >= 0:
+                        cable_cost += line.base_cost[line.active_config]
+                opt_obj = MIP_obj_value + cable_cost + loss_cost
+            elif NL == 'PF':
+                # PF: post-processing power flow for losses, not in opt_obj
+                from .ACDC_PF import Power_flow
+                Power_flow(grid)
+                loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
+                loss_cost = loss_MW * present_value_factor*grid.LCoE
+                cable_cost = obj_value
+                opt_obj = cable_cost + MIP_obj_value
+            else:
+                # Linear: no losses
+                cable_cost = obj_value
+                loss_cost = 0
+                loss_MW = 0
+                opt_obj = cable_cost + MIP_obj_value
+            total_cost = MIP_obj_value + cable_cost + loss_cost
         # Create a dictionary for this iteration's results
         iteration_result = {
             'cable_length': cable_length,
             'weighted_length': weighted_length,
             'installation_cost': MIP_obj_value,
+            'loss_MW': loss_MW,
             'cable_cost': cable_cost,
             'loss_cost': loss_cost,
             'total_cost': total_cost,  # Save the objective value
+            'opt_obj': opt_obj,
             'cable_options': iter_cab_available,  # Save a copy of the cable list
             'cables_used': used_cable_names,
             'model_results': model_results,
@@ -301,8 +319,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         }
         results.append(iteration_result)  # Add to the results list   
         
-        if i > 0 and total_cost is not None and results[i-1]['total_cost'] is not None:
-            if total_cost > results[i-1]['total_cost']:
+        if i > 0 and opt_obj is not None and results[i-1]['opt_obj'] is not None:
+            if opt_obj > results[i-1]['opt_obj']:
                 if tee:
                     print(f'Iteration {i} objective value increased, breaking loop')
                 break
@@ -332,10 +350,12 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
     summary_results = {
         'cable_length': [result['cable_length'] for result in results],
         'weighted_length': [result['weighted_length'] for result in results],
+        'loss_MW': [result['loss_MW'] for result in results],
         'installation_cost': [result['installation_cost'] for result in results],
         'cable_cost':    [result['cable_cost'] for result in results],
         'loss_cost':     [result['loss_cost'] for result in results],
         'total_cost':   [result['total_cost'] for result in results],
+        'opt_obj':      [result['opt_obj'] for result in results],
         'cable_options': [result['cable_options'] for result in results],
         'cables_used':  [result['cables_used'] for result in results],
         'timing_info':  [result['timing_info'] for result in results],
@@ -348,7 +368,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
 
     # Find best result
     if len(results) > 1:
-        best_result = min(results, key=lambda x: x['total_cost'])
+        best_result = min(results, key=lambda x: x['opt_obj'])
     else:
         best_result = results[0]  # Just return the single result
     
@@ -406,7 +426,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             used_types.add(line.active_config)
     grid.Cable_options[0].active_config = [1 if k in used_types else 0 for k in range(len(og_cable_types))]
 
-    if NL:
+    if NL == 'OPF':
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
     else:
         ExportACDC_Lmodel_toPyflowACDC(model, grid, solver_results=model_results, tee=tee)
