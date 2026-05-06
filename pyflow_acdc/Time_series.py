@@ -1015,6 +1015,10 @@ def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
 
             i = find_value_from_cdf(cumulative_prob, curtail)
             name=ts.name
+            if 'loading' in name:
+                n = sum(1 for num in ts.data if num > over_loading)
+            else:
+                n = sum(1 for num in ts.data if num > over_loading * maxim)
            
             # Create a dictionary to store the statistics
             stats_dict = {
@@ -1027,6 +1031,7 @@ def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
                 'Mode_count': count,
                 'IQR': iqr,
                 f'{curtail*100}%': sorted_data[i].item(),
+                f'Number above {over_loading*100}%': n,
                }
 
             # Convert the dictionary to a DataFrame and append it to the stats DataFrame

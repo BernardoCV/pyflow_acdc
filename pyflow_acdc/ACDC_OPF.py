@@ -1147,6 +1147,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         'lower_bound': getattr(results.problem, 'lower_bound', None) if results else None,
         'time': getattr(results.solver, 'time', None) if results else None,
         'termination_condition': str(results.solver.termination_condition) if results else None,
+        'solver_status': str(getattr(results.solver, 'status', '') or '') if results else None,
         'solver_message': solver_message,
         'feasible_solutions': feasible_solutions,
         'all_solutions': all_solutions,
@@ -1165,6 +1166,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     except AttributeError:
         tc = ''
     solver_message_lc = solver_message.lower()
+    solver_status_lc = str((solver_stats or {}).get('solver_status') or '').lower()
     solver_name_lc = str(solver).lower() if solver is not None else ''
     trusted_termination = tc in ('optimal', 'feasible', 'locallyoptimal', 'acceptable', 'locally_optimal', 'maxiterations')
     explicit_infeasible_termination = tc in (
@@ -1197,8 +1199,27 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         'aborted' in solver_message_lc
         or 'error in step computation' in solver_message_lc
         or 'error encountered in optimization' in solver_message_lc
+        or 'dynamic_library_failure' in solver_message_lc
+        or 'library loading failure' in solver_message_lc
+        or 'cannot open shared object file' in solver_message_lc
+        or 'libhsl.so' in solver_message_lc
     ):
         explicit_error_termination = True
+
+    # Some solver interfaces return termination_condition="other" for hard solver failures.
+    # Promote those cases to explicit error so callers can catch them deterministically.
+    if tc == 'other':
+        if solver_status_lc in ('error', 'aborted'):
+            explicit_error_termination = True
+            solver_stats['termination_condition'] = 'error'
+        elif (
+            'dynamic_library_failure' in solver_message_lc
+            or 'library loading failure' in solver_message_lc
+            or 'cannot open shared object file' in solver_message_lc
+            or 'libhsl.so' in solver_message_lc
+        ):
+            explicit_error_termination = True
+            solver_stats['termination_condition'] = 'error'
 
         # If callback mode was used, analyze the last Ipopt iteration from the log
         # to measure how close we are to acceptable feasibility with default tolerances.
