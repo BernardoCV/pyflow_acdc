@@ -29,7 +29,7 @@ def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
 
     
 
-def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,initiate_max=False):
+def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
     from .ACDC_OPF import Translate_pyf_OPF 
     
     if limit_flow_rate is True:
@@ -54,7 +54,7 @@ def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_r
         Converter_variables(model,grid,Conv_info,TEP)
 
     if TEP:
-        TEP_variables(model,grid,initiate_max=initiate_max)
+        TEP_variables(model,grid,n_init_install=n_init_install)
     else:
         TEP_parameters(model,grid,AC_info,DC_info,Conv_info)
 
@@ -1930,7 +1930,9 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
         model.np_conv = pyo.Param(model.conv,initialize=np_conv,mutable=True)
 
 
-def TEP_variables(model,grid,initiate_max=False):
+def TEP_variables(model,grid,n_init_install=None):
+    if n_init_install not in (None, "max", "mean"):
+        raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
 
     from .ACDC_Static_TEP import get_TEP_variables
 
@@ -2088,9 +2090,12 @@ def TEP_variables(model,grid,initiate_max=False):
                 return (NP_lineDC[line], NP_lineDC_max[line])
         
         def NP_lineDC_init(model, line):
-            if initiate_max:
+            if n_init_install == "max":
                 _, ub = NPline_bounds(model, line)
                 return ub
+            if n_init_install == "mean":
+                lb, ub = NPline_bounds(model, line)
+                return int(round((lb + ub) / 2.0))
             return NP_lineDC_model_first_guess[line]
 
         model.NumLinesDCP = pyo.Var(
@@ -2110,9 +2115,12 @@ def TEP_variables(model,grid,initiate_max=False):
                 return (np_conv[conv], np_conv_max[conv])
         
         def NP_conv_init(model, conv):
-            if initiate_max:
+            if n_init_install == "max":
                 _, ub = NPconv_bounds(model, conv)
                 return ub
+            if n_init_install == "mean":
+                lb, ub = NPconv_bounds(model, conv)
+                return int(round((lb + ub) / 2.0))
             return np_conv_model_first_guess[conv]
 
         model.np_conv = pyo.Var(

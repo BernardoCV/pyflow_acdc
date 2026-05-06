@@ -153,10 +153,15 @@ class Grid:
         self.Array_opf = False
         # Toggle for enforcing minimum converter capacity relative to standalone wind
         # (added as an MP-MS coupling constraint in ACDC_MultiPeriod_TEP).
-        self.enable_conv_wind_min_constraint = False
+        self.enable_conv_wind_min_constraint = False #Experimental
         # Minimum converter-to-standalone-wind sizing ratio (in apparent-power terms).
         # Used by MP coupling constraint in ACDC_MultiPeriod_TEP.
         self.conv_wind_min_ratio = 1
+        # Toggle for enforcing converter/DC-line capacity ratio coupling.
+        self.enable_conv_dcline_ratio_constraint = False #Experimental
+        # Enforced band for conv_capacity / connected_dc_line_capacity.
+        self.conv_dcline_ratio_min = 0.9
+        self.conv_dcline_ratio_max = 1.1
         
         self.name = 'Grid'
         
