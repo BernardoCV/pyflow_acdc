@@ -1478,11 +1478,13 @@ def run_elbow_analysis(
     save_path='clustering_results',
     time_series=None,
     print_details=False,
+    print_step=True,
     ts_options=None,
     correlation_decisions=None,
     forced_centers=None,
     format='svg',
     identifier=None,
+    save_clusters_path=None,
 ):
     """
     Run elbow analysis (inertia vs number of clusters) and save plot + CSV.
@@ -1503,7 +1505,35 @@ def run_elbow_analysis(
         )
 
     rows = []
-    for n in n_clusters_list:
+    if save_clusters_path is not None:
+        Path(save_clusters_path).mkdir(parents=True, exist_ok=True)
+
+    def _export_clusters_payload(grid_obj, n_clusters):
+        cluster_data = grid_obj.Clusters[n_clusters]
+        representatives = cluster_data.get("Representatives", pd.DataFrame())
+        reps_data = representatives.to_dict(orient="list") if isinstance(representatives, pd.DataFrame) else {}
+        payload = {
+            "n_clusters": int(n_clusters),
+            "weight": [float(x) for x in cluster_data.get("Weight", [])],
+            "cluster_count": [int(x) for x in cluster_data.get("Cluster Count", [])],
+            "labels": [int(x) for x in cluster_data.get("Labels", [])],
+            "cluster_idx": {str(k): [int(i) for i in v] for k, v in cluster_data.get("Cluster idx", {}).items()},
+            "representatives": {"data": reps_data},
+            "time_series_clustered": {},
+        }
+        for ts in grid_obj.Time_series:
+            clustered_dict = getattr(ts, "data_clustered", {})
+            if isinstance(clustered_dict, dict) and n_clusters in clustered_dict:
+                payload["time_series_clustered"][ts.name] = [float(x) for x in clustered_dict[n_clusters]]
+        return payload
+
+    total_steps = len(n_clusters_list)
+    for idx, n in enumerate(n_clusters_list, start=1):
+        if print_step:
+            print(
+                f"[run_elbow_analysis] algorithm={algorithm} "
+                f"step={idx}/{total_steps} requested_k={int(n)}"
+            )
         n_used, _, metrics, _ = cluster_TS(
             grid,
             n_clusters=int(n),
@@ -1516,6 +1546,11 @@ def run_elbow_analysis(
             correlation_decisions=correlation_decisions,
             forced_centers=forced_centers,
         )
+        if print_step:
+            print(
+                f"[run_elbow_analysis] algorithm={algorithm} "
+                f"step={idx}/{total_steps} completed used_k={int(n_used)}"
+            )
         cov_value, inertia_value = metrics[0], metrics[1]
         latest = getattr(grid, 'Clustering_information', {}).get('latest_technique', {})
         specific_info = latest.get('specific_info', {}) if isinstance(latest, dict) else {}
@@ -1536,6 +1571,12 @@ def run_elbow_analysis(
                 'time_taken_s': float(time_taken) if time_taken is not None else float('nan'),
             }
         )
+        if save_clusters_path is not None:
+            payload = _export_clusters_payload(grid, int(n_used))
+            payload["cluster_algorithm"] = algorithm
+            save_json = Path(save_clusters_path) / f"clusters_{algorithm}_k{int(n_used)}.json"
+            with open(save_json, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, indent=2)
 
     df_elbow = pd.DataFrame(rows).sort_values('n_clusters').reset_index(drop=True)
     Path(save_path).mkdir(parents=True, exist_ok=True)
