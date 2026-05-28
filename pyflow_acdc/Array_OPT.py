@@ -62,6 +62,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
     
     if LCoE is not None:
         grid.LCoE = LCoE
+    if NL == True:
+        NL = 'OPF'
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
         # If save_path is provided and is a directory, create "sequential_CSS" inside it

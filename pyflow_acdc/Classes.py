@@ -115,6 +115,7 @@ class Grid:
        'DC_losses': {'w': 0},
        'Converter_Losses': {'w': 0},
        'General_Losses': {'w': 0},
+       'Array_losses': {'w': 0},
        'PZ_cost_of_generation': {'w': 0},
        'Renewable_profit': {'w': 0},
        'Gen_set_dev': {'w': 0}

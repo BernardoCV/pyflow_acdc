@@ -63,6 +63,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
        'DC_losses': {'w': 0},
        'Converter_Losses': {'w': 0},
        'General_Losses': {'w': 0},
+       'Array_losses': {'w': 0},
        'PZ_cost_of_generation': {'w': 0},
        'Renewable_profit': {'w': 0},
        'Gen_set_dev': {'w': 0}
@@ -1441,15 +1442,28 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
             gen = sum(model.P_renSource[rs]*model.gamma[rs] for rs in model.ren_sources)
         return (gen - load)*grid.LCoE
     
+    def formula_Array_losses():
+        if weights_def['Array_losses']['w'] == 0:
+            return 0
+        ren_injected = 0
+        if grid.RenSources != []:
+            ren_injected = sum(model.P_renSource[rs] * model.gamma[rs]*model.np_rsgen[rs] for rs in model.ren_sources)
+        substations_extracted = sum(
+            model.PGi_opt[node]
+            for node in model.nodes_AC
+            if grid.nodes_AC[node].type in (NodeType.SLACK, 'Slack')
+        )
+        return (ren_injected + substations_extracted) * grid.LCoE * grid.S_base
+    
     def formula_curtailment_red():
         if weights_def['Curtailment_Red']['w']==0:
             return 0
         ac_curt=0
         dc_curt=0
         if grid.ACmode:
-            ac_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price[grid.rs2node['AC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
+            ac_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price[grid.rs2node['AC'].get(rs, 0)*model.np_rsgen[rs]]*rs.sigma for rs in model.ren_sources)*grid.S_base
         if grid.DCmode:
-            dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)]*rs.sigma for rs in model.ren_sources)*grid.S_base
+            dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)*model.np_rsgen[rs]]*rs.sigma for rs in model.ren_sources)*grid.S_base
         return ac_curt+dc_curt
     def formula_CG():
        if weights_def['PZ_cost_of_generation']['w']==0:
@@ -1492,6 +1506,8 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
             entry['f'] = formula_Converter_Losses()
         elif key == 'General_Losses':
             entry['f'] = formula_General_Losses()
+        elif key == 'Array_losses':
+            entry['f'] = formula_Array_losses()
         elif key == 'Curtailment_Red':   
             entry ['f'] = formula_curtailment_red()
         elif key == 'PZ_cost_of_generation':
@@ -1970,13 +1986,22 @@ def calculate_objective(grid,obj,OnlyGen=True):
                 sum(line.loss for line in grid.lines_DC) +
                 sum(conv.P_loss for conv in grid.Converters_ACDC))*grid.S_base*grid.LCoE
 
+    if obj == 'Array_losses':
+        ren_injected = sum(rs.PGi_ren * rs.gamma * rs.np_rsgen for rs in grid.RenSources) * grid.S_base
+        substations_extracted = sum(
+            node.PGi_opt * grid.S_base
+            for node in grid.nodes_AC
+            if node.type in (NodeType.SLACK, 'Slack')
+        )
+        return (ren_injected - substations_extracted) * grid.LCoE
+
     if obj =='Curtailment_Red':
         ac_curt=0
         dc_curt=0
         if grid.ACmode:
-            ac_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_AC[grid.rs2node['AC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
+            ac_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_AC[grid.rs2node['AC'].get(rs, 0)].price*rs.np_rsgen*rs.sigma for rs in grid.RenSources)*grid.S_base
         if  grid.DCmode:
-            dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.sigma for rs in grid.RenSources)*grid.S_base
+            dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.np_rsgen*rs.sigma for rs in grid.RenSources)*grid.S_base
         return ac_curt+dc_curt
     
     if obj=='PZ_cost_of_generation':
