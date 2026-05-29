@@ -30,6 +30,9 @@ from .constants import (
     DataInput,
     Polarity,
     AcDcSide,
+    PricingStrategy,
+    TSType,
+    TS_RENEWABLE_TYPES,
 )
 from .grid_analysis import (
     pol2cart,
@@ -471,7 +474,7 @@ def add_price_zone(grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,impor
     
     return M
 
-def add_MTDC_price_zone(grid, name,  linked_price_zones=None,pricing_strategy='avg'):
+def add_MTDC_price_zone(grid, name,  linked_price_zones=None,pricing_strategy=PricingStrategy.AVG.value):
     # Initialize the MTDC price_zone and link it to the given price_zones
     mtdc_price_zone = MTDCPrice_Zone(name=name, linked_price_zones=linked_price_zones, pricing_strategy=pricing_strategy)
     grid.Price_Zones.append(mtdc_price_zone)
@@ -842,33 +845,33 @@ def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=N
 def time_series_dict(grid, ts):
     typ = ts.type
     
-    if typ == 'a_CG':
+    if typ == TSType.A_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
                 break
-    elif typ == 'b_CG':
+    elif typ == TSType.B_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
                 break
-    elif typ == 'c_CG':
+    elif typ == TSType.C_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
                 break
-    elif typ == 'PGL_min':
+    elif typ == TSType.PGL_MIN:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
                 break
-    elif typ == 'PGL_max':
+    elif typ == TSType.PGL_MAX:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
                 break
                 
-    if typ == 'price':
+    if typ == TSType.PRICE:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
@@ -878,7 +881,7 @@ def time_series_dict(grid, ts):
                 node.TS_dict[typ] = ts.TS_num
                 break  # Stop after assigning to the correct node    
     
-    elif typ == 'Load':
+    elif typ == TSType.LOAD:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.TS_dict[typ] = ts.TS_num
@@ -888,7 +891,7 @@ def time_series_dict(grid, ts):
                 node.TS_dict[typ] = ts.TS_num
                 break  # Stop after assigning to the correct node
                 
-    elif typ in ['WPP', 'OWPP', 'SF', 'REN', 'Solar']:
+    elif typ in TS_RENEWABLE_TYPES:
         for zone in grid.RenSource_zones:
             if ts.element_name == zone.name:
                 zone.TS_dict['PRGi_available'] = ts.TS_num

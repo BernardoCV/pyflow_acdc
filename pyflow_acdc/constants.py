@@ -103,6 +103,41 @@ class MIPBackend(str, Enum):
     ORTOOLS = 'ortools'
 
 
+class PricingStrategy(str, Enum):
+    """How an `MTDCPrice_Zone` derives its price from linked price zones."""
+    MIN = 'min'
+    MAX = 'max'
+    AVG = 'avg'
+
+
+class TSType(str, Enum):
+    """`TimeSeries.type` labels recognised by the TS dispatch logic.
+
+    These are the built-in time-series categories matched in
+    `Time_series.update_grid_data`, `grid_modifications.time_series_dict`
+    and `ACDC_Static_TEP`. ``ts.type`` is user-set, so unknown labels simply
+    match no branch (unchanged behaviour); this enum only centralises the
+    labels the package itself acts on.
+    """
+    A_CG = 'a_CG'
+    B_CG = 'b_CG'
+    C_CG = 'c_CG'
+    PGL_MIN = 'PGL_min'
+    PGL_MAX = 'PGL_max'
+    PRICE = 'price'
+    LOAD = 'Load'
+    # Renewable availability series (see TS_RENEWABLE_TYPES)
+    WPP = 'WPP'
+    OWPP = 'OWPP'
+    SF = 'SF'
+    REN = 'REN'
+    SOLAR = 'Solar'
+
+
+# Renewable-availability TS labels handled together as one group.
+TS_RENEWABLE_TYPES = (TSType.WPP, TSType.OWPP, TSType.SF, TSType.REN, TSType.SOLAR)
+
+
 # Default fuel / technology labels for Grid.gen_ac_types (ENTSO-E-like; grids may extend).
 DEFAULT_GENERATION_TYPES = (
     'nuclear',

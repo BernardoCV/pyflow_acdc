@@ -26,6 +26,7 @@ from .constants import (
     PowerLossModel,
     CableType,
     ConverterOpfFxType,
+    PricingStrategy,
     default_obj_weights,
     DEFAULT_GENERATION_TYPES,
     DEFAULT_RENEWABLE_TYPES,
@@ -3617,7 +3618,7 @@ class OffshorePrice_Zone(Price_Zone):
             node.price = value  # Update prices of nodes in the offshore price_zone
 
 class MTDCPrice_Zone(Price_Zone):
-    def __init__(self, linked_price_zones=None, pricing_strategy='avg', *args, **kwargs):
+    def __init__(self, linked_price_zones=None, pricing_strategy=PricingStrategy.AVG.value, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.linked_price_zones = linked_price_zones or []  # List to store linked price_zones
         self.pricing_strategy = pricing_strategy  # 'min', 'max', or 'avg'
@@ -3645,11 +3646,11 @@ class MTDCPrice_Zone(Price_Zone):
 
         prices = [price_zone.price for price_zone in self.linked_price_zones]
         
-        if self.pricing_strategy == 'min':
+        if self.pricing_strategy == PricingStrategy.MIN:
             self._price = min(prices)
-        elif self.pricing_strategy == 'max':
+        elif self.pricing_strategy == PricingStrategy.MAX:
             self._price = max(prices)
-        elif self.pricing_strategy == 'avg':
+        elif self.pricing_strategy == PricingStrategy.AVG:
             self._price = sum(prices) / len(prices)
 
         # Update node prices based on the new MTDC price

@@ -12,7 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from .grid_analysis import analyse_grid
-from .constants import HOURS_PER_YEAR, CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
+from .constants import HOURS_PER_YEAR, CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, TSType, TS_RENEWABLE_TYPES
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC, TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
@@ -89,32 +89,32 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
     else:
         ts_data = ts.data
     
-    if typ == 'a_CG':
+    if typ == TSType.A_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.a_base = ts_data[idx]
                 break
-    elif typ == 'b_CG':
+    elif typ == TSType.B_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.b = ts_data[idx]
                 break
-    elif typ == 'c_CG':
+    elif typ == TSType.C_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.c = ts_data[idx]
                 break
-    elif typ == 'PGL_min':
+    elif typ == TSType.PGL_MIN:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.PGL_min_base= ts_data[idx]
                 break
-    elif typ == 'PGL_max':
+    elif typ == TSType.PGL_MAX:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.PGL_max= ts_data[idx]
                 break
-    if typ == 'price':
+    if typ == TSType.PRICE:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.price = ts_data[idx]
@@ -124,7 +124,7 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
                 node.price = ts_data[idx]
                 break  # Stop after assigning to the correct node    
     
-    elif typ == 'Load':
+    elif typ == TSType.LOAD:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
                 price_zone.PLi_factor = ts_data[idx]
@@ -138,7 +138,7 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
                 node.PLi_factor = ts_data[idx]
                 break  # Stop after assigning to the correct node
 
-    elif typ in ['WPP', 'OWPP','SF','REN','Solar']:
+    elif typ in TS_RENEWABLE_TYPES:
         for zone in grid.RenSource_zones:
             if ts.element_name == zone.name:
                 zone.PRGi_available = ts_data[idx]

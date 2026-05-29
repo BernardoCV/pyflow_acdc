@@ -14,7 +14,7 @@ import time
 
 from .grid_analysis import analyse_grid, grid_state
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential
-from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights
+from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights, TSType, TS_RENEWABLE_TYPES
 
 
 # Base __all__ with functions that don't require OPF
@@ -124,18 +124,18 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False,use_clusters=Fal
         # Using dictionaries to directly access the Price Zone objects
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
-            if typ == 'a_CG':
+            if typ == TSType.A_CG:
                 price_zone.a_base = ts_data[idx]
-            elif typ == 'b_CG':
+            elif typ == TSType.B_CG:
                 price_zone.b = ts_data[idx]
-            elif typ == 'c_CG':
+            elif typ == TSType.C_CG:
                 price_zone.c = ts_data[idx]
-            elif typ == 'PGL_min':
+            elif typ == TSType.PGL_MIN:
                 price_zone.PGL_min_base = ts_data[idx]
-            elif typ == 'PGL_max':
+            elif typ == TSType.PGL_MAX:
                 price_zone.PGL_max = ts_data[idx]
     
-    if typ == 'price':
+    if typ == TSType.PRICE:
         # Directly access price zone and nodes using dictionaries
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
@@ -149,7 +149,7 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False,use_clusters=Fal
         if node_dc:
             node_dc.price = ts_data[idx]    
     
-    elif typ == 'Load':
+    elif typ == TSType.LOAD:
         # Directly access price zone and nodes using dictionaries
         price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
         if price_zone:
@@ -163,7 +163,7 @@ def update_grid_data(grid,ts, idx,price_zone_restrictions=False,use_clusters=Fal
         if node_dc:
             node_dc.PLi_factor = ts_data[idx]    
     
-    elif typ in ['WPP', 'OWPP', 'SF', 'REN','Solar']:
+    elif typ in TS_RENEWABLE_TYPES:
         # Directly access RenSource_zones and RenSources using dictionaries
         zone = grid.RenSource_zones_dict.get(ts.element_name, None)
         if zone:

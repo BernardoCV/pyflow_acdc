@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD
+from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy
 
 
 __all__ = [
@@ -1803,7 +1803,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
         
             pricing_strategy = grid.Price_Zones[mtdc_price_zone].pricing_strategy
         
-            if pricing_strategy == 'min':
+            if pricing_strategy == PricingStrategy.MIN:
                 grid.MixedBinCont=True
                 model.y_min = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=1)
 
@@ -1815,7 +1815,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
                 for mkt in linked_price_zones:
                     model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_min[mkt, mtdc_price_zone])
 
-            elif pricing_strategy == 'max':
+            elif pricing_strategy == PricingStrategy.MAX:
                 grid.MixedBinCont=True
                 model.y_max = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=0)
         
@@ -1827,7 +1827,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
                 for mkt in linked_price_zones:
                     model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_max[mkt, mtdc_price_zone]/sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones))
         
-            elif pricing_strategy == 'avg':
+            elif pricing_strategy == PricingStrategy.AVG:
                 avg_expr = sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
                 model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == avg_expr)
         
