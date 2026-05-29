@@ -1447,7 +1447,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
             return 0
         ren_injected = 0
         if grid.RenSources != []:
-            ren_injected = sum(model.P_renSource[rs] * model.gamma[rs]*model.np_rsgen[rs] for rs in model.ren_sources)
+            ren_injected = sum(model.P_renSource[rs] *model.np_rsgen[rs] for rs in model.ren_sources)
         substations_extracted = sum(
             model.PGi_opt[node]
             for node in model.nodes_AC
