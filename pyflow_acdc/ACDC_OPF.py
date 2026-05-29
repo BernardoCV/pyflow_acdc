@@ -20,7 +20,7 @@ import re
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC, ExportACDC_NLmodel_toPyflowACDC
 from .AC_OPF_L_model import OPF_create_LModel_AC, ExportACDC_Lmodel_toPyflowACDC
 from .grid_analysis import analyse_grid
-from .constants import NodeType, ConverterDCType, ConverterOpfFxType
+from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights
 
 try:
     import gurobipy
@@ -55,19 +55,7 @@ def pack_variables(*args):
             
 
 def obj_w_rule(grid,ObjRule,OnlyGen):
-    weights_def = {
-       'Ext_Gen': {'w': 0},
-       'Energy_cost': {'w': 0},
-       'Curtailment_Red': {'w': 0},
-       'AC_losses': {'w': 0},
-       'DC_losses': {'w': 0},
-       'Converter_Losses': {'w': 0},
-       'General_Losses': {'w': 0},
-       'Array_losses': {'w': 0},
-       'PZ_cost_of_generation': {'w': 0},
-       'Renewable_profit': {'w': 0},
-       'Gen_set_dev': {'w': 0}
-    }
+    weights_def = default_obj_weights()
 
     # If user provides specific weights, merge them with the default
     if ObjRule is not None:
@@ -78,9 +66,9 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
     if OnlyGen == False:
         grid.OnlyGen=False
     Price_Zones = False
-    if  weights_def['PZ_cost_of_generation']['w']!=0 :
+    if  weights_def[ObjComponent.PZ_COST_OF_GENERATION]['w']!=0 :
         Price_Zones=True
-    if  weights_def['Curtailment_Red']['w']!=0 :
+    if  weights_def[ObjComponent.CURTAILMENT_RED]['w']!=0 :
         grid.CurtCost=True
 
     return weights_def, Price_Zones
@@ -94,9 +82,9 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
     
     # Check if any other weight is non-zero while Energy_cost is zero
-    if weights_def['Energy_cost']['w'] == 0:
+    if weights_def[ObjComponent.ENERGY_COST]['w'] == 0:
         other_weights_nonzero = [key for key, value in weights_def.items() 
-                               if key != 'Energy_cost' and value['w'] != 0]
+                               if key != ObjComponent.ENERGY_COST and value['w'] != 0]
         if other_weights_nonzero:
             warnings.warn("Linear OPF can only consider energy cost by AC Generator power")
         
@@ -1362,7 +1350,7 @@ def OPF_updateParam(model,grid):
 
 def OPF_obj_L(model,grid,ObjRule):
     
-    if ObjRule['Energy_cost']['w']==0:
+    if ObjRule[ObjComponent.ENERGY_COST]['w']==0:
         return 0
     AC= sum((model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
 
@@ -1373,12 +1361,12 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
     np_den_eps = 1e-3
    
     def formula_Min_Ext_Gen():
-        if weights_def['Ext_Gen']['w']==0:
+        if weights_def[ObjComponent.EXT_GEN]['w']==0:
             return 0
         return sum((model.PGi_opt[node]*grid.S_base) for node in model.nodes_AC)
 
     def formula_Energy_cost():
-        if weights_def['Energy_cost']['w']==0:
+        if weights_def[ObjComponent.ENERGY_COST]['w']==0:
             return 0
         
         AC= 0
@@ -1401,7 +1389,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
                    + sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base \
                    + sum(model.P_conv_AC[node]*model.price[node] for node in nodes_with_conv)*grid.S_base
     def formula_AC_losses():
-        if weights_def['AC_losses']['w']==0:
+        if weights_def[ObjComponent.AC_LOSSES]['w']==0:
             return 0
         loss = sum(model.PAC_line_loss[line] for line in model.lines_AC)
         if grid.TAP_tf:
@@ -1415,7 +1403,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
         return loss*grid.LCoE
 
     def formula_DC_losses():
-        if weights_def['DC_losses']['w']==0:
+        if weights_def[ObjComponent.DC_LOSSES]['w']==0:
             return 0
         loss = sum(model.PDC_line_loss[line] for line in model.lines_DC)
         if grid.CDC:
@@ -1423,12 +1411,12 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
         return loss*grid.LCoE
 
     def formula_Converter_Losses():
-        if weights_def['Converter_Losses']['w']==0:
+        if weights_def[ObjComponent.CONVERTER_LOSSES]['w']==0:
             return 0
         return sum(model.P_conv_loss[conv]+model.P_AC_loss_conv[conv] for conv in model.conv)*grid.LCoE
 
     def formula_General_Losses():
-        if weights_def['General_Losses']['w']==0:
+        if weights_def[ObjComponent.GENERAL_LOSSES]['w']==0:
             return 0
         load = 0
         if grid.nodes_AC != []:
@@ -1443,7 +1431,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
         return (gen - load)*grid.LCoE
     
     def formula_Array_losses():
-        if weights_def['Array_losses']['w'] == 0:
+        if weights_def[ObjComponent.ARRAY_LOSSES]['w'] == 0:
             return 0
         ren_injected = 0
         if grid.RenSources != []:
@@ -1451,12 +1439,12 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
         substations_extracted = sum(
             model.PGi_opt[node]
             for node in model.nodes_AC
-            if grid.nodes_AC[node].type in (NodeType.SLACK, 'Slack')
+            if grid.nodes_AC[node].type == NodeType.SLACK
         )
         return (ren_injected + substations_extracted) * grid.LCoE * grid.S_base
     
     def formula_curtailment_red():
-        if weights_def['Curtailment_Red']['w']==0:
+        if weights_def[ObjComponent.CURTAILMENT_RED]['w']==0:
             return 0
         ac_curt=0
         dc_curt=0
@@ -1466,13 +1454,13 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
             dc_curt= sum((1-model.gamma[rs])*model.P_renSource[rs]*model.price_DC[grid.rs2node['DC'].get(rs, 0)*model.np_rsgen[rs]]*rs.sigma for rs in model.ren_sources)*grid.S_base
         return ac_curt+dc_curt
     def formula_CG():
-       if weights_def['PZ_cost_of_generation']['w']==0:
+       if weights_def[ObjComponent.PZ_COST_OF_GENERATION]['w']==0:
            return 0
        return sum(model.SocialCost[price_zone] for price_zone in model.M)
    
     def formula_Offshoreprofit():
         from .Classes import OffshorePrice_Zone
-        if weights_def['Renewable_profit']['w']==0:
+        if weights_def[ObjComponent.RENEWABLE_PROFIT]['w']==0:
             return 0
         nodes_with_RenSource = []
         convloss=0
@@ -1489,32 +1477,32 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
         return -sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base +convloss
    
     def formula_Gen_set_dev():
-        if weights_def['Gen_set_dev']['w']==0:
+        if weights_def[ObjComponent.GEN_SET_DEV]['w']==0:
             return 0
         return sum((model.PGi_gen[gen.genNumber]-gen.Pset)**2 for gen in grid.Generators)
     s=1
     for key, entry in weights_def.items():
-        if key == 'Ext_Gen':
+        if key == ObjComponent.EXT_GEN:
             entry['f'] = formula_Min_Ext_Gen()
-        elif key == 'Energy_cost':
+        elif key == ObjComponent.ENERGY_COST:
             entry['f'] = formula_Energy_cost()
-        elif key == 'AC_losses':
+        elif key == ObjComponent.AC_LOSSES:
             entry['f'] = formula_AC_losses()
-        elif key == 'DC_losses':
+        elif key == ObjComponent.DC_LOSSES:
             entry['f'] = formula_DC_losses()
-        elif key == 'Converter_Losses':
+        elif key == ObjComponent.CONVERTER_LOSSES:
             entry['f'] = formula_Converter_Losses()
-        elif key == 'General_Losses':
+        elif key == ObjComponent.GENERAL_LOSSES:
             entry['f'] = formula_General_Losses()
-        elif key == 'Array_losses':
+        elif key == ObjComponent.ARRAY_LOSSES:
             entry['f'] = formula_Array_losses()
-        elif key == 'Curtailment_Red':   
+        elif key == ObjComponent.CURTAILMENT_RED:   
             entry ['f'] = formula_curtailment_red()
-        elif key == 'PZ_cost_of_generation':
+        elif key == ObjComponent.PZ_COST_OF_GENERATION:
             entry['f']  =formula_CG()   
-        elif key == 'Renewable_profit':
+        elif key == ObjComponent.RENEWABLE_PROFIT:
             entry['f']  =formula_Offshoreprofit()    
-        elif key == 'Gen_set_dev':
+        elif key == ObjComponent.GEN_SET_DEV:
             entry['f']  =formula_Gen_set_dev()  
         
     s=1
@@ -1945,10 +1933,10 @@ def OPF_step_results(model,grid):
 
 def calculate_objective(grid,obj,OnlyGen=True):
    
-    if obj =='Ext_Gen':
+    if obj ==ObjComponent.EXT_GEN:
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
 
-    if obj =='Energy_cost':
+    if obj ==ObjComponent.ENERGY_COST:
         AC= 0
         DC= 0
         if grid.ACmode:
@@ -1962,40 +1950,39 @@ def calculate_objective(grid,obj,OnlyGen=True):
         return AC+DC
 
         
-    if obj =='PZ_cost_of_generation':
-       return sum(pz.a*(pz.PN*grid.S_base)**2+pz.b*(pz.PN*grid.S_base) for pz in grid.Price_Zones)
+    
    
-    if obj =='AC_losses':
+    if obj ==ObjComponent.AC_LOSSES:
         return (sum(line.P_loss for line in grid.lines_AC)+
                 sum(tf.P_loss for tf in grid.lines_AC_tf)+
                 sum(line.P_loss for line in grid.lines_AC_exp)+
                 sum(line.P_loss for line in grid.lines_AC_rec)+
                 sum(line.P_loss for line in grid.lines_AC_ct))*grid.S_base*grid.LCoE
 
-    if obj =='DC_losses':
+    if obj ==ObjComponent.DC_LOSSES:
         return (sum(line.loss for line in grid.lines_DC)+
                 sum(conv.loss for conv in grid.Converters_DCDC))*grid.S_base*grid.LCoE
 
-    if obj =='Converter_Losses':
+    if obj ==ObjComponent.CONVERTER_LOSSES:
         return sum(conv.P_loss for conv in grid.Converters_ACDC)*grid.S_base*grid.LCoE
 
-    if obj =='General_Losses':
+    if obj ==ObjComponent.GENERAL_LOSSES:
         return (sum(line.P_loss for line in grid.lines_AC) +
                 sum(tf.P_loss for tf in grid.lines_AC_tf) +
                 sum(line.P_loss for line in grid.lines_AC_exp) +
                 sum(line.loss for line in grid.lines_DC) +
                 sum(conv.P_loss for conv in grid.Converters_ACDC))*grid.S_base*grid.LCoE
 
-    if obj == 'Array_losses':
+    if obj == ObjComponent.ARRAY_LOSSES:
         ren_injected = sum(rs.PGi_ren * rs.gamma * rs.np_rsgen for rs in grid.RenSources) * grid.S_base
         substations_extracted = sum(
             node.PGi_opt * grid.S_base
             for node in grid.nodes_AC
-            if node.type in (NodeType.SLACK, 'Slack')
+            if node.type == NodeType.SLACK
         )
         return (ren_injected - substations_extracted) * grid.LCoE
 
-    if obj =='Curtailment_Red':
+    if obj ==ObjComponent.CURTAILMENT_RED:
         ac_curt=0
         dc_curt=0
         if grid.ACmode:
@@ -2003,11 +1990,11 @@ def calculate_objective(grid,obj,OnlyGen=True):
         if  grid.DCmode:
             dc_curt= sum((1-rs.gamma)*rs.PGi_ren*grid.nodes_DC[grid.rs2node['DC'].get(rs, 0)].price*rs.np_rsgen*rs.sigma for rs in grid.RenSources)*grid.S_base
         return ac_curt+dc_curt
-    
-    if obj=='PZ_cost_of_generation':
-           return  sum(pz.PN**2*pz.a+pz.PN*pz.b for pz in grid.Price_Zones)
-   
-    if obj=='Gen_set_dev':
+    if obj ==ObjComponent.PZ_COST_OF_GENERATION:
+       return sum(pz.a*(pz.PN*grid.S_base)**2+pz.b*(pz.PN*grid.S_base) for pz in grid.Price_Zones)
+
+
+    if obj==ObjComponent.GEN_SET_DEV:
         return sum((gen.PGen-gen.Pset)**2 for gen in grid.Generators)
     
     return 0

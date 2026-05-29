@@ -11,7 +11,7 @@ from gurobipy import GRB
 import numpy as np
 import time
 from .Graph_and_plot import save_network_svg
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
+from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, ObjComponent
 
 __all__ = ['Optimal_L_CSS_gurobi']
 
@@ -225,7 +225,7 @@ def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEA
     ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=tee)
     
     if OPEX:
-        obj = {'Energy_cost': 1}
+        obj = {ObjComponent.ENERGY_COST.value: 1}
     else:
         obj = None
 

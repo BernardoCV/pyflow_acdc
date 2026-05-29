@@ -26,6 +26,7 @@ from .constants import (
     PowerLossModel,
     CableType,
     ConverterOpfFxType,
+    default_obj_weights,
     DEFAULT_GENERATION_TYPES,
     DEFAULT_RENEWABLE_TYPES,
     DEFAULT_GEN_TYPE,
@@ -107,19 +108,7 @@ class Grid:
         self.iter_flow_DC = []
 
         self.LCoE = 1
-        self.OPF_obj = {
-       'Ext_Gen': {'w': 0},
-       'Energy_cost': {'w': 0},
-       'Curtailment_Red': {'w': 0},
-       'AC_losses': {'w': 0},
-       'DC_losses': {'w': 0},
-       'Converter_Losses': {'w': 0},
-       'General_Losses': {'w': 0},
-       'Array_losses': {'w': 0},
-       'PZ_cost_of_generation': {'w': 0},
-       'Renewable_profit': {'w': 0},
-       'Gen_set_dev': {'w': 0}
-    }
+        self.OPF_obj = default_obj_weights()
         self.reset_run_flags()
     
         self.TEP_multiScenario_res=None

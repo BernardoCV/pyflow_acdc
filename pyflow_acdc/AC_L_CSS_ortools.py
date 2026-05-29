@@ -14,7 +14,7 @@ __all__ = ['Optimal_L_CSS_ortools']
 
 from .ACDC_OPF import obj_w_rule, calculate_objective
 from .grid_analysis import analyse_grid
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
+from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, ObjComponent
 
 try:
     from ortools.linear_solver import pywraplp
@@ -70,7 +70,7 @@ def Optimal_L_CSS_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YE
                                             tee=tee)
 
     if OPEX:
-        obj = {'Energy_cost': 1}
+        obj = {ObjComponent.ENERGY_COST.value: 1}
     else:
         obj = None
 

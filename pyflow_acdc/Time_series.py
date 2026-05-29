@@ -14,7 +14,7 @@ import time
 
 from .grid_analysis import analyse_grid, grid_state
 from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential
-from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType
+from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights
 
 
 # Base __all__ with functions that don't require OPF
@@ -643,19 +643,7 @@ def TS_ACDC_OPF(
     Time_series_b = []
     Time_series_res_available = []
     
-    weights_def = {
-       'Ext_Gen': {'w': 0},
-       'Energy_cost': {'w': 0},
-       'Curtailment_Red': {'w': 0},
-       'AC_losses': {'w': 0},
-       'DC_losses': {'w': 0},
-       'Converter_Losses': {'w': 0},
-       'General_Losses': {'w': 0},
-       'Array_losses': {'w': 0},
-       'PZ_cost_of_generation': {'w': 0},
-       'Renewable_profit': {'w': 0},
-       'Gen_set_dev': {'w': 0}
-    }
+    weights_def = default_obj_weights()
 
     # If user provides specific weights, merge them with the default
     if ObjRule is not None:
@@ -664,9 +652,9 @@ def TS_ACDC_OPF(
                weights_def[key]['w'] = ObjRule[key]
 
     PV_set=False
-    if  weights_def['PZ_cost_of_generation']['w']!=0 :
+    if  weights_def[ObjComponent.PZ_COST_OF_GENERATION]['w']!=0 :
         price_zone_restrictions=True
-    if  weights_def['Curtailment_Red']['w']!=0 :
+    if  weights_def[ObjComponent.CURTAILMENT_RED]['w']!=0 :
         grid.CurtCost=True
         
         

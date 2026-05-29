@@ -24,7 +24,7 @@ from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, NodeType
+from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, NodeType, CssMode, MIPBackend, ObjComponent
 
 
 __all__ = [
@@ -46,7 +46,7 @@ class MIPConfig:
     while keeping the public function signatures unchanged.
     """
     solver_name: str = 'glpk'
-    backend: str = 'pyomo'
+    backend: str = MIPBackend.PYOMO.value
     crossings: bool = False
     tee: bool = False
     callback: bool = False
@@ -58,12 +58,12 @@ class MIPConfig:
 
 def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
                    MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=DEFAULT_TIME_LIMIT,NL=False,tee=False,fs=False,save_path=None,
-                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
+                   MIP_gap=0.01,backend=MIPBackend.PYOMO.value,min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
     
     if LCoE is not None:
         grid.LCoE = LCoE
     if NL == True:
-        NL = 'OPF'
+        NL = CssMode.OPF.value
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
         # If save_path is provided and is a directory, create "sequential_CSS" inside it
@@ -71,8 +71,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
     else:
         # If save_path is None or not a directory, create "sequential_CSS" in current working directory
         save_dir = 'sequential_CSS'
-    if MIP_solver == 'ortools':
-        backend = 'ortools'
+    if MIP_solver == MIPBackend.ORTOOLS.value:
+        backend = MIPBackend.ORTOOLS.value
     # Create the directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -180,14 +180,14 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
             print(f'Iteration {i} iter_cab_available: {iter_cab_available}')
         
         t3 = time.perf_counter()
-        if NL == 'OPF':
+        if NL == CssMode.OPF:
             from .Graph_and_plot import save_network_svg
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             os.makedirs(intermediate_dir, exist_ok=True)
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_preCSS', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
         
         # OPF uses NL solver; False and PF both use linear CSS
-        css_NL = (NL == 'OPF')
+        css_NL = (NL == CssMode.OPF)
         model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,css_NL,tee,fs=fs)
         css_ok = solver_stats.get('solution_found', False) if solver_stats else False
         feasible_solutions_CSS = solver_stats.get('feasible_solutions', []) if solver_stats else []
@@ -203,7 +203,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
             if tee:
                 print(f'Iteration {i} saving SVG')
             from .Graph_and_plot import save_network_svg
-            CSS_solver = CSS_NL_solver if NL == 'OPF' else CSS_L_solver
+            CSS_solver = CSS_NL_solver if NL == CssMode.OPF else CSS_L_solver
             # Save SVG in the sequential_CSS folder
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             if not os.path.exists(intermediate_dir):
@@ -273,7 +273,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
             opt_obj = None
             total_cost = None
         else:
-            if NL == 'OPF':
+            if NL == CssMode.OPF:
                 # OPF: losses from NL solver export
                 loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
                 loss_cost = loss_MW * pv_factor*grid.LCoE
@@ -282,7 +282,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
                     if line.active_config >= 0:
                         cable_cost += line.base_cost[line.active_config]
                 opt_obj = MIP_obj_value + cable_cost + loss_cost
-            elif NL == 'PF':
+            elif NL == CssMode.PF:
                 # PF: post-processing power flow for losses, not in opt_obj
                 from .ACDC_PF import Power_flow
                 Power_flow(grid)
@@ -432,7 +432,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
             used_types.add(line.active_config)
     grid.Cable_options[0].active_config = [1 if k in used_types else 0 for k in range(len(og_cable_types))]
 
-    if NL == 'OPF':
+    if NL == CssMode.OPF:
         ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
     else:
         ExportACDC_Lmodel_toPyflowACDC(model, grid, solver_results=model_results, tee=tee)
@@ -456,7 +456,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
 
 def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, max_ns=None,
-                        callback=False, MIP_gap=None, backend='pyomo',
+                        callback=False, MIP_gap=None, backend=MIPBackend.PYOMO.value,
                         min_turbines_per_string=False, mip_cfg: MIPConfig | None = None,t_MW=None):
     # If a MIPConfig is provided, let it override the individual flags.
     if mip_cfg is not None:
@@ -570,7 +570,7 @@ def simple_assign_cable_types(grid, model, t_MW=None):
 
 
 def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False,
-                   callback=False, MIP_gap=None, backend='pyomo',
+                   callback=False, MIP_gap=None, backend=MIPBackend.PYOMO.value,
                    enable_cable_types=False, t_MW=None, cab_types_allowed=None,
                    min_turbines_per_string=False, fixed_substation_connections=None,
                    min_sub_connections=False, sub_k_max=None,
@@ -622,7 +622,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     if t_MW is None:
         t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
     # Route to appropriate backend
-    if backend.lower() == 'ortools':
+    if backend.lower() == MIPBackend.ORTOOLS.value:
         if not ORTOOLS_AVAILABLE:
             raise ImportError(
                 "OR-Tools is not installed. Please install it with: pip install ortools\n"
@@ -637,8 +637,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                       fixed_substation_connections=fixed_substation_connections,
                                       min_sub_connections=min_sub_connections,
                                       sub_k_max=sub_k_max)
-    elif backend.lower() != 'pyomo':
-        raise ValueError(f"Unknown backend: {backend}. Must be 'pyomo' or 'ortools'")
+    elif backend.lower() != MIPBackend.PYOMO.value:
+        raise ValueError(f"Unknown backend: {backend}. Must be '{MIPBackend.PYOMO.value}' or '{MIPBackend.ORTOOLS.value}'")
     
     # Original Pyomo implementation
     model = _create_master_problem_pyomo(grid, crossings, max_flow, 
@@ -2125,9 +2125,9 @@ def simple_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_
     grid.Array_opf = False
     if NL:
         model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export,PV_set=True,callback=fs)
-    elif CSS_L_solver == 'ortools':
+    elif CSS_L_solver == MIPBackend.ORTOOLS.value:
         from .AC_L_CSS_ortools import Optimal_L_CSS_ortools
-        OPEX = ObjRule is not None and ObjRule.get('Energy_cost', 0) != 0
+        OPEX = ObjRule is not None and ObjRule.get(ObjComponent.ENERGY_COST.value, 0) != 0
         model, model_results, timing_info, solver_stats = Optimal_L_CSS_ortools(
             grid, OPEX=OPEX, NPV=NPV, n_years=n_years, Hy=Hy,
             discount_rate=discount_rate, tee=tee, time_limit=time_limit)

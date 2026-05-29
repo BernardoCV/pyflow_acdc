@@ -65,6 +65,44 @@ class PriceZoneCategory(str, Enum):
     MTDC = 'MTDC'
 
 
+class ObjComponent(str, Enum):
+    """OPF objective components (keys of the `ObjRule` / `weights_def` dict).
+
+    Values are the public string keys users pass via ``ObjRule`` (e.g.
+    ``Optimal_PF(grid, ObjRule={'Energy_cost': 1})``). Being a ``str`` Enum,
+    members compare and hash equal to their string value, so they can be used
+    interchangeably as dict keys/lookups while giving fail-fast typo protection
+    on comparisons.
+    """
+    EXT_GEN = 'Ext_Gen'
+    ENERGY_COST = 'Energy_cost'
+    CURTAILMENT_RED = 'Curtailment_Red'
+    AC_LOSSES = 'AC_losses'
+    DC_LOSSES = 'DC_losses'
+    CONVERTER_LOSSES = 'Converter_Losses'
+    GENERAL_LOSSES = 'General_Losses'
+    ARRAY_LOSSES = 'Array_losses'
+    PZ_COST_OF_GENERATION = 'PZ_cost_of_generation'
+    RENEWABLE_PROFIT = 'Renewable_profit'
+    GEN_SET_DEV = 'Gen_set_dev'
+
+
+class CssMode(str, Enum):
+    """Cable-string-sizing solve mode in `Array_OPT` (`NL` argument).
+
+    ``NL=False`` selects the linear model; ``NL=True`` is normalized to
+    ``OPF``. Only the non-linear string values are enumerated here.
+    """
+    OPF = 'OPF'
+    PF = 'PF'
+
+
+class MIPBackend(str, Enum):
+    """Solver backend for the array-MIP path problem in `Array_OPT`."""
+    PYOMO = 'pyomo'
+    ORTOOLS = 'ortools'
+
+
 # Default fuel / technology labels for Grid.gen_ac_types (ENTSO-E-like; grids may extend).
 DEFAULT_GENERATION_TYPES = (
     'nuclear',
@@ -156,6 +194,20 @@ CT_SELECTION_THRESHOLD = 0.90
 """ Time_series, ACDC_OPF_NL_model, ACDC_Static_TEP, AC_OPF_L_model
     (binary variable rounding: >= threshold → treat as 1) """
 BINARY_THRESHOLD = 0.99999
+
+
+# ── OPF objective defaults ───────────────────────────────────────────────
+
+def default_obj_weights():
+    """Return a fresh OPF objective-weights dict with every component at ``w=0``.
+
+    Single source of truth for the ``weights_def`` / ``Grid.OPF_obj`` layout
+    (used by ``obj_w_rule``, ``Grid.__init__`` and ``TS_ACDC_OPF``). A new dict
+    with fresh inner dicts is built on every call so each caller can mutate its
+    own copy. Key order follows ``ObjComponent`` declaration order; keys are
+    plain strings (``.value``) so existing serialization/display is unchanged.
+    """
+    return {component.value: {'w': 0} for component in ObjComponent}
 
 
 # ── Shared economics helpers ────────────────────────────────────────────
