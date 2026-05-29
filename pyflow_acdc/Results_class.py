@@ -12,6 +12,8 @@ import pandas as pd
 from .Classes import Price_Zone
 from .constants import SQRT_3, HOURS_PER_YEAR, NodeType, AcDcSide
 
+__all__ = ['Results']
+
 
 class Results:
     def __init__(self, Grid, decimals=2, export_location=None, export_type="csv", save_res=False):

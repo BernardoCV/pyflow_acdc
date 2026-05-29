@@ -5,6 +5,8 @@ from shapely.geometry import LineString, MultiPolygon, Polygon, shape
 
 from .grid_creator import Create_grid_from_pickle
 
+__all__ = ['load_case_grid_and_geo']
+
 
 def _name_variants(case_name):
     return [

@@ -359,7 +359,7 @@ The AC reconducting branch :math:`u` is modeled with in admittance matrix model 
 
 
 
-Class Reference: :class:`pyflow_acdc.Classes.Rep_Line_AC`
+Class Reference: :class:`pyflow_acdc.Classes.rec_Line_AC`
 
 Inherits from :class:`Line_AC` with the following additional attributes:
 
@@ -449,7 +449,7 @@ Additionally, to limit the number of branch types in the evaluated system, inequ
     \end{align}
 
 
-Class Reference: :class:`pyflow_acdc.Classes.Line_sizing`
+Class Reference: :class:`pyflow_acdc.Classes.Size_selection`
 
 Inherits from :class:`Line_AC` with the following additional attributes:
 
