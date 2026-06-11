@@ -36,6 +36,7 @@ ALL_CASES = [
     'DC_OPF.py',
     'CigreB4_OPF.py',
     'case39ac_OPF.py',
+    'case39ac_LOPF.py',
     'case39acdc_OPF.py',
     'case24_3zones_acdc_OPF.py',
    

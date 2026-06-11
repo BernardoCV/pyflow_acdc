@@ -13,7 +13,7 @@ Running the OPF
 
 This function runs the AC/DC hybrid optimal power flow calculation. It creates the :ref:`model <model_creation>`, chooses an :ref:`objective function <obj_functions>`, and :ref:`solves <model_solving>` the model.
 
-.. py:function::  Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+.. py:function::  Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, limit_flow_rate=True, solver='ipopt', tee=False, callback=False, obj_scaling=1.0)
 
    Performs AC/DC hybrid optimal power flow calculation.
 
@@ -45,12 +45,32 @@ This function runs the AC/DC hybrid optimal power flow calculation. It creates t
         - bool
         - Enable price zone constraints
         - False
+      * - ``limit_flow_rate``
+        - bool
+        - Enforce branch flow-rate limits
+        - True
+      * - ``solver``
+        - str
+        - Pyomo solver name (e.g. ``'ipopt'``, ``'bonmin'``)
+        - ``'ipopt'``
+      * - ``tee``
+        - bool
+        - Stream solver output to console
+        - False
+      * - ``callback``
+        - bool
+        - Enable solver iteration callback / progress capture
+        - False
+      * - ``obj_scaling``
+        - float
+        - Divides the objective expression for numerical scaling
+        - 1.0
   
    **Example**
 
    .. code-block:: python
 
-      model, model_res , timing_info, solver_stats =pyf.Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+      model, model_res , timing_info, solver_stats =pyf.Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False, solver='ipopt')
 
 .. _model_creation:
 

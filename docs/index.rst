@@ -83,6 +83,12 @@ API Documentation
    api/folium
    api/export_files
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Development:
+
+   architecture
+
 Quick Start
 -----------
 

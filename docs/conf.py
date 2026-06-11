@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'pyflow acdc'
-copyright = '2025, Bernardo Castro Valerio'
+copyright = '2025-2026, Bernardo Castro Valerio'
 author = 'Bernardo Castro Valerio'
 
 

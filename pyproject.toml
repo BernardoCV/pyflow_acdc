@@ -22,11 +22,21 @@ description = "A python-based tool for the design and analysis of hybrid AC/DC g
 
 readme = "README.md"
 
+keywords = [
+    "power systems",
+    "AC/DC",
+    "HVDC",
+    "optimal power flow",
+    "power flow",
+    "transmission expansion planning",
+    "offshore wind",
+    "energy systems",
+]
+
 classifiers = [
     'Development Status :: 3 - Alpha',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: BSD License',
-    'Programming Language :: C',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.10',
@@ -76,7 +86,8 @@ Gurobi = ["gurobipy"]
 
 plotting = ["kaleido"]
 
-tests = ["pytest"]
+tests = ["pytest",
+         "pytest-cov"]
 
 All = ["folium",
        "branca",
@@ -88,6 +99,7 @@ All = ["folium",
        "kaleido"]
 
 [project.urls]
+Homepage       = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Repository     = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
