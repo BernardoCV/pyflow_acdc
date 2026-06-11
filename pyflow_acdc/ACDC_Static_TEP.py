@@ -1315,7 +1315,7 @@ def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_
     
     results = []
     model.kappa = pyo.Param(initialize=min_kappa,mutable=True)
-    present_value =   Hy*(1 - (1 + model.discount_rate) ** -n_years) / model.discount_rate
+    present_value =  present_value_factor(Hy, discount_rate, n_years)
     
 
     obj_OPF  *= present_value

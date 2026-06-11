@@ -52,6 +52,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `load_flow_AC→load_flow_ac`, `TEP_obj→tep_obj`,
   `Jacobian_conv→jacobian_conv`, `OPF_create_LModel_AC_gurobi→opf_create_l_model_ac_gurobi`).
   Submodule-only; no deprecation aliases added.
+- **Multi-scenario TEP economics (`weighted_subobj`):** scenario weights `w[t]`
+  carry each frame's share of the year; `Hy` (default 8760 h/y) scales per-hour
+  OPF costs to annual. `create_scenarios` passes the full
+  `present_value_factor(Hy, discount_rate, n_years)` (or `Hy` when `NPV=False`)
+  into `weighted_subobj` — not a separate bug. Prior audit/CHANGELOG note about
+  “missing `Hy`” was incorrect (looked at the helper body, not the caller).
 
 ### Fixed
 - `Export_files` no longer emits an unquoted `pricing_strategy=` value in
@@ -60,9 +66,6 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `calculate_objective` (kept the `S_base`-scaled formula).
 - Removed the invalid `Programming Language :: C` classifier from packaging
   metadata.
-
-### Known issues
-- `kappa_sensitivity` references `model.discount_rate` without creating it
-  (raises `AttributeError` at runtime) — pending fix.
-- `weighted_subobj` omits the `Hy` (hours/year) factor used elsewhere —
-  pending review.
+- `kappa_sensitivity` no longer references undefined `model.discount_rate`;
+  it now uses `present_value_factor(Hy, discount_rate, n_years)` like the other
+  TEP sensitivity helpers (fixes `AttributeError` at runtime).
