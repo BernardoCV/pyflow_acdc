@@ -40,7 +40,7 @@ Options
 All
 ^^^
 
-.. py:method:: All()
+.. py:method:: all()
 
    Displays all available results for both AC and DC grids including:
    
@@ -65,7 +65,7 @@ All
    - :ref:`Transmission expansion <res_TEP_N>`
    - :ref:`Normalized transmission expansion <res_TEP_norm>`
 
-.. py:method:: All_AC()
+.. py:method:: all_ac()
 
    Displays results for AC grid only:
    
@@ -75,7 +75,7 @@ All
    - :ref:`AC slack bus info <res_ac_slack>`
    - :ref:`AC power losses <res_ac_power_loss>`
 
-.. py:method:: All_DC()
+.. py:method:: all_dc()
 
    Displays results for DC grid only:
    
@@ -85,7 +85,7 @@ All
    - :ref:`DC power losses <res_dc_power_loss>`
 
 .. _res_slack_all:
-.. py:method:: Slack_All()
+.. py:method:: slack_all()
 
    Displays slack bus information for both AC and DC grids.
 
@@ -100,12 +100,12 @@ By running the following code, the results will be printed in the terminal.
 
    grid,res = pyf.Stagg5MATACDC()
    pyf.ACDC_sequential(grid)
-   res.All()
+   res.all()
 
 
 .. _res_ac_powerflow:
 
-.. py:method:: AC_Powerflow()
+.. py:method:: ac_powerflow()
 
    Displays AC power flow, split into differnet asynchronous grids. Results include:
    
@@ -135,7 +135,7 @@ By running the following code, the results will be printed in the terminal.
       
 
 .. _res_ac_voltage:
-.. py:method:: AC_voltage()
+.. py:method:: ac_voltage()
 
    Displays AC voltage results including:
    
@@ -159,7 +159,7 @@ By running the following code, the results will be printed in the terminal.
 
 
 .. _res_ac_lines_current:
-.. py:method:: AC_lines_current()
+.. py:method:: ac_lines_current()
 
    Displays AC line current results including:
    
@@ -185,7 +185,7 @@ By running the following code, the results will be printed in the terminal.
       +------+----------+--------+-------------+-----------+-----------+----------------+
 
 .. _res_ac_lines_power:
-.. py:method:: AC_lines_power()
+.. py:method:: ac_lines_power()
 
    Displays AC line power flow results including:
    
@@ -210,7 +210,7 @@ By running the following code, the results will be printed in the terminal.
       +------+----------+--------+-------------+---------------+-----------+-----------+-----------------+---------------+
 
 .. _res_ac_slack:
-.. py:method:: Slack_AC()
+.. py:method:: slack_ac()
 
    Displays slack bus information for AC grid.
 
@@ -225,7 +225,7 @@ By running the following code, the results will be printed in the terminal.
 
 
 .. _res_ac_power_loss:
-.. py:method:: Power_loss_AC()
+.. py:method:: power_loss_ac()
 
    Displays power loss information for AC grid.   
 
@@ -245,7 +245,7 @@ DC Specific Results
 
 .. _res_dc_bus:
 
-.. py:method:: DC_bus()
+.. py:method:: dc_bus()
 
    Displays DC bus results including:
    
@@ -269,7 +269,7 @@ DC Specific Results
       +------+----------------+-----------------+---------------------------+---------------------+--------------+
 
 .. _res_dc_lines_current:
-.. py:method:: DC_lines_current()
+.. py:method:: dc_lines_current()
 
    Displays DC line current results including:
    
@@ -292,7 +292,7 @@ DC Specific Results
 
 
 .. _res_dc_lines_power:
-.. py:method:: DC_lines_power()
+.. py:method:: dc_lines_power()
 
    Displays DC line power flow results including:
    
@@ -314,7 +314,7 @@ DC Specific Results
 
 
 .. _res_dc_slack:
-.. py:method:: Slack_DC() 
+.. py:method:: slack_dc() 
 
    Displays slack bus information for DC grid.
 
@@ -330,7 +330,7 @@ DC Specific Results
 
 
 .. _res_dc_power_loss:
-.. py:method:: Power_loss_DC()
+.. py:method:: power_loss_dc()
 
    Displays power loss information for DC grid.
 
@@ -349,7 +349,7 @@ Optimization Results
 
 
 .. _res_ext_gen:
-.. py:method:: Ext_gen()
+.. py:method:: ext_gen()
 
    Displays external generator results including:
    
@@ -371,7 +371,7 @@ Optimization Results
       +-----------+------+------------+-----------------------+-------------------------+--------------------+-----------+---------+
 
 .. _res_ext_ren:
-.. py:method:: Ext_REN()
+.. py:method:: ext_ren()
 
    Displays renewable sources results including:
    
@@ -398,7 +398,7 @@ Optimization Results
       +-------+-----------------+---------------+---------------------+--------------------------------+-------------+---------+-----------------------+
 
 .. _res_objective:
-.. py:method:: OBJ_res()
+.. py:method:: obj_res()
 
    Displays function value for all optimization functions.
 
@@ -469,7 +469,7 @@ Treansmission expansion
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _res_TEP_N:
-.. py:method:: TEP_N()
+.. py:method:: tep_n()
 
    Displays transmission expansion results 
    
@@ -486,7 +486,7 @@ Treansmission expansion
       +---------+---------+---------+-------------+---------+-----------------------------+--------------------+
 
 .. _res_TEP_norm:
-.. py:method:: TEP_norm()
+.. py:method:: tep_norm()
 
    Displays NPV objective function value for transmission expansion results
 
@@ -513,7 +513,7 @@ Other Results
 ^^^^^^^^^^^^^^^
 
 .. _res_converter:
-.. py:method:: Converter()
+.. py:method:: converter()
 
    Displays converter results including:
    
@@ -542,7 +542,7 @@ Other Results
       +-----------+-----------------+-----------------+-----------+----------------+
 
 .. _res_power_loss:
-.. py:method:: Power_loss()
+.. py:method:: power_loss()
 
    Displays power loss information for both AC and DC grids.
 

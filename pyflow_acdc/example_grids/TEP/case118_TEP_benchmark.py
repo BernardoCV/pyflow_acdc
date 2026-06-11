@@ -649,7 +649,7 @@ def case_118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed
     nodes_AC['Power_load']  *= load_factor
     nodes_AC['Reactive_load']  *= load_factor
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='Ohm')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='Ohm')
     grid.name = 'case118_TEP'
     
     

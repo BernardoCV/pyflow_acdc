@@ -367,7 +367,7 @@ def PEI_grid():
 
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
     grid.name = 'Princess Elizabeth Island'
     
     # Assign Price Zones to Nodes

@@ -4,7 +4,7 @@ def folium_test():
 
         grid,res = pyf.cases['NS_MTDC']()
 
-        pyf.Optimal_PF(grid)
+        pyf.optimal_pf(grid)
 
         pyf.plot_folium(grid)
 

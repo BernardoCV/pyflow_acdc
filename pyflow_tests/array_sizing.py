@@ -38,7 +38,7 @@ def array_sizing(combinations):
             gamma_limit = 1
 
 
-        grid,res = pyf.Create_grid_from_data(S_base)
+        grid,res = pyf.create_grid_from_data(S_base)
 
 
 
@@ -116,7 +116,7 @@ def array_sizing(combinations):
 
 
         # pyf.AC_PowerFlow(grid)
-        # res.TEP_N()
+        # res.tep_n()
 
 
         obj = {'Energy_cost': 1}
@@ -125,19 +125,19 @@ def array_sizing(combinations):
 
 
         if opt_type == 'OPF':
-            model, timing_info, model_res,solver_stats= pyf.Optimal_PF(grid,ObjRule=obj)
-            res.All()
-            res.TEP_N()
-            res.OBJ_res()
+            model, timing_info, model_res,solver_stats= pyf.optimal_pf(grid,ObjRule=obj)
+            res.all()
+            res.tep_n()
+            res.obj_res()
         
         elif opt_type == 'FLH':
             model, model_results , timing_info, solver_stats= pyf.transmission_expansion(grid,NPV=True,Hy=FLH,discount_rate=WACC,ObjRule=obj,tee=True)
-            res.TEP_N()
-            res.TEP_norm()
+            res.tep_n()
+            res.tep_norm()
             model.obj.display()
         else:
             model, model_results , timing_info, solver_stats= pyf.transmission_expansion(grid,NPV=True,discount_rate=WACC)
-            res.All()
+            res.all()
 
         
         print(timing_info)

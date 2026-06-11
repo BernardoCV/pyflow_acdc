@@ -14,11 +14,11 @@ Sequential algorithm
 
 """
 
-time,tol,ps_iterations = pyf.ACDC_sequential(grid,QLimit=False)
+time,tol,ps_iterations = pyf.acdc_sequential(grid,QLimit=False)
 
 
 
 
-res.All()
+res.all()
 print ('------')
 print(f'Time elapsed : {time}')

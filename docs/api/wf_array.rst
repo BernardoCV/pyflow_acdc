@@ -65,7 +65,7 @@ Sequential Cable Sizing (CSS)
       pyf.sequential_CSS(grid,NPV=True,max_turbines_per_string=None,MIP_solver='gurobi',CSS_L_solver='gurobi',max_iter=None,time_limit=300,tee=True)
           
 
-      res.All()
+      res.all()
 
 
 MIP Path Selection (Array)

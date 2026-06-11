@@ -30,12 +30,12 @@ def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
     
 
 def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
-    from .ACDC_OPF import Translate_pyf_OPF 
+    from .ACDC_OPF import translate_pyf_opf 
     
     if limit_flow_rate is True:
         limit_flow_rate = 1
         
-    opf_data = Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+    opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
     AC_info = opf_data['AC_info']
     DC_info = opf_data['DC_info']
     Conv_info = opf_data['Conv_info']

@@ -12,7 +12,7 @@ from .Classes import (
     Grid, Line_AC, Line_DC, Node_AC, Node_DC, Price_Zone, Ren_Source,
     Ren_source_zone, Size_selection, TF_Line_AC, TimeSeries,
 )
-from .grid_analysis import Cable_parameters, Converter_parameters
+from .grid_analysis import cable_parameters, converter_parameters
 from .grid_modifications import add_gen
 from .constants import SQRT_3, MAX_RATING_PLACEHOLDER, DEFAULT_V_MIN_DC, DEFAULT_V_MAX_DC, DataInput
 
@@ -27,12 +27,12 @@ except Exception:
 
 
 __all__ = [ # Grid Creation and Import
-    'Create_grid_from_data',
-    'Create_grid_from_mat',
-    'Create_grid_from_turbine_graph',
-    'Extend_grid_from_data',
+    'create_grid_from_data',
+    'create_grid_from_mat',
+    'create_grid_from_turbine_graph',
+    'extend_grid_from_data',
     'initialize_pyflowacdc',
-    'Create_grid_from_pickle'
+    'create_grid_from_pickle'
 ]
 
 def initialize_pyflowacdc():
@@ -56,7 +56,7 @@ def initialize_pyflowacdc():
     Ren_Source.reset_class()
     
     
-def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
+def create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
     
     if isinstance(AC_node_data, str):
         AC_node_data = pd.read_csv(AC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
@@ -93,7 +93,7 @@ def Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_
 
     return [G, res]
 
-def Extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
+def extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
     
 
     if isinstance(AC_node_data, str):
@@ -353,7 +353,7 @@ def process_AC_line(S_base,data_in,AC_line_data,AC_nodes=None,grid=None):
                 isTF = True
             else:
                 isTF = False    
-            [Resistance, Reactance, Conductance, Susceptance, MVA_rating] = Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables=N_cables)
+            [Resistance, Reactance, Conductance, Susceptance, MVA_rating] = cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km,N_cables=N_cables)
             
             geometry        = AC_line_data.at[index, 'geometry']  if 'geometry'     in AC_line_data.columns else None
            
@@ -518,7 +518,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
             L_mH = 0
             C_uF = 0
             G_uS = 0
-            [Resistance, _, _, _, MW_rating] = Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1)
+            [Resistance, _, _, _, MW_rating] = cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1)
             
             if pol == 'm':
                 pol_val = 1
@@ -689,7 +689,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
                 arm_res = 0.001
 
 
-            [T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu] = Converter_parameters(S_base, kV_base, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter)
+            [T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu] = converter_parameters(S_base, kV_base, Transformer_R, Transformer_X, Phase_Reactor_R, Phase_Reactor_X, Filter)
 
             geometry      = Converter_data.at[index, 'geometry']         if 'geometry'    in Converter_data.columns else None
 
@@ -722,7 +722,7 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
     return    Converters
 
 
-def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=None,cable_database=None,cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_time=None,name=None):
+def create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=None,cable_database=None,cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_time=None,name=None):
     from .grid_modifications import add_AC_node, add_line_sizing, add_RenSource, add_extgrid, add_cable_option
     from .Classes import Cable_options, Line_AC, Line_DC
 
@@ -866,7 +866,7 @@ def Create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=None,
     
     return grid, res
 
-def Create_grid_from_mat(matfile):
+def create_grid_from_mat(matfile):
     if not matfile.endswith('.mat'):
         matfile = matfile + '.mat'
     
@@ -1358,7 +1358,7 @@ def Create_grid_from_mat(matfile):
     return [G, res]
 
 
-def Create_grid_from_pickle(path,use_dill=False):
+def create_grid_from_pickle(path,use_dill=False):
     initialize_pyflowacdc()
 
     grid = load_pickle(path,use_dill)

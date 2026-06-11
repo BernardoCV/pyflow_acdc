@@ -139,7 +139,7 @@ def case24_OPF():
 
 
 
-    grid,res = pyf.Create_grid_from_data(S_base,nodes_AC,lines_AC,data_in='pu')
+    grid,res = pyf.create_grid_from_data(S_base,nodes_AC,lines_AC,data_in='pu')
 
 
     gen_size =5
@@ -185,11 +185,11 @@ def case24_OPF():
 
     pyf.expand_elements_from_pd(grid,expandable_data)
 
-    model, model_res,timing_info,solver_stats= pyf.Optimal_PF(grid,ObjRule=obj)
+    model, model_res,timing_info,solver_stats= pyf.optimal_pf(grid,ObjRule=obj)
 
 
 
-    res.All()
+    res.all()
 
     print(model_res)
     print(timing_info)

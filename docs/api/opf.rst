@@ -151,7 +151,7 @@ Objective Functions
 
 The user can define the objective by setting the weight of each sub objective. The objective function is defined as:
 
-.. function:: OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False)
+.. function:: opf_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False)
 
   This function creates a weighted sum of the different sub objectives.
 
@@ -273,15 +273,15 @@ Tested with:
 Result Translation Helpers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: OPF_line_res(model, grid)
+.. py:function:: opf_line_res(model, grid)
 
    Extracts AC/DC line OPF results from a solved model into pandas-friendly structures.
 
-.. py:function:: OPF_price_priceZone(model, grid)
+.. py:function:: opf_price_price_zone(model, grid)
 
    Extracts price-zone results from a solved OPF model.
 
-.. py:function:: Translate_pyf_OPF(grid, Price_Zones=False)
+.. py:function:: translate_pyf_opf(grid, Price_Zones=False)
 
    Translates solved OPF variables into `grid` result containers for plotting/export.
 

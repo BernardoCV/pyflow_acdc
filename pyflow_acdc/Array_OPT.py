@@ -20,7 +20,7 @@ except ImportError:
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
+from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
@@ -284,8 +284,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
                 opt_obj = MIP_obj_value + cable_cost + loss_cost
             elif NL == CssMode.PF:
                 # PF: post-processing power flow for losses, not in opt_obj
-                from .ACDC_PF import Power_flow
-                Power_flow(grid)
+                from .ACDC_PF import power_flow
+                power_flow(grid)
                 loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
                 loss_cost = loss_MW * pv_factor*grid.LCoE
                 cable_cost = obj_value
@@ -2126,9 +2126,9 @@ def simple_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_
     if NL:
         model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export,PV_set=True,callback=fs)
     elif CSS_L_solver == MIPBackend.ORTOOLS.value:
-        from .AC_L_CSS_ortools import Optimal_L_CSS_ortools
+        from .AC_L_CSS_ortools import optimal_l_css_ortools
         OPEX = ObjRule is not None and ObjRule.get(ObjComponent.ENERGY_COST.value, 0) != 0
-        model, model_results, timing_info, solver_stats = Optimal_L_CSS_ortools(
+        model, model_results, timing_info, solver_stats = optimal_l_css_ortools(
             grid, OPEX=OPEX, NPV=NPV, n_years=n_years, Hy=Hy,
             discount_rate=discount_rate, tee=tee, time_limit=time_limit)
     else:

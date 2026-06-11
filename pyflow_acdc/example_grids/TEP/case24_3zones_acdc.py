@@ -255,7 +255,7 @@ def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=0.5):
 
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
     grid.name = 'case24_3zones_acdc_TEP'
 
     pyf.add_price_zone(grid, '100', 1)
@@ -352,24 +352,24 @@ def case24_3zones_acdc(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=0.5):
             for line in list(grid.lines_DC):  # Create a copy of the list
                 name = line.name
                 line_cost = lines_DC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+                pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
             for conv in list(grid.Converters_ACDC):  # Create a copy of the list
                 name = conv.name
                 conv_cost = Converters_ACDC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
+                pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
         else:
             for line in list(grid.lines_DC):  
                 name = line.name
                 if name not in exp:
                     continue
                 line_cost = lines_DC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+                pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
             for conv in list(grid.Converters_ACDC):  
                 name = conv.name
                 if name not in exp:
                     continue
                 conv_cost = Converters_ACDC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=conv_cost)
+                pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=conv_cost)
                 
                 
                 

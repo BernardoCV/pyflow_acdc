@@ -115,7 +115,7 @@ This function is used to plot the probability of the time series parameters or r
 - 'DC line loading'
 - 'AC/DC Converters loading'
 
-.. py:function:: Time_series_prob(grid, element_name, save_format=None, path=None)
+.. py:function:: time_series_prob(grid, element_name, save_format=None, path=None)
 
    .. list-table::
       :widths: 20 10 50 10
@@ -164,9 +164,9 @@ This function is used to plot the probability of the time series parameters or r
       TS_wl = pd.read_csv(wind_load_url)
       pyf.add_TimeSeries(grid,TS_wl)
 
-      pyf.Time_series_prob(grid,'OWPP_BE',save_format='svg')
-      pyf.Time_series_prob(grid,'BE_price',save_format='svg')
-      pyf.Time_series_prob(grid,'L_BE',save_format='svg')
+      pyf.time_series_prob(grid,'OWPP_BE',save_format='svg')
+      pyf.time_series_prob(grid,'BE_price',save_format='svg')
+      pyf.time_series_prob(grid,'L_BE',save_format='svg')
 
    .. list-table::
       :widths: 50 50 50 
@@ -181,7 +181,7 @@ Network Graph Visualization
 Full grid visualization as a network graph
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
+.. py:function:: plot_graph(Grid,text='inPu',base_node_size=10,G=None):
 
    Creates an interactive network graph visualization using Plotly.
 
@@ -218,7 +218,7 @@ Full grid visualization as a network graph
 
        grid,res = pyf.case24_3zones_acdc()
 
-       pyf.plot_Graph(grid)
+       pyf.plot_graph(grid)
 
    .. figure:: ../images/case24acdc_full.svg
       :alt: case24_3zones_acdc_graph

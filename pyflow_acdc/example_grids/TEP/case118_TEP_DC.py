@@ -461,7 +461,7 @@ def case118_TEP_DC(exp='All',N_b=0,N_i=1,N_max=1):
 
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
     grid.name = 'case118_TEP'
     
     # Assign Price Zones to Nodes
@@ -539,24 +539,24 @@ def case118_TEP_DC(exp='All',N_b=0,N_i=1,N_max=1):
         for line in list(grid.lines_DC):  # Create a copy of the list
             name = line.name
             line_cost = lines_DC.loc[name,'cost']/4*10**6
-            pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+            pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
         for conv in list(grid.Converters_ACDC):
             name = conv.name
             conv_cost = Conv_cost*10**6
-            pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max*3,base_cost=conv_cost)
+            pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max*3,base_cost=conv_cost)
     else:
         for line in list(grid.lines_DC):  # Create a copy of the list
             name = line.name
             if name not in exp:
                 continue
             line_cost = lines_DC.loc[name,'cost']/4*10**6
-            pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+            pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
         for conv in list(grid.Converters_ACDC):  
             name = conv.name
             if name not in exp:
                 continue
             conv_cost = Conv_cost*10**6
-            pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max*3,base_cost=conv_cost)
+            pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max*3,base_cost=conv_cost)
 
 
     # Return the grid

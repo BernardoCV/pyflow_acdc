@@ -72,7 +72,7 @@ def case6_TEP_DC():
 
 
 
-    grid,res = pyf.Create_grid_from_data(S_base,nodes_AC,lines_AC,nodes_DC,lines_DC,convacdc,data_in='pu')
+    grid,res = pyf.create_grid_from_data(S_base,nodes_AC,lines_AC,nodes_DC,lines_DC,convacdc,data_in='pu')
 
 
 

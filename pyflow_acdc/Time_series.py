@@ -13,14 +13,14 @@ from scipy import stats as st
 import time
 
 from .grid_analysis import analyse_grid, grid_state
-from .ACDC_PF import AC_PowerFlow, DC_PowerFlow, ACDC_sequential
+from .ACDC_PF import ac_power_flow, dc_power_flow, acdc_sequential
 from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights, TSType, TS_RENEWABLE_TYPES
 
 
 # Base __all__ with functions that don't require OPF
-__all__ = ['Time_series_PF',
-           'TS_ACDC_PF',
-           'Time_series_statistics',
+__all__ = ['time_series_pf',
+           'ts_acdc_pf',
+           'time_series_statistics',
            'update_grid_data']
 
 try:
@@ -31,16 +31,16 @@ try:
     
     from .ACDC_OPF import (
         pyomo_model_solve,
-        OPF_obj,
+        opf_obj,
         OPF_step_results,
         pack_variables,
-        Translate_pyf_OPF,
+        translate_pyf_opf,
         reset_to_initialize,
         calculate_objective
     )
     pyomo_imp= True
     # Add OPF-dependent functions to __all__ only if pyomo is available
-    __all__.extend(['TS_ACDC_OPF', 'results_TS_OPF'])
+    __all__.extend(['ts_acdc_opf', 'results_ts_opf'])
     
 except ImportError:    
     pyomo_imp= False
@@ -52,7 +52,7 @@ def find_value_from_cdf(cdf, x):
             return i
     return None
 
-def Time_series_PF(grid):
+def time_series_pf(grid):
     if grid.nodes_AC == None:
         print("only DC")
     elif grid.nodes_DC == None:
@@ -422,7 +422,7 @@ def calculate_pn_min_max_from_model(grid, model, idx):
     return pn_min, pn_max, a, b
 
 
-def TS_ACDC_PF(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     if end is None:
@@ -449,11 +449,11 @@ def TS_ACDC_PF(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
                 if conv.type in ['Droop', 'P']:
                     conv.P_DC = grid.Pconv_save[conv.ConvNumber] #This resets the converters droop target
             
-            ACDC_sequential(grid,QLimit=False)
+            acdc_sequential(grid,QLimit=False)
         elif grid.ACmode:
-            t,tol=AC_PowerFlow(grid,tol_lim, maxIter)
+            t,tol=ac_power_flow(grid,tol_lim, maxIter)
         elif grid.DCmode:
-            t,tol=DC_PowerFlow(grid,tol_lim, maxIter)
+            t,tol=dc_power_flow(grid,tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
             # Submit the functions to the executor
@@ -514,7 +514,7 @@ def TS_ACDC_PF(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
 
 
 def _modify_parameters(grid,model,Price_Zones):
-    opf_data = Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+    opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
     AC_info = opf_data['AC_info']
     DC_info = opf_data['DC_info']
     Price_Zone_info = opf_data['Price_Zone_info']
@@ -592,7 +592,7 @@ def _modify_parameters(grid,model,Price_Zones):
         model.P_renSource[idx].set_value(val)
 
 
-def TS_ACDC_OPF(
+def ts_acdc_opf(
     grid,
     start=1,
     end=None,
@@ -670,7 +670,7 @@ def TS_ACDC_OPF(
 
         OPF_create_NLModel_ACDC(model_obj,grid,PV_set,price_zone_restrictions,limit_flow_rate=limit_flow_rate)
 
-        obj_rule_local = OPF_obj(model_obj,grid,weights_def,OnlyGen=True)
+        obj_rule_local = opf_obj(model_obj,grid,weights_def,OnlyGen=True)
         if obj_scaling != 1.0:
             obj_rule_local = obj_rule_local / obj_scaling
         model_obj.obj = pyo.Objective(rule=obj_rule_local, sense=pyo.minimize)
@@ -984,7 +984,7 @@ def save_TS_to_grid (grid,ts_results,infeasible):
     grid.time_series_results['reactive_power_opf'].columns = grid.time_series_results['reactive_power_opf'].columns.str.replace('Reactor_' , '',regex=False)
     grid.time_series_results['real_power_opf'].columns = grid.time_series_results['real_power_opf'].columns.str.replace('RenSource_','', regex=False)
 
-def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
+def time_series_statistics(grid, curtail=0.99,over_loading=0.9):
 
     a = grid.Time_series
 
@@ -1100,7 +1100,7 @@ def Time_series_statistics(grid, curtail=0.99,over_loading=0.9):
 
     return stats
 
-def results_TS_OPF(grid,excel_file_path,grid_names=None,stats=None,times=None):
+def results_ts_opf(grid,excel_file_path,grid_names=None,stats=None,times=None):
     
     if not excel_file_path.endswith('.xlsx'):
         excel_file_path = f'{excel_file_path}.xlsx'

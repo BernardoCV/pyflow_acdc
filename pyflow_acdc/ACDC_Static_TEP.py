@@ -16,7 +16,7 @@ from .constants import HOURS_PER_YEAR, CT_SELECTION_THRESHOLD, BINARY_THRESHOLD,
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC, TEP_variables
 from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
+from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
 
 from .Graph_and_plot import save_network_svg
 
@@ -26,8 +26,8 @@ __all__ = [
     'expand_elements_from_pd',
     'repurpose_element_from_pd',
     'update_attributes',
-    'Expand_element',
-    'Translate_pd_TEP',
+    'expand_element',
+    'translate_pd_tep',
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
@@ -151,12 +151,12 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
 
 def expand_elements_from_pd(grid,exp_elements):
     """
-    This function iterates over exp_elements and applies Expand_element 
+    This function iterates over exp_elements and applies expand_element 
     with the corresponding columns (N_i, life_time, and base_cost) if available.
     
     Parameters:
     exp_elements: DataFrame containing element data.
-    grid: The grid object to be passed to Expand_element.
+    grid: The grid object to be passed to expand_element.
     """
     
     # Normalize CSV headers to lowercase so lookups are case-insensitive.
@@ -196,7 +196,7 @@ def expand_elements_from_pd(grid,exp_elements):
         if planned_installation is None:
             planned_installation = get_column_value(row, 'planned_install')
 
-        Expand_element(
+        expand_element(
             grid,
             name,
             get_column_value(row, 'n_b'),
@@ -261,7 +261,7 @@ def repurpose_element_from_pd(grid,rec_elements):
     def get_column_value(row, col_name,default_value=None):
         return row[col_name] if col_name in row.index else default_value
     
-    # Apply the Expand_element function for each element in exp_elements
+    # Apply the expand_element function for each element in exp_elements
     rec_elements.iloc[:, 0].apply(lambda name: change_line_AC_to_reconducting(
         grid,
         name,
@@ -391,7 +391,7 @@ def update_attributes(
        element.exp = exp
 
 
-def Expand_element(
+def expand_element(
     grid,
     name,
     n_b=None,
@@ -470,7 +470,7 @@ def base_cost_calculation(element):
     if isinstance(element, Ren_Source):
         element.base_cost= element.cost_perMVA*element.Max_S
 
-def Translate_pd_TEP(grid):
+def translate_pd_tep(grid):
     """Translation of element wise to internal numbering"""
     # Price_Zones
     price_zone2node, price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max, PL_price_zone = {}, {}, {}, {}, {}, {}, {}
@@ -956,7 +956,7 @@ def _prepare_TEP_model(
     
 
     obj_TEP = TEP_obj(model,grid,NPV)
-    obj_OPF = OPF_obj(model,grid,weights_def,True)
+    obj_OPF = opf_obj(model,grid,weights_def,True)
     
 
     return model, obj_TEP, obj_OPF,weights_def,PZ
@@ -1111,7 +1111,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
     
 
     obj_TEP = TEP_obj(model,grid,NPV)
-    obj_OPF = OPF_obj_L(model,grid,weights_def)
+    obj_OPF = opf_obj_l(model,grid,weights_def)
     
     present_value = present_value_factor(Hy, discount_rate, n_years)
     if NPV:
@@ -1645,7 +1645,7 @@ def multi_scenario_TEP(
 def TEP_subObj(scenario_model,grid,ObjRule):
     OnlyGen=True
 
-    obj_rule= OPF_obj(scenario_model,grid,ObjRule,OnlyGen)
+    obj_rule= opf_obj(scenario_model,grid,ObjRule,OnlyGen)
     scenario_model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
     s=1
     

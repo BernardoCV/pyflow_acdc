@@ -196,7 +196,7 @@ def Borssele_3_and_4():
 
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, data_in='pu')
     grid.name = 'Borssele_3&4'
     
     

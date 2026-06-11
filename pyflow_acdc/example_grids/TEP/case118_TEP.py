@@ -349,7 +349,7 @@ def case118_TEP(exp='All',N_b=1,N_i=1,N_max=5,kappa=0.5):
     Converters_ACDC = None
 
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
     grid.name = 'case118_TEP'
     
 
@@ -418,14 +418,14 @@ def case118_TEP(exp='All',N_b=1,N_i=1,N_max=5,kappa=0.5):
         for line in list(grid.lines_AC):  # Create a copy of the list
             name = line.name
             line_cost = lines_AC.loc[name,'Cost MEUR']*10**6
-            pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+            pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
     else:
         for line in list(grid.lines_AC):  
             name = line.name
             if name not in exp:
                 continue
             line_cost = lines_AC.loc[name,'Cost MEUR']*10**6
-            pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
+            pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost)
 
 
     # Return the grid

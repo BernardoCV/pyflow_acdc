@@ -17,10 +17,10 @@ def run_test():
 
     grid, res = pyf.cases['CigreB4_ACDC']()
 
-    t = pyf.ACDC_sequential(grid, Droop_PF=True,maxIter=500)
+    t = pyf.acdc_sequential(grid, Droop_PF=True,maxIter=500)
     #model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
 
-    res.All()
+    res.all()
     end_time = time.perf_counter()
     elapsed_time = end_time - start_time
 

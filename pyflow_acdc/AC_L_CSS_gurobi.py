@@ -13,7 +13,7 @@ import time
 from .Graph_and_plot import save_network_svg
 from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, ObjComponent
 
-__all__ = ['Optimal_L_CSS_gurobi']
+__all__ = ['optimal_l_css_gurobi']
 
 from .ACDC_OPF import  obj_w_rule, calculate_objective
 from .grid_analysis import analyse_grid
@@ -187,7 +187,7 @@ def debug_infeasibility(model, gen_vars=None, ac_vars=None):
     print("=" * 80)
 
 
-def Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEAR, discount_rate=DEFAULT_DISCOUNT_RATE,tee=False,time_limit=DEFAULT_TIME_LIMIT):
+def optimal_l_css_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEAR, discount_rate=DEFAULT_DISCOUNT_RATE,tee=False,time_limit=DEFAULT_TIME_LIMIT):
     """Main function to create and solve Gurobi model"""
     
     analyse_grid(grid)
@@ -309,11 +309,11 @@ def solve_gurobi_model(model, grid):
 
 def OPF_create_LModel_AC_gurobi(model,grid):
     """Create Gurobi model for AC DC OPF"""
-    from .ACDC_OPF import Translate_pyf_OPF 
+    from .ACDC_OPF import translate_pyf_opf 
    
     
     # Get problem data
-    opf_data = Translate_pyf_OPF(grid,False)
+    opf_data = translate_pyf_opf(grid,False)
     AC_info = opf_data['AC_info']
     gen_info = opf_data['gen_info']
     

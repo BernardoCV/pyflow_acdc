@@ -106,7 +106,7 @@ Basic usage::
    pyf.ACDC_sequential(grid,QLimit=False)
 
    
-   res.All()
+   res.all()
    
 Indices and tables
 ==================

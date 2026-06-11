@@ -19,10 +19,10 @@ __all__ = [
 
 
 def OPF_create_LModel_AC(model,grid,TEP=False):
-    from .ACDC_OPF import Translate_pyf_OPF 
+    from .ACDC_OPF import translate_pyf_opf 
     
     
-    opf_data = Translate_pyf_OPF(grid)
+    opf_data = translate_pyf_opf(grid)
     AC_info = opf_data['AC_info']
     gen_info = opf_data['gen_info']
    

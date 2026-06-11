@@ -7,7 +7,7 @@ from pymoo.optimize import minimize
 import time
 import matplotlib.pyplot as plt
 from .ACDC_OPF_NL_model import ExportACDC_NLmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective
+from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective
 from .grid_analysis import analyse_grid
 from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
 
@@ -208,7 +208,7 @@ class TEPOuterProblem(ElementwiseProblem):
         OPF_create_NLModel_ACDC(model, self.grid, PV_set=self.pv_set, 
                                Price_Zones=self.pz, TEP=False)
         
-        obj_OPF = OPF_obj(model,self.grid,self.weights_def)
+        obj_OPF = opf_obj(model,self.grid,self.weights_def)
     
         model.obj = pyo.Objective(rule=obj_OPF, sense=pyo.minimize)
         return model

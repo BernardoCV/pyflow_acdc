@@ -13,9 +13,9 @@ def test_docs_opf_quick():
 
     [grid, res] = pyf.cases['case39_acdc']()
 
-    model, timing_info, model_res,solver_stats= pyf.Optimal_PF(grid, ObjRule=obj)
+    model, timing_info, model_res,solver_stats= pyf.optimal_pf(grid, ObjRule=obj)
 
-    res.All()
+    res.all()
     print(model_res)
     print(timing_info)
     model.obj.display()

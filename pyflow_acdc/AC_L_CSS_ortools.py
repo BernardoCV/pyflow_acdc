@@ -10,7 +10,7 @@ Only considers CT lines (no expansion or reconductoring).
 import numpy as np
 import time
 
-__all__ = ['Optimal_L_CSS_ortools']
+__all__ = ['optimal_l_css_ortools']
 
 from .ACDC_OPF import obj_w_rule, calculate_objective
 from .grid_analysis import analyse_grid
@@ -25,7 +25,7 @@ except ImportError:
 
 # ── Main entry point ────────────────────────────────────────────────────────
 
-def Optimal_L_CSS_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEAR,
+def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEAR,
                           discount_rate=DEFAULT_DISCOUNT_RATE, tee=False, time_limit=DEFAULT_TIME_LIMIT):
     """Main function to create and solve OR-Tools linear_solver model.
 
@@ -152,9 +152,9 @@ def solve_ortools_model(solver, grid, tee=False):
 
 def OPF_create_LModel_AC_ortools(solver, grid):
     """Build the linear AC OPF model inside *solver*."""
-    from .ACDC_OPF import Translate_pyf_OPF
+    from .ACDC_OPF import translate_pyf_opf
 
-    opf_data = Translate_pyf_OPF(grid, False)
+    opf_data = translate_pyf_opf(grid, False)
     AC_info = opf_data['AC_info']
     gen_info = opf_data['gen_info']
 

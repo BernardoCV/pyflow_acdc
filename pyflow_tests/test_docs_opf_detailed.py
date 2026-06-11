@@ -34,7 +34,7 @@ def test_docs_opf_detailed():
     lines_AC = pd.DataFrame(lines_AC_data)
 
     # Create the grid as shown in docs
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, data_in='pu')
 
     # Add generators as shown in docs
     pyf.add_gen(grid, '1.0', '1', lf=14, qf=0, MWmax=40.0, MWmin=0.0, MVArmax=30.0, MVArmin=-30.0, PsetMW=20.0, QsetMVA=0.0)
@@ -45,9 +45,9 @@ def test_docs_opf_detailed():
 
     obj = {'Energy_cost': 1}
 
-    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid, ObjRule=obj)
+    model, timing_info, model_res,solver_stats=pyf.optimal_pf(grid, ObjRule=obj)
 
-    res.All()
+    res.all()
     print(model_res)
     print(timing_info)
     model.obj.display()

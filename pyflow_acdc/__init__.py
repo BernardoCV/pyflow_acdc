@@ -57,11 +57,11 @@ __all__ = [
     'add_gen_mix_limits',
     
     # Grid Creation and Import
-    'Create_grid_from_data',
-    'Create_grid_from_mat',
-    'Create_grid_from_turbine_graph',
-    'Extend_grid_from_data',
-    'Create_grid_from_pickle',
+    'create_grid_from_data',
+    'create_grid_from_mat',
+    'create_grid_from_turbine_graph',
+    'extend_grid_from_data',
+    'create_grid_from_pickle',
     
     # Line Modifications
     'change_line_AC_to_expandable',
@@ -73,8 +73,8 @@ __all__ = [
     'assign_ConvToPrice_Zone',
     
     # Parameter Calculations
-    'Cable_parameters',
-    'Converter_parameters',
+    'cable_parameters',
+    'converter_parameters',
     
     # Utility Functions
     'pol2cart',
@@ -88,15 +88,15 @@ __all__ = [
     'create_gen_limit_csv_template',
     
     # Power Flow
-    'AC_PowerFlow',
-    'DC_PowerFlow',
-    'ACDC_sequential',
-    'Power_flow',
+    'ac_power_flow',
+    'dc_power_flow',
+    'acdc_sequential',
+    'power_flow',
     
     # Time Series Analysis
-    'Time_series_PF',
-    'TS_ACDC_PF',
-    'Time_series_statistics',
+    'time_series_pf',
+    'ts_acdc_pf',
+    'time_series_statistics',
     'update_grid_data',
     
     # Export
@@ -106,8 +106,8 @@ __all__ = [
     'export_solver_progress_to_excel',
 
     # Visualization
-    'plot_Graph',
-    'Time_series_prob',
+    'plot_graph',
+    'time_series_prob',
     'plot_neighbour_graph',
     'plot_TS_res',
     'plot_folium',
@@ -135,9 +135,9 @@ try:
     # Time_series module functions that depend on OPF are already imported via Time_series
     # but we need to add them to __all__ only if OPF is available
     __all__.extend([
-        'Optimal_PF', 'Optimal_L_PF', 'pyomo_model_solve', 'OPF_obj', 'OPF_line_res',
-        'OPF_price_priceZone', 'Translate_pyf_OPF',
-        'TS_ACDC_OPF', 'results_TS_OPF'
+        'optimal_pf', 'optimal_l_pf', 'pyomo_model_solve', 'opf_obj', 'opf_line_res',
+        'opf_price_price_zone', 'translate_pyf_opf',
+        'ts_acdc_opf', 'results_ts_opf'
     ])
     HAS_OPF = True
     
@@ -147,8 +147,8 @@ try:
         __all__.extend([
             'transmission_expansion', 'linear_transmission_expansion',
             'multi_scenario_TEP', 'expand_elements_from_pd',
-            'repurpose_element_from_pd', 'update_attributes', 'Expand_element',
-            'Translate_pd_TEP', 'export_TEP_TS_results_to_excel',
+            'repurpose_element_from_pd', 'update_attributes', 'expand_element',
+            'translate_pd_tep', 'export_TEP_TS_results_to_excel',
             'alpha_pareto', 'rate_sensitivity', 'kappa_sensitivity',
             'comprehensive_sensitivity_analysis'
         ])
@@ -205,14 +205,14 @@ except ImportError:
     
 try:
     from .AC_L_CSS_gurobi import *
-    __all__.extend(['Optimal_L_CSS_gurobi'])
+    __all__.extend(['optimal_l_css_gurobi'])
     HAS_AC_L_CSS_GUROBI = True
 except ImportError:
     HAS_AC_L_CSS_GUROBI = False
 
 try:
     from .AC_L_CSS_ortools import *
-    __all__.extend(['Optimal_L_CSS_ortools'])
+    __all__.extend(['optimal_l_css_ortools'])
     HAS_AC_L_CSS_ORTOOLS = True
 except ImportError:
     HAS_AC_L_CSS_ORTOOLS = False
@@ -232,6 +232,12 @@ try:
     HAS_CLUSTERING = True
 except ImportError:
     HAS_CLUSTERING = False
+
+# Deprecated mixed-case aliases (snake_case is the default API).
+# Imported last so the legacy names resolve to the deprecation wrappers.
+from . import depreciation_methods
+from .depreciation_methods import *
+__all__.extend(depreciation_methods.__all__)
 
 # Dynamically load all .py files in the example_grids folders.
 _cases_root = Path(__file__).parent / "example_grids"

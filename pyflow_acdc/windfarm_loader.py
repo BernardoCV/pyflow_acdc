@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from shapely.geometry import LineString, MultiPolygon, Polygon, shape
 
-from .grid_creator import Create_grid_from_pickle
+from .grid_creator import create_grid_from_pickle
 
 __all__ = ['load_case_grid_and_geo']
 
@@ -112,7 +112,7 @@ def _parse_geojson_context(geojson_path):
 
 def load_case_grid_and_geo(case_name, source_tag="gebco"):
     grid_pickle = _find_grid_pickle(case_name, source_tag=source_tag)
-    grid, res = Create_grid_from_pickle(str(grid_pickle), use_dill=True)
+    grid, res = create_grid_from_pickle(str(grid_pickle), use_dill=True)
 
     geojson_path = _find_geojson(case_name)
     dev_area_polygons, export_lines, exclusion_zones, soft_exclusion_zones = _parse_geojson_context(geojson_path)

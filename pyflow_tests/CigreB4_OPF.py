@@ -20,9 +20,9 @@ def CigreB4_OPF():
 
     grid,res  = pyf.cases['CigreB4_ACDC']()
     # pyf.ACDC_sequential(grid)
-    model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
+    model, timing_info, model_res,solver_stats=pyf.optimal_pf(grid)
 
-    res.All()
+    res.all()
     print(model_res)
     print(timing_info)
     model.obj.display()

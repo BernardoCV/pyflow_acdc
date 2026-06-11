@@ -411,7 +411,7 @@ def {file_name}():
     {Converters_ACDC_code}
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='{DataInput.PU.value}')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='{DataInput.PU.value}')
     grid.name = '{file_name}'
     """
     

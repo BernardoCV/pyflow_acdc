@@ -211,7 +211,7 @@ Statistical Analysis
 Results Export
 ^^^^^^^^^^^^^^
 
-.. py:function:: results_TS_OPF(grid, excel_file_path, grid_names=None, stats=None, times=None)
+.. py:function:: results_ts_opf(grid, excel_file_path, grid_names=None, stats=None, times=None)
 
    Exports time series results to Excel file.
 
@@ -269,7 +269,7 @@ Results Export
 
    .. code-block:: python
 
-       pyf.results_TS_OPF(grid, "results", stats=stats_df)
+       pyf.results_ts_opf(grid, "results", stats=stats_df)
 
 **References**
 

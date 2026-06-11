@@ -135,7 +135,7 @@ def case24_TEP():
 
 
 
-    grid,res = pyf.Create_grid_from_data(S_base,nodes_AC,lines_AC,data_in='pu')
+    grid,res = pyf.create_grid_from_data(S_base,nodes_AC,lines_AC,data_in='pu')
 
     # pyf.add_gen(grid,'3', MWmax=0.0, MVArmin=-9999,MVArmax=9999,PsetMW=0.0)
     # pyf.add_gen(grid,'4', MWmax=0.0, MVArmin=-9999,MVArmax=9999,PsetMW=0.0)
@@ -160,8 +160,8 @@ def case24_TEP():
     model, model_results , timing_info, solver_stats= pyf.transmission_expansion(grid,NPV=True,solver='bonmin')
 
 
-    res.TEP_N()
-    res.TEP_norm()
+    res.tep_n()
+    res.tep_norm()
 
     print(timing_info)
     model.obj.display()

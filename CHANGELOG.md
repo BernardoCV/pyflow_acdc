@@ -17,6 +17,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `ObjComponent`, `CssMode`, `MIPBackend`, `PricingStrategy`, `TSType`
   (plus the `TS_RENEWABLE_TYPES` group), and a `default_obj_weights()` factory.
 - `__all__` is now defined on every module, making the public surface explicit.
+- `pyflow_acdc/depreciation_methods.py`: deprecated mixed-case aliases (both
+  module-level functions and `Results` methods) that forward to the snake_case
+  implementations and emit `DeprecationWarning`.
 - `pyproject.toml`: `keywords`, a `Homepage` URL, and `pytest-cov` in the
   `[tests]` extra.
 
@@ -30,6 +33,18 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - Docs: corrected class references (`rec_Line_AC`, `Size_selection`),
   refreshed the `Optimal_PF` signature, removed the unused `sphinx-rtd-theme`
   dependency, and updated the copyright year.
+- **snake_case is now the default for the public API.** Public functions were
+  renamed to snake_case (e.g. `Power_flow→power_flow`, `Create_grid_from_data→
+  create_grid_from_data`, `Optimal_PF→optimal_pf`, `OPF_obj→opf_obj`,
+  `Expand_element→expand_element`, `Translate_pyf_OPF→translate_pyf_opf`,
+  `plot_Graph→plot_graph`, `results_TS_OPF→results_ts_opf`). The legacy
+  mixed-case names remain importable as deprecated aliases (see below). The
+  `grid.OPF_obj` attribute is unchanged (only the same-named function moved).
+- **`Results` methods renamed to snake_case** (e.g. `res.All()→res.all()`,
+  `res.AC_Powerflow()→res.ac_powerflow()`, `res.TEP_N()→res.tep_n()`,
+  `res.Converter()→res.converter()`). Old method names remain as deprecated
+  aliases that warn and forward. Excel-sheet/table keys, `Grid` attributes, and
+  the `Price_Zone` class are unchanged.
 
 ### Fixed
 - `Export_files` no longer emits an unquoted `pricing_strategy=` value in

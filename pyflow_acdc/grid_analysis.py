@@ -13,8 +13,8 @@ __all__ = [
     "pol2cartz",
     "cart2pol",
     "cartz2pol",
-    "Converter_parameters",
-    "Cable_parameters",
+    "converter_parameters",
+    "cable_parameters",
     "grid_state",
     "analyse_grid",
     "current_fuel_type_distribution",
@@ -46,7 +46,7 @@ def cartz2pol(z):
     return r, theta
 
 
-def Converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Filter_uF, f=50):
+def converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Filter_uF, f=50):
     Z_base = kV_base**2 / S_base  # kv^2/MVA
     Y_base = 1 / Z_base
 
@@ -67,7 +67,7 @@ def Converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Fi
     return [T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu]
 
 
-def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1, f=50):
+def cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1, f=50):
     Z_base = kV_base**2 / S_base  # kv^2/MVA
     Y_base = 1 / Z_base
 

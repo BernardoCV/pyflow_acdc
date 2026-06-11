@@ -35,14 +35,14 @@ import warnings
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'Translate_pyf_OPF',
-    'Optimal_L_PF',
-    'Optimal_PF',
+    'translate_pyf_opf',
+    'optimal_l_pf',
+    'optimal_pf',
     'pyomo_model_solve',
     'OPF_updateParam',
-    'OPF_obj',
-    'OPF_line_res',
-    'OPF_price_priceZone',
+    'opf_obj',
+    'opf_line_res',
+    'opf_price_price_zone',
     'OPF_step_results',
     'fx_conv',
     'export_solver_progress_to_excel',
@@ -75,7 +75,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 
-def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0):
+def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0):
     grid.reset_run_flags()
     analyse_grid(grid)
 
@@ -104,7 +104,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     
     
   
-    obj_rule= OPF_obj_L(model,grid,weights_def)
+    obj_rule= opf_obj_l(model,grid,weights_def)
 
     if obj_scaling != 1.0:
         obj_rule = obj_rule / obj_scaling
@@ -136,7 +136,7 @@ def Optimal_L_PF(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0):
+def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0):
     grid.reset_run_flags()
     analyse_grid(grid)
 
@@ -158,7 +158,7 @@ def Optimal_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     
     
     
-    obj_rule= OPF_obj(model,grid,weights_def,OnlyGen)
+    obj_rule= opf_obj(model,grid,weights_def,OnlyGen)
 
     if obj_scaling != 1.0:
         obj_rule = obj_rule / obj_scaling
@@ -877,7 +877,7 @@ def reset_to_initialize(model, initial_values):
                 var_data.set_value(value)
 
 def _store_pyomo_results_on_grid(grid_obj, model_obj, results_obj, solver_stats):
-    """Persist latest Pyomo model results table on grid for Results.All()."""
+    """Persist latest Pyomo model results table on grid for Results.all()."""
     if grid_obj is None:
         return
     try:
@@ -1348,7 +1348,7 @@ def OPF_updateParam(model,grid):
 
     return model
 
-def OPF_obj_L(model,grid,ObjRule):
+def opf_obj_l(model,grid,ObjRule):
     
     if ObjRule[ObjComponent.ENERGY_COST]['w']==0:
         return 0
@@ -1357,7 +1357,7 @@ def OPF_obj_L(model,grid,ObjRule):
     return AC
     
 
-def OPF_obj(model,grid,weights_def,OnlyGen=True):
+def opf_obj(model,grid,weights_def,OnlyGen=True):
     np_den_eps = 1e-3
    
     def formula_Min_Ext_Gen():
@@ -1520,7 +1520,7 @@ def OPF_obj(model,grid,weights_def,OnlyGen=True):
 
 
 
-def Translate_pyf_OPF(grid,Price_Zones=False):
+def translate_pyf_opf(grid,Price_Zones=False):
     """Translation of element wise to internal numbering"""
     AC_info, DC_info, Conv_info,DCDC_info = None, None, None,None
     ACmode= grid.ACmode
@@ -1752,7 +1752,7 @@ def Translate_pyf_OPF(grid,Price_Zones=False):
 
 
 
-def OPF_line_res (model,grid):
+def opf_line_res (model,grid):
     opt_res_Loading_line = {}
     opt_res_Loading_grid ={}
     loadS_AC = np.zeros(grid.Num_Grids_AC)
@@ -1828,7 +1828,7 @@ def OPF_line_res (model,grid):
     return opt_res_Loading_line,opt_res_Loading_grid
 
 
-def OPF_price_priceZone (model,grid):
+def opf_price_price_zone (model,grid):
     opt_res_Loading_pz = {}
     for pz in grid.Price_Zones:
         m= pz.price_zone_num
@@ -2002,19 +2002,19 @@ def calculate_objective(grid,obj,OnlyGen=True):
 def calculate_objective_from_model(model, grid, weights_def, OnlyGen=True):
     """
     Calculate weighted objective value directly from a solved Pyomo model.
-    Uses OPF_obj() to build the expression, then evaluates it once.
+    Uses opf_obj() to build the expression, then evaluates it once.
     
     Args:
         model: Solved Pyomo model
         grid: Grid object (needed for generator properties and grid structure)
-        ObjRule: Dictionary with objective rules (same format as OPF_obj)
+        ObjRule: Dictionary with objective rules (same format as opf_obj)
         OnlyGen: Boolean flag for energy cost calculation
     
     Returns:
         Weighted sum of objectives (float)
     """
     # Build the objective expression (Pyomo expression)
-    obj = OPF_obj(model, grid, weights_def, OnlyGen)
+    obj = opf_obj(model, grid, weights_def, OnlyGen)
     # Evaluate it once
     obj_value = pyo.value(obj)
     return obj_value

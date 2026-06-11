@@ -62,8 +62,8 @@ def run_test():
                                         Droop=0, kV_base=345, MVA_max=120)
 
     # Run power flow as shown in docs
-    time,tol,ps_iterations = pyf.ACDC_sequential(grid)
-    res.All()
+    time,tol,ps_iterations = pyf.acdc_sequential(grid)
+    res.all()
 
     print("✓ Add components test passed")
 

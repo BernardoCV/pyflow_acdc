@@ -17,9 +17,9 @@ def run_test():
     # Test the PEI grid example from docs
     [grid, res] = pyf.cases['PEI_grid']()
 
-    time,tol,ps_iterations = pyf.ACDC_sequential(grid, QLimit=False)
+    time,tol,ps_iterations = pyf.acdc_sequential(grid, QLimit=False)
 
-    res.All()
+    res.all()
     print('------')
     print("✓ Power flow example test passed")
 

@@ -8,7 +8,7 @@ import os
 import copy
 
 from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective,calculate_objective_from_model,Optimal_PF
+from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective,calculate_objective_from_model,optimal_pf
 from .ACDC_Static_TEP import (
     get_TEP_variables,
     _initialize_MS_STEP_sets_model,
@@ -17,7 +17,7 @@ from .ACDC_Static_TEP import (
     ExportACDC_TEP_MS_toPyflowACDC,
 )
 from .grid_analysis import analyse_grid, current_fuel_type_distribution
-from .Time_series import _modify_parameters, TS_ACDC_OPF, results_TS_OPF
+from .Time_series import _modify_parameters, ts_acdc_opf, results_ts_opf
 from .Graph_and_plot import save_network_svg, create_geometries_from_layout
 from .Results_class import Results
 from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, PF_INNER_TOLERANCE, present_value_factor
@@ -971,7 +971,7 @@ def multi_period_transmission_expansion(
         _modify_parameters(grid,model.inv_model[i],PZ)
 
         
-        obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
+        obj_OPF = opf_obj(model.inv_model[i],grid,weights_def,True)
     
         obj_OPF *=present_value_opf
         
@@ -1584,7 +1584,7 @@ def _build_period_scenario_block(
         sc_block.transfer_attributes_from(base_model.clone())
         
         _modify_parameters(grid, sc_block, Price_Zones)
-        sc_obj = OPF_obj(sc_block, grid, weights_def, True)
+        sc_obj = opf_obj(sc_block, grid, weights_def, True)
         sc_block.obj = pyo.Objective(rule=sc_obj, sense=pyo.minimize)
 
         maybe_weight = _scenario_weight_for_frame(grid, t, n_clusters, clustering)
@@ -1914,7 +1914,7 @@ def run_opf_for_investment_period(
     
     _, PZ = obj_w_rule(grid,ObjRule,True)
     _set_grid_to_multiperiod_state(grid, period_idx,PZ)
-    model, model_res, timing_info, solver_stats = Optimal_PF(
+    model, model_res, timing_info, solver_stats = optimal_pf(
         grid,
         ObjRule=ObjRule,
         solver=solver,
@@ -1932,13 +1932,13 @@ def run_opf_for_investment_period(
             'export_location': export_location,
         }
         res.pyomo_model_results(model, solver_stats=solver_stats, model_results=model_res, print_table=False)
-        res.All(**all_kwargs)
+        res.all(**all_kwargs)
 
     if save_grid_pkl:
         from .Export_files import save_pickle
 
         base_name = file_name or f"{getattr(grid, 'name', 'grid')}_period_{period_idx}"
-        # Match Excel naming convention in Results.All():
+        # Match Excel naming convention in Results.all():
         #   excel_path = f"{base_name}_results.xlsx"
         pkl_path = os.path.join(export_location, f"{base_name}_results.pkl")
         save_pickle(grid, pkl_path, compress=True)
@@ -2037,7 +2037,7 @@ def run_ts_opf_for_investment_period(
         _, PZ = obj_w_rule(grid, ObjRule, True)
         _set_grid_to_multiperiod_state(grid, period_idx, PZ)
 
-    times = TS_ACDC_OPF(
+    times = ts_acdc_opf(
         grid,
         start=start,
         end=end,
@@ -2063,7 +2063,7 @@ def run_ts_opf_for_investment_period(
     excel_path = os.path.join(export_location, base_name)
 
     if export_excel:
-        results_TS_OPF(grid, excel_file_path=excel_path, times=times)
+        results_ts_opf(grid, excel_file_path=excel_path, times=times)
 
     if save_grid_pkl:
         from .Export_files import save_pickle

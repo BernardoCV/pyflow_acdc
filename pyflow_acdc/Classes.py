@@ -1932,7 +1932,7 @@ class Line_AC:
         Line_AC.names.remove(self._name)  # Remove the line's name from the set
         
     def get_cable_parameters(self, Cable_type, S_base, Length_km, N_cables,kV_base):
-        from .grid_analysis import Cable_parameters
+        from .grid_analysis import cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
         if Line_AC._cable_database is None:
@@ -1951,7 +1951,7 @@ class Line_AC:
         G_uS = cable_data['G_uS_km'] 
         A_rating = cable_data['A_rating']
       
-        R,X,G,B,MVA_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, Length_km,N_cables)
+        R,X,G,B,MVA_rating = cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, Length_km,N_cables)
         return R, X, G, B, MVA_rating
     
     def __init__(self, fromNode: Node_AC, toNode: Node_AC,r: float= 0.001, x: float=0.001, g: float=0, b: float=0, MVA_rating: float=9999,Length_km:float=1.0,m:float=1, shift:float=0,N_cables=1, name=None,geometry=None,isTf=False,S_base:float=100,Cable_type:str = CableType.CUSTOM):
@@ -2743,7 +2743,7 @@ class Line_DC:
         return 0.0 if cap == 0 else (self.power_MW / cap) * 100.0
 
     def get_cable_parameters(self, Cable_type, S_base, Length_km, N_cables,kV_base):
-        from .grid_analysis import Cable_parameters
+        from .grid_analysis import cable_parameters
         """Get cable parameters from the database."""
         # Ensure database is loaded
         if Line_DC._cable_database is None:
@@ -2763,7 +2763,7 @@ class Line_DC:
         A_rating = cable_data['A_rating']
         km = Length_km
 
-        r, _, _, _, MW_rating = Cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,1)
+        r, _, _, _, MW_rating = cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,1)
         return r, MW_rating
     
     def __init__(self, fromNode: Node_DC, toNode: Node_DC, r: float=0.001, MW_rating: float=9999,km:float=1, polarity=Polarity.MONOPOLAR, name=None,N_cables=1,Cable_type:str=CableType.CUSTOM,S_base:float=100):

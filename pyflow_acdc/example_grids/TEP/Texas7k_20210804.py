@@ -15902,7 +15902,7 @@ def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=1):
 
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
     grid.name = 'Texas7k_20210804'
     
     # Assign Price Zones to Nodes
@@ -16565,7 +16565,7 @@ def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=1):
             for line in list(grid.lines_AC):  # Create a copy of the list
                 name = line.name
                 line_cost = lines_AC.loc[name,'Cost MUSD']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost,update_grid=False)
+                pyf.expand_element(grid,name,N_b=N_b,N_i=N_i,N_max=N_max,base_cost=line_cost,update_grid=False)
         else:
             for line in list(grid.lines_AC):  
                 name = line.name
@@ -16575,7 +16575,7 @@ def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=1):
                 N_i_value = exp_dict[name]
                 N_i_rounded = int(round(N_i_value))
                 line_cost = lines_AC.loc[name,'Cost MUSD']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b,N_i=N_i_rounded,N_max=N_max,base_cost=line_cost,update_grid=False)
+                pyf.expand_element(grid,name,N_b=N_b,N_i=N_i_rounded,N_max=N_max,base_cost=line_cost,update_grid=False)
 
         grid.Update_Graph_AC()
         grid.create_Ybus_AC()

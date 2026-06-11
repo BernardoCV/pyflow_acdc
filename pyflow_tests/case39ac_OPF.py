@@ -4,9 +4,9 @@ def case39ac_OPF():
 
     grid,res = pyf.cases['case39']()
     obj = {'Energy_cost': 1}
-    pyf.Optimal_PF(grid,ObjRule=obj)
+    pyf.optimal_pf(grid,ObjRule=obj)
 
-    res.All()
+    res.all()
 
 
 def run_test():

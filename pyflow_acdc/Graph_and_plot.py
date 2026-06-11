@@ -33,8 +33,8 @@ def _loading_colormap(value, vmin=0, vmax=100):
     return mcolors.to_hex(rgba)
 
 
-__all__ = ['plot_Graph',
-           'Time_series_prob',
+__all__ = ['plot_graph',
+           'time_series_prob',
            'plot_neighbour_graph',
            'plot_TS_res',
            'plot_model_feasibility',
@@ -622,10 +622,10 @@ def plot_neighbour_graph(grid,node=None,node_name=None,base_node_size=10, proxim
     if node is None: 
         print('Node name provided not found')
         return
-    plot_Graph(grid,base_node_size=base_node_size,G=Gn)
+    plot_graph(grid,base_node_size=base_node_size,G=Gn)
 
         
-def plot_Graph(Grid,text='inPu',base_node_size=10,G=None):
+def plot_graph(Grid,text='inPu',base_node_size=10,G=None):
     
     if G is None:
         G = Grid.Graph_toPlot
@@ -992,7 +992,7 @@ def plot_TS_res(grid, start, end, plotting_choices=None,show=True,path=None,save
             plt.close()
         
 
-def Time_series_prob(grid, element_name, save_format=None, path=None):
+def time_series_prob(grid, element_name, save_format=None, path=None):
         
         a = grid.Time_series
         

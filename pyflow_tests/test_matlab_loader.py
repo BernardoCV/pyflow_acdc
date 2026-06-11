@@ -12,7 +12,7 @@ def matlab_loader(output_dir):
 
     data = f'{path}/case39_acdc_var.mat'
 
-    [grid,res]=pyf.Create_grid_from_mat(data)
+    [grid,res]=pyf.create_grid_from_mat(data)
 
     pyf.save_grid_to_file(grid, "case39", folder_name=str(output_dir))
 
@@ -23,9 +23,9 @@ def matlab_loader(output_dir):
     print(nac)
 
         
-    model, model_res,timing_info, solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
+    model, model_res,timing_info, solver_stats = pyf.optimal_pf(grid,ObjRule=obj)
 
-    res.All()
+    res.all()
 
     print(timing_info)
     print(model_res)

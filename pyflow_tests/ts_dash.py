@@ -17,7 +17,7 @@ def ts_dash():
     TS_wl = pd.read_csv(wind_load_url)
     pyf.add_TimeSeries(grid,TS_wl)
 
-    pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)
+    pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)
 
     app = create_dash_app(grid)
     assert app.layout is not None

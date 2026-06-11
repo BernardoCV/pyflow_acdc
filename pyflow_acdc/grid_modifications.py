@@ -39,8 +39,8 @@ from .grid_analysis import (
     cart2pol,
     pol2cartz,
     cartz2pol,
-    Cable_parameters,
-    Converter_parameters,
+    cable_parameters,
+    converter_parameters,
     analyse_grid,
     grid_state,
     current_fuel_type_distribution,
@@ -94,8 +94,8 @@ __all__ = [
     'assign_lineToCable_options',
     
     # Parameter Calculations
-    'Cable_parameters',
-    'Converter_parameters',
+    'cable_parameters',
+    'converter_parameters',
     
     # Utility Functions
     'pol2cart',
@@ -154,7 +154,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         Conductance_pu = g*Z_base
         Susceptance_pu = b*Z_base
     elif data_in== DataInput.REAL and Cable_type == CableType.CUSTOM: 
-       [Resistance_pu, Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating] = Cable_parameters(grid.S_base, R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating, kV_base, Length_km,N_cables=N_cables)
+       [Resistance_pu, Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating] = cable_parameters(grid.S_base, R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating, kV_base, Length_km,N_cables=N_cables)
     else:
         Resistance_pu = r if r!=0 else 0.00001
         Reactance_pu  = x if x!=0  else 0.00001
@@ -347,7 +347,7 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
     elif data_in== DataInput.REAL or R_Ohm_km is not None: 
         if A_rating is None:
             A_rating = MW_rating*1000/kV_base     
-        [Resistance_pu, _, _, _, MW_rating] = Cable_parameters(grid.S_base, R_Ohm_km, 0, 0, 0, A_rating, kV_base, Length_km,N_cables=1)
+        [Resistance_pu, _, _, _, MW_rating] = cable_parameters(grid.S_base, R_Ohm_km, 0, 0, 0, A_rating, kV_base, Length_km,N_cables=1)
     else:
         Resistance_pu = r if r!=0 else 0.00001
       

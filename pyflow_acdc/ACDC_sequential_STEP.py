@@ -337,7 +337,7 @@ def _run_sequential_core(
                 from .Results_class import Results
                 res = Results(grid)
                 res.pyomo_model_results(model, solver_stats=solver_stats, model_results=model_res, print_table=False)
-                res.All(
+                res.all(
                     export_location=export_dir,
                     export_type="excel",
                     file_name=f"{excel_prefix}_{k+1}",

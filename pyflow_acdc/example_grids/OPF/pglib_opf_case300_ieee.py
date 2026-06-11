@@ -762,7 +762,7 @@ def pglib_opf_case300_ieee():
 
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
     grid.name = 'IEEE 300-bus System'
     # Assign Price Zones to Nodes
     for index, row in nodes_AC.iterrows():

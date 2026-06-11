@@ -49,7 +49,7 @@ class Results:
             print(method_name)
     # def export(self):
 
-    def All(self, decimals=None, export_location=None, export_type=None,print_table=True, file_name=None,opt_exit=True):
+    def all(self, decimals=None, export_location=None, export_type=None,print_table=True, file_name=None,opt_exit=True):
         # Allow overriding configuration for this run
         if decimals is not None:
             self.dec = decimals
@@ -85,67 +85,67 @@ class Results:
                 if not solution_found:
                     return
         if self.Grid.Clustering_information != {}:
-            self.Clustering_results(print_table=print_table)
+            self.clustering_results(print_table=print_table)
         if self.Grid.nodes_AC != []:
-            self.AC_Powerflow(print_table=print_table)
-            self.AC_voltage(print_table=print_table)
-            self.AC_lines_current(print_table=print_table)
-            self.AC_lines_power(print_table=print_table)
+            self.ac_powerflow(print_table=print_table)
+            self.ac_voltage(print_table=print_table)
+            self.ac_lines_current(print_table=print_table)
+            self.ac_lines_power(print_table=print_table)
         
         if self.Grid.nodes_DC != []:
             if self.Grid.nconv != 0:
-                self.Converter(print_table=print_table)
-            self.DC_bus(print_table=print_table)
-            self.DC_lines_current(print_table=print_table)
-            self.DC_lines_power(print_table=print_table)
+                self.converter(print_table=print_table)
+            self.dc_bus(print_table=print_table)
+            self.dc_lines_current(print_table=print_table)
+            self.dc_lines_power(print_table=print_table)
             
 
             if self.Grid.Converters_DCDC != []:
-                self.DC_converter(print_table=print_table)
+                self.dc_converter(print_table=print_table)
         
         if self.Grid.nodes_AC != [] and self.Grid.nodes_DC != []:
-            self.Slack_All(print_table=print_table)
+            self.slack_all(print_table=print_table)
             
         elif self.Grid.nodes_AC != []:
-            self.Slack_AC(print_table=print_table)
+            self.slack_ac(print_table=print_table)
 
-        self.Power_loss(print_table=print_table)
+        self.power_loss(print_table=print_table)
         if self.Grid.OPF_run :
             if self.Grid.Generators != [] or self.Grid.Generators_DC != []:
-                self.Ext_gen(print_table=print_table)
+                self.ext_gen(print_table=print_table)
             if self.Grid.RenSources:
-                self.Ext_REN(print_table=print_table)
+                self.ext_ren(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
-                self.OBJ_res(print_table=print_table)
+                self.obj_res(print_table=print_table)
             if self.Grid.Price_Zones != []: 
-                self.Price_Zone(print_table=print_table)    
+                self.price_zone(print_table=print_table)    
         if self.Grid.lines_AC_exp+self.Grid.lines_AC_rec+self.Grid.lines_AC_ct != []:
-            self.AC_exp_lines_power(print_table=print_table)
+            self.ac_exp_lines_power(print_table=print_table)
         if self.Grid.TEP_run:    
-            self.TEP_N(print_table=print_table)
+            self.tep_n(print_table=print_table)
             if self.Grid.TEP_multiScenario_res is not None:
-                self.TEP_TS_norm(print_table=print_table)
-                self.TEP_multiScenario_res(print_table=print_table)
+                self.tep_ts_norm(print_table=print_table)
+                self.tep_multi_scenario_res(print_table=print_table)
                 s=1
             else:
-                self.TEP_norm(print_table=print_table)
+                self.tep_norm(print_table=print_table)
         if self.Grid.MP_TEP_run:
-            self.MP_TEP_results(print_table=print_table)
-            self.MP_TEP_obj_res(print_table=print_table)
-            self.MP_TEP_fuel_type_distribution(print_table=print_table)
+            self.mp_tep_results(print_table=print_table)
+            self.mp_tep_obj_res(print_table=print_table)
+            self.mp_tep_fuel_type_distribution(print_table=print_table)
         if self.Grid.MP_MS_TEP_run:
-            self.MP_TEP_results(print_table=print_table)
-            self.MP_MS_TEP_results(print_table=print_table)
-            self.MP_MS_TEP_obj_res(print_table=print_table)
-            self.MP_TEP_fuel_type_distribution(print_table=print_table)
+            self.mp_tep_results(print_table=print_table)
+            self.mp_ms_tep_results(print_table=print_table)
+            self.mp_ms_tep_obj_res(print_table=print_table)
+            self.mp_tep_fuel_type_distribution(print_table=print_table)
         if getattr(self.Grid, "Seq_STEP_run", False):
-            self.Seq_STEP_results(print_table=print_table)
-            self.Seq_STEP_obj_res(print_table=print_table)
-            self.Seq_STEP_fuel_type_distribution(print_table=print_table)
+            self.seq_step_results(print_table=print_table)
+            self.seq_step_obj_res(print_table=print_table)
+            self.seq_step_fuel_type_distribution(print_table=print_table)
         if getattr(self.Grid, "Seq_MS_STEP_run", False):
-            self.Seq_MS_STEP_results(print_table=print_table)
-            self.Seq_MS_STEP_obj_res(print_table=print_table)
-            self.Seq_MS_STEP_fuel_type_distribution(print_table=print_table)
+            self.seq_ms_step_results(print_table=print_table)
+            self.seq_ms_step_obj_res(print_table=print_table)
+            self.seq_ms_step_fuel_type_distribution(print_table=print_table)
         # Final separator for All() run
         print('------')
 
@@ -161,27 +161,27 @@ class Results:
                     sheet_name = name[:31]
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    def All_AC(self, print_table=True):
-        self.AC_Powerflow(print_table=print_table)
-        self.AC_voltage(print_table=print_table)
-        self.AC_lines_current(print_table=print_table)
-        self.AC_lines_power(print_table=print_table)
-        self.Slack_AC(print_table=print_table)
-        self.Power_loss_AC(print_table=print_table)
+    def all_ac(self, print_table=True):
+        self.ac_powerflow(print_table=print_table)
+        self.ac_voltage(print_table=print_table)
+        self.ac_lines_current(print_table=print_table)
+        self.ac_lines_power(print_table=print_table)
+        self.slack_ac(print_table=print_table)
+        self.power_loss_ac(print_table=print_table)
 
-    def All_DC(self, print_table=True):
+    def all_dc(self, print_table=True):
 
         if self.Grid.nconv != 0:
-            self.Converter(print_table=print_table)
+            self.converter(print_table=print_table)
 
-        self.DC_bus(print_table=print_table)
+        self.dc_bus(print_table=print_table)
 
-        self.DC_lines_current(print_table=print_table)
-        self.DC_lines_power(print_table=print_table)
-        self.Slack_DC(print_table=print_table)
-        self.Power_loss_DC(print_table=print_table)
+        self.dc_lines_current(print_table=print_table)
+        self.dc_lines_power(print_table=print_table)
+        self.slack_dc(print_table=print_table)
+        self.power_loss_dc(print_table=print_table)
 
-    def Slack_All(self, print_table=True):
+    def slack_all(self, print_table=True):
         rows = []
         for i in range(self.Grid.Num_Grids_AC):
             for node in self.Grid.Grids_AC[i]:
@@ -206,7 +206,7 @@ class Results:
 
         return df
 
-    def Slack_AC(self, print_table=True):
+    def slack_ac(self, print_table=True):
         rows = []
         for i in range(self.Grid.Num_Grids_AC):
             for node in self.Grid.Grids_AC[i]:
@@ -227,7 +227,7 @@ class Results:
 
         return df
 
-    def Slack_DC(self, print_table=True):
+    def slack_dc(self, print_table=True):
         rows = []
         for i in range(self.Grid.Num_Grids_DC):
             for node in self.Grid.Grids_DC[i]:
@@ -252,7 +252,7 @@ class Results:
         return df
 
 
-    def Power_loss(self, print_table=True):
+    def power_loss(self, print_table=True):
         rows = []
         generation=0 
         grid_loads = 0
@@ -464,7 +464,7 @@ class Results:
 
         return df
 
-    def Power_loss_AC(self, print_table=True):
+    def power_loss_ac(self, print_table=True):
         rows = []
         self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
         for line in self.Grid.lines_AC:
@@ -501,7 +501,7 @@ class Results:
 
         return df
 
-    def Power_loss_DC(self, print_table=True):
+    def power_loss_dc(self, print_table=True):
         rows = []
 
         self.lossP_DC = np.zeros(self.Grid.Num_Grids_DC)
@@ -541,7 +541,7 @@ class Results:
 
         return df
 
-    def DC_bus(self, print_table=True):
+    def dc_bus(self, print_table=True):
 
         if self.Grid.OPF_run:
             P_DC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
@@ -616,7 +616,7 @@ class Results:
 
         return df_all
 
-    def AC_Powerflow(self, Grid=None, print_table=True):
+    def ac_powerflow(self, Grid=None, print_table=True):
         # Build combined DataFrame for all AC nodes
         rows = []
 
@@ -752,7 +752,7 @@ class Results:
 
         return df_all
 
-    def AC_voltage(self, print_table=True):
+    def ac_voltage(self, print_table=True):
         rows = []
 
         for g in range(self.Grid.Num_Grids_AC):
@@ -796,7 +796,7 @@ class Results:
 
         return df_all
 
-    def AC_lines_current(self, print_table=True):
+    def ac_lines_current(self, print_table=True):
         rows = []
 
         for g in range(self.Grid.Num_Grids_AC):
@@ -864,7 +864,7 @@ class Results:
 
         return df_all
 
-    def AC_exp_lines_power(self, print_table=True):
+    def ac_exp_lines_power(self, print_table=True):
 
         rows = []
 
@@ -1007,7 +1007,7 @@ class Results:
         return df_all
 
 
-    def AC_lines_power(self, Grid=None, print_table=True):
+    def ac_lines_power(self, Grid=None, print_table=True):
         
         rows = []
         base = self.Grid.S_base
@@ -1082,7 +1082,7 @@ class Results:
             df_all.to_csv(csv_filename, index=False)
 
         return df_all
-    def Ext_gen(self, print_table=True):
+    def ext_gen(self, print_table=True):
         rows = []
         Ptot=0
         Qtot=0
@@ -1209,7 +1209,7 @@ class Results:
     
         return df
     
-    def Ext_REN(self, print_table=True):
+    def ext_ren(self, print_table=True):
         rows = []
         bp=0
         tcur=0
@@ -1306,14 +1306,14 @@ class Results:
             print(table)
 
         return df
-    def Clustering_results(self, print_table=True):
-        self.Clustering_Time_series_statistics()
+    def clustering_results(self, print_table=True):
+        self.clustering_time_series_statistics()
         for key in self.Grid.Clustering_information:
             if key.startswith('technique_'):
-                self.Clustering_technique(key, print_table)
-        self.Cluster_representatives(print_table=print_table)
+                self.clustering_technique(key, print_table)
+        self.cluster_representatives(print_table=print_table)
 
-    def Cluster_representatives(self, print_table=True):
+    def cluster_representatives(self, print_table=True):
         """
         Display cluster representatives (centroids/medoids) for each clustering run.
         Each row is a cluster, columns are the time series features plus Weight and Count.
@@ -1355,7 +1355,7 @@ class Results:
             return list(all_dfs.values())[0]
         return all_dfs
                 
-    def Clustering_technique(self, key, print_table=True):
+    def clustering_technique(self, key, print_table=True):
         """
         Display clustering results for a specific technique.
         
@@ -1437,7 +1437,7 @@ class Results:
         
         return clustering_result
 
-    def Clustering_Time_series_statistics(self, print_table=True):
+    def clustering_time_series_statistics(self, print_table=True):
         """
         Display time series statistics (Mean, Std, Var, CV) from clustering analysis.
         
@@ -1503,7 +1503,7 @@ class Results:
         
         return df
     
-    def TEP_multiScenario_res(self, print_table=True):
+    def tep_multi_scenario_res(self, print_table=True):
         if self.Grid.TEP_multiScenario_res is None:
             return None
         
@@ -1635,7 +1635,7 @@ class Results:
             "price": price,
         }
 
-    def TEP_N(self, print_table=True):
+    def tep_n(self, print_table=True):
         rows = []
         tot=0
         
@@ -1764,7 +1764,7 @@ class Results:
 
         return df
 
-    def TEP_norm(self, print_table=True):
+    def tep_norm(self, print_table=True):
         weights = self.Grid.OPF_obj
 
         # Keep raw numeric values in the DataFrame; formatting is only for PrettyTable printing
@@ -1795,7 +1795,7 @@ class Results:
         return df
 
 
-    def OBJ_res(self, print_table=True):
+    def obj_res(self, print_table=True):
         weights = self.Grid.OPF_obj
 
         # Raw numeric values in DataFrame
@@ -1822,7 +1822,7 @@ class Results:
 
         return df
         
-    def TEP_TS_norm(self, print_table=True):
+    def tep_ts_norm(self, print_table=True):
         if not self.Grid.OPF_obj['PZ_cost_of_generation']['w'] > 0:
             return None
         tot = 0
@@ -1940,7 +1940,7 @@ class Results:
             "NPV": df_npv,
         }
 
-    def MP_TEP_results(self, print_table=True):
+    def mp_tep_results(self, print_table=True):
         # Check if the attribute exists and is a DataFrame
         if hasattr(self.Grid, "MP_TEP_results") and isinstance(self.Grid.MP_TEP_results, pd.DataFrame):
             df = self.Grid.MP_TEP_results
@@ -2123,7 +2123,7 @@ class Results:
                     ignore_index=True
                 )
 
-    def MP_MS_TEP_results(self, print_table=True):
+    def mp_ms_tep_results(self, print_table=True):
         data = self.Grid.MP_MS_TEP_results
 
         period_results = data['period_results']
@@ -2161,7 +2161,7 @@ class Results:
 
         return data
 
-    def MP_TEP_obj_res(self, print_table=True):
+    def mp_tep_obj_res(self, print_table=True):
         df = self.Grid.MP_TEP_obj_res
         self.tables["MP_TEP_obj_res"] = df
 
@@ -2217,7 +2217,7 @@ class Results:
 
         return df
 
-    def MP_MS_TEP_obj_res(self, print_table=True):
+    def mp_ms_tep_obj_res(self, print_table=True):
         df = getattr(self.Grid, "MP_MS_TEP_obj_res", None)
         if df is None:
             if print_table:
@@ -2281,7 +2281,7 @@ class Results:
             print('')
         return df
 
-    def MP_TEP_fuel_type_distribution(self, print_table=True):
+    def mp_tep_fuel_type_distribution(self, print_table=True):
         dist = getattr(self.Grid, "MP_TEP_fuel_type_distribution", None)
 
         if not isinstance(dist, dict):
@@ -2437,7 +2437,7 @@ class Results:
 
         return out
 
-    def Seq_STEP_results(self, print_table=True):
+    def seq_step_results(self, print_table=True):
         df = getattr(self.Grid, "Seq_STEP_results", None)
         if df is None:
             if print_table:
@@ -2446,13 +2446,13 @@ class Results:
         return self._render_seq_step_with_mp_renderer(
             seq_attr="Seq_STEP_results",
             mp_attr="MP_TEP_results",
-            mp_method=self.MP_TEP_results,
+            mp_method=self.mp_tep_results,
             mp_table_prefix="MP_TEP_results",
             seq_table_prefix="Seq_STEP_results",
             print_table=print_table,
         )
 
-    def Seq_STEP_obj_res(self, print_table=True):
+    def seq_step_obj_res(self, print_table=True):
         df = getattr(self.Grid, "Seq_STEP_obj_res", None)
         if df is None:
             if print_table:
@@ -2461,13 +2461,13 @@ class Results:
         return self._render_seq_step_with_mp_renderer(
             seq_attr="Seq_STEP_obj_res",
             mp_attr="MP_TEP_obj_res",
-            mp_method=self.MP_TEP_obj_res,
+            mp_method=self.mp_tep_obj_res,
             mp_table_prefix="MP_TEP_obj_res",
             seq_table_prefix="Seq_STEP_obj_res",
             print_table=print_table,
         )
 
-    def Seq_STEP_fuel_type_distribution(self, print_table=True):
+    def seq_step_fuel_type_distribution(self, print_table=True):
         dist = getattr(self.Grid, "Seq_STEP_fuel_type_distribution", None)
         if dist is None:
             if print_table:
@@ -2476,13 +2476,13 @@ class Results:
         return self._render_seq_step_with_mp_renderer(
             seq_attr="Seq_STEP_fuel_type_distribution",
             mp_attr="MP_TEP_fuel_type_distribution",
-            mp_method=self.MP_TEP_fuel_type_distribution,
+            mp_method=self.mp_tep_fuel_type_distribution,
             mp_table_prefix="MP_TEP_fuel_type_distribution",
             seq_table_prefix="Seq_STEP_fuel_type_distribution",
             print_table=print_table,
         )
 
-    def Seq_MS_STEP_results(self, print_table=True):
+    def seq_ms_step_results(self, print_table=True):
         df = getattr(self.Grid, "Seq_MS_STEP_results", None)
         if df is None:
             if print_table:
@@ -2491,13 +2491,13 @@ class Results:
         return self._render_seq_step_with_mp_renderer(
             seq_attr="Seq_MS_STEP_results",
             mp_attr="MP_TEP_results",
-            mp_method=self.MP_TEP_results,
+            mp_method=self.mp_tep_results,
             mp_table_prefix="MP_TEP_results",
             seq_table_prefix="Seq_MS_STEP_results",
             print_table=print_table,
         )
 
-    def Seq_MS_STEP_obj_res(self, print_table=True):
+    def seq_ms_step_obj_res(self, print_table=True):
         df = getattr(self.Grid, "Seq_MS_STEP_obj_res", None)
         if df is None:
             if print_table:
@@ -2506,13 +2506,13 @@ class Results:
         return self._render_seq_step_with_mp_renderer(
             seq_attr="Seq_MS_STEP_obj_res",
             mp_attr="MP_TEP_obj_res",
-            mp_method=self.MP_TEP_obj_res,
+            mp_method=self.mp_tep_obj_res,
             mp_table_prefix="MP_TEP_obj_res",
             seq_table_prefix="Seq_MS_STEP_obj_res",
             print_table=print_table,
         )
 
-    def Seq_MS_STEP_fuel_type_distribution(self, print_table=True):
+    def seq_ms_step_fuel_type_distribution(self, print_table=True):
         dist = getattr(self.Grid, "Seq_MS_STEP_fuel_type_distribution", None)
         if dist is None:
             if print_table:
@@ -2521,13 +2521,13 @@ class Results:
         return self._render_seq_step_with_mp_renderer(
             seq_attr="Seq_MS_STEP_fuel_type_distribution",
             mp_attr="MP_TEP_fuel_type_distribution",
-            mp_method=self.MP_TEP_fuel_type_distribution,
+            mp_method=self.mp_tep_fuel_type_distribution,
             mp_table_prefix="MP_TEP_fuel_type_distribution",
             seq_table_prefix="Seq_MS_STEP_fuel_type_distribution",
             print_table=print_table,
         )
 
-    def Price_Zone(self, print_table=True):
+    def price_zone(self, print_table=True):
         rows = []
         
         tot_sc=0
@@ -2679,7 +2679,7 @@ class Results:
             print(table2)
             
         return df
-    def DC_lines_current(self, print_table=True):
+    def dc_lines_current(self, print_table=True):
         
         rows = []
         base = self.Grid.S_base
@@ -2757,7 +2757,7 @@ class Results:
                 
         return df_all
 
-    def DC_lines_power(self, print_table=True):
+    def dc_lines_power(self, print_table=True):
         
         rows = []
         base = self.Grid.S_base
@@ -2817,7 +2817,7 @@ class Results:
 
         return df_all
 
-    def DC_converter(self, print_table=True):
+    def dc_converter(self, print_table=True):
         rows = []
         base = self.Grid.S_base
 
@@ -2858,7 +2858,7 @@ class Results:
 
         return df
 
-    def Converter(self, print_table=True):
+    def converter(self, print_table=True):
         rows_main = []
         rows_cap = []
         base = self.Grid.S_base

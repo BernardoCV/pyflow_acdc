@@ -279,7 +279,7 @@ def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1,k
     Converters_ACDC['Cost MEUR'] = Converters_ACDC['Cost MEUR'] * kappa
     
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in = 'pu')
     grid.name = 'case39_acdc'
 
     
@@ -312,24 +312,24 @@ def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1,k
             for line in list(grid.lines_AC):  # Create a copy of the list
                 name = line.name
                 line_cost = lines_AC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b_ac,N_i=N_i,N_max=N_max,base_cost=line_cost)
+                pyf.expand_element(grid,name,N_b=N_b_ac,N_i=N_i,N_max=N_max,base_cost=line_cost)
             for line in list(grid.lines_DC):  # Create a copy of the list
                 name = line.name
                 line_cost = lines_DC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=line_cost)
+                pyf.expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=line_cost)
             for conv in list(grid.Converters_ACDC):  # Create a copy of the list
                 name = conv.name
                 conv_cost =  (Converters_ACDC.loc[name,'Cost MEUR']*10**6)
-                pyf.Expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
+                pyf.expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
         elif exp == 'DC':
             for line in list(grid.lines_DC):  # Create a copy of the list
                 name = line.name
                 line_cost = lines_DC.loc[name,'Cost MEUR']*10**6
-                pyf.Expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=line_cost)
+                pyf.expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=line_cost)
             for conv in list(grid.Converters_ACDC):  # Create a copy of the list
                 name = conv.name
                 conv_cost = (Converters_ACDC.loc[name,'Cost MEUR']*10**6)/2
-                pyf.Expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
+                pyf.expand_element(grid,name,N_b=N_b_dc,N_i=N_i,N_max=N_max,base_cost=conv_cost)    
                 
                 
 

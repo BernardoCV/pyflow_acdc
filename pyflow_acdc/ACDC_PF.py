@@ -11,24 +11,24 @@ from .grid_analysis import analyse_grid, pol2cartz, cartz2pol
 from .constants import DEFAULT_TOLERANCE, PF_OUTER_TOLERANCE, PF_INNER_TOLERANCE, CONV_TOLERANCE, DEFAULT_PF_MAX_ITER, DEFAULT_CONV_MAX_ITER, NodeType, ConverterDCType, PowerLossModel
 
 __all__ = [
-    'AC_PowerFlow',
-    'DC_PowerFlow',
-    'ACDC_sequential',
-    'Power_flow'
+    'ac_power_flow',
+    'dc_power_flow',
+    'acdc_sequential',
+    'power_flow'
 ]
 
-def Power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
-        t,tol,_=ACDC_sequential(grid,tol_lim, maxIter)
+        t,tol,_=acdc_sequential(grid,tol_lim, maxIter)
     elif grid.ACmode:
-        t,tol=AC_PowerFlow(grid,tol_lim, maxIter)
+        t,tol=ac_power_flow(grid,tol_lim, maxIter)
     elif grid.DCmode:
-        t,tol=DC_PowerFlow(grid,tol_lim, maxIter)
+        t,tol=dc_power_flow(grid,tol_lim, maxIter)
     return t,tol
 
 
-def AC_PowerFlow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.Update_PQ_AC()
@@ -41,7 +41,7 @@ def AC_PowerFlow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     time_2 = time.perf_counter()
     return time_2-time_1,ac_tol
     
-def DC_PowerFlow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
+def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.Update_P_DC()
@@ -51,7 +51,7 @@ def DC_PowerFlow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Dr
     time_2 = time.perf_counter()
     return time_2-time_1,dc_tol
 
-def ACDC_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, internal_tol=PF_INNER_TOLERANCE,change_slack2Droop=False, QLimit=False,Droop_PF=True):
+def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, internal_tol=PF_INNER_TOLERANCE,change_slack2Droop=False, QLimit=False,Droop_PF=True):
     time_1 = time.perf_counter()
     tolerance = 1
     grid.reset_run_flags()

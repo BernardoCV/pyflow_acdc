@@ -4,9 +4,9 @@ def case24_3zones_acdc_OPF():
 
     grid,res = pyf.cases['case24_3zones_acdc']()
 
-    pyf.Optimal_PF(grid)
+    pyf.optimal_pf(grid)
 
-    res.All()
+    res.all()
 
 
 def run_test():

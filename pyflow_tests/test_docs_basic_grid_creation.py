@@ -70,10 +70,10 @@ def run_test():
     res = pyf.Results(grid, decimals=3)
     
     # Run power flow as shown in docs
-    time,tol,ps_iterations = pyf.ACDC_sequential(grid)
+    time,tol,ps_iterations = pyf.acdc_sequential(grid)
     
     # Get results as shown in docs
-    res.All()
+    res.all()
     
     print("✓ Basic grid creation test passed")
 

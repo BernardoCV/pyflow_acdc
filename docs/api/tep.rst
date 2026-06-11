@@ -176,11 +176,11 @@ Element Expansion Helpers
 
    Updates expansion-related attributes of a TEP-enabled element.
 
-.. py:function:: Expand_element(grid, name, n_b=None, n_i=None, n_max=None, life_time=None, base_cost=None, per_unit_cost=None, exp=None, update_grid=True, n_inv_max=None, **legacy_kwargs)
+.. py:function:: expand_element(grid, name, n_b=None, n_i=None, n_max=None, life_time=None, base_cost=None, per_unit_cost=None, exp=None, update_grid=True, n_inv_max=None, **legacy_kwargs)
 
    Enables or updates one element for TEP investment modeling.
 
-.. py:function:: Translate_pd_TEP(grid)
+.. py:function:: translate_pd_tep(grid)
 
    Builds pandas summaries from solved TEP model variables.
 

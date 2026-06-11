@@ -33,10 +33,10 @@ def DC_OPF():
     pyf.add_gen_DC(grid,'Node_1',qf=0.002,lf=20,fc=100,MWmax=400,MWmin=100)
     pyf.add_gen_DC(grid,'Node_2',qf=0.005,lf=25,fc=50,MWmax=400,MWmin=100)
 
-    model, model_res , timing_info, solver_stats =pyf.Optimal_PF(grid,ObjRule=obj)
+    model, model_res , timing_info, solver_stats =pyf.optimal_pf(grid,ObjRule=obj)
 
     # model.pprint()
-    res.All()
+    res.all()
 
 
 

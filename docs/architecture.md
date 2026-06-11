@@ -46,7 +46,7 @@ everything else builds on.
 - **`ACDC_PF.py`** — Power flow: `Power_flow`, `AC_PowerFlow`,
   `DC_PowerFlow`, `ACDC_sequential`. Pure numpy/Newton-style solve, no Pyomo.
 - **`ACDC_OPF.py`** — OPF orchestration: `Optimal_PF` / `Optimal_L_PF`,
-  objective assembly (`obj_w_rule`, `OPF_obj`), solve (`pyomo_model_solve`),
+  objective assembly (`obj_w_rule`, `opf_obj`), solve (`pyomo_model_solve`),
   and result translation back onto the `Grid`.
 - **`ACDC_OPF_NL_model.py`** — Builds the non-linear Pyomo model (full AC/DC
   physics, converters, price zones, optional TEP variables).
