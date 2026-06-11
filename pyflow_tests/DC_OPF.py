@@ -28,7 +28,7 @@ def DC_OPF():
     pyf.add_line_DC(grid,DC_node_2, DC_node_3,R_Ohm_km=r,Length_km=d23,MW_rating=600,polarity='m',update_grid=False)
 
     grid.create_Ybus_DC()
-    grid.Update_Graph_DC()
+    grid.update_graph_dc()
 
     pyf.add_gen_DC(grid,'Node_1',qf=0.002,lf=20,fc=100,MWmax=400,MWmin=100)
     pyf.add_gen_DC(grid,'Node_2',qf=0.005,lf=25,fc=50,MWmax=400,MWmin=100)

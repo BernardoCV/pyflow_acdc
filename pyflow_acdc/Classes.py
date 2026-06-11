@@ -181,12 +181,12 @@ class Grid:
         self.name = 'Grid'
         
         if self.nodes_AC:
-            self.Update_Graph_AC()
-            self.Update_PQ_AC()
+            self.update_graph_ac()
+            self.update_pq_ac()
            
         if self.nodes_DC:
-            self.Update_Graph_DC()
-            self.Update_P_DC()
+            self.update_graph_dc()
+            self.update_p_dc()
         else:
             self.Num_Grids_DC=0
         # #Call Y bus formula to fill matrix
@@ -491,7 +491,7 @@ class Grid:
                 node.type = NodeType.SLACK
         
     
-    def Update_Graph_DC(self):
+    def update_graph_dc(self):
         self.Graph_DC = nx.Graph()
 
         "Checking for un used nodes "
@@ -578,7 +578,7 @@ class Grid:
         s = 1
 
    
-    def Update_Graph_AC(self):
+    def update_graph_ac(self):
         self.Graph_AC = nx.MultiGraph()
         
 
@@ -681,7 +681,7 @@ class Grid:
         return lines[0] if lines else None
 
     
-    def Update_P_DC(self):
+    def update_p_dc(self):
 
         self.P_DC = np.vstack([node.PGi-node.PLi
                                +node.PconvDC
@@ -691,7 +691,7 @@ class Grid:
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
         
         s=1
-    def Update_PQ_AC(self):
+    def update_pq_ac(self):
         for node in self.nodes_AC:
             node.Q_s_fx=sum(self.Converters_ACDC[conv].Q_AC for conv  in node.connected_conv if self.Converters_ACDC[conv].AC_type==NodeType.PQ)
             node.Q_s   = sum(self.Converters_ACDC[conv].Q_AC for conv  in node.connected_conv if self.Converters_ACDC[conv].AC_type!=NodeType.PQ)
@@ -827,7 +827,7 @@ class Grid:
             self.Ybus_DC[m, m] = -self.Ybus_DC[:,m].sum() if self.Ybus_DC[:, m].sum() != 0 else 1.0
             self.Ybus_DC_full[m, m] = -self.Ybus_DC_full[:,m].sum() if self.Ybus_DC_full[:, m].sum() != 0 else 1.0
 
-    def Check_SlacknDroop(self, change_slack2Droop):
+    def check_slack_n_droop(self, change_slack2Droop):
         for conv in self.Converters_ACDC:
             if conv.type == ConverterDCType.SLACK:
 
@@ -854,7 +854,7 @@ class Grid:
                 conv.P_DC = P_syst
                 DC_node.Pconv = P_syst
 
-                self.Update_P_DC()
+                self.update_p_dc()
 
             elif conv.type == ConverterDCType.DROOP:
 
@@ -877,11 +877,11 @@ class Grid:
                         conv.type = ConverterDCType.SLACK
                         DC_node.type = ConverterDCType.SLACK
                         print(f"Changing converter {conv.name} to Slack")
-                self.Update_P_DC()
+                self.update_p_dc()
 
     
 
-    def Line_AC_calc(self):
+    def line_ac_calc(self):
         V_cart = self._initialize_voltage_cartesian()
         
         self.I_AC_cart = np.matmul(self.Ybus_AC, V_cart)
@@ -892,7 +892,7 @@ class Grid:
         for line in self.lines_AC:
             self._calculate_line_power_flow(line, V_cart)
 
-    def Line_AC_calc_exp(self):
+    def line_ac_calc_exp(self):
         """
         Calculate power flow and losses for expansion AC lines, reconductored lines, 
         and configurable transmission lines.
@@ -990,7 +990,7 @@ class Grid:
         line.i_from, _ = cartz2pol(i_from)
         line.i_to, _ = cartz2pol(i_to)
 
-    def Line_DC_calc(self):
+    def line_dc_calc(self):
         V = self.V_DC
         Ybus = self.Ybus_DC
         

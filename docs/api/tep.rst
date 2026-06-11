@@ -190,7 +190,7 @@ Element Expansion Helpers
 Transmission Expansion Planning objectives
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: TEP_obj(model,grid,NPV)
+.. py:function:: tep_obj(model,grid,NPV)
 
    Returns the objective function for the transmission expansion planning based on [1]_:
 

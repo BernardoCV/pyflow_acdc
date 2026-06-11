@@ -18,9 +18,9 @@ try:
 except ImportError:
     ORTOOLS_AVAILABLE = False
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
-from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
+from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables
+from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
+from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
@@ -261,7 +261,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
         
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
-        # Compute cable cost matching TEP_obj Array_investments()
+        # Compute cable cost matching tep_obj Array_investments()
         
                
         pv_factor = present_value_factor(Hy, discount_rate, n_years)
@@ -433,9 +433,9 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
     grid.Cable_options[0].active_config = [1 if k in used_types else 0 for k in range(len(og_cable_types))]
 
     if NL == CssMode.OPF:
-        ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
+        export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ, TEP=True)
     else:
-        ExportACDC_Lmodel_toPyflowACDC(model, grid, solver_results=model_results, tee=tee)
+        export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=model_results, tee=tee)
 
 
     present_value = present_value_factor(Hy, discount_rate, n_years)

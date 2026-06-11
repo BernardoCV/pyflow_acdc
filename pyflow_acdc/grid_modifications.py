@@ -166,12 +166,12 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         line = TF_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,m, shift, name)
         grid.lines_AC_tf.append(line)
         if update_grid:
-            grid.Update_Graph_AC()
+            grid.update_graph_ac()
     elif Expandable:
         line = Exp_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating,Length_km,m, shift,N_cables, name,S_base=grid.S_base,Cable_type=Cable_type)
         grid.lines_AC_exp.append(line)
         if update_grid:
-            grid.Update_Graph_AC()
+            grid.update_graph_ac()
         
     else:    
         line = Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating,Length_km,m, shift,N_cables, name,S_base=grid.S_base,Cable_type=Cable_type)
@@ -179,7 +179,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
         grid.lines_AC.append(line)
         if update_grid: 
             grid.create_Ybus_AC()
-            grid.Update_Graph_AC()
+            grid.update_graph_ac()
         
     if geometry is not None:
        if isinstance(geometry, str): 
@@ -218,7 +218,7 @@ def change_line_AC_to_expandable(grid, line_name,update_grid=True):
         expandable_line = Exp_Line_AC(**line_vars)
         grid.lines_AC_exp.append(expandable_line)
         if update_grid:
-            grid.Update_Graph_AC()
+            grid.update_graph_ac()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
@@ -263,7 +263,7 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
         rec_line = rec_Line_AC(r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,**line_vars)
         grid.lines_AC_rec.append(rec_line)
         if update_grid:
-            grid.Update_Graph_AC()
+            grid.update_graph_ac()
 
     # Reassign line numbers to ensure continuity
     for i, line in enumerate(grid.lines_AC):
@@ -326,7 +326,7 @@ def add_line_sizing(grid, fromNode, toNode,cable_types=None, active_config: int 
         assign_lineToCable_options(grid,line.name,cable_option)
     if update_grid:
         grid.create_Ybus_AC()
-        grid.Update_Graph_AC() 
+        grid.update_graph_ac() 
     if geometry is not None:
        if isinstance(geometry, str): 
             geometry = loads(geometry)  
@@ -367,7 +367,7 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
        line.geometry = geometry
     if update_grid:
         grid.create_Ybus_DC()
-        grid.Update_Graph_DC()
+        grid.update_graph_dc()
     return line
 
 def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Arm_R=None,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):

@@ -144,6 +144,22 @@ _RESULTS_METHOD_ALIASES = {
 for _old, _new in _RESULTS_METHOD_ALIASES.items():
     _register_method(Results, _old, _new)
 
+# --- Grid class methods (snake_case is canonical) -------------------------
+from .Classes import Grid
+
+_GRID_METHOD_ALIASES = {
+    'Update_Graph_AC': 'update_graph_ac',
+    'Update_Graph_DC': 'update_graph_dc',
+    'Update_PQ_AC': 'update_pq_ac',
+    'Update_P_DC': 'update_p_dc',
+    'Line_AC_calc': 'line_ac_calc',
+    'Line_AC_calc_exp': 'line_ac_calc_exp',
+    'Line_DC_calc': 'line_dc_calc',
+    'Check_SlacknDroop': 'check_slack_n_droop',
+}
+for _old, _new in _GRID_METHOD_ALIASES.items():
+    _register_method(Grid, _old, _new)
+
 # --- OPF (requires pyomo) -------------------------------------------------
 try:
     from .ACDC_OPF import (

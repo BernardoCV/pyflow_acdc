@@ -196,7 +196,7 @@ DEFAULT_TOLERANCE = 1e-10
 """ ACDC_PF (ACDC_sequential outer loop), ACDC_OPF """
 PF_OUTER_TOLERANCE = 1e-4
 
-""" ACDC_PF (load_flow_DC, load_flow_AC, ACDC_sequential internal_tol),
+""" ACDC_PF (load_flow_dc, load_flow_ac, acdc_sequential internal_tol),
     ACDC_MultiPeriod_TEP """
 PF_INNER_TOLERANCE = 1e-8
 

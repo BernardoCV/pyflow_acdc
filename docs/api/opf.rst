@@ -78,7 +78,7 @@ Creating the OPF model
 ^^^^^^^^^^^^^^^^^^^^^^
 
 
-.. function:: OPF_create_NLModel_ACDC(model, grid, PV_set, Price_Zones, TEP=False, limit_flow_rate=True)
+.. function:: opf_create_nl_model_acdc(model, grid, PV_set, Price_Zones, TEP=False, limit_flow_rate=True)
 
    Creates the OPF model.
 
@@ -141,8 +141,8 @@ Creating the OPF model
 
    .. code-block:: python
 
-      from pyflow_acdc.ACDC_OPF_NL_model import OPF_create_NLModel_ACDC
-      model = OPF_create_NLModel_ACDC(model, grid, PV_set=False, Price_Zones=False)
+      from pyflow_acdc.ACDC_OPF_NL_model import opf_create_nl_model_acdc
+      model = opf_create_nl_model_acdc(model, grid, PV_set=False, Price_Zones=False)
 
 .. _obj_functions:
 

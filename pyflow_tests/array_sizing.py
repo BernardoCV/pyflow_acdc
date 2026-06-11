@@ -112,7 +112,7 @@ def array_sizing(combinations):
         
 
         grid.create_Ybus_AC()
-        grid.Update_Graph_AC()
+        grid.update_graph_ac()
 
 
         # pyf.AC_PowerFlow(grid)

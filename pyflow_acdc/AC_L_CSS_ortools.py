@@ -48,7 +48,7 @@ def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YE
         raise RuntimeError("Could not create CBC solver via OR-Tools")
 
     t1 = time.perf_counter()
-    gen_vars, ac_vars = OPF_create_LModel_AC_ortools(solver, grid)
+    gen_vars, ac_vars = opf_create_l_model_ac_ortools(solver, grid)
     t2 = time.perf_counter()
     t_modelcreate = t2 - t1
 
@@ -66,7 +66,7 @@ def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YE
     t4 = time.perf_counter()
 
     # Export results to grid
-    ExportACDC_Lmodel_toPyflowACDC_ortools(solver, grid, gen_vars, ac_vars,
+    export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
                                             tee=tee)
 
     if OPEX:
@@ -150,7 +150,7 @@ def solve_ortools_model(solver, grid, tee=False):
 
 # ── Model creation ──────────────────────────────────────────────────────────
 
-def OPF_create_LModel_AC_ortools(solver, grid):
+def opf_create_l_model_ac_ortools(solver, grid):
     """Build the linear AC OPF model inside *solver*."""
     from .ACDC_OPF import translate_pyf_opf
 
@@ -584,7 +584,7 @@ def set_objective_ortools(solver, grid, gen_vars, ac_vars, OPEX=True,
 
 # ── Export results back to grid ─────────────────────────────────────────────
 
-def ExportACDC_Lmodel_toPyflowACDC_ortools(solver, grid, gen_vars, ac_vars,
+def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
                                              tee=True):
     """Write solver results into the pyflow_acdc grid object.
 

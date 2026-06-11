@@ -14,9 +14,9 @@ from concurrent.futures import ThreadPoolExecutor
 from .grid_analysis import analyse_grid
 from .constants import HOURS_PER_YEAR, CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, TSType, TS_RENEWABLE_TYPES
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC, TEP_variables
-from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
+from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
+from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
+from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
 
 from .Graph_and_plot import save_network_svg
 
@@ -211,7 +211,7 @@ def expand_elements_from_pd(grid,exp_elements):
             planned_installation=planned_installation,
             allow_planned_decrease=parse_optional_bool(get_column_value(row, 'allow_planned_decrease')),
         )
-    grid.Update_Graph_AC()
+    grid.update_graph_ac()
     grid.create_Ybus_AC() 
 
 
@@ -275,7 +275,7 @@ def repurpose_element_from_pd(grid,rec_elements):
         False
             
     ))
-    grid.Update_Graph_AC()
+    grid.update_graph_ac()
     grid.create_Ybus_AC()    
 
 
@@ -946,7 +946,7 @@ def _prepare_TEP_model(
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC AC/DC hybrid OPF"
 
-    OPF_create_NLModel_ACDC(model,grid,PV_set=PV_set,Price_Zones=PZ,TEP=True)
+    opf_create_nl_model_acdc(model,grid,PV_set=PV_set,Price_Zones=PZ,TEP=True)
     _TEP_install_variables(model, grid, initiate_max=initiate_max)
     _TEP_install_constraints(model, grid)
 
@@ -955,7 +955,7 @@ def _prepare_TEP_model(
         GEN_balance_constraints(model, grid)
     
 
-    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_TEP = tep_obj(model,grid,NPV)
     obj_OPF = opf_obj(model,grid,weights_def,True)
     
 
@@ -1075,7 +1075,7 @@ def transmission_expansion(
             grid.create_Ybus_AC()
         if grid.DCmode:
             grid.create_Ybus_DC()   
-        ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ,TEP=True)
+        export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ,TEP=True)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
@@ -1107,10 +1107,10 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
-    OPF_create_LModel_AC(model,grid,TEP=True)
+    opf_create_l_model_ac(model,grid,TEP=True)
     
 
-    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_TEP = tep_obj(model,grid,NPV)
     obj_OPF = opf_obj_l(model,grid,weights_def)
     
     present_value = present_value_factor(Hy, discount_rate, n_years)
@@ -1138,7 +1138,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
     
     t1 = time.perf_counter()
     if export:
-        ExportACDC_Lmodel_toPyflowACDC(model, grid, solver_results=model_results, tee=tee)
+        export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=model_results, tee=tee)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
@@ -1504,7 +1504,7 @@ def create_scenarios(
     w={}
 
     base_model = pyo.ConcreteModel()
-    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True,limit_flow_rate=limit_flow_rate)
+    opf_create_nl_model_acdc(base_model,grid,PV_set=False,Price_Zones=Price_Zones,TEP=True,limit_flow_rate=limit_flow_rate)
 
     for t in model.scenario_frames:
         if t == 1:
@@ -1517,7 +1517,7 @@ def create_scenarios(
         
         _modify_parameters(grid,model.scenario_model[t],Price_Zones)
         
-        TEP_subObj(model.scenario_model[t],grid,weights_def)
+        tep_sub_obj(model.scenario_model[t],grid,weights_def)
         if clustering:
             w[t]= float(grid.Clusters[n_clusters]['Weight'][t-1])
 
@@ -1537,7 +1537,7 @@ def create_scenarios(
 
     
     model.weights = pyo.Param(model.scenario_frames, initialize=w)
-    obj_TEP = TEP_obj(model,grid,NPV)
+    obj_TEP = tep_obj(model,grid,NPV)
     pv = present_value_factor(Hy, discount_rate, n_years) if NPV else Hy
     obj_weighted = weighted_subobj(model, pv)
     
@@ -1620,7 +1620,7 @@ def multi_scenario_TEP(
     model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback,solver_options=solver_options,nlp_warmstart=nlp_warmstart)
     
     t1 = time.perf_counter()
-    TEP_multiScenario_res = ExportACDC_TEP_MS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones)   
+    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zones)   
     
     TEP_multiScenario_res['OPF_obj'] = weights_def
     
@@ -1642,7 +1642,7 @@ def multi_scenario_TEP(
     return model, model_results , timing_info, solver_stats , TEP_multiScenario_res
 
 
-def TEP_subObj(scenario_model,grid,ObjRule):
+def tep_sub_obj(scenario_model,grid,ObjRule):
     OnlyGen=True
 
     obj_rule= opf_obj(scenario_model,grid,ObjRule,OnlyGen)
@@ -1650,7 +1650,7 @@ def TEP_subObj(scenario_model,grid,ObjRule):
     s=1
     
 
-def TEP_obj(model,grid,NPV):
+def tep_obj(model,grid,NPV):
   
     def Gen_investments():
         Gen_Inv=0
@@ -2037,7 +2037,7 @@ def get_gen_data(t, model, grid):
     return row_data_gen,row_data_qgen
 
 
-def ExportACDC_TEP_MS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones,mutate_grid=True,not_transposed=False):
+def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zones,mutate_grid=True,not_transposed=False):
     if mutate_grid:
         grid.V_AC =np.zeros(grid.nn_AC)
         grid.Theta_V_AC=np.zeros(grid.nn_AC)
@@ -2413,9 +2413,9 @@ def ExportACDC_TEP_MS_toPyflowACDC(model,grid,n_clusters,clustering,Price_Zones,
         }
     
     if mutate_grid:
-        grid.Line_AC_calc()
+        grid.line_ac_calc()
         grid.create_Ybus_DC()
-        grid.Line_DC_calc()
+        grid.line_dc_calc()
     
     return TEP_multiScenario_res
 
@@ -2583,6 +2583,6 @@ def calculate_STEP_objective_from_model(model,grid,weights_def,multi_scenario=Fa
     else:
         opf_objs = [calculate_objective_from_model(model,grid,weights_def,True)]
 
-    tep_obj = TEP_obj(model,grid,True)  
-    tep_obj_value = pyo.value(tep_obj)
+    tep_obj_expr = tep_obj(model,grid,True)  
+    tep_obj_value = pyo.value(tep_obj_expr)
     return opf_objs, tep_obj_value

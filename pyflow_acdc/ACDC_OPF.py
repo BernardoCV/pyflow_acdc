@@ -17,8 +17,8 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 import re
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC, ExportACDC_NLmodel_toPyflowACDC
-from .AC_OPF_L_model import OPF_create_LModel_AC, ExportACDC_Lmodel_toPyflowACDC
+from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
+from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
 from .grid_analysis import analyse_grid
 from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights
 
@@ -39,11 +39,11 @@ __all__ = [
     'optimal_l_pf',
     'optimal_pf',
     'pyomo_model_solve',
-    'OPF_updateParam',
+    'opf_update_param',
     'opf_obj',
     'opf_line_res',
     'opf_price_price_zone',
-    'OPF_step_results',
+    'opf_step_results',
     'fx_conv',
     'export_solver_progress_to_excel',
     'reset_to_initialize'
@@ -94,7 +94,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     
     t1 = time.perf_counter()
     
-    OPF_create_LModel_AC(model,grid)
+    opf_create_l_model_ac(model,grid)
     
     t2 = time.perf_counter()  
     t_modelcreate = t2-t1
@@ -118,7 +118,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     model_res,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
-    ExportACDC_Lmodel_toPyflowACDC(model, grid)
+    export_acdc_l_model_to_pyflow_acdc(model, grid)
 
     for obj in weights_def:
         weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
@@ -148,7 +148,7 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     
     t1 = time.perf_counter()
     
-    OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,limit_flow_rate=limit_flow_rate)
+    opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,limit_flow_rate=limit_flow_rate)
     
     t2 = time.perf_counter()  
     t_modelcreate = t2-t1
@@ -178,7 +178,7 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     model_res,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
     
     t1 = time.perf_counter()
-    ExportACDC_NLmodel_toPyflowACDC(model, grid, Price_Zones)
+    export_acdc_nl_model_to_pyflow_acdc(model, grid, Price_Zones)
 
     for obj in weights_def:
         weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
@@ -1334,7 +1334,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
 
 
 
-def OPF_updateParam(model,grid):
+def opf_update_param(model,grid):
  
     for n in grid.nodes_AC:
         model.P_Gain_known_AC[n.nodeNumber] = n.PGi
@@ -1838,7 +1838,7 @@ def opf_price_price_zone (model,grid):
     
     return opt_res_Loading_pz
  
-def OPF_step_results(model,grid):
+def opf_step_results(model,grid):
     opt_res_P_conv_DC = {}
     opt_res_P_conv_AC = {}
     opt_res_Q_conv_AC = {}

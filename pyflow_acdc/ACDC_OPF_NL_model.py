@@ -13,8 +13,8 @@ from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy
 
 
 __all__ = [
-    'OPF_create_NLModel_ACDC',
-    'ExportACDC_NLmodel_toPyflowACDC'
+    'opf_create_nl_model_acdc',
+    'export_acdc_nl_model_to_pyflow_acdc'
 ]
 
 
@@ -29,7 +29,7 @@ def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
 
     
 
-def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
+def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
     from .ACDC_OPF import translate_pyf_opf 
     
     if limit_flow_rate is True:
@@ -2132,7 +2132,7 @@ def TEP_variables(model,grid,n_init_install=None):
         model.np_conv_base  =pyo.Param(model.conv,initialize=np_conv)
 
 
-def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
+def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
     
     
     
@@ -2356,7 +2356,7 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             node.P_INJ = Pf[i]
             node.Q_INJ = Qf[i]
                     
-        grid.Line_AC_calc() 
+        grid.line_ac_calc() 
         
     if grid.DCmode:
         
@@ -2408,7 +2408,7 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             with ThreadPoolExecutor() as executor:
                 executor.map(process_conv_DCDC, grid.Converters_DCDC)
 
-        grid.Line_DC_calc()
+        grid.line_dc_calc()
 
     if grid.ACmode and grid.DCmode:
         # converters

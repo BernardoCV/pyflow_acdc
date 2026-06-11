@@ -26,13 +26,13 @@ __all__ = ['time_series_pf',
 try:
     import pyomo.environ as pyo
     from .ACDC_OPF_NL_model import (
-        OPF_create_NLModel_ACDC,
-        ExportACDC_NLmodel_toPyflowACDC)
+        opf_create_nl_model_acdc,
+        export_acdc_nl_model_to_pyflow_acdc)
     
     from .ACDC_OPF import (
         pyomo_model_solve,
         opf_obj,
-        OPF_step_results,
+        opf_step_results,
         pack_variables,
         translate_pyf_opf,
         reset_to_initialize,
@@ -668,7 +668,7 @@ def ts_acdc_opf(
         model_obj = pyo.ConcreteModel()
         model_obj.name = "TS AC/DC hybrid OPF"
 
-        OPF_create_NLModel_ACDC(model_obj,grid,PV_set,price_zone_restrictions,limit_flow_rate=limit_flow_rate)
+        opf_create_nl_model_acdc(model_obj,grid,PV_set,price_zone_restrictions,limit_flow_rate=limit_flow_rate)
 
         obj_rule_local = opf_obj(model_obj,grid,weights_def,OnlyGen=True)
         if obj_scaling != 1.0:
@@ -767,7 +767,7 @@ def ts_acdc_opf(
         total_solve_time += t_modelsolve
       
         count += 1
-        [opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] = OPF_step_results(model,grid)
+        [opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,opt_res_Loading_conv] = opf_step_results(model,grid)
                  
         
         opt_res_curtailment['time'] = idx+1
@@ -829,7 +829,7 @@ def ts_acdc_opf(
     
     if export_to_grid:
         t1 = time.perf_counter()
-        ExportACDC_NLmodel_toPyflowACDC(model, grid, price_zone_restrictions)
+        export_acdc_nl_model_to_pyflow_acdc(model, grid, price_zone_restrictions)
         for obj in weights_def:
             weights_def[obj]['v'] = calculate_objective(grid, obj)
         t2 = time.perf_counter()
@@ -978,7 +978,7 @@ def save_TS_to_grid (grid,ts_results,infeasible):
     grid.ts_infeasible_count = infeasible
     grid.time_series_results['real_load_by_zone']  = Ext_Load_joined
     # Track the *model* P_known_AC sign convention aggregated by price zone.
-    # In OPF_step_results: opt_P_load = -P_known_AC, so real_load_by_zone is the sign-flipped view.
+    # In opf_step_results: opt_P_load = -P_known_AC, so real_load_by_zone is the sign-flipped view.
     grid.time_series_results['real_load_known_by_zone'] = -Ext_Load_joined
     grid.time_series_results['real_power_by_zone'] = Ext_Gen_joined
     grid.time_series_results['reactive_power_opf'].columns = grid.time_series_results['reactive_power_opf'].columns.str.replace('Reactor_' , '',regex=False)

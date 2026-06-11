@@ -13,12 +13,12 @@ from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD
 
 
 __all__ = [
-    'OPF_create_LModel_AC',
-    'ExportACDC_Lmodel_toPyflowACDC',
+    'opf_create_l_model_ac',
+    'export_acdc_l_model_to_pyflow_acdc',
 ]
 
 
-def OPF_create_LModel_AC(model,grid,TEP=False):
+def opf_create_l_model_ac(model,grid,TEP=False):
     from .ACDC_OPF import translate_pyf_opf 
     
     
@@ -649,7 +649,7 @@ def TEP_variables(model,grid):
         model.ct_types = pyo.Var(model.ct_set,domain=pyo.Binary,initialize=ct_types_ini)
 
 
-def ExportACDC_Lmodel_toPyflowACDC(model,grid, solver_results=None, tee=False):
+def export_acdc_l_model_to_pyflow_acdc(model,grid, solver_results=None, tee=False):
     """
     Export Pyomo results back to grid object
     

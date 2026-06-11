@@ -31,23 +31,23 @@ def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
 def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     time_1 = time.perf_counter()
     grid.reset_run_flags()
-    grid.Update_PQ_AC()
+    grid.update_pq_ac()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
-    ac_tol =load_flow_AC(grid, tol_lim, maxIter)
-    grid.Update_PQ_AC()
-    grid.Line_AC_calc()
-    grid.Line_AC_calc_exp()
+    ac_tol =load_flow_ac(grid, tol_lim, maxIter)
+    grid.update_pq_ac()
+    grid.line_ac_calc()
+    grid.line_ac_calc_exp()
     time_2 = time.perf_counter()
     return time_2-time_1,ac_tol
     
 def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
     time_1 = time.perf_counter()
     grid.reset_run_flags()
-    grid.Update_P_DC()
-    dc_tol =load_flow_DC(grid, tol_lim, maxIter,Droop_PF)
-    grid.Update_P_DC()
-    grid.Line_DC_calc()
+    grid.update_p_dc()
+    dc_tol =load_flow_dc(grid, tol_lim, maxIter,Droop_PF)
+    grid.update_p_dc()
+    grid.line_dc_calc()
     time_2 = time.perf_counter()
     return time_2-time_1,dc_tol
 
@@ -83,7 +83,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             AC_node.P_s = conv.P_AC
             s = 1
             
-    grid.Update_PQ_AC()
+    grid.update_pq_ac()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
     # Initialize ps_iterations as a numpy array with shape (maxIter, nn_AC)
@@ -93,7 +93,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
         
         # Track AC power flow tolerance
-        ac_tol = load_flow_AC(grid, tol_lim=internal_tol)
+        ac_tol = load_flow_ac(grid, tol_lim=internal_tol)
         tolerance_tracker['ac_pf_tolerances'].append(ac_tol)
         
         for conv in grid.Converters_ACDC:
@@ -116,19 +116,19 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
 
         if QLimit == True:
             for conv in grid.Converters_ACDC:
-                Converter_Qlimit(grid,conv)
+                converter_qlimit(grid,conv)
 
         if grid.iter_num_seq == 0:
             s = 1
-            grid.Check_SlacknDroop(change_slack2Droop)
+            grid.check_slack_n_droop(change_slack2Droop)
 
         s = 1
 
-        grid.Update_PQ_AC()
-        grid.Update_P_DC()
+        grid.update_pq_ac()
+        grid.update_p_dc()
 
         # Track DC power flow tolerance
-        dc_tol = load_flow_DC(grid, tol_lim=internal_tol, Droop_PF=Droop_PF)
+        dc_tol = load_flow_dc(grid, tol_lim=internal_tol, Droop_PF=Droop_PF)
         tolerance_tracker['dc_pf_tolerances'].append(dc_tol)
 
         # Track converter tolerances
@@ -168,7 +168,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         for node in grid.nodes_AC:
             node.P_s = Ps_AC_new[node.nodeNumber]
             grid.Ps_AC[node.nodeNumber] = np.copy(Ps_AC_new[node.nodeNumber])
-        grid.Update_PQ_AC()
+        grid.update_pq_ac()
 
         # print(f'{iter_num} tolerance reached: {np.round(tolerance,decimals=12)}')
         grid.iter_num_seq += 1
@@ -181,16 +181,16 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             warnings.warn(f'Sequential flow did not converge in {maxIter} iterations. Lowest tolerance: {np.round(tolerance, decimals=6)}')
             tolerance_tracker['convergence_status']['sequential_converged'] = False
     
-    grid.Line_AC_calc()
-    grid.Line_AC_calc_exp()
-    grid.Line_DC_calc()
+    grid.line_ac_calc()
+    grid.line_ac_calc_exp()
+    grid.line_dc_calc()
     
     time_2=time.perf_counter()
     t = time_2-time_1
     
     return t, tolerance_tracker,ps_iterations
 
-def Jacobian_DC(grid, V_DC, P,Droop_PF):
+def jacobian_dc(grid, V_DC, P,Droop_PF):
     grid.slack_bus_number_DC = []
     J = np.zeros((grid.nn_DC, grid.nn_DC))
     V = V_DC
@@ -225,7 +225,7 @@ def Jacobian_DC(grid, V_DC, P,Droop_PF):
 
     return J
 
-def load_flow_DC(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
+def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
 
     iter_num = 0
 
@@ -266,7 +266,7 @@ def load_flow_DC(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
 
         dPa = P_known-P
 
-        J_DC = Jacobian_DC(grid,V, P,Droop_PF)
+        J_DC = jacobian_dc(grid,V, P,Droop_PF)
 
         if len(grid.slack_bus_number_DC) == 0:
             J_modified = J_DC
@@ -321,10 +321,10 @@ def load_flow_DC(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
                 conv.Node_DC.Pconv = Pf[n].item()-grid.P_DC[n].item()
                 conv.P_DC          = Pf[n].item()-grid.P_DC[n].item()
                 s = 1
-    grid.Update_P_DC()
+    grid.update_p_dc()
     s = 1
     return tol
-def Jacobian_AC(grid, Voltages, Angles,P,Q):
+def jacobian_ac(grid, Voltages, Angles,P,Q):
     grid.slack_bus_number_AC = []
 
     V = Voltages
@@ -378,7 +378,7 @@ def Jacobian_AC(grid, Voltages, Angles,P,Q):
 
 
 
-def load_flow_AC(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
 
     Pnet = np.copy(grid.P_AC+grid.Ps_AC)
     Qnet = np.copy(grid.Q_AC+grid.Qs_AC)
@@ -433,7 +433,7 @@ def load_flow_AC(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
         dQa = Qnet- Q[:, None]
         k = 0
 
-        J_AC = Jacobian_AC(grid,V, angles,P,Q)
+        J_AC = jacobian_ac(grid,V, angles,P,Q)
 
         Q_del = []
         for node in grid.nodes_AC:
@@ -575,7 +575,7 @@ def flow_conv_P_AC(grid, conv):
     conv.Ic = Ic
     s=1
 
-def Jacobian_conv_notransformer(grid, conv, U_c, Pc, Qc, Ps, Qs):
+def jacobian_conv_no_transformer(grid, conv, U_c, Pc, Qc, Ps, Qs):
     J_conv = np.zeros((2, 2))
 
     # dPc/dTheta_c
@@ -592,7 +592,7 @@ def Jacobian_conv_notransformer(grid, conv, U_c, Pc, Qc, Ps, Qs):
 
     return J_conv
 
-def Jacobian_conv_no_Filter(grid, conv, U_c, Pc, Qc, Ps, Qs):
+def jacobian_conv_no_filter(grid, conv, U_c, Pc, Qc, Ps, Qs):
     J_conv = np.zeros((2, 2))
 
     # dPc/dTheta_c
@@ -609,7 +609,7 @@ def Jacobian_conv_no_Filter(grid, conv, U_c, Pc, Qc, Ps, Qs):
 
     return J_conv
 
-def Jacobian_conv(grid, conv, Qcf, Qsf, Pcf, Psf, U_f, U_c, Pc, Qc, Ps, Qs):
+def jacobian_conv(grid, conv, Qcf, Qsf, Pcf, Psf, U_f, U_c, Pc, Qc, Ps, Qs):
     J_conv = np.zeros((4, 4))
 
     # dPc/dTheta_c
@@ -708,7 +708,7 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
                 Qc = -Uc*Uc*Bc+Us*Uc * \
                     (Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
     
-                J_conv = Jacobian_conv_no_Filter(grid,conv, Uc, Pc, Qc, Ps, Qs)
+                J_conv = jacobian_conv_no_filter(grid,conv, Uc, Pc, Qc, Ps, Qs)
     
                 dPc = Pc_known-Pc
                 dQs = Qs_known-Qs
@@ -822,7 +822,7 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
             Qc = -Uc*Uc*Bc+Us*Uc * \
                 (Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
 
-            J_conv = Jacobian_conv_notransformer(grid,conv, Uc, Pc, Qc, Ps, Qs)
+            J_conv = jacobian_conv_no_transformer(grid,conv, Uc, Pc, Qc, Ps, Qs)
 
             dPc = Pc_known-Pc
             dQs = Qs_known-Qs
@@ -938,7 +938,7 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
 
             Qf = -Uf*Uf*Bf
 
-            J_conv = Jacobian_conv(grid,conv, Qcf, Qsf, Pcf, Psf, Uf, Uc, Pc, Qc, Ps, Qs)
+            J_conv = jacobian_conv(grid,conv, Qcf, Qsf, Pcf, Psf, Uf, Uc, Pc, Qc, Ps, Qs)
 
             F1 = Pcf-Psf
             F2 = Qcf-Qsf-Qf
@@ -1017,7 +1017,7 @@ def mmc_loss(conv,Pc):
     conv.Vsum = -Ra*I + Vdc
     return P_loss,I
 
-def Converter_Qlimit(grid, conv):
+def converter_qlimit(grid, conv):
 
     Us = conv.Node_AC.V
     th_s = conv.Node_AC.theta

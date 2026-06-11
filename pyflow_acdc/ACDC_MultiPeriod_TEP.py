@@ -7,14 +7,14 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import copy
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
+from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables,export_acdc_nl_model_to_pyflow_acdc
 from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective,calculate_objective_from_model,optimal_pf
 from .ACDC_Static_TEP import (
     get_TEP_variables,
     _initialize_MS_STEP_sets_model,
     identify_standalone_rs_conv_pairs,
     update_grid_scenario_frame,
-    ExportACDC_TEP_MS_toPyflowACDC,
+    export_acdc_tep_ms_to_pyflow_acdc,
 )
 from .grid_analysis import analyse_grid, current_fuel_type_distribution
 from .Time_series import _modify_parameters, ts_acdc_opf, results_ts_opf
@@ -949,7 +949,7 @@ def multi_period_transmission_expansion(
     model.inv_model = pyo.Block(model.inv_periods)
 
     base_model = pyo.ConcreteModel()
-    OPF_create_NLModel_ACDC(
+    opf_create_nl_model_acdc(
         base_model,
         grid,
         PV_set=False,
@@ -1031,7 +1031,7 @@ def multi_period_transmission_expansion(
     if solver != 'ipopt':
         MINLP = True
     
-    export_MP_TEP_results_toPyflowACDC(
+    export_mp_tep_results_to_pyflow_acdc(
         model,
         grid,
         Price_Zones=PZ,
@@ -1041,7 +1041,7 @@ def multi_period_transmission_expansion(
     _save_inv_models(model,grid)
     t4 = time.time()
 
-    inv_objs, inv_opf_objs = calculate_MPTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False)
+    inv_objs, inv_opf_objs = calculate_mptep_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False)
     
     # Build list of rows then create DataFrame once to avoid concat-on-empty FutureWarning
     obj_rows = []
@@ -1223,7 +1223,7 @@ def export_and_save_inv_period_svgs(grid,Price_Zones=False,folder_name=None):
         
         for i in grid.inv_models:
             save_path = f"{folder_name}/{grid_name}_inv_model_{i}" if folder_name else f'{grid_name}_inv_model_{i}'
-            ExportACDC_NLmodel_toPyflowACDC(grid.inv_models[i],grid,Price_Zones,TEP=True)
+            export_acdc_nl_model_to_pyflow_acdc(grid.inv_models[i],grid,Price_Zones,TEP=True)
             save_network_svg(
                 grid,
                 name=save_path,
@@ -1239,7 +1239,7 @@ def _save_inv_models(model,grid):
     for i in model.inv_periods:
         grid.inv_models[i] = model.inv_model[i]
 
-def export_MP_TEP_results_toPyflowACDC(
+def export_mp_tep_results_to_pyflow_acdc(
     model,
     grid,
     Price_Zones=False,
@@ -1424,7 +1424,7 @@ def export_MP_TEP_results_toPyflowACDC(
     if export_last_opf_state:
         last_i = max(model.inv_periods)
         _set_grid_to_multiperiod_state(grid, last_i,Price_Zones)
-        ExportACDC_NLmodel_toPyflowACDC(model.inv_model[last_i],grid,Price_Zones,TEP=True)
+        export_acdc_nl_model_to_pyflow_acdc(model.inv_model[last_i],grid,Price_Zones,TEP=True)
 
     grid.MP_TEP_results = df  
 
@@ -1688,7 +1688,7 @@ def multi_period_MS_TEP(
     grid.TEP_n_periods = n_periods
 
     base_model = pyo.ConcreteModel()
-    OPF_create_NLModel_ACDC(
+    opf_create_nl_model_acdc(
         base_model,
         grid,
         PV_set=False,
@@ -1761,7 +1761,7 @@ def multi_period_MS_TEP(
         raise RuntimeError(msg)
 
     MINLP = solver != 'ipopt'
-    export_MP_TEP_results_toPyflowACDC(
+    export_mp_tep_results_to_pyflow_acdc(
         model,
         grid,
         Price_Zones=Price_Zones,
@@ -1779,7 +1779,7 @@ def multi_period_MS_TEP(
     for i in model.inv_periods:
         period_block = model.inv_model[i]
         _set_grid_to_multiperiod_state(grid, i, Price_Zones)
-        period_result = ExportACDC_TEP_MS_toPyflowACDC(
+        period_result = export_acdc_tep_ms_to_pyflow_acdc(
             period_block, grid, n_clusters, clustering, Price_Zones, mutate_grid=False, not_transposed=True
         )
         period_result['Investment_Period'] = int(i)
@@ -1823,7 +1823,7 @@ def multi_period_MS_TEP(
         )
     
     _set_grid_to_multiperiod_state(grid, last_period, Price_Zones)
-    ExportACDC_TEP_MS_toPyflowACDC(
+    export_acdc_tep_ms_to_pyflow_acdc(
         model.inv_model[last_period], grid, n_clusters, clustering, Price_Zones, mutate_grid=True
     )
 
@@ -2276,7 +2276,7 @@ def _calculate_decomision_period(element,n_years):
 
     element.decomision_period = math.ceil(element.life_time/n_years)
 
-def calculate_MPTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False):
+def calculate_mptep_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False):
     inv_objs = {}
     inv_opf_objs = {}
     for i in model.inv_periods:    

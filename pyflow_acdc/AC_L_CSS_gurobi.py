@@ -199,7 +199,7 @@ def optimal_l_css_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEA
     
           
     t1 = time.perf_counter()
-    model, gen_vars, ac_vars = OPF_create_LModel_AC_gurobi(model,grid)
+    model, gen_vars, ac_vars = opf_create_l_model_ac_gurobi(model,grid)
     t2 = time.perf_counter()  
     t_modelcreate = t2 - t1
     
@@ -222,7 +222,7 @@ def optimal_l_css_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEA
     t4 = time.perf_counter()
     
     # Export results
-    ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=tee)
+    export_acdc_l_model_to_pyflow_acdc_gurobi(model, grid,gen_vars,ac_vars, tee=tee)
     
     if OPEX:
         obj = {ObjComponent.ENERGY_COST.value: 1}
@@ -307,7 +307,7 @@ def solve_gurobi_model(model, grid):
     return model_res, solver_stats
 
 
-def OPF_create_LModel_AC_gurobi(model,grid):
+def opf_create_l_model_ac_gurobi(model,grid):
     """Create Gurobi model for AC DC OPF"""
     from .ACDC_OPF import translate_pyf_opf 
    
@@ -851,7 +851,7 @@ def set_objective(model, grid, gen_vars, ac_vars, OPEX=True, NPV=True, n_years=2
     model.setObjective(total_cost, GRB.MINIMIZE)
 
 
-def ExportACDC_Lmodel_toPyflowACDC_gurobi(model, grid,gen_vars,ac_vars, tee=True):
+def export_acdc_l_model_to_pyflow_acdc_gurobi(model, grid,gen_vars,ac_vars, tee=True):
     """Export Gurobi results back to grid object"""
     
     if model.status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL, GRB.TIME_LIMIT] or model.SolCount == 0:

@@ -136,11 +136,11 @@ def extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_da
     
     
     if grid.nodes_AC: 
-        grid.Update_Graph_AC()
-        grid.Update_PQ_AC()
+        grid.update_graph_ac()
+        grid.update_pq_ac()
     if grid.nodes_DC: 
-        grid.Update_Graph_DC()
-        grid.Update_P_DC()
+        grid.update_graph_dc()
+        grid.update_p_dc()
         
     return grid
 
@@ -853,7 +853,7 @@ def create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=None,
                 grid.crossing_groups.append(line_numbers_group)
     
         
-    grid.Update_Graph_AC()
+    grid.update_graph_ac()
     grid.create_Ybus_AC()
     grid.Array_opf = True  
     grid.cab_types_allowed = cable_types_allowed
@@ -1296,7 +1296,7 @@ def create_grid_from_mat(matfile):
             line.np_line_b = 0
             line.np_line_max = 3
             G.lines_AC_exp.append(line)
-        G.Update_Graph_AC()
+        G.update_graph_ac()
 
     if Gen_data is not None:        
         for index, row in Gen_data.iterrows():
@@ -1419,7 +1419,7 @@ def change_S_base(grid,Sbase_new):
         gen.Pset *= rate
         gen.QGen *= rate
         gen.Qset *= rate
-    grid.Update_PQ_AC()
+    grid.update_pq_ac()
     grid.create_Ybus_AC()
     grid.S_base=Sbase_new
     

@@ -305,7 +305,7 @@ def Borssele_3_and_4():
     grid.cab_types_allowed = Nc
 
     grid.create_Ybus_AC()
-    grid.Update_Graph_AC()
+    grid.update_graph_ac()
     
     # Return the grid
     return grid,res

@@ -25,7 +25,7 @@ This flow sets up and solves the AC 'dc linear' OPF. It creates the :ref:`model 
 Creating the Linear OPF model
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. function:: OPF_create_LModel_AC(model, grid, TEP=False)
+.. function:: opf_create_l_model_ac(model, grid, TEP=False)
 
    Creates the AC 'dc linear' OPF model.
 
@@ -76,8 +76,8 @@ Creating the Linear OPF model
 
    .. code-block:: python
 
-      from pyflow_acdc.AC_OPF_L_model import OPF_create_LModel_AC
-      model = OPF_create_LModel_AC(model, grid, TEP=False)
+      from pyflow_acdc.AC_OPF_L_model import opf_create_l_model_ac
+      model = opf_create_l_model_ac(model, grid, TEP=False)
 
 TEP/REC/CT Parameters and Variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -98,9 +98,10 @@ TEP/REC/CT Parameters and Variables
 Exporting Results
 ^^^^^^^^^^^^^^^^^
 
-.. function:: ExportACDC_Lmodel_toPyflowACDC(model, grid, Price_Zones, TEP=False, solver_results=None, tee=False)
+.. function:: export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=None, tee=False)
 
-   Exports Pyomo solution back to the `grid`:
+   Exports Pyomo solution back to the `grid` (internal helper; not exported from
+   ``pyflow_acdc`` top level — called by :func:`optimal_l_pf`):
    - Generator dispatch and renewable gamma
    - AC node angles and injections
    - AC line flows and losses (linearized, zero reactive)
@@ -111,7 +112,8 @@ Exporting Results
 
    .. code-block:: python
 
-      pyf.ExportACDC_Lmodel_toPyflowACDC(model, grid, Price_Zones=False, TEP=False, solver_results=results, tee=True)
+      from pyflow_acdc.AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc
+      export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=results, tee=True)
 
 
 

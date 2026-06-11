@@ -41,10 +41,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   mixed-case names remain importable as deprecated aliases (see below). The
   `grid.OPF_obj` attribute is unchanged (only the same-named function moved).
 - **`Results` methods renamed to snake_case** (e.g. `res.All()→res.all()`,
-  `res.AC_Powerflow()→res.ac_powerflow()`, `res.TEP_N()→res.tep_n()`,
-  `res.Converter()→res.converter()`). Old method names remain as deprecated
-  aliases that warn and forward. Excel-sheet/table keys, `Grid` attributes, and
-  the `Price_Zone` class are unchanged.
+  `res.AC_Powerflow()→res.ac_powerflow()`, `res.TEP_N()→res.tep_n()`). Old
+  method names remain as deprecated aliases. Excel-sheet/table keys, `Grid`
+  attributes, and the `Price_Zone` class are unchanged.
+- **`Grid` methods renamed to snake_case** (e.g. `grid.Update_Graph_AC()→grid.update_graph_ac()`,
+  `grid.Line_AC_calc()→grid.line_ac_calc()`, `grid.Check_SlacknDroop()→grid.check_slack_n_droop()`).
+  Old method names remain as deprecated aliases on `Grid`.
+- **Internal OPF/PF/TEP helpers renamed to snake_case** (e.g.
+  `OPF_create_NLModel_ACDC→opf_create_nl_model_acdc`,
+  `load_flow_AC→load_flow_ac`, `TEP_obj→tep_obj`,
+  `Jacobian_conv→jacobian_conv`, `OPF_create_LModel_AC_gurobi→opf_create_l_model_ac_gurobi`).
+  Submodule-only; no deprecation aliases added.
 
 ### Fixed
 - `Export_files` no longer emits an unquoted `pricing_strategy=` value in

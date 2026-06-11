@@ -16577,7 +16577,7 @@ def Texas7k_20210804(TEP=False,exp='All',N_b=1,N_i=1,N_max=3,kappa=1):
                 line_cost = lines_AC.loc[name,'Cost MUSD']*10**6
                 pyf.expand_element(grid,name,N_b=N_b,N_i=N_i_rounded,N_max=N_max,base_cost=line_cost,update_grid=False)
 
-        grid.Update_Graph_AC()
+        grid.update_graph_ac()
         grid.create_Ybus_AC()
 
     
