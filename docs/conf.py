@@ -9,10 +9,12 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+
+# Make the package importable for autodoc when building from a source checkout
+# (Read the Docs installs it via `pip install .`, but local builds may not).
+sys.path.insert(0, os.path.abspath(".."))
 
 
 # -- Project information -----------------------------------------------------
@@ -34,6 +36,28 @@ extensions = [
     'sphinx.ext.mathjax',
     'myst_parser',  
 ]
+
+# Optional/heavy dependencies are not installed in the docs build environment
+# (Read the Docs only installs the core deps via `pip install .`). The package
+# guards them with try/except ImportError, but autodoc still needs to import the
+# submodules to read signatures/docstrings, so we mock these imports.
+autodoc_mock_imports = [
+    "pyomo",
+    "dash",
+    "ortools",
+    "pymoo",
+    "gurobipy",
+    "folium",
+    "branca",
+    "kaleido",
+    "highspy",
+]
+
+# Keep rendered names short (e.g. ``power_flow`` instead of
+# ``pyflow_acdc.power_flow``) and preserve source order of members.
+add_module_names = False
+autodoc_member_order = "bysource"
+autodoc_typehints = "description"
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 

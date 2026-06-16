@@ -9,7 +9,11 @@ Interactive Dashboard
 For now you have to run the time series to have results to plot. Then run the dashboard. Once the dashboard is running, you can see the plots by selecting the desired plot type. And choose axis limits to zoom in or out.
 
 
-.. py:function:: run_dash(grid)
+.. autofunction:: pyflow_acdc.run_dash
+
+.. autofunction:: pyflow_acdc.run_ts_dash
+
+.. autofunction:: pyflow_acdc.run_mp_ts_dash
 
    Creates and runs an interactive Dash web application for visualizing time series results.
 
@@ -72,9 +76,9 @@ Once the dashboard is created, you can see it in your browser under the url:
     TS_wl = pd.read_csv(wind_load_url)
     pyf.add_TimeSeries(grid,TS_wl)
 
-    times=pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)  
+       times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)  
 
-    pyf.run_dash(grid)
+       pyf.run_dash(grid)
 
 .. figure:: ../images/dash_example.svg
    :width: 100%

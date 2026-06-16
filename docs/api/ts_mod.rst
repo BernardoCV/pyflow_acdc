@@ -14,26 +14,7 @@ Renewable Source Zone is an object designed to unify multiple renewable sources 
 Add Renewable Source Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_RenSource_zone(grid, name)
-
-   Adds a renewable source zone to the grid.
-
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-      * - ``grid``
-        - Grid
-        - Grid to modify
-      * - ``name``
-        - str
-        - Zone name
-      * - Returns
-        - Ren_source_zone
-        - Created renewable zone
+.. autofunction:: pyflow_acdc.add_RenSource_zone
 
    **Example**
 
@@ -45,26 +26,7 @@ Add Renewable Source Zone
 Assign Renewable to Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: assign_RenToZone(grid, ren_source_name, new_zone_name)
-
-   Assigns a renewable source to a zone.
-
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-      * - ``grid``
-        - Grid
-        - Grid containing source
-      * - ``ren_source_name``
-        - str
-        - Name of renewable source
-      * - ``new_zone_name``
-        - str
-        - Name of target zone
+.. autofunction:: pyflow_acdc.assign_RenToZone
 
    **Example**
 
@@ -119,30 +81,8 @@ Time series data can be added to the grid by using the :py:func:`add_TimeSeries`
 
 
 
-.. py:function:: add_TimeSeries(grid, Time_Series_data, associated=None, TS_type=None)
+.. autofunction:: pyflow_acdc.add_TimeSeries
 
-   Adds time series data to grid components.
-
-   .. list-table::
-      :widths: 20 10 70
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-      * - ``grid``
-        - Grid
-        - Grid to modify
-      * - ``Time_Series_data``
-        - DataFrame
-        - Time series data
-      * - ``associated``
-        - str
-        - Object name
-      * - ``TS_type``
-        - str
-        - Time series type
-      
 
 Accepted types
 ^^^^^^^^^^^^^^
@@ -438,21 +378,13 @@ Time-Series Clustering
 
 These functions are found in `pyflow_acdc.Time_series_clustering`.
 
-.. py:function:: identify_correlations(grid, time_series=[], correlation_threshold=0, cv_threshold=0, central_market=[], print_details=False, correlation_decisions=[])
+.. autofunction:: pyflow_acdc.identify_correlations
 
-   Detects highly correlated time-series and builds reduction decisions.
+.. autofunction:: pyflow_acdc.cluster_TS
 
-.. py:function:: cluster_TS(grid, n_clusters, time_series=[], central_market=[], algorithm='Kmeans', cv_threshold=0, correlation_threshold=0.8, print_details=False, correlation_decisions=[], critical_idx=[], base_critical_ratio=0.5, scaler_type='robust', **kwargs)
+.. autofunction:: pyflow_acdc.run_clustering_analysis_and_plot
 
-   Clusters time-series profiles into representative operating states.
-
-.. py:function:: run_clustering_analysis_and_plot(grid, algorithms=['kmeans', 'kmedoids', 'ward', 'pam_hierarchical'], n_clusters_list=DEFAULT_CLUSTER_NUMBERS, path='clustering_results', time_series=[], print_details=False, ts_options=[None, 0, 0.8], correlation_decisions=[True, '2', True], plotting_options=[None, 'svg'], identifier=None)
-
-   Runs clustering sweeps and exports comparison plots/artifacts.
-
-.. py:function:: cluster_analysis(grid, clustering_options)
-
-   Applies clustering configuration and returns representative scenarios for TS/TEP workflows.
+.. autofunction:: pyflow_acdc.cluster_analysis
 
 **References**
 

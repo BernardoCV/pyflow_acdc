@@ -908,43 +908,17 @@ def time_series_dict(grid, ts):
 
 
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
-    """ INFORMATION
-    Supported investment-series inputs:
+    """Attach investment-period time series to grid elements from a CSV file.
 
-    - Price_Zone
-      - 'Load'
-      - 'curvature_factor'
-      - 'import_expand'
+    Supported ``inv_type`` keys by element: ``Price_Zone`` (Load,
+    curvature_factor, import_expand); ``Node_AC`` / ``Node_DC`` (Load);
+    ``Gen_AC``, ``Ren_Source``, ``Exp_Line_AC``, ``Line_DC``, ``AC_DC_converter``
+    (planned_installation, planned_decommission, max_inv, np_dynamic).
 
-    - Node_AC / Node_DC
-      - 'Load'
-
-    - Gen_AC
-      - 'planned_installation'
-      - 'planned_decommission'
-      - 'max_inv'
-      - 'np_dynamic'
-
-    - Ren_Source
-      - 'planned_installation'
-      - 'planned_decommission'
-      - 'max_inv'
-      - 'np_dynamic'
-
-    - Exp_Line_AC / Line_DC / AC_DC_converter
-      - 'planned_installation'
-      - 'planned_decommission'
-      - 'max_inv'
-      - 'np_dynamic'
-
-    Notes:
-    - inv_data must be a CSV file path.
-    - CSV is read with header=None (no header row).
-    - Row order in each column:
-      - row 0: element (optional if 'associated' is passed)
-      - row 1: inv_type (optional if 'inv_type' is passed)
-      - remaining rows: period data
-    - Period lengths must be consistent across all investment series in the grid.
+    ``inv_data`` must be a CSV path read with ``header=None``. Each column is
+    one series: row 0 = element name (optional if ``associated`` is passed),
+    row 1 = inv_type (optional if ``inv_type`` is passed), remaining rows =
+    period values. All series in the grid must share the same period length.
     """
     if not isinstance(inv_data, (str, Path)):
         raise TypeError("inv_data must be a CSV file path (str or Path)")
@@ -1630,11 +1604,9 @@ def import_orbit_cables(
     Args:
         data: pandas DataFrame, CSV path, directory containing CSV files, or URL.
               If None, source_url is used.
-        column_map: optional dict mapping pyflow field names to source columns.
-                    pyflow fields:
-                      ['name', 'R_Ohm_km', 'L_mH_km', 'C_uF_km', 'G_uS_km',
-                       'A_rating', 'Nominal_voltage_kV', 'conductor_size',
-                       'Type', 'Cost_per_km', 'Reference']
+        column_map: optional dict mapping pyflow field names to source columns
+            (name, R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating,
+            Nominal_voltage_kV, conductor_size, Type, Cost_per_km, Reference).
         default_type: fallback cable type when not provided ('AC' or 'DC').
         name_prefix: prefix used if a source row has no usable name.
         save_yaml: if True, also save imported entries as YAML files.

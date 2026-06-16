@@ -5,15 +5,11 @@ CSV files for importing data
 
 In this page the column names for importing data from CSV files are described. It is important to note that column names are case sensitive. The CSV can then be used for the following functions:
 
-.. py:function:: Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
+.. autofunction:: pyflow_acdc.create_grid_from_data
    :noindex:
 
-   Creates a new grid from pandas/geopandas DataFrames or csv file strings containing component data.
-
-.. py:function:: Extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
+.. autofunction:: pyflow_acdc.extend_grid_from_data
    :noindex:
-
-   Extends an existing grid with new components from pandas/geopandas DataFrames or csv file strings.
 
 
 .. figure:: ../images/Stagg5MATACDC.svg
@@ -353,7 +349,7 @@ Here are example CSV files from a 5-bus test system in per unit:
     converters = pd.read_csv('Converter_data.csv')
 
     # Create grid
-    grid, results = pyf.Create_grid_from_data(
+    grid, results = pyf.create_grid_from_data(
         S_base=100,
         AC_node_data=ac_nodes,
         AC_line_data=ac_lines,
@@ -706,7 +702,7 @@ Here are example CSV files from a 5-bus test system using the data in Ohm values
     converters = pd.read_csv('Converter_data_Ohm.csv')
 
     # Create grid
-    grid, results = pyf.Create_grid_from_data(
+    grid, results = pyf.create_grid_from_data(
         S_base=100,
         AC_node_data=ac_nodes,
         AC_line_data=ac_lines,
@@ -1048,7 +1044,7 @@ Here are example CSV files from a 5-bus test system using the data in Real value
     converters = pd.read_csv('Converter_data_Real.csv')
 
     # Create grid
-    grid, results = pyf.Create_grid_from_data(
+    grid, results = pyf.create_grid_from_data(
         S_base=100,
         AC_node_data=ac_nodes,
         AC_line_data=ac_lines,

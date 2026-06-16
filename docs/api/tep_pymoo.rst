@@ -13,7 +13,7 @@ their Pareto trade-off using a Pyomo-based optimization model [2]_.
 Transmission Expansion (pymoo)
 -------------------------------
 
-.. function:: transmission_expansion_pymoo(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, solver='GA', time_limit=300, tee=False, n_gen=10)
+.. autofunction:: pyflow_acdc.transmission_expansion_pymoo
 
    Runs a pymoo-based outer optimization for TEP. For single-objective, minimizes
    present value of total cost (CAPEX + NPV·OPEX). For multi-objective (``solver='NSGA2'``),

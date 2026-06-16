@@ -36,6 +36,10 @@ def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     -------
     tuple
         ``(elapsed_seconds, final_tolerance)``.
+
+    Examples
+    --------
+    >>> time, tol = pyf.power_flow(grid)
     """
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
@@ -57,6 +61,10 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     -------
     tuple
         ``(elapsed_seconds, final_tolerance)``.
+
+    Examples
+    --------
+    >>> time, tol = pyf.ac_power_flow(grid)
     """
     time_1 = time.perf_counter()
     grid.reset_run_flags()
@@ -84,6 +92,10 @@ def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
     -------
     tuple
         ``(elapsed_seconds, final_tolerance)``.
+
+    Examples
+    --------
+    >>> time, tol = pyf.dc_power_flow(grid)
     """
     time_1 = time.perf_counter()
     grid.reset_run_flags()
@@ -119,6 +131,10 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
     tuple
         ``(elapsed_seconds, final_tolerance, tolerance_tracker)`` where
         ``tolerance_tracker`` is a dict of per-iteration convergence detail.
+
+    Examples
+    --------
+    >>> time, tol, ps_iterations = pyf.acdc_sequential(grid)
     """
     time_1 = time.perf_counter()
     tolerance = 1

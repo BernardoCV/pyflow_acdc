@@ -8,7 +8,12 @@ For this module, you need to have the optional dependendency pyflow_acdc[mapping
 Interactive map
 ---------------
 
-.. py:function:: plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None)
+.. autofunction:: pyflow_acdc.plot_folium
+
+Network map (static topology)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.plot_folium_network
    
    Creates an interactive map visualization using Folium.
 
@@ -75,7 +80,7 @@ Interactive map
 
        grid,res = pyf.NS_MTDC()
 
-       pyf.Optimal_PF(grid)
+       pyf.optimal_pf(grid)
 
        pyf.plot_folium(grid)
 

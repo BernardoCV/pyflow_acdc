@@ -14,7 +14,7 @@ Welcome to PyFlow ACDC's documentation!
 
 This is a  python-based tool for the design and analysis of hybrid AC/DC grids
 
-PyFlow ACDC is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_.
+PyFlow ACDC is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_. By `CITCEA-UPC <https://www.linkedin.com/company/citcea>`_ and `Youwind <https://youwindrenewables.com/>`_.
 
 .. figure:: images/ADOreD_logo_colours.png
    :align: right
@@ -101,9 +101,9 @@ Basic usage::
    import pyflow_acdc as pyf
 
    #Use pre saved grids to familiarize yourself with the package
-   [grid,res]=pyf.PEI_grid()
+   [grid,res]=pyf.cases['PEI_grid']()
 
-   pyf.ACDC_sequential(grid,QLimit=False)
+   pyf.acdc_sequential(grid,QLimit=False)
 
    
    res.all()

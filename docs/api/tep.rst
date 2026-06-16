@@ -13,47 +13,7 @@ This section creates an OPF :ref:`model <model_creation>`, chooses a state :ref:
 Running one state transmission expansion planning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: transmission_expansion(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,solver='bonmin')
-
-   Performs transmission expansion planning analysis.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``NPV``
-        - bool
-        - Calculate net present value
-        - True
-      * - ``n_years``
-        - int
-        - Number of years for NPV calculation
-        - 25
-      * - ``Hy``
-        - int
-        - Hours per year
-        - 8760
-      * - ``discount_rate``
-        - float
-        - Discount rate for NPV
-        - 0.02
-      * - ``ObjRule``
-        - dict
-        - Objective function weights
-        - None
-      * - ``solver``
-        - str
-        - Solver to use
-        - 'bonmin'
-     
+.. autofunction:: pyflow_acdc.transmission_expansion
 
    **Returns**
 
@@ -73,7 +33,7 @@ Running one state transmission expansion planning
 Running multiple scenario based transmission expansion planning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: multi_scenario_TEP(grid,increase_Pmin=False,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,clustering_options=None,ObjRule=None,solver='bonmin')
+.. autofunction:: pyflow_acdc.multi_scenario_TEP
 
    Performs a multiple scenario based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states.
 
@@ -141,46 +101,46 @@ Running multiple scenario based transmission expansion planning
 Linear and Sensitivity Utilities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: linear_transmission_expansion(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, solver='gurobi', time_limit=300, tee=False, export=True, fs=False, obj_scaling=1.0)
+.. autofunction:: pyflow_acdc.linear_transmission_expansion
 
    Linearized TEP workflow suitable for faster studies and large sweeps.
 
-.. py:function:: alpha_paretto(grid, steps, ObjRule, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, solver='bonmin', time_limit=None, tee=False, save_name=None, obj_scaling=1.0)
+.. autofunction:: pyflow_acdc.alpha_pareto
 
    Computes Pareto-like trade-off points by sweeping alpha-style objective mixing.
 
-.. py:function:: rate_sensitivity(grid, steps, ObjRule, min_rate=0.0, max_rate=0.1, NPV=True, n_years=25, Hy=8760, solver='bonmin', time_limit=None, tee=False, obj_scaling=1.0)
+.. autofunction:: pyflow_acdc.rate_sensitivity
 
    Runs discount-rate sensitivity for TEP objective outcomes.
 
-.. py:function:: kappa_sensitivity(grid, steps, ObjRule, min_kappa=0.0, max_kappa=1.0, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, solver='bonmin', time_limit=None, tee=False, obj_scaling=1.0)
+.. autofunction:: pyflow_acdc.kappa_sensitivity
 
    Runs kappa-weight sensitivity for TEP objective outcomes.
 
-.. py:function:: comprehensive_sensitivity_analysis(grid, ObjRule, alpha_steps=None, rate_steps=None, kappa_steps=None, alpha_range=(0.0, 1.0), rate_range=(0.01, 0.1), kappa_range=(0.0, 1.0), n_years=25, Hy=8760, discount_rate=0.02, solver='bonmin', time_limit=None, tee=False, obj_scaling=1.0)
+.. autofunction:: pyflow_acdc.comprehensive_sensitivity_analysis
 
    Convenience wrapper to execute multiple TEP sensitivity studies.
 
 Element Expansion Helpers
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: expand_elements_from_pd(grid, exp_elements)
+.. autofunction:: pyflow_acdc.expand_elements_from_pd
 
    Applies expansion definitions from a pandas table.
 
-.. py:function:: repurpose_element_from_pd(grid, rec_elements)
+.. autofunction:: pyflow_acdc.repurpose_element_from_pd
 
    Applies reconductoring/repurposing definitions from a pandas table.
 
-.. py:function:: update_attributes(element, n_b, n_i, n_max, life_time, base_cost, per_unit_cost, exp, n_inv_max=None)
+.. autofunction:: pyflow_acdc.update_attributes
 
    Updates expansion-related attributes of a TEP-enabled element.
 
-.. py:function:: expand_element(grid, name, n_b=None, n_i=None, n_max=None, life_time=None, base_cost=None, per_unit_cost=None, exp=None, update_grid=True, n_inv_max=None, **legacy_kwargs)
+.. autofunction:: pyflow_acdc.expand_element
 
    Enables or updates one element for TEP investment modeling.
 
-.. py:function:: translate_pd_tep(grid)
+.. autofunction:: pyflow_acdc.translate_pd_tep
 
    Builds pandas summaries from solved TEP model variables.
 
@@ -190,7 +150,7 @@ Element Expansion Helpers
 Transmission Expansion Planning objectives
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: tep_obj(model,grid,NPV)
+.. autofunction:: pyflow_acdc.ACDC_Static_TEP.tep_obj
 
    Returns the objective function for the transmission expansion planning based on [1]_:
 
@@ -220,7 +180,7 @@ Transmission Expansion Planning objectives
 Export Results
 ^^^^^^^^^^^^^^
 
-.. py:function:: export_TEP_TS_results_to_excel(grid, export)
+.. autofunction:: pyflow_acdc.export_TEP_multiScenario_results_to_excel
 
    Exports time series TEP results to Excel file.
 

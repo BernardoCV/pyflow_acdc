@@ -201,6 +201,11 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     -------
     tuple
         ``(model, model_res, timing_info, solver_stats)``.
+
+    Examples
+    --------
+    >>> model, model_res, timing_info, solver_stats = pyf.optimal_pf(
+    ...     grid, ObjRule=None, PV_set=False, OnlyGen=True, solver='ipopt')
     """
     grid.reset_run_flags()
     analyse_grid(grid)

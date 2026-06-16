@@ -9,7 +9,7 @@ This module provides functions for wind farm array sizing based on [1]_.
 Sequential Cable Sizing (CSS)
 -----------------------------
 
-.. function:: sequential_CSS(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, max_turbines_per_string=None, limit_crossings=True, MIP_solver='glpk', CSS_L_solver='gurobi', CSS_NL_solver='bonmin', svg=None, max_iter=None, time_limit=300, NL=False, tee=False, fs=False)
+.. autofunction:: pyflow_acdc.sequential_CSS
 
    Iteratively alternates between a path selection MIP and a linear/nonlinear OPF-based cable type selection to converge to an efficient array layout. Returns models, a summary of iterations, timing info, solver stats, and the best iteration index.
 
@@ -71,7 +71,7 @@ Sequential Cable Sizing (CSS)
 MIP Path Selection (Array)
 --------------------------
 
-.. function:: MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False)
+.. autofunction:: pyflow_acdc.MIP_path_graph
 
    Solves a master MIP to select array connection paths minimizing total cable length, with optional crossing constraints and Gurobi callback to record feasible solutions over time. Activates cable types on candidate lines upon success.
 
@@ -130,22 +130,22 @@ MIP Path Selection (Array)
 Simplified CSS Workflow
 -----------------------
 
-.. py:function:: simple_CSS(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, CSS_L_solver='gurobi', CSS_NL_solver='bonmin', time_limit=1200, NL=False, tee=False, export=True, fs=False)
+.. autofunction:: pyflow_acdc.simple_CSS
 
    Runs a simplified sequential cable sizing workflow with reduced setup.
 
-.. py:function:: simple_assign_cable_types(grid, model, t_MW=None)
+.. autofunction:: pyflow_acdc.simple_assign_cable_types
 
    Assigns cable types from an optimized model back into the grid.
 
 Linear CSS Solvers
 ------------------
 
-.. py:function:: Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, tee=False, time_limit=300)
+.. autofunction:: pyflow_acdc.optimal_l_css_gurobi
 
    Solves the linear CSS formulation with Gurobi.
 
-.. py:function:: Optimal_L_CSS_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, tee=False, time_limit=300)
+.. autofunction:: pyflow_acdc.optimal_l_css_ortools
 
    Solves the linear CSS formulation with OR-Tools.
 

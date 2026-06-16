@@ -1,10 +1,6 @@
 import os
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Feb 15 12:59:08 2024
-
-@author: BernardoCastro
-"""
+"""Results tables and terminal reporting for power-flow / OPF runs."""
 import numpy as np
 from prettytable import PrettyTable as pt
 import pandas as pd
@@ -16,6 +12,24 @@ __all__ = ['Results']
 
 
 class Results:
+    """Print and export power-flow / OPF result tables for a :class:`~pyflow_acdc.Classes.Grid`.
+
+    Methods write formatted tables to the terminal (via ``prettytable``) and
+    optionally persist DataFrames as CSV or a single Excel workbook.
+
+    Parameters
+    ----------
+    Grid : Grid
+        Network whose results are reported.
+    decimals : int, optional
+        Decimal places for printed numeric values.
+    export_location : str, optional
+        Output folder; defaults to ``pyflowacdc_res``.
+    export_type : str, optional
+        ``"csv"``, ``"excel"``, or other (no automatic file export).
+    save_res : bool, optional
+        When ``True``, write tables to ``export_location``.
+    """
     def __init__(self, Grid, decimals=2, export_location=None, export_type="csv", save_res=False):
         self.Grid = Grid
         self.dec = decimals
@@ -2038,19 +2052,11 @@ class Results:
 
     def add_period_results_to_tables(self, period_results, prefix="MP_MS_res"):
         """
-        Reads:
+        Merge multi-period OPF result dicts into ``self.tables``.
 
-        Expected structure:
-            period_results = {
-                0: {"PN": df, "price": df, ...},
-                1: {"PN": df, "price": df, ...},
-                ...
-            }
-
-        Writes:
-            self.tables["MP_MS_res_PN"] = combined_df
-            self.tables["MP_MS_res_price"] = combined_df
-            ...
+        ``period_results`` maps period index to a dict of named DataFrames
+        (e.g. ``{"PN": df, "price": df, ...}``). Combined tables are stored
+        under keys like ``"{prefix}_PN"``, ``"{prefix}_price"``, etc.
         """
 
         # collect all categories present in any investment period

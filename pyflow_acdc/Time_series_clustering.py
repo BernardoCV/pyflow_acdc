@@ -611,15 +611,34 @@ def cluster_TS(grid, n_clusters, time_series=None, central_market=None, algorith
               cv_threshold=0, correlation_threshold=0.8, print_details=False,
               correlation_decisions=None, critical_idx=None, base_critical_ratio=0.5, scaler_type='robust',
               forced_centers=None, **kwargs):
-    """
-    Main clustering function with enhanced parameter support.
+    """Cluster time-series profiles into representative operating states.
 
-    Additional Parameters:
-    --------------------
-    **kwargs : dict
-        Additional parameters passed to specific clustering algorithms:
-        - For kmedoids: method, init, max_iter, random_state, metric
-        - For kmeans: random_state, n_init, max_iter
+    Runs correlation-based reduction (:func:`identify_correlations`) and then the
+    selected clustering algorithm, optionally weighting a set of "critical"
+    rows more heavily.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid whose time series are clustered.
+    n_clusters : int
+        Number of representative states (clusters) to produce.
+    time_series, central_market : list, optional
+        Time-series selection and central-market references.
+    algorithm : str, optional
+        One of ``'kmeans'``, ``'kmedoids'``, ``'ward'``, ``'pam_hierarchical'``
+        (default ``'kmeans'``).
+    cv_threshold, correlation_threshold : float, optional
+        Coefficient-of-variation and correlation thresholds for reduction.
+    critical_idx : list, optional
+        Indices treated as critical (clustered separately).
+    base_critical_ratio : float or int, optional
+        Fraction (or count) of clusters reserved for critical rows.
+    scaler_type : str, optional
+        Scaler used before clustering (default ``'robust'``).
+    **kwargs
+        Extra algorithm-specific options, e.g. ``random_state``, ``n_init``,
+        ``max_iter`` (kmeans) or ``method``, ``init``, ``metric`` (kmedoids).
     """
     algorithm = algorithm.lower()
     valid_algorithms = {'kmeans', 'kmeans_medoids', 'ward', 'pam_hierarchical', 'kmedoids'}

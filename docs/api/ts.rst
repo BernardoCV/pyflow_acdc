@@ -12,34 +12,7 @@ Sequential AC/DC Time Series Power Flow
 Cross-sectional time series
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: TS_ACDC_PF(grid, start=1, end=99999, print_step=False)
-
-   Performs sequential AC/DC power flow for time series data.
-
-   .. list-table::
-      :widths: 20 10 50 10 
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``start``
-        - int
-        - Start time step
-        - 1
-      * - ``end``
-        - int
-        - End time step
-        - 99999
-      * - ``print_step``
-        - bool
-        - Print progress
-        - False
+.. autofunction:: pyflow_acdc.ts_acdc_pf
 
    **Returns**
 
@@ -56,19 +29,17 @@ Cross-sectional time series
 
    .. code-block:: python
 
-       pyf.TS_ACDC_PF(grid, start=1, end=24)
+       pyf.ts_acdc_pf(grid, start=1, end=24)
 
 Simple Time-Series Power Flow
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: Time_series_PF(grid)
-
-   Runs time-series power flow using the configured grid time-series inputs.
+.. autofunction:: pyflow_acdc.time_series_pf
 
 Grid Data Update Helper
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=False, n_clusters=None)
+.. autofunction:: pyflow_acdc.Time_series.update_grid_data
 
    Internal helper that applies one time-step (or one clustered state) to grid
    data before solving PF/OPF routines.
@@ -78,46 +49,10 @@ Optimal Power Flow Time Series
 
 Cross-sectional time series
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-.. py:function:: TS_ACDC_OPF(grid,start=1,end=99999,ObjRule=None ,price_zone_restrictions=False,expand=False,print_step=False)
-    
-   Performs time series optimal power flow analysis.
+.. autofunction:: pyflow_acdc.ts_acdc_opf
 
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``start``
-        - int
-        - Start time step 
-        - 1
-      * - ``end``
-        - int
-        - End time step
-        - 99999 
-      * - ``ObjRule``
-        - dict
-        - Objective rule, check :ref:`Objective Functions <obj_functions>` for more details
-        - None
-      * - ``price_zone_restrictions``
-        - bool
-        - Price zone restrictions, adds price zone restrictions to the model [1]_
-        - False
-      * - ``expand``
-        - bool
-        - Expand price zone import limits
-        - False
-      * - ``print_step``
-        - bool
-        - Print step in the terminal
-        - False
+   Objective rule (``ObjRule``) — see :ref:`Objective Functions <obj_functions>`.
+   ``price_zone_restrictions`` adds price-zone restrictions to the model [1]_.
 
    **Returns**
 
@@ -163,7 +98,7 @@ Cross-sectional time series
        TS_wl = pd.read_csv(wind_load_url)
        pyf.add_TimeSeries(grid,TS_wl)
 
-       times=pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)  
+       times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)
 
        res_dict = grid.time_series_results
 
@@ -174,30 +109,7 @@ Data handling
 Statistical Analysis
 ^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: Time_series_statistics(grid, curtail=0.99, over_loading=0.9)
-
-   Calculates statistical metrics for time series results.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid with results
-        - Required
-      * - ``curtail``
-        - float
-        - Curtailment percentile
-        - 0.99
-      * - ``over_loading``
-        - float
-        - Overloading threshold
-        - 0.9
+.. autofunction:: pyflow_acdc.time_series_statistics
 
    Calculates for each time series:
 
@@ -211,38 +123,7 @@ Statistical Analysis
 Results Export
 ^^^^^^^^^^^^^^
 
-.. py:function:: results_ts_opf(grid, excel_file_path, grid_names=None, stats=None, times=None)
-
-   Exports time series results to Excel file.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid with results
-        - Required
-      * - ``excel_file_path``
-        - str
-        - Output file path
-        - Required
-      * - ``grid_names``
-        - dict
-        - Grid name mappings
-        - None
-      * - ``stats``
-        - DataFrame
-        - Statistical results
-        - None
-      * - ``times``
-        - dict
-        - Computation times
-        - None
+.. autofunction:: pyflow_acdc.results_ts_opf
 
    Exports sheets for:
 

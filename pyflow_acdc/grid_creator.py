@@ -44,6 +44,12 @@ __all__ = [ # Grid Creation and Import
 ]
 
 def initialize_pyflowacdc():
+    """Reset all element class counters and name registries.
+
+    Needed when constructing grids manually (e.g. after a fresh ``pip`` install)
+    to clear class-level numbering/name state between grids. ``create_grid_from_data``
+    and ``create_grid_from_mat`` call this automatically.
+    """
     Node_AC.reset_class()
     Line_AC.reset_class()
     Size_selection.reset_class()
@@ -65,7 +71,22 @@ def initialize_pyflowacdc():
 
 
 def create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
+    """Create a new grid from component data tables.
 
+    Parameters
+    ----------
+    S_base : float
+        Base power in MVA.
+    AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_data : optional
+        Component data as a pandas/geopandas DataFrame or a CSV path string.
+    data_in : str, optional
+        Input data format (``'Real'``, ``'pu'`` or ``'Ohm'``).
+
+    Returns
+    -------
+    list
+        ``[grid, res]`` — the constructed :class:`Grid` and its :class:`Results`.
+    """
     if isinstance(AC_node_data, str):
         AC_node_data = pd.read_csv(AC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
     if isinstance(AC_line_data, str):
@@ -102,7 +123,22 @@ def create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_
     return [G, res]
 
 def extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
+    """Extend an existing grid with additional components from data tables.
 
+    Parameters
+    ----------
+    grid : Grid
+        Existing grid to extend (mutated in place).
+    AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_data : optional
+        Component data as a pandas/geopandas DataFrame or a CSV path string.
+    data_in : str, optional
+        Input data format (``'Real'`` or ``'pu'``).
+
+    Returns
+    -------
+    Grid
+        The extended grid.
+    """
 
     if isinstance(AC_node_data, str):
         AC_node_data = pd.read_csv(AC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
@@ -731,6 +767,38 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
 
 
 def create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=None,cable_database=None,cable_types_allowed=3,curtailment_allowed=0.05,max_turbines_per_string= None,LCoE=1,trenching_cost=1,MIP_time=None,name=None):
+    """Create a grid from a turbine array graph and metadata.
+
+    Intended for offshore wind-farm array studies: builds the grid (nodes,
+    sizing lines, renewable sources) from a turbine connectivity graph and the
+    associated turbine/cable data.
+
+    Parameters
+    ----------
+    array_graph : networkx graph
+        Turbine connectivity graph.
+    Data : object
+        Turbine/site metadata.
+    S_base : float, optional
+        Base power in MVA.
+    cable_types, cable_database, cable_types_allowed : optional
+        Candidate cable types / database and the max number selectable per line.
+    curtailment_allowed : float, optional
+        Allowed renewable curtailment fraction.
+    max_turbines_per_string : int or None, optional
+        Cap on turbines per radial string.
+    LCoE, trenching_cost : float, optional
+        Cost weights used by the sizing problem.
+    MIP_time : float or None, optional
+        Time limit for the MIP path solve.
+    name : str or None, optional
+        Grid name.
+
+    Returns
+    -------
+    list
+        ``[grid, res]`` — the constructed :class:`Grid` and its :class:`Results`.
+    """
     from .grid_modifications import add_AC_node, add_line_sizing, add_RenSource, add_extgrid, add_cable_option
     from .Classes import Cable_options, Line_AC, Line_DC
 
@@ -875,6 +943,21 @@ def create_grid_from_turbine_graph(array_graph,Data,S_base=100,cable_types=None,
     return grid, res
 
 def create_grid_from_mat(matfile):
+    """Create a grid from a MATPOWER ``.mat`` case file.
+
+    Load your MATPOWER ``.m`` case in MATLAB and save the case struct as a
+    ``.mat`` file, then pass its path here.
+
+    Parameters
+    ----------
+    matfile : str
+        Path to the ``.mat`` file (``.mat`` suffix optional).
+
+    Returns
+    -------
+    list
+        ``[grid, res]`` — the constructed :class:`Grid` and its :class:`Results`.
+    """
     if not matfile.endswith('.mat'):
         matfile = matfile + '.mat'
 
@@ -1367,6 +1450,20 @@ def create_grid_from_mat(matfile):
 
 
 def create_grid_from_pickle(path,use_dill=False):
+    """Load a previously serialized grid from a pickle/dill file.
+
+    Parameters
+    ----------
+    path : str
+        Path to the pickle (optionally gzip-compressed) file.
+    use_dill : bool, optional
+        Use ``dill`` instead of ``pickle`` for deserialization.
+
+    Returns
+    -------
+    list
+        ``[grid, res]`` — the loaded :class:`Grid` and its :class:`Results`.
+    """
     initialize_pyflowacdc()
 
     grid = load_pickle(path,use_dill)
@@ -1407,7 +1504,20 @@ def load_pickle(path, use_dill=False):
     return obj
 
 def change_S_base(grid,Sbase_new):
+    """Change the system power base of a grid (rescales per-unit quantities).
 
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify (mutated in place).
+    Sbase_new : float
+        New base power in MVA.
+
+    Returns
+    -------
+    Grid
+        The modified grid.
+    """
     Sbase_old = grid.S_base
     rate = Sbase_old/Sbase_new
     for line in grid.lines_AC:
@@ -1435,7 +1545,31 @@ def change_S_base(grid,Sbase_new):
 
 
 def create_sub_grid(grid,Area=None, Area_name = None,polygon_coords=None):
+        """Create a sub-grid from a larger grid by area or polygon.
 
+        Can be built from :class:`Area` objects, area names, or polygon
+        coordinates.
+
+        .. warning::
+            Currently unidirectional: the original grid is left in an unusable
+            state after the sub-grid is created.
+
+        Parameters
+        ----------
+        grid : Grid
+            Original grid.
+        Area : list, optional
+            Area objects defining the sub-grid.
+        Area_name : list of str, optional
+            Names of areas defining the sub-grid.
+        polygon_coords : optional
+            Polygon coordinates defining the sub-grid boundary.
+
+        Returns
+        -------
+        list
+            ``[grid, res]`` — the sub-grid and its :class:`Results`.
+        """
         ac_nodes_list=[]
         dc_nodes_list=[]
         opz=None

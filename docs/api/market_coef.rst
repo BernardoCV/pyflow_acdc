@@ -11,7 +11,7 @@ Price Zone Coefficient Analysis
 Obtain price zone coefficients
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: price_zone_coef_data(df, start, end, increase_eq_price=50)
+.. autofunction:: pyflow_acdc.price_zone_coef_data
 
    Analyzes market data to generate price zone coefficients.
 
@@ -72,7 +72,7 @@ Obtain price zone coefficients
 Export data to csv
 ^^^^^^^^^^^^^^^^^^
 
-.. py:function:: price_zone_data_pd(data,save_csv=None)
+.. autofunction:: pyflow_acdc.price_zone_data_pd
 
    Converts market data to pandas DataFrame and saves it to a csv file.
 
@@ -98,7 +98,7 @@ Visualization
 
 Generates plots of market curves.
 
-.. py:function:: plot_curves(data, hour, name=None)
+.. autofunction:: pyflow_acdc.plot_curves
 
    Creates visualization of market curves.
 
@@ -161,7 +161,7 @@ For the use of entsoe data cleaning, the data has to be structured as follows:
 This is the name of the files when downloaded from ENTSO-E transparency platform.
 
 
-.. py:function:: clean_entsoe_data(key_list, year_list, production_types=[], output_excel=None,path=None):
+.. autofunction:: pyflow_acdc.clean_entsoe_data
     
    Process generation and load data for multiple areas/years and save to Excel.
 

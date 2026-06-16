@@ -22,12 +22,14 @@ __all__ = [
 
 
 def pol2cart(r, theta):
+    """Convert polar coordinates to Cartesian. Returns ``(x, y)``."""
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     return x, y
 
 
 def pol2cartz(r, theta):
+    """Convert polar coordinates to a complex number ``x + jy``."""
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     z = x + 1j * y
@@ -35,18 +37,42 @@ def pol2cartz(r, theta):
 
 
 def cart2pol(x, y):
+    """Convert Cartesian coordinates to polar. Returns ``(rho, theta)``."""
     rho = np.sqrt(x**2 + y**2)
     theta = np.arctan2(y, x)
     return rho, theta
 
 
 def cartz2pol(z):
+    """Convert a complex number to polar coordinates. Returns ``(r, theta)``."""
     r = np.abs(z)
     theta = np.angle(z)
     return r, theta
 
 
 def converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Filter_uF, f=50):
+    """Convert converter transformer/reactor/filter data to per-unit values.
+
+    Parameters
+    ----------
+    S_base : float
+        System power base in MVA.
+    kV_base : float
+        Voltage base in kV.
+    T_R_Ohm, T_X_mH : float
+        Transformer resistance (ohm) and inductance (mH).
+    PR_R_Ohm, PR_X_mH : float
+        Phase-reactor resistance (ohm) and inductance (mH).
+    Filter_uF : float
+        Filter capacitance in microfarad.
+    f : float, optional
+        System frequency in Hz (default 50).
+
+    Returns
+    -------
+    list
+        ``[T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu]`` in per unit.
+    """
     Z_base = kV_base**2 / S_base  # kv^2/MVA
     Y_base = 1 / Z_base
 
@@ -68,6 +94,36 @@ def converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Fi
 
 
 def cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1, f=50):
+    """Convert cable data to per-unit equivalent parameters and rating.
+
+    For DC cables (``L_mH == 0``) ``N_cables`` is forced to 1 and a 2-conductor
+    MVA rating is used; otherwise a 3-phase (``sqrt(3)``) rating is used.
+
+    Parameters
+    ----------
+    S_base : float
+        System power base in MVA.
+    R : float
+        Series resistance per km (ohm/km).
+    L_mH, C_uF, G_uS : float
+        Per-km inductance (mH), capacitance (microF), and shunt conductance
+        (microS).
+    A_rating : float
+        Current rating in A.
+    kV_base : float
+        Voltage base in kV.
+    km : float
+        Cable length in km.
+    N_cables : int, optional
+        Number of parallel cables (default 1).
+    f : float, optional
+        System frequency in Hz (default 50).
+
+    Returns
+    -------
+    list
+        ``[Rpu, Xpu, Gpu, Bpu, MVA_rating]`` (per-unit parameters + MVA rating).
+    """
     Z_base = kV_base**2 / S_base  # kv^2/MVA
     Y_base = 1 / Z_base
 
@@ -112,6 +168,17 @@ def cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
 
 
 def grid_state(grid):
+    """Return aggregate load and generation bounds for the current grid.
+
+    Sums AC+DC load and the min/max dispatchable generation (conventional
+    generators and renewable sources, accounting for unit counts and external
+    grids).
+
+    Returns
+    -------
+    tuple
+        ``(total_load, min_generation, max_generation)`` in per unit.
+    """
     Total_load = 0
     min_generation = 0
     max_generation = 0
@@ -137,6 +204,19 @@ def grid_state(grid):
 
 
 def analyse_grid(grid):
+    """Detect enabled grid features and store them on the grid object.
+
+    Sets boolean flags on ``grid`` describing which subsystems/features are
+    present (``ACmode``, ``DCmode``, ``TEP_AC``, ``REC_AC``, ``TAP_tf``,
+    ``CT_AC``, ``CFC``, ``CDC``, ``GPR``, ``rs_GPR``, ``act_gen``). Called at the
+    start of the power-flow / OPF / TEP entry points to configure model
+    building.
+
+    Returns
+    -------
+    tuple
+        ``(ACmode, DCmode, [TEP_AC, TAP_tf, REC_AC, CT_AC], [CFC, CDC], GPR)``.
+    """
     def _has_positive_planned_install(element):
         planned = getattr(element, "planned_installation", 0)
         if isinstance(planned, np.ndarray):

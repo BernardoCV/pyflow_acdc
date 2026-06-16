@@ -11,7 +11,7 @@ Add Grid Components
 Add AC Node
 ^^^^^^^^^^^^	
 
-.. py:function:: add_AC_node(grid, kV_base, node_type='PQ', Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1, Gs=0, Bs=0, x_coord=None, y_coord=None, geometry=None)
+.. autofunction:: pyflow_acdc.add_AC_node
 
    Adds an AC node to the grid.
 
@@ -127,7 +127,7 @@ Add AC Node
 Add AC Line
 ^^^^^^^^^^^^
 
-.. py:function:: add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in='pu',Cable_type:str ='Custom',update_grid=True):
+.. autofunction:: pyflow_acdc.add_line_AC
     
    Adds an AC line to the grid.
 
@@ -329,7 +329,7 @@ Line sizing
 Add Cable Options
 ~~~~~~~~~~~~~~~~~
 
-.. py:function:: add_cable_option(grid, cable_types: list,name=None)
+.. autofunction:: pyflow_acdc.add_cable_option
 
    Adds a cable option to the grid. This is a list that will link different line sizing options to one singular cable type list, so that only a set maximum number of different ones are used.
 
@@ -380,7 +380,7 @@ Add Cable Options
 Add Line sizing
 ~~~~~~~~~~~~~~~
 
-.. py:function:: add_line_sizing(grid, fromNode, toNode, cable_types: list=[], active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None,update_grid=True,geometry=None)
+.. autofunction:: pyflow_acdc.add_line_sizing
 
    Adds a line sizing to the grid.
 
@@ -454,7 +454,7 @@ Add Line sizing
 Add DC Node
 ^^^^^^^^^^^^
 
-.. py:function:: add_DC_node(grid, kV_base, node_type='P', Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None, Umin=0.95, Umax=1.05, x_coord=None, y_coord=None, geometry=None)
+.. autofunction:: pyflow_acdc.add_DC_node
 
    Adds a DC node to the grid.
 
@@ -550,7 +550,7 @@ Add DC Node
 Add DC Line
 ^^^^^^^^^^^^
 
-.. py:function:: add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,A_rating=None,polarity='m', name=None,geometry=None,Cable_type:str ='Custom',data_in='pu',update_grid=True):
+.. autofunction:: pyflow_acdc.add_line_DC
     
    Adds a DC line to the grid.
 
@@ -657,7 +657,7 @@ Add DC Line
 Add AC/DC Converter
 ^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_ACDC_converter(grid, AC_node, DC_node, AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max=None, nConvP=1, polarity=1, lossa=1.103, lossb=0.887, losscrect=2.885, losscinv=4.371, Ucmin=0.85, Ucmax=1.2, name=None, geometry=None)
+.. autofunction:: pyflow_acdc.add_ACDC_converter
 
    Adds an AC/DC converter to the grid.
 
@@ -810,7 +810,7 @@ Add AC/DC Converter
 Add Generator
 ^^^^^^^^^^^^^^
 
-.. py:function:: add_gen(grid, node_name, gen_name=None, price_zone_link=False, lf=0, qf=0, MWmax=99999, MWmin=0, MVArmin=None, MVArmax=None, PsetMW=0, QsetMVA=0, Smax=None, fuel_type='Other', geometry=None)
+.. autofunction:: pyflow_acdc.add_gen
 
    Adds a generator to the grid.
 
@@ -858,7 +858,7 @@ Add Generator
 Add Renewable Source
 ^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_RenSource(grid, node_name, base, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', np_rsgen=1)
+.. autofunction:: pyflow_acdc.add_RenSource
 
    Adds a renewable energy source to the grid.
 
@@ -906,7 +906,7 @@ Add Renewable Source
 Add Price Zone
 ^^^^^^^^^^^^^^	
 
-.. py:function:: add_price_zone(grid, name, price, import_pu_L=1, export_pu_G=1, a=0, b=1, c=0, import_expand_pu=0)
+.. autofunction:: pyflow_acdc.add_price_zone
 
    Adds a price zone to the grid.
 
@@ -950,35 +950,35 @@ Add Price Zone
 Add DCDC Converter
 ^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_DCDC_converter(grid, fromNode, toNode, P_MW=None, Pset=None, R_Ohm=None, r=0.0001, MW_rating=99999, name=None, geometry=None)
+.. autofunction:: pyflow_acdc.add_DCDC_converter
 
    Adds a DC/DC converter between two DC nodes.
 
 Add DC Generator
 ^^^^^^^^^^^^^^^^
 
-.. py:function:: add_gen_DC(grid, node_name, gen_name=None, price_zone_link=False, lf=0, qf=0, fc=0, MWmax=99999, MWmin=0, PsetMW=0, fuel_type='Other', geometry=None, installation_cost=0, np_gen=1)
+.. autofunction:: pyflow_acdc.add_gen_DC
 
    Adds a generator connected to a DC node.
 
 Add External Grid
 ^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_extgrid(grid, node, gen_name=None, price_zone_link=False, lf=0, qf=0, MVAmax=99999, MWmax=None, MVArmin=None, MVArmax=None, Allow_sell=True, P_load_MW=0)
+.. autofunction:: pyflow_acdc.add_extgrid
 
    Adds an external grid equivalent as a generator-like source.
 
 Bulk Add Generators
 ^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_generators(grid, Gen_csv, curtailmet_allowed=1)
+.. autofunction:: pyflow_acdc.add_generators
 
    Adds multiple generators from tabular input.
 
 Add Renewable Source Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_RenSource_zone(grid, name)
+.. autofunction:: pyflow_acdc.add_RenSource_zone
    :no-index:
 
    Adds a renewable source zone object.
@@ -988,21 +988,21 @@ Add Renewable Source Zone
 Add MTDC Price Zone
 ^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_MTDC_price_zone(grid, name, linked_price_zones=None, pricing_strategy='avg')
+.. autofunction:: pyflow_acdc.add_MTDC_price_zone
 
    Adds an MTDC price zone linked to existing price zones.
 
 Add Offshore Price Zone
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_offshore_price_zone(grid, main_price_zone, name)
+.. autofunction:: pyflow_acdc.add_offshore_price_zone
 
    Adds an offshore price zone linked to a main/onshore price zone.
 
 Add Time Series
 ^^^^^^^^^^^^^^^
 
-.. py:function:: add_TimeSeries(grid, Time_Series_data, associated=None, TS_type=None, name=None)
+.. autofunction:: pyflow_acdc.add_TimeSeries
    :no-index:
 
    Adds time-series data to grid elements.
@@ -1012,21 +1012,21 @@ Add Time Series
 Add Investment Series
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_inv_series(grid, inv_data, associated=None, inv_type=None, name=None)
+.. autofunction:: pyflow_acdc.add_inv_series
 
    Adds dynamic investment-period series data to supported elements.
 
 Add Generator Mix Limits
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: add_gen_mix_limits(grid, mix_data)
+.. autofunction:: pyflow_acdc.add_gen_mix_limits
 
    Adds generation-mix constraint data for optimization workflows.
 
 Assign Node to Price Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^^	
 
-.. py:function:: assign_nodeToPrice_Zone(grid, node_name, ACDC, new_price_zone_name)
+.. autofunction:: pyflow_acdc.assign_nodeToPrice_Zone
 
    Assigns a node to a price zone.
 
@@ -1059,22 +1059,22 @@ Assign Node to Price Zone
 Assign Converter to Price Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: assign_ConvToPrice_Zone(grid, conv_name, new_price_zone_name)
+.. autofunction:: pyflow_acdc.assign_ConvToPrice_Zone
 
    Assigns an AC/DC converter to a price zone.
 
 Template and Import Helpers
 ---------------------------
 
-.. py:function:: create_inv_csv_template(grid, file_path=None, exclude=None)
+.. autofunction:: pyflow_acdc.create_inv_csv_template
 
    Creates a CSV template for dynamic investment-series input.
 
-.. py:function:: create_gen_limit_csv_template(grid, file_path=None)
+.. autofunction:: pyflow_acdc.create_gen_limit_csv_template
 
    Creates a CSV template for generation mix limit input.
 
-.. py:function:: import_orbit_cables(data=None, column_map=None, default_type='AC', name_prefix='NREL', save_yaml=False, source_url='https://github.com/NLRWindSystems/ORBIT/tree/dev/library/cables')
+.. autofunction:: pyflow_acdc.import_orbit_cables
 
    Imports/normalizes ORBIT-style cable data into the cable database format.
 
@@ -1085,7 +1085,7 @@ Line Modifications
 Change Line to Expandable
 ^^^^^^^^^^^^^^^^^^^^^^^^^    
 
-.. py:function:: change_line_AC_to_expandable(grid, line_name)
+.. autofunction:: pyflow_acdc.change_line_AC_to_expandable
 
    Converts an AC line to an expandable line.
 
@@ -1112,7 +1112,7 @@ Change Line to Expandable
 Change Line to Reconducting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: change_line_AC_to_reconducting(grid, line_name, r_new, x_new, g_new, b_new, MVA_rating_new, Life_time, base_cost)
+.. autofunction:: pyflow_acdc.change_line_AC_to_reconducting
 
    Converts an AC line to a reconducting line.
 
@@ -1169,7 +1169,7 @@ Change Line to Reconducting
 Change Line to Transformer
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: change_line_AC_to_tap_transformer(grid, line_name)
+.. autofunction:: pyflow_acdc.change_line_AC_to_tap_transformer
 
    Converts an AC line to a tap-changing transformer.
 

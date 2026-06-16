@@ -1,10 +1,10 @@
 <img src="docs/images/logo_dark.svg" align="right" width="200px">
 
-# PyFlow ACDC
+# pyflow-acdc
 A python-based tool for the design and analysis of hybrid AC/DC grids
 
 
-PyFlow ACDC is a program worked on by ADOreD Project 
+pyflow-acdc is a program worked on by ADOreD Project by CITCEA-UPC and Youwind
 
 This project has received funding from the European Union’s  Horizon Europe 
 Research and Innovation programme under the Marie Skłodowska-Curie grant 
@@ -46,10 +46,7 @@ https://www.sciencedirect.com/science/article/pii/S0142061525010075
 
 **For array optimization:**
 ```
-B. C. Valerio, P. M. Gebraad, M. Cheah-Mane, V. Lacerda, and O. Gomis-
-Bellmunt, “Strategies for wind park inter-array optimisation through mixed in-
-teger linear programming,” in Proceedings of the TORQUE 2026 Conference,
-2026, to be published in Journal of Physics: Conference Series [under review].
+Castro Valerio, B., Gebraad, P. M. O., Cheah-Mane, M., A. Lacerda, V., and Gomis-Bellmunt, O.: A multi-stage methodology for wind park inter-array cabling: graph preparation, layout, and sizing, Wind Energ. Sci. Discuss. [preprint], https://doi.org/10.5194/wes-2026-53, in review, 2026.
 
 ```
 

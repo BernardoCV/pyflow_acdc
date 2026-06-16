@@ -3,28 +3,11 @@ Results
 
 The Results class provides methods for analyzing and displaying power flow results. Results are printed in the terminal with the use of prettytable.
 
-Class Attributes
-----------------
+Class Reference
+---------------
 
-.. py:class:: Results(Grid, decimals=2, export=None)
-
-    .. list-table::
-       :widths: 20 80 20
-       :header-rows: 1
-
-       * - Attribute
-         - Description     
-         - default
-       * - Grid
-         - The power grid object containing the network data.
-         - Required
-       * - decimals
-         - Number of decimal places to round results to.
-         - 2
-       * - export
-         - Path to export results to CSV files.
-         - None
-
+.. autoclass:: pyflow_acdc.Results
+   :no-members:
 
 Class Methods
 -------------
@@ -33,14 +16,14 @@ Options
 ^^^^^^^
 
 
-.. py:method:: options()
+.. automethod:: pyflow_acdc.Results.options
 
    Prints a list of all available results methods.
 
 All
 ^^^
 
-.. py:method:: all()
+.. automethod:: pyflow_acdc.Results.all
 
    Displays all available results for both AC and DC grids including:
    
@@ -65,7 +48,7 @@ All
    - :ref:`Transmission expansion <res_TEP_N>`
    - :ref:`Normalized transmission expansion <res_TEP_norm>`
 
-.. py:method:: all_ac()
+.. automethod:: pyflow_acdc.Results.all_ac
 
    Displays results for AC grid only:
    
@@ -75,7 +58,7 @@ All
    - :ref:`AC slack bus info <res_ac_slack>`
    - :ref:`AC power losses <res_ac_power_loss>`
 
-.. py:method:: all_dc()
+.. automethod:: pyflow_acdc.Results.all_dc
 
    Displays results for DC grid only:
    
@@ -85,7 +68,7 @@ All
    - :ref:`DC power losses <res_dc_power_loss>`
 
 .. _res_slack_all:
-.. py:method:: slack_all()
+.. automethod:: pyflow_acdc.Results.slack_all
 
    Displays slack bus information for both AC and DC grids.
 
@@ -98,14 +81,14 @@ By running the following code, the results will be printed in the terminal.
 
    import pyflow_acdc as pyf
 
-   grid,res = pyf.Stagg5MATACDC()
-   pyf.ACDC_sequential(grid)
+   grid,res = pyf.cases['Stagg5MATACDC']()
+   pyf.acdc_sequential(grid)
    res.all()
 
 
 .. _res_ac_powerflow:
 
-.. py:method:: ac_powerflow()
+.. automethod:: pyflow_acdc.Results.ac_powerflow
 
    Displays AC power flow, split into differnet asynchronous grids. Results include:
    
@@ -135,7 +118,7 @@ By running the following code, the results will be printed in the terminal.
       
 
 .. _res_ac_voltage:
-.. py:method:: ac_voltage()
+.. automethod:: pyflow_acdc.Results.ac_voltage
 
    Displays AC voltage results including:
    
@@ -159,7 +142,7 @@ By running the following code, the results will be printed in the terminal.
 
 
 .. _res_ac_lines_current:
-.. py:method:: ac_lines_current()
+.. automethod:: pyflow_acdc.Results.ac_lines_current
 
    Displays AC line current results including:
    
@@ -185,7 +168,7 @@ By running the following code, the results will be printed in the terminal.
       +------+----------+--------+-------------+-----------+-----------+----------------+
 
 .. _res_ac_lines_power:
-.. py:method:: ac_lines_power()
+.. automethod:: pyflow_acdc.Results.ac_lines_power
 
    Displays AC line power flow results including:
    
@@ -210,7 +193,7 @@ By running the following code, the results will be printed in the terminal.
       +------+----------+--------+-------------+---------------+-----------+-----------+-----------------+---------------+
 
 .. _res_ac_slack:
-.. py:method:: slack_ac()
+.. automethod:: pyflow_acdc.Results.slack_ac
 
    Displays slack bus information for AC grid.
 
@@ -225,7 +208,7 @@ By running the following code, the results will be printed in the terminal.
 
 
 .. _res_ac_power_loss:
-.. py:method:: power_loss_ac()
+.. automethod:: pyflow_acdc.Results.power_loss_ac
 
    Displays power loss information for AC grid.   
 
@@ -245,7 +228,7 @@ DC Specific Results
 
 .. _res_dc_bus:
 
-.. py:method:: dc_bus()
+.. automethod:: pyflow_acdc.Results.dc_bus
 
    Displays DC bus results including:
    
@@ -269,7 +252,7 @@ DC Specific Results
       +------+----------------+-----------------+---------------------------+---------------------+--------------+
 
 .. _res_dc_lines_current:
-.. py:method:: dc_lines_current()
+.. automethod:: pyflow_acdc.Results.dc_lines_current
 
    Displays DC line current results including:
    
@@ -292,7 +275,7 @@ DC Specific Results
 
 
 .. _res_dc_lines_power:
-.. py:method:: dc_lines_power()
+.. automethod:: pyflow_acdc.Results.dc_lines_power
 
    Displays DC line power flow results including:
    
@@ -314,7 +297,7 @@ DC Specific Results
 
 
 .. _res_dc_slack:
-.. py:method:: slack_dc() 
+.. automethod:: pyflow_acdc.Results.slack_dc
 
    Displays slack bus information for DC grid.
 
@@ -330,7 +313,7 @@ DC Specific Results
 
 
 .. _res_dc_power_loss:
-.. py:method:: power_loss_dc()
+.. automethod:: pyflow_acdc.Results.power_loss_dc
 
    Displays power loss information for DC grid.
 
@@ -349,7 +332,7 @@ Optimization Results
 
 
 .. _res_ext_gen:
-.. py:method:: ext_gen()
+.. automethod:: pyflow_acdc.Results.ext_gen
 
    Displays external generator results including:
    
@@ -371,7 +354,7 @@ Optimization Results
       +-----------+------+------------+-----------------------+-------------------------+--------------------+-----------+---------+
 
 .. _res_ext_ren:
-.. py:method:: ext_ren()
+.. automethod:: pyflow_acdc.Results.ext_ren
 
    Displays renewable sources results including:
    
@@ -398,7 +381,7 @@ Optimization Results
       +-------+-----------------+---------------+---------------------+--------------------------------+-------------+---------+-----------------------+
 
 .. _res_objective:
-.. py:method:: obj_res()
+.. automethod:: pyflow_acdc.Results.obj_res
 
    Displays function value for all optimization functions.
 
@@ -424,7 +407,7 @@ Price Zone optimization
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _res_price_zone:
-.. py:method:: Price_zone()
+.. automethod:: pyflow_acdc.Results.price_zone
 
    Displays price zone results
 
@@ -469,7 +452,7 @@ Treansmission expansion
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _res_TEP_N:
-.. py:method:: tep_n()
+.. automethod:: pyflow_acdc.Results.tep_n
 
    Displays transmission expansion results 
    
@@ -486,7 +469,7 @@ Treansmission expansion
       +---------+---------+---------+-------------+---------+-----------------------------+--------------------+
 
 .. _res_TEP_norm:
-.. py:method:: tep_norm()
+.. automethod:: pyflow_acdc.Results.tep_norm
 
    Displays NPV objective function value for transmission expansion results
 
@@ -513,7 +496,7 @@ Other Results
 ^^^^^^^^^^^^^^^
 
 .. _res_converter:
-.. py:method:: converter()
+.. automethod:: pyflow_acdc.Results.converter
 
    Displays converter results including:
    
@@ -542,7 +525,7 @@ Other Results
       +-----------+-----------------+-----------------+-----------+----------------+
 
 .. _res_power_loss:
-.. py:method:: power_loss()
+.. automethod:: pyflow_acdc.Results.power_loss
 
    Displays power loss information for both AC and DC grids.
 

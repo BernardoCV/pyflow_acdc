@@ -13,80 +13,56 @@ Running the OPF
 
 This flow sets up and solves the AC 'dc linear' OPF. It creates the :ref:`model <L_model_creation>`, optionally adds TEP/REC/CT investment variables, and solves with a Pyomo solver. Results are then exported back to the `grid`.
 
+.. autofunction:: pyflow_acdc.optimal_l_pf
+
 .. code-block:: python
 
-   
    import pyflow_acdc as pyf
 
-   pyf.Optimal_L_PF(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False)
+   pyf.optimal_l_pf(grid, ObjRule=None, OnlyGen=True, Price_Zones=False, solver='glpk', tee=False)
 
 .. _L_model_creation:
 
 Creating the Linear OPF model
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. function:: opf_create_l_model_ac(model, grid, TEP=False)
+.. autofunction:: pyflow_acdc.AC_OPF_L_model.opf_create_l_model_ac
 
-   Creates the AC 'dc linear' OPF model.
+**Variables**
 
-   .. list-table::
-      :widths: 20 10 50
-      :header-rows: 1
+The linear OPF includes variables for:
 
-      * - Parameter
-        - Type
-        - Description
-      * - ``model``
-        - Model
-        - Pyomo model to populate
-      * - ``grid``
-        - Grid
-        - Grid to optimize
-      * - ``Price_Zones``
-        - bool
-        - Enable price zone constraints (if applicable)
-      * - ``TEP``
-        - bool
-        - Enable TEP investment variables (lines/generators)
+- AC node angles
+- Generator active power
+- Renewable generation via availability and curtailment factors
+- AC line active power flows
 
-   **Variables**
+**Constraints**
 
-   The linear OPF includes variables for:
+The model enforces constraints for:
 
-   - AC node angles
-   - Generator active power 
-   - Renewable generation via availability and curtailment factors
-   - AC line active power flows
-   
+- AC nodal active power balance (linearized)
+- Generator aggregation at nodes
+- Renewable injection aggregation at nodes
+- AC branch linearized power flow equations
+- Thermal limits (including linear big-M formulations for REC/CT states)
+- Slack angle constraints
+- Optional array network-flow conservation and investment-linking
+- Optional investment bounds for generators and lines (if TEP)
 
-   **Constraints**
+.. code-block:: python
 
-   The model enforces constraints for:
-
-   - AC nodal active power balance (linearized)
-   - Generator aggregation at nodes
-   - Renewable injection aggregation at nodes
-   - AC branch linearized power flow equations
-   - Thermal limits (including linear big-M formulations for REC/CT states)
-   - Slack angle constraints
-   - Optional array network-flow conservation and investment-linking
-   - Optional investment bounds for generators and lines (if TEP)
-
-   **Example**
-
-   .. code-block:: python
-
-      from pyflow_acdc.AC_OPF_L_model import opf_create_l_model_ac
-      model = opf_create_l_model_ac(model, grid, TEP=False)
+   from pyflow_acdc.AC_OPF_L_model import opf_create_l_model_ac
+   opf_create_l_model_ac(model, grid, TEP=False)
 
 TEP/REC/CT Parameters and Variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. function:: TEP_parameters(model, grid, AC_info, DC_info, Conv_info)
+.. autofunction:: pyflow_acdc.AC_OPF_L_model.TEP_parameters
 
    Sets parameters for TEP/REC/CT decisions (e.g., base multiplicities, initial configs, limits).
 
-.. function:: TEP_variables(model, grid)
+.. autofunction:: pyflow_acdc.AC_OPF_L_model.TEP_variables
 
    Adds investment variables:
    - Generator multiplicities (optional integer bounded by capability)
@@ -98,7 +74,7 @@ TEP/REC/CT Parameters and Variables
 Exporting Results
 ^^^^^^^^^^^^^^^^^
 
-.. function:: export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=None, tee=False)
+.. autofunction:: pyflow_acdc.AC_OPF_L_model.export_acdc_l_model_to_pyflow_acdc
 
    Exports Pyomo solution back to the `grid` (internal helper; not exported from
    ``pyflow_acdc`` top level — called by :func:`optimal_l_pf`):

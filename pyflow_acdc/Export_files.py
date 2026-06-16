@@ -472,6 +472,17 @@ def {file_name}():
 
 
 def save_pickle(grid, path, compress=True, use_dill=False):
+    """Serialize ``grid`` to a pickle (or dill) file for reload via :func:`create_grid_from_pickle`.
+
+    Parameters
+    ----------
+    path : str
+        Output file path (parent directories are created if needed).
+    compress : bool, optional
+        Write gzip-compressed pickle when ``True``.
+    use_dill : bool, optional
+        Use ``dill`` instead of ``pickle`` when ``True``.
+    """
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     lib = _dill if (use_dill and _dill is not None) else pickle
     protocol = pickle.HIGHEST_PROTOCOL
@@ -486,11 +497,11 @@ def save_pickle(grid, path, compress=True, use_dill=False):
 
 
 def save_grid_to_file(grid, file_name,folder_name=None):
-    """
-    Save the generated main code to a .py file.
+    """Export ``grid`` to a runnable Python loader file.
 
-    :param main_code: The code to save to the file.
-    :param file_name: The name of the file where the code will be saved.
+    Generates Python code that reconstructs the grid (same pattern as the bundled
+    ``example_grids`` cases) and writes it to ``file_name`` (optionally under
+    ``folder_name``).
     """
 
     main_code= generate_loading_code(grid,file_name)
@@ -730,7 +741,14 @@ def gather_grid_data(grid):
 
 
 def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
+    """Export ``grid`` to a MATPOWER-style MATLAB ``.m`` case file.
 
+    Parameters
+    ----------
+    dcpol : int, optional
+        DC polarity code written into the MATACDC export. Only one polarity can
+        be chosen for all DC grids in the file.
+    """
     base,node_ac_data,line_ac_data,node_dc_data,line_dc_data,conv_data,gen_data,gen_cost_data = gather_grid_data(grid)
 
     if folder_name is not None:

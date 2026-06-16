@@ -8,12 +8,9 @@ functions are found in pyflow_acdc.ACDC_PF
 Running the Power Flow
 ----------------------
 
-For a simple power flow, the function :py:func:`Power_flow` can be used. This function will automatically detect the type of power flow to run (AC, DC or AC/DC) and will run the appropriate power flow.
+For a simple power flow, the function :py:func:`~pyflow_acdc.power_flow` can be used. This function will automatically detect the type of power flow to run (AC, DC or AC/DC) and will run the appropriate power flow.
 
-.. py:function:: Power_flow(grid,tol_lim=1e-10, maxIter=100)
-
-   Performs power flow calculation.
-
+.. autofunction:: pyflow_acdc.power_flow
 
 
 AC Power Flow
@@ -122,37 +119,7 @@ The Newton-Raphson iteration is then:
 Running the AC Power Flow
 ^^^^^^^^^^^^^^^^^^^^^^^^^	
 
-.. py:function:: AC_PowerFlow(grid, tol_lim=1e-8, maxIter=100)
-
-   Performs AC power flow calculation.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``tol_lim``
-        - float
-        - Convergence tolerance
-        - 1e-8
-      * - ``maxIter``
-        - int
-        - Maximum iterations
-        - 100
-
-
-   **Example**
-
-   .. code-block:: python
-
-       time,tol = pyf.AC_PowerFlow(grid)
+.. autofunction:: pyflow_acdc.ac_power_flow
 
 DC Power Flow
 -------------
@@ -230,36 +197,7 @@ Where :math:`P_{conv_0}` is the target power in pu of the converter, :math:`U_i`
 Running the DC Power Flow
 ^^^^^^^^^^^^^^^^^^^^^^^^^	
 
-.. py:function:: DC_PowerFlow(grid, tol_lim=1e-8, maxIter=100)
-
-   Performs DC power flow calculation.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``tol_lim``
-        - float
-        - Convergence tolerance
-        - 1e-8
-      * - ``maxIter``
-        - int
-        - Maximum iterations
-        - 100
-
-   **Example**
-
-   .. code-block:: python
-
-       time,tol = pyf.DC_PowerFlow(grid)
+.. autofunction:: pyflow_acdc.dc_power_flow
 
 Sequential AC/DC Power Flow
 ---------------------------
@@ -284,45 +222,7 @@ The sequential solver will compare the :math:`P_{conv}` of converters in the AC 
 
 Running the Sequential AC/DC Power Flow
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-.. py:function:: ACDC_sequential(grid, tol_lim=1e-8, maxIter=20, change_slack2Droop=False, QLimit=False)
-
-   Performs sequential AC/DC power flow calculation.
-
-   .. list-table::
-      :widths: 20 10 50 10 
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``tol_lim``
-        - float
-        - Convergence tolerance
-        - 1e-8
-      * - ``maxIter``
-        - int
-        - Maximum iterations
-        - 20
-      * - ``change_slack2Droop``
-        - bool
-        - Change slack to droop control
-        - False
-      * - ``QLimit``
-        - bool
-        - Enable converter Q limits
-        - False
-
-
-   **Example**
-
-   .. code-block:: python
-
-       time,tol,ps_iterations = pyf.ACDC_sequential(grid)
+.. autofunction:: pyflow_acdc.acdc_sequential
 
 **References**
 
