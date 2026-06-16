@@ -1157,12 +1157,12 @@ def _initialize_MPTEP_sets_model(model,grid):
         model.ren_sources = pyo.Set(
             initialize=[i for i, rs in enumerate(grid.RenSources) if getattr(rs, "np_rsgen_mp", False)]
         )
-    standalone_pairs = identify_standalone_rs_conv_pairs(
-        grid,
-        ren_source_ids=model.ren_sources,
-        conv_ids=model.conv if (grid.ACmode and grid.DCmode) else None,
-    )
-    model.standalone_rs_conv_pairs = pyo.Set(dimen=2, initialize=standalone_pairs)
+        standalone_pairs = identify_standalone_rs_conv_pairs(
+            grid,
+            ren_source_ids=model.ren_sources,
+            conv_ids=model.conv if (grid.ACmode and grid.DCmode) else None,
+        )
+        model.standalone_rs_conv_pairs = pyo.Set(dimen=2, initialize=standalone_pairs)
 
 
 def _period_base_cost(element, i):
