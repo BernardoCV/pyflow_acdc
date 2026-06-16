@@ -67,7 +67,7 @@ def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YE
 
     # Export results to grid
     export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
-                                            tee=tee)
+                                            tee=tee, time_limit=time_limit)
 
     if OPEX:
         obj = {ObjComponent.ENERGY_COST.value: 1}
@@ -397,14 +397,6 @@ def AC_constraints_ortools(solver, grid, AC_info, gen_info, gen_vars, ac_vars):
             solver.Add(connections <= nAC.ct_limit,
                         f'ct_node_limit_rule_{node}')
 
-    # Crossing constraints
-    for ct_crossing in grid.crossing_groups:
-        solver.Add(
-            sum(ac_vars['ct_branch'][line, ct]
-                for line in grid.crossing_groups[ct_crossing]
-                for ct in cab_types_set) <= 1,
-            f'ct_crossings_rule_{ct_crossing}')
-
     # ── McCormick envelope + power-flow linking for CT lines ─────────────
     for line in lista_lineas_AC_ct:
         l = grid.lines_AC_ct[line]
@@ -585,7 +577,7 @@ def set_objective_ortools(solver, grid, gen_vars, ac_vars, OPEX=True,
 # ── Export results back to grid ─────────────────────────────────────────────
 
 def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
-                                             tee=True):
+                                             tee=True, time_limit=None):
     """Write solver results into the pyflow_acdc grid object.
 
     Must be called *after* ``solve_ortools_model`` – solution values are
@@ -668,7 +660,7 @@ def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
         line.i_to = abs(P_ji)
 
     # Fix oversizing if solver hit time limit
-    if solver.wall_time() >= solver.time_limit() * 0.99:
+    if time_limit is not None and solver.wall_time() >= time_limit * 0.99:
         try:
             from .AC_OPF_L_model import (analyze_oversizing_issues_grid,
                                           apply_oversizing_fixes_grid)

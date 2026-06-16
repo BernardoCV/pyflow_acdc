@@ -651,13 +651,6 @@ def AC_constraints_gurobi(model, grid, AC_info, gen_info, gen_vars, ac_vars):
                 name=f"ct_node_limit_rule_{node}"
             )
 
-    # Crossings rule - limit cable types in crossing groups
-    for ct_crossing in grid.crossing_groups:
-        model.addConstr(
-            sum(ac_vars['ct_branch'][line, ct] for line in grid.crossing_groups[ct_crossing] for ct in cab_types_set) <= 1,
-            name=f"ct_crossings_rule_{ct_crossing}"
-        )
-
     # McCormick envelope constraints for z variables
     for line in lista_lineas_AC_ct:
         l = grid.lines_AC_ct[line]

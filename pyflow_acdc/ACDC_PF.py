@@ -287,7 +287,7 @@ def jacobian_dc(grid, V_DC, P,Droop_PF):
                 if m != n:
                     if grid.Ybus_DC[m, n] != 0:
                         line = grid.get_lineDC_by_nodes(m, n)
-                        G = line.np_line / line.R
+                        G = line.np_line / line.r
                         J[m, n] = -line.pol * G * V[m] * V[n]
                 else:
                     J[m, n] = P[m, 0]
@@ -299,7 +299,7 @@ def jacobian_dc(grid, V_DC, P,Droop_PF):
                         if a != m:
                             if grid.Ybus_DC[m, a] != 0:
                                 line = grid.get_lineDC_by_nodes(m, a)
-                                G = line.np_line / line.R
+                                G = line.np_line / line.r
                                 J[m, n] += line.pol * G * V[m] * V[m]
 
         else:
@@ -335,7 +335,7 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
                 if k != i:
                     if grid.Ybus_DC[i, k] != 0:
                         line = grid.get_lineDC_by_nodes(i, k)
-                        G = line.np_line / line.R
+                        G = line.np_line / line.r
                         P[i] += line.pol*V[i]*(V[i]-V[k])*G
 
         for node in grid.nodes_DC:
@@ -382,7 +382,7 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
             if k != i:
                 if grid.Ybus_DC[i, k] != 0:
                     line = grid.get_lineDC_by_nodes(i, k)
-                    G = line.np_line / line.R
+                    G = line.np_line / line.r
                     Pf[i] += line.pol*V[i]*(V[i]-V[k])*G
         grid.nodes_DC[i].V = V[i]
         node.P_INJ = Pf[i].item()
@@ -670,7 +670,7 @@ def jacobian_conv_no_transformer(grid, conv, U_c, Pc, Qc, Ps, Qs):
     J_conv[1, 0] = -Ps-conv.Gc*conv.U_s*conv.U_s
 
     # Uc*dQs/dU_c
-    J_conv[1, 1] = Qs-(conv.Bf+conv.Bc)*conv.U_s*conv.U_s
+    J_conv[1, 1] = Qs-(conv.bf+conv.Bc)*conv.U_s*conv.U_s
 
     return J_conv
 
@@ -734,13 +734,13 @@ def jacobian_conv(grid, conv, Qcf, Qsf, Pcf, Psf, U_f, U_c, Pc, Qc, Ps, Qs):
     J_conv[3, 2] = Qcf-conv.Bc*U_f*U_f
 
     # Uf*dF2/dUf
-    J_conv[3, 3] = Qcf-Qsf+(conv.Bc+conv.Btf+2*conv.Bf)*U_f*U_f
+    J_conv[3, 3] = Qcf-Qsf+(conv.Bc+conv.Btf+2*conv.bf)*U_f*U_f
 
     return J_conv
 
 def flow_conv(grid, conv, tol_lim=CONV_TOLERANCE, maxIter=DEFAULT_CONV_MAX_ITER):
 
-    if conv.Bf == 0:
+    if conv.bf == 0:
         tol = flow_conv_no_filter(grid,conv, tol_lim, maxIter)
 
     elif conv.Gtf == 0:
@@ -875,10 +875,10 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     th_c = conv.th_c
 
 
-    Bf = conv.Bf    * conv.np_conv
+    Bf = conv.bf    * conv.np_conv
     Gc  = conv.Gc   * conv.np_conv
     Bc  = conv.Bc   * conv.NumConv
-    Bf  = conv.Bf   * conv.np_conv
+    Bf  = conv.bf   * conv.np_conv
 
 
     Pc_known = -np.copy(conv.P_DC)
@@ -978,12 +978,12 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
     th_f = conv.th_f
     th_c = conv.th_c
 
-    Bf = conv.Bf    * conv.np_conv
+    Bf = conv.bf    * conv.np_conv
     Gc  = conv.Gc   * conv.np_conv
     Bc  = conv.Bc   * conv.np_conv
     Gtf = conv.Gtf  * conv.np_conv
     Btf = conv.Btf  * conv.np_conv
-    Bf  = conv.Bf   * conv.np_conv
+    Bf  = conv.bf   * conv.np_conv
 
 
     Pc_known = -np.copy(conv.P_DC)

@@ -1479,6 +1479,39 @@ def create_grid_from_pickle(path,use_dill=False):
     res = Results(grid, decimals=3)
     return [grid, res]
 
+def _migrate_legacy_line_rxgb(line):
+    """Rename pre-0.6.0 pickle branch attrs (R/X/G/B) to lowercase."""
+    for old, new in (
+        ('R', 'r'), ('X', 'x'), ('G', 'g'), ('B', 'b'),
+        ('R_new', 'r_new'), ('X_new', 'x_new'), ('G_new', 'g_new'), ('B_new', 'b_new'),
+        ('R_list', 'r_list'), ('X_list', 'x_list'), ('G_list', 'g_list'), ('B_list', 'b_list'),
+    ):
+        if not hasattr(line, new) and hasattr(line, old):
+            setattr(line, new, getattr(line, old))
+
+
+def _migrate_legacy_converter_impedance(conv):
+    """Rename pre-0.6.0 pickle converter impedance attrs to lowercase."""
+    for old, new in (
+        ('R_t', 'r_t'), ('X_t', 'x_t'),
+        ('PR_R', 'pr_r'), ('PR_X', 'pr_x'),
+        ('Bf', 'bf'),
+    ):
+        if not hasattr(conv, new) and hasattr(conv, old):
+            setattr(conv, new, getattr(conv, old))
+
+
+def _migrate_legacy_grid_attrs(grid):
+    """Apply pickle attribute renames once after deserialization."""
+    for line in (
+        grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
+        + grid.lines_AC_tf + grid.lines_AC_ct + grid.lines_DC
+    ):
+        _migrate_legacy_line_rxgb(line)
+    for conv in grid.Converters_ACDC:
+        _migrate_legacy_converter_impedance(conv)
+
+
 def load_pickle(path, use_dill=False):
     """Load a Grid object from a pickle/dill file.
 
@@ -1501,6 +1534,7 @@ def load_pickle(path, use_dill=False):
             obj = lib.load(f)
     if not isinstance(obj, Grid):
         raise TypeError(f"Expected a Grid object, got {type(obj).__name__}")
+    _migrate_legacy_grid_attrs(obj)
     return obj
 
 def change_S_base(grid,Sbase_new):

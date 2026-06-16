@@ -721,7 +721,7 @@ def case_118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed
                     if exp_220== 'Reconducting':
                         if N_b==-1 or N_b ==2:
                             continue
-                        row={'Line_id': name, 'r_new': line.R, 'x_new': line.X, 'b_new': line.B, 'MVA_rating_new': 900, 'base_cost':275000*line.Length_km}
+                        row={'Line_id': name, 'r_new': line.r, 'x_new': line.x, 'b_new': line.b, 'MVA_rating_new': 900, 'base_cost':275000*line.Length_km}
                         upgradable_data.append(row)
                     elif exp_220 == 'Expandable':
                         if N_b == -1:
@@ -734,7 +734,7 @@ def case_118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed
                     if exp_380== 'Reconducting':
                         if N_b==-1 or N_b ==2:
                             continue
-                        row={'Line_id': name, 'r_new': line.R, 'x_new': line.X, 'b_new': line.B, 'MVA_rating_new': 2369, 'base_cost':550000*line.Length_km}
+                        row={'Line_id': name, 'r_new': line.r, 'x_new': line.x, 'b_new': line.b, 'MVA_rating_new': 2369, 'base_cost':550000*line.Length_km}
                         upgradable_data.append(row)
                     elif exp_380 == 'Expandable':
                         if N_b == -1:

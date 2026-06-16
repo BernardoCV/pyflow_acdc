@@ -848,11 +848,11 @@ class Grid:
             line = self.lines_DC[k]
             fromNode = line.fromNode.nodeNumber
             toNode = line.toNode.nodeNumber
-            if line.R ==0:
-                s=1
-            self.Ybus_DC[fromNode, toNode] -= line.np_line/line.R
+            if line.r ==0:
+                raise ValueError("Resistance of line is 0, DC lines can not be 0 resistance")
+            self.Ybus_DC[fromNode, toNode] -= line.np_line/line.r
             self.Ybus_DC[toNode, fromNode] = self.Ybus_DC[fromNode, toNode]
-            self.Ybus_DC_full[fromNode, toNode] -= line.np_line*line.pol/line.R
+            self.Ybus_DC_full[fromNode, toNode] -= line.np_line*line.pol/line.r
             self.Ybus_DC_full[toNode, fromNode] = self.Ybus_DC_full[fromNode, toNode]
 
         # Diagonal elements
@@ -2022,13 +2022,13 @@ class Line_AC:
     toNode : Node_AC
         Ending bus of the line.
     r : float, optional
-        Resistance in pu (stored as ``R``).
+        Resistance in pu.
     x : float, optional
-        Reactance in pu (stored as ``X``).
+        Reactance in pu.
     g : float, optional
-        Conductance in pu (stored as ``G``).
+        Conductance in pu.
     b : float, optional
-        Susceptance in pu (stored as ``B``).
+        Susceptance in pu.
     MVA_rating : float, optional
         MVA rating of the line.
     Length_km : float, optional
@@ -2164,10 +2164,10 @@ class Line_AC:
         self.toNode = toNode
         self.kV_base = toNode.kV_base
 
-        self.R = r
-        self.X = x
-        self.G = g
-        self.B = b
+        self.r = r
+        self.x = x
+        self.g = g
+        self.b = b
         self.MVA_rating = MVA_rating
 
         self.m =m
@@ -2238,7 +2238,7 @@ class Line_AC:
     def Cable_type(self, new_type):
         self._Cable_type = new_type
         if new_type != CableType.CUSTOM:
-            self.R, self.X, self.G, self.B, self.MVA_rating = self.get_cable_parameters(
+            self.r, self.x, self.g, self.b, self.MVA_rating = self.get_cable_parameters(
                 new_type, self.S_base, self.Length_km, self.N_cables,self.kV_base)
             self._calculate_Ybus_branch()
 
@@ -2256,8 +2256,8 @@ class Line_AC:
         - Ytf: admittance at to-bus to from-bus
         - Ytt: admittance at to-bus to to-bus
         """
-        self.Z = self.R + self.X * 1j
-        self.Y = self.G + self.B * 1j
+        self.Z = self.r + self.x * 1j
+        self.Y = self.g + self.b * 1j
 
         branch_ft = -(1/self.Z)/np.conj(self.tap)
         branch_tf = -(1/self.Z)/self.tap
@@ -2334,10 +2334,10 @@ class rec_Line_AC(Line_AC):
         self.rec_line_opf=True
         self.planned_installation = 0
 
-        self.R_new = r_new
-        self.X_new = x_new
-        self.G_new = g_new
-        self.B_new = b_new
+        self.r_new = r_new
+        self.x_new = x_new
+        self.g_new = g_new
+        self.b_new = b_new
         self.MVA_rating_new = MVA_rating_new
 
         self.ts_max_loading = 0
@@ -2366,8 +2366,8 @@ class rec_Line_AC(Line_AC):
         - Ytt: admittance at to-bus to to-bus
         """
         # Calculate new impedance and admittance
-        self.Z_new = self.R_new + self.X_new * 1j
-        self.Y_new = self.G_new + self.B_new * 1j
+        self.Z_new = self.r_new + self.x_new * 1j
+        self.Y_new = self.g_new + self.b_new * 1j
 
         # Calculate new branch elements
         branch_ft_new = -(1/self.Z_new)/np.conj(self.tap)
@@ -2448,10 +2448,10 @@ class Size_selection(Line_AC):
         self._active_config = active_config
         self.direction = 'from'
         # Initialize parameter lists
-        self.R_list = []
-        self.X_list = []
-        self.G_list = []
-        self.B_list = []
+        self.r_list = []
+        self.x_list = []
+        self.g_list = []
+        self.b_list = []
         self.MVA_rating_list = []
         self.base_cost = []
         self.Ybus_list = []
@@ -2518,24 +2518,24 @@ class Size_selection(Line_AC):
             # No cable selected or no cable types available
             self._set_zero_parameters()
         else:
-            if self._active_config >= len(self.R_list):
-                self._active_config = len(self.R_list) - 1
-            self.R = self.R_list[self._active_config]
-            self.X = self.X_list[self._active_config]
-            self.G = self.G_list[self._active_config]
-            self.B = self.B_list[self._active_config]
-            self.Z = self.R + self.X * 1j
-            self.Y = self.G + self.B * 1j
+            if self._active_config >= len(self.r_list):
+                self._active_config = len(self.r_list) - 1
+            self.r = self.r_list[self._active_config]
+            self.x = self.x_list[self._active_config]
+            self.g = self.g_list[self._active_config]
+            self.b = self.b_list[self._active_config]
+            self.Z = self.r + self.x * 1j
+            self.Y = self.g + self.b * 1j
             self.MVA_rating = self.MVA_rating_list[self._active_config]
             self.Ybus_branch = self.Ybus_list[self._active_config]  # Use stored matrix
             self.max_active_config = self.MVA_rating_list.index(max(self.MVA_rating_list))
 
     def _set_zero_parameters(self):
         """Set all parameters to zero (no cable selected)."""
-        self.R = 0
-        self.X = 0
-        self.G = 0
-        self.B = 0
+        self.r = 0
+        self.x = 0
+        self.g = 0
+        self.b = 0
         self.Z = 0 + 0j
         self.Y = 0 + 0j
         self.MVA_rating = 0
@@ -2544,16 +2544,16 @@ class Size_selection(Line_AC):
     def _calculate_all_parameters(self):
         """Calculate and store parameters for all configurations."""
         # Initialize parameter lists
-        self.R_list = []
-        self.X_list = []
-        self.G_list = []
-        self.B_list = []
+        self.r_list = []
+        self.x_list = []
+        self.g_list = []
+        self.b_list = []
         self.MVA_rating_list = []
         self.base_cost = []
         self.Ybus_list = []
 
         for cable_type in self._cable_types:
-            R, X, G, B, MVA_rating = self.get_cable_parameters(
+            r, x, g, b, MVA_rating = self.get_cable_parameters(
                 cable_type,
                 self.S_base,
                 self.Length_km,
@@ -2561,16 +2561,16 @@ class Size_selection(Line_AC):
                 self.kV_base
             )
 
-            self.R_list.append(R)
-            self.X_list.append(X)
-            self.G_list.append(G)
-            self.B_list.append(B)
+            self.r_list.append(r)
+            self.x_list.append(x)
+            self.g_list.append(g)
+            self.b_list.append(b)
             self.MVA_rating_list.append(MVA_rating)
 
             cost_per_km = self.get_cost_parameter(cable_type)
             self.base_cost.append(cost_per_km * self.Length_km)
 
-            Ybus_branch = self.local_Ybus_branch(R,X,G,B)
+            Ybus_branch = self.local_Ybus_branch(r,x,g,b)
             self.Ybus_list.append(Ybus_branch)
 
         # Set initial parameters
@@ -2782,12 +2782,12 @@ class TF_Line_AC:
         self.fromNode = fromNode
         self.toNode = toNode
         self.direction = 'from'
-        self.R = r
-        self.X = x
-        self.G = g
-        self.B = b
-        self.Z = self.R + self.X * 1j
-        self.Y = self.G + self.B * 1j
+        self.r = r
+        self.x = x
+        self.g = g
+        self.b = b
+        self.Z = self.r + self.x * 1j
+        self.Y = self.g + self.b * 1j
         self.kV_base = kV_base
         self.MVA_rating = MVA_rating
 
@@ -2839,7 +2839,7 @@ class Line_DC:
     toNode : Node_DC
         Ending bus of the line.
     r : float, optional
-        Resistance in pu (stored as ``R``).
+        Resistance in pu.
     MW_rating : float, optional
         MW rating of one cable.
     km : float, optional
@@ -3000,7 +3000,7 @@ class Line_DC:
             'lambda_capex': [self.lambda_capex],
         }
 
-        self.R = r
+        self.r = r
         self.MW_rating = MW_rating
         self.Length_km=km
 
@@ -3050,8 +3050,8 @@ class Line_DC:
         if hasattr(self, '_S_base'):
             old_S_base = self._S_base
             rate = old_S_base / new_S_base
-            if self.R is not None and old_S_base != new_S_base:
-                self.R *= rate
+            if self.r is not None and old_S_base != new_S_base:
+                self.r *= rate
         self._S_base = new_S_base
     @property
     def Cable_type(self):
@@ -3061,7 +3061,7 @@ class Line_DC:
     def Cable_type(self, new_type):
         self._Cable_type = new_type
         if new_type != CableType.CUSTOM:
-            self.R, self.MW_rating = self.get_cable_parameters(new_type, self.S_base, self.Length_km, self.np_line,self.kV_base)
+            self.r, self.MW_rating = self.get_cable_parameters(new_type, self.S_base, self.Length_km, self.np_line,self.kV_base)
 
 class CFC_DC:
     CFC_num = 0
@@ -3092,15 +3092,15 @@ class AC_DC_converter:
     P_DC : float, optional
         Active power injection at the DC side in pu.
     Transformer_resistance : float, optional
-        Transformer resistance in pu (stored as ``R_t``, scaled by polarity).
+        Transformer resistance in pu (scaled by polarity).
     Transformer_reactance : float, optional
-        Transformer reactance in pu (stored as ``X_t``).
+        Transformer reactance in pu.
     Phase_Reactor_R : float, optional
-        Phase-reactor resistance in pu (stored as ``PR_R``).
+        Phase-reactor resistance in pu.
     Phase_Reactor_X : float, optional
-        Phase-reactor reactance in pu (stored as ``PR_X``).
+        Phase-reactor reactance in pu.
     Filter : float, optional
-        Filter susceptance in pu (stored as ``Bf``).
+        Filter susceptance in pu.
     Droop : float, optional
         Droop rate (stored as ``Droop_rate``).
     kV_base : float, optional
@@ -3208,12 +3208,12 @@ class AC_DC_converter:
         if hasattr(self, '_S_base'):
             old_S_base = self._S_base
             rate = old_S_base / new_S_base
-            if self.R is not None and old_S_base != new_S_base:
-                self.R_t *= rate
-                self.X_t *= rate
-                self.PR_R *= rate
-                self.PR_X *= rate
-                self.Bf *= rate
+            if hasattr(self, 'r_t') and old_S_base != new_S_base:
+                self.r_t *= rate
+                self.x_t *= rate
+                self.pr_r *= rate
+                self.pr_x *= rate
+                self.bf *= rate
                 self.P_DC *= rate
                 self.P_AC *= rate
                 self.Q_AC *= rate
@@ -3223,14 +3223,14 @@ class AC_DC_converter:
 
 
     def Z_Y_parameters(self):
-            self.Ztf = self.R_t+1j*self.X_t
-            self.Zc = self.PR_R+1j*self.PR_X
-            if self.Bf != 0:
-                self.Zf = 1/(1j*self.Bf)
+            self.Ztf = self.r_t+1j*self.x_t
+            self.Zc = self.pr_r+1j*self.pr_x
+            if self.bf != 0:
+                self.Zf = 1/(1j*self.bf)
             else:
                 self.Zf = 0
 
-            if self.R_t != 0:
+            if self.r_t != 0:
                 self.Y_tf = 1/self.Ztf
                 self.Gtf = np.real(self.Y_tf)
                 self.Btf = np.imag(self.Y_tf)
@@ -3238,7 +3238,7 @@ class AC_DC_converter:
                 self.Gtf = 0
                 self.Btf = 0
 
-            if self.PR_R != 0:
+            if self.pr_r != 0:
                 self.Y_c = 1/self.Zc
                 self.Gc = np.real(self.Y_c)
                 self.Bc = np.imag(self.Y_c)
@@ -3317,11 +3317,11 @@ class AC_DC_converter:
 
         self.type = DC_type
 
-        self.R_t = Transformer_resistance/self.cn_pol
-        self.X_t = Transformer_reactance /self.cn_pol
-        self.PR_R = Phase_Reactor_R /self.cn_pol
-        self.PR_X = Phase_Reactor_X /self.cn_pol
-        self.Bf = Filter * self.cn_pol
+        self.r_t = Transformer_resistance/self.cn_pol
+        self.x_t = Transformer_reactance /self.cn_pol
+        self.pr_r = Phase_Reactor_R /self.cn_pol
+        self.pr_x = Phase_Reactor_X /self.cn_pol
+        self.bf = Filter * self.cn_pol
         self.P_DC = P_DC
         self.P_AC = P_AC
         self.Q_AC = Q_AC

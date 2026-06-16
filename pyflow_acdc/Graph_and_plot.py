@@ -188,7 +188,7 @@ def update_lineDC_hovertext(line,S_base,text):
         tonode = line.toNode.name
         np_line = np.round(line.np_line, decimals=1)
         installation_cost = _installation_cost_meur(line)
-        r= np.round(line.R,decimals=5)
+        r= np.round(line.r,decimals=5)
         l = int(line.Length_km)
         rating = np.round(line.MW_rating, decimals=0)
         rating_total = np.round(line.capacity_MW, decimals=0)

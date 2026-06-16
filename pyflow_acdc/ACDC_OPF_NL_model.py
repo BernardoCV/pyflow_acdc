@@ -1160,7 +1160,7 @@ def DC_constraints(model,grid,TEP=False):
                 if Y != 0:
                     line = grid.get_lineDC_by_nodes(i, k)
                     pol = line.pol
-                    G = 1/line.R
+                    G = 1/line.r
 
                     P_sum += pol*model.V_DC[i] * (model.V_DC[i]-model.V_DC[k])*(G)*model.NumLinesDCP[line.lineNumber]
 
@@ -1184,7 +1184,7 @@ def DC_constraints(model,grid,TEP=False):
         f = l.fromNode.nodeNumber
         t = l.toNode.nodeNumber
         pol = l.pol
-        G = 1/l.R
+        G = 1/l.r
 
         Pfrom = (model.V_DC[f] - model.V_DC[t]) * G * model.V_DC[f] * pol
 
@@ -1197,7 +1197,7 @@ def DC_constraints(model,grid,TEP=False):
         f = l.fromNode.nodeNumber
         t = l.toNode.nodeNumber
         pol = l.pol
-        G = 1/l.R
+        G = 1/l.r
 
 
         Pto = (model.V_DC[t] - model.V_DC[f]) * G * model.V_DC[t] * pol
@@ -1329,9 +1329,9 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
        Bc  = element.Bc
        Gtf = element.Gtf
        Btf = element.Btf
-       Bf  = element.Bf
+       Bf  = element.bf
 
-       if element.Bf == 0:
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
@@ -1372,9 +1372,9 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
        Bc = element.Bc
        Gtf = element.Gtf
        Btf = element.Btf
-       Bf = element.Bf
+       Bf = element.bf
 
-       if element.Bf == 0:
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
@@ -1415,9 +1415,9 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
        Bc = element.Bc
        Gtf = element.Gtf
        Btf = element.Btf
-       Bf = element.Bf
+       Bf = element.bf
 
-       if element.Bf == 0:
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
@@ -1458,9 +1458,9 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
        Bc = element.Bc
        Gtf = element.Gtf
        Btf = element.Btf
-       Bf = element.Bf
+       Bf = element.bf
 
-       if element.Bf == 0:
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
@@ -1500,7 +1500,7 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
 
 
-       if element.Bf == 0 or element.Gtf == 0:
+       if element.bf == 0 or element.Gtf == 0:
         return pyo.Constraint.Skip
 
        else:
@@ -1508,7 +1508,7 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
            Bc = element.Bc
            Gtf = element.Gtf
            Btf = element.Btf
-           Bf = element.Bf
+           Bf = element.bf
 
            Psf = model.Uf[conv]*model.Uf[conv]*Gtf-model.Uf[conv]*model.V_AC[nAC] * \
                (Gtf*pyo.cos(model.theta_AC[nAC]-model.th_f[conv])-Btf*pyo.sin(model.theta_AC[nAC]-model.th_f[conv]))
@@ -1529,7 +1529,7 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
        constraints = pyo.ConstraintList()
 
-       if element.Bf == 0 or element.Gtf == 0:
+       if element.bf == 0 or element.Gtf == 0:
         return pyo.Constraint.Skip
 
        else:
@@ -1538,7 +1538,7 @@ def Converter_constraints(model,grid,Conv_info,TEP=False):
            Bc = element.Bc
            Gtf = element.Gtf
            Btf = element.Btf
-           Bf = element.Bf
+           Bf = element.bf
 
 
            Qsf = -model.Uf[conv]**2*Btf+model.Uf[conv]*model.V_AC[nAC] * \
