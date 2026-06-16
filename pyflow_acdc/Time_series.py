@@ -20,6 +20,8 @@ from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD,
 # Base __all__ with functions that don't require OPF
 __all__ = ['time_series_pf',
            'ts_acdc_pf',
+           'ts_ac_pf',
+           'ts_dc_pf',
            'time_series_statistics',
            'update_grid_data']
 
@@ -53,13 +55,15 @@ def find_value_from_cdf(cdf, x):
     return None
 
 def time_series_pf(grid):
-    if grid.nodes_AC == None:
+    if grid.nodes_AC is None:
         print("only DC")
-    elif grid.nodes_DC == None:
+        ts_dc_pf(grid)
+    elif grid.nodes_DC is None:
         print("only AC")
+        ts_ac_pf(grid)
     else:
         print("Sequential")
-        grid.TS_ACDC_PF(grid)
+        ts_acdc_pf(grid)
 
 def combine_TS(ts_list, rep_year=False):
     """Combines multiple time series while maintaining the order of the input list.
@@ -177,8 +181,8 @@ def update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
     for node in grid.nodes_AC:
         if node.type == NodeType.SLACK:
-            PGi = (node.P_INJ - node.P_s - node.PGi_ren * node.curtailment + node.PLi).item()
-            QGi = node.Q_INJ - node.Q_s - node.Q_s_fx + node.QLi
+            PGi = node.gen_P_injection().item()
+            QGi = node.gen_Q_injection()
             if node.S_rating !=0:
                 loading = np.sqrt(PGi**2 + QGi**2) / node.S_rating
             else:
@@ -510,6 +514,106 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
         grid.time_series_results['converter_loading'] = to_dataframe(Time_series_conv_res)
     grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
  
+    grid.Time_series_ran = True
+
+
+def ts_ac_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    idx = start-1
+    TS_len = len(grid.Time_series[0].data)
+    if end is None:
+        end = TS_len
+    max_time = min(TS_len, end)
+
+    Time_series_res = []
+    Time_series_line_res = []
+    Time_series_grid_loading = []
+    analyse_grid(grid)
+
+    while idx < max_time:
+        for ts in grid.Time_series:
+            update_grid_data(grid, ts, idx)
+        ac_power_flow(grid, tol_lim, maxIter)
+
+        with ThreadPoolExecutor() as executor:
+            future_row_data = executor.submit(update_ac_nodes, grid, idx)
+            future_line_data = executor.submit(calculate_line_loading, grid, idx)
+            row_data = future_row_data.result()
+            line_data, loadS_AC, loadP_DC = future_line_data.result()
+
+        grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC, idx)
+        row_data['time'] = idx+1
+        Time_series_res.append(row_data)
+        line_data['time'] = idx+1
+        Time_series_line_res.append(line_data)
+        grid_data_loading['time'] = idx+1
+        Time_series_grid_loading.append(grid_data_loading)
+
+        if print_step:
+            print(idx+1)
+        idx += 1
+
+    def to_dataframe(data):
+        return pd.DataFrame(data).set_index('time')
+    grid.time_series_results['PF_results'] = to_dataframe(Time_series_res)
+    line_data_df = to_dataframe(Time_series_line_res)
+    ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
+    ac_mw_to = line_data_df.filter(like='AC_to_', axis=1)
+    ac_loading.columns = ac_loading.columns.str.replace('AC_Load_', '', regex=False)
+    ac_mw_to.columns = ac_mw_to.columns.str.replace('AC_to_', '', regex=False)
+    grid.time_series_results['ac_loading'] = ac_loading
+    grid.time_series_results['ac_MW_to'] = ac_mw_to
+    grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
+
+    grid.Time_series_ran = True
+
+
+def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    idx = start-1
+    TS_len = len(grid.Time_series[0].data)
+    if end is None:
+        end = TS_len
+    max_time = min(TS_len, end)
+
+    Time_series_res = []
+    Time_series_line_res = []
+    Time_series_grid_loading = []
+    analyse_grid(grid)
+
+    while idx < max_time:
+        for ts in grid.Time_series:
+            update_grid_data(grid, ts, idx)
+        dc_power_flow(grid, tol_lim, maxIter)
+
+        with ThreadPoolExecutor() as executor:
+            future_row_data = executor.submit(update_ac_nodes, grid, idx)
+            future_line_data = executor.submit(calculate_line_loading, grid, idx)
+            row_data = future_row_data.result()
+            line_data, loadS_AC, loadP_DC = future_line_data.result()
+
+        grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC, idx)
+        row_data['time'] = idx+1
+        Time_series_res.append(row_data)
+        line_data['time'] = idx+1
+        Time_series_line_res.append(line_data)
+        grid_data_loading['time'] = idx+1
+        Time_series_grid_loading.append(grid_data_loading)
+
+        if print_step:
+            print(idx+1)
+        idx += 1
+
+    def to_dataframe(data):
+        return pd.DataFrame(data).set_index('time')
+    grid.time_series_results['PF_results'] = to_dataframe(Time_series_res)
+    line_data_df = to_dataframe(Time_series_line_res)
+    dc_loading = line_data_df.filter(like='DC_Load_', axis=1)
+    dc_mw_to = line_data_df.filter(like='DC_to_', axis=1)
+    dc_loading.columns = dc_loading.columns.str.replace('DC_Load_', '', regex=False)
+    dc_mw_to.columns = dc_mw_to.columns.str.replace('DC_to_', '', regex=False)
+    grid.time_series_results['dc_loading'] = dc_loading
+    grid.time_series_results['dc_MW_to'] = dc_mw_to
+    grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
+
     grid.Time_series_ran = True
 
 

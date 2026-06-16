@@ -22,10 +22,45 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   implementations and emit `DeprecationWarning`.
 - `pyproject.toml`: `keywords`, a `Homepage` URL, and `pytest-cov` in the
   `[tests]` extra.
+- `ts_ac_pf` and `ts_dc_pf`: AC-only and DC-only time-series power-flow
+  helpers (mirroring `ts_acdc_pf`), exported at the top level.
 
 ### Changed
 - Objective-weight defaults are now built from a single factory instead of
   three duplicated literal dicts.
+- Node active/reactive generation expressions are centralized on `Node_AC`
+  (`gen_P_injection`, `gen_Q_injection`, `gen_P_total`, `gen_Q_total`,
+  `gen_P_node_aggregate`), replacing duplicated formulas in `Time_series`,
+  `Results_class`, and `Graph_and_plot`. The slack and PV reactive
+  back-calculations (which were identical) now share `gen_Q_injection`.
+  **Behavior change:** the non-OPF forward generation sums now scale per-unit
+  generator/renewable output by the parallel-unit counts (`np_gen` /
+  `np_rsgen`); previously these counts were ignored outside the OPF path.
+- Power flow now populates per-node generation aggregates as a single source of
+  truth: `Node_AC.PGi_ren`/`QGi_ren` (renewable: `Σ rs.PGi_ren*rs.gamma*rs.np_rsgen`
+  active, `Σ rs.QGi_ren*rs.np_rsgen` reactive — reactive is not curtailed) and
+  `Node_AC.PGi_opt`/`QGi_opt` (connected-generator dispatch: `Σ gen.PGen`/`Σ gen.QGen`).
+  The known-power vectors are now `PGi + PGi_ren + PGi_opt - PLi` (and the reactive
+  analog). The DC path mirrors the active side, and `Node_DC` gained `PGi_ren` /
+  `PGi_opt` attributes. The converter `P_AC`/`Q_AC` back-calculation in
+  `ACDC_PF.acdc_sequential` now reads these node attributes instead of recomputing
+  the sums inline. **Behavior change:** for renewable sources with `np_rsgen > 1`
+  the power-flow injection now includes the parallel-unit count (and the renewable
+  reactive contribution, previously omitted entirely from `Q_AC`).
+- `Gen_AC`/`Gen_DC` now initialize `PGen`/`QGen` as the **total** output
+  (`Pset * np_gen` / `Qset * np_gen`) instead of the per-unit setpoint, making
+  `PGen` consistently the total dispatch both before and after an OPF solve
+  (`Pset`/`Qset` remain the per-unit inputs). The power-flow known-power vectors
+  therefore use `Σ gen.PGen` / `Σ gen.QGen` directly. **Behavior change:** for
+  generators with `np_gen > 1`, the power-flow injection and `PGen`-derived
+  reporting (e.g. loading) now reflect the full parallel-unit output, which was
+  previously omitted in the pre-OPF state.
+
+### Removed
+- `Node_AC.curtailment` (a node-level scalar that was always `1` and never
+  assigned): curtailment is modeled per `Ren_Source` via `gamma`/`min_gamma`,
+  and `PGi_ren` already reflects it, so the redundant factor was dropped from
+  the node generation expressions.
 - **Namespace narrowing:** accidentally re-exported internals (e.g.
   `pyflow_acdc.NodeType`) are no longer in the top-level namespace now that
   every module declares `__all__`. Use `pyflow_acdc.constants.<Name>` or a
@@ -69,3 +104,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - `kappa_sensitivity` no longer references undefined `model.discount_rate`;
   it now uses `present_value_factor(Hy, discount_rate, n_years)` like the other
   TEP sensitivity helpers (fixes `AttributeError` at runtime).
+- `time_series_pf` no longer calls the non-existent `grid.TS_ACDC_PF` attribute
+  (which raised `AttributeError` for AC/DC grids); it now routes to the
+  module-level `ts_dc_pf` (DC-only), `ts_ac_pf` (AC-only), or `ts_acdc_pf`
+  (sequential). Also replaced `== None` comparisons with `is None`.

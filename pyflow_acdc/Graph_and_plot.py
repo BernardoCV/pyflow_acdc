@@ -72,7 +72,7 @@ def update_ACnode_hovertext(node,S_base,text):
             name = node.name
             V = np.round(node.V, decimals=dec)
             theta = np.round(node.theta, decimals=dec)
-            PGi= node.PGi+node.PGi_ren*node.curtailment +node.PGi_opt
+            PGi= node.gen_P_node_aggregate()
             Gen =  np.round(PGi, decimals=dec)
             Load = np.round(node.PLi, decimals=dec)
             conv = np.round(node.P_s, decimals=dec)
@@ -82,7 +82,7 @@ def update_ACnode_hovertext(node,S_base,text):
             name = node.name
             V = int(np.round(node.V*node.kV_base, decimals=0))
             theta = int(np.round(np.degrees(node.theta), decimals=0))
-            PGi= node.PGi+node.PGi_ren*node.curtailment  +node.PGi_opt
+            PGi= node.gen_P_node_aggregate()
             Gen =  int(np.round(PGi*S_base, decimals=0))
             Load = int(np.round(node.PLi*S_base, decimals=0))
             conv = int(np.round(node.P_s*S_base, decimals=0))

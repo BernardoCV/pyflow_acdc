@@ -683,10 +683,16 @@ class Grid:
     
     def update_p_dc(self):
 
+        for node in self.nodes_DC:
+            # Aggregate dispatched renewable the node sees (availability * dispatch * parallel units).
+            node.PGi_ren = sum(rs.PGi_ren*rs.gamma*rs.np_rsgen for rs in node.connected_RenSource)
+            # Aggregate connected-generator dispatch the node sees (PGen is total output).
+            node.PGi_opt = sum(gen.PGen for gen in node.connected_gen)
+
         self.P_DC = np.vstack([node.PGi-node.PLi
                                +node.PconvDC
-                               +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
-                               +sum(gen.PGen for gen in node.connected_gen)
+                               +node.PGi_ren
+                               +node.PGi_opt
                                 for node in self.nodes_DC])
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
         
@@ -695,13 +701,23 @@ class Grid:
         for node in self.nodes_AC:
             node.Q_s_fx=sum(self.Converters_ACDC[conv].Q_AC for conv  in node.connected_conv if self.Converters_ACDC[conv].AC_type==NodeType.PQ)
             node.Q_s   = sum(self.Converters_ACDC[conv].Q_AC for conv  in node.connected_conv if self.Converters_ACDC[conv].AC_type!=NodeType.PQ)
+            # Aggregate dispatched renewable the node sees (availability * dispatch * parallel units).
+            # Populated here so it acts as a known negative load during power flow.
+            node.PGi_ren = sum(rs.PGi_ren*rs.gamma*rs.np_rsgen for rs in node.connected_RenSource)
+            # Renewable reactive is not curtailed (no gamma), only scaled by parallel units.
+            node.QGi_ren = sum(rs.QGi_ren*rs.np_rsgen for rs in node.connected_RenSource)
+            # Aggregate connected-generator dispatch the node sees (PGen/QGen are total output).
+            node.PGi_opt = sum(gen.PGen for gen in node.connected_gen)
+            node.QGi_opt = sum(gen.QGen for gen in node.connected_gen)
         # # Negative means power leaving the system, positive means injected into the system at a node  
        
         self.P_AC = np.vstack([node.PGi
-                               +sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
-                               +sum(gen.PGen for gen in node.connected_gen)
+                               +node.PGi_ren
+                               +node.PGi_opt
                                -node.PLi for node in self.nodes_AC])
-        self.Q_AC = np.vstack([node.QGi+sum(gen.QGen for gen in node.connected_gen)
+        self.Q_AC = np.vstack([node.QGi
+                                +node.QGi_ren
+                                +node.QGi_opt
                                -node.QLi +node.Q_s_fx for node in self.nodes_AC])
         self.Ps_AC = np.vstack([node.P_s for node in self.nodes_AC])
         self.Qs_AC = np.vstack([node.Q_s for node in self.nodes_AC])
@@ -1175,8 +1191,10 @@ class Gen_AC:
         
         node.connected_gen.append(self)
         
-        self.PGen=Pset
-        self.QGen=Qset
+        # PGen/QGen are the total output (per-unit setpoint * parallel units); after an
+        # OPF solve they hold the optimized dispatch. Pset/Qset remain the per-unit input.
+        self.PGen=Pset*np_gen
+        self.QGen=Qset*np_gen
         
         self.Pset=Pset
         self.Qset=Qset
@@ -1298,7 +1316,9 @@ class Gen_DC:
         
         node.connected_gen.append(self)
         
-        self.PGen=Pset
+        # PGen is the total output (per-unit setpoint * parallel units); after an OPF
+        # solve it holds the optimized dispatch. Pset remains the per-unit input.
+        self.PGen=Pset*np_gen
        
         self.Pset=Pset
        
@@ -1575,6 +1595,7 @@ class Node_AC:
         
         self.QGi = Reactive_Gained
         self.QGi_opt =0
+        self.QGi_ren = 0
         self.QLi = Reactive_load
         
        
@@ -1600,7 +1621,6 @@ class Node_AC:
         self.ct_limit=None
         self.max_turbines_per_string=99
         self.pu_power_limit=None
-        self.curtailment=1
 
         self.connected_gen=[]
         self.connected_RenSource=[]
@@ -1680,7 +1700,52 @@ class Node_AC:
     def recalc_extgrid_load(self):
         self._PLi_extgrid = sum(gen.p_load_base for gen in self.connected_gen if gen.is_ext_grid)
         self.update_PLi()
-        
+
+    # --- Generation accessors (single source of truth) -----------------------
+    # These centralize the node active/reactive generation expressions that were
+    # previously duplicated across Time_series, Results_class and Graph_and_plot.
+    def gen_Q_injection(self):
+        """Reactive generation back-calculated from the converged injection.
+
+        Slack and PV nodes share this formula.
+        """
+        return self.Q_INJ - self.Q_s - self.Q_s_fx + self.QLi
+
+    def gen_P_injection(self, include_ren=True):
+        """Active generation back-calculated from the converged injection (slack).
+
+        ``include_ren`` subtracts the node renewable contribution (``PGi_ren``,
+        the aggregate dispatched renewable the node sees); kept as a flag so the
+        two existing call sites preserve their current behavior.
+        """
+        p = self.P_INJ - self.P_s + self.PLi
+        if include_ren:
+            p = p - self.PGi_ren
+        return p
+
+    def gen_P_total(self, opf_run=False):
+        """Total active generation injected at the node (forward sum).
+
+        With ``opf_run`` the optimized dispatch (already bounded by ``np_gen`` /
+        ``np_rsgen``) is used directly. Otherwise the per-unit values are summed
+        and scaled by the parallel-unit counts.
+        """
+        if opf_run:
+            return self.PGi + self.PGi_ren + self.PGi_opt
+        return (self.PGi
+                + sum(rs.PGi_ren * rs.gamma * rs.np_rsgen for rs in self.connected_RenSource)
+                + sum(gen.Pset * gen.np_gen for gen in self.connected_gen))
+
+    def gen_Q_total(self, opf_run=False):
+        """Total reactive generation injected at the node (forward sum)."""
+        if opf_run:
+            return self.QGi + self.QGi_ren + self.QGi_opt
+        return self.QGi + sum(gen.Qset * gen.np_gen for gen in self.connected_gen)
+
+    def gen_P_node_aggregate(self):
+        """Node-level active generation aggregate used for plotting/hover."""
+        return self.PGi + self.PGi_ren + self.PGi_opt
+
 class Node_DC:
     """
     Attributes
@@ -1773,6 +1838,8 @@ class Node_DC:
 
         self.connected_gen=[]
         self.connected_RenSource=[]
+        self.PGi_ren = 0
+        self.PGi_opt = 0
         
         
         if name in Node_DC.names:

@@ -98,10 +98,10 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         
         for conv in grid.Converters_ACDC:
             if conv.type== ConverterDCType.PAC:
-                PGi_ren = sum(rs.PGi_ren*rs.gamma for rs in conv.Node_AC.connected_RenSource)
-                QGi_ren = sum(rs.QGi_ren for rs in conv.Node_AC.connected_RenSource)
-                PGi_opt = sum(gen.PGen for gen in conv.Node_AC.connected_gen)
-                QGi_opt = sum(gen.QGen for gen in conv.Node_AC.connected_gen)
+                PGi_ren = conv.Node_AC.PGi_ren
+                QGi_ren = conv.Node_AC.QGi_ren
+                PGi_opt = conv.Node_AC.PGi_opt
+                QGi_opt = conv.Node_AC.QGi_opt
                 if conv.Node_AC.stand_alone == True:
                     conv.P_AC = -(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
                     conv.Q_AC = -(conv.Node_AC.QGi+QGi_opt+QGi_ren-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
@@ -139,9 +139,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             DC_node = conv.Node_DC
 
             if conv.AC_type == NodeType.PV:
-                QGi_opt = sum(gen.QGen for gen in conv.Node_AC.connected_gen)
-                QGi_ren = sum(rs.QGi_ren for rs in conv.Node_AC.connected_RenSource)
-                conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi+QGi_opt+QGi_ren-AC_node.QLi+AC_node.Q_s_fx)
+                conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi+AC_node.QGi_opt+AC_node.QGi_ren-AC_node.QLi+AC_node.Q_s_fx)
             conv.U_s = AC_node.V
             conv.th_s = AC_node.theta
             

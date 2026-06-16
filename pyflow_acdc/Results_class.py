@@ -620,20 +620,12 @@ class Results:
         # Build combined DataFrame for all AC nodes
         rows = []
 
-        if self.Grid.OPF_run:
-            # During OPF, the optimized dispatch is exported into:
-            # - node.PGi_opt / node.QGi_opt  (flexible generators, already bounded by np_gen)
-            # - node.PGi_ren / node.QGi_ren (renewables with np_rsgen and curtailment via OPF)
-            #
-            # Using `rs.PGi_ren*rs.gamma` would ignore `np_rsgen` because `rs.PGi_ren`
-            # represents available resource (PRGi_available) rather than the OPF-selected
-            # renewable units.
-            P_AC = np.vstack([node.PGi + node.PGi_ren + node.PGi_opt for node in self.Grid.nodes_AC])
-            Q_AC = np.vstack([node.QGi + node.QGi_ren + node.QGi_opt for node in self.Grid.nodes_AC])
-        else:
-            P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
-                              + sum(gen.Pset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
-            Q_AC = np.vstack([node.QGi+sum(gen.Qset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
+        # Generation expressions are centralized on Node_AC (gen_P_total / gen_Q_total).
+        # OPF path uses the optimized dispatch (already bounded by np_gen / np_rsgen);
+        # the non-OPF path sums per-unit values scaled by the parallel-unit counts.
+        opf_run = self.Grid.OPF_run
+        P_AC = np.vstack([node.gen_P_total(opf_run=opf_run) for node in self.Grid.nodes_AC])
+        Q_AC = np.vstack([node.gen_Q_total(opf_run=opf_run) for node in self.Grid.nodes_AC])
 
         has_dc = (self.Grid.nodes_DC is not None) and (self.Grid.nodes_DC != [])
 
@@ -647,11 +639,10 @@ class Results:
 
                 if not self.Grid.OPF_run:
                     if node.type == NodeType.SLACK:
-                        ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
-                        PGi = node.P_INJ-ps + node.PLi
-                        QGi = node.Q_INJ-node.Q_s-node.Q_s_fx+node.QLi
+                        PGi = node.gen_P_injection(include_ren=False)
+                        QGi = node.gen_Q_injection()
                     if node.type == NodeType.PV:
-                        QGi = node.Q_INJ-(node.Q_s+node.Q_s_fx)+node.QLi
+                        QGi = node.gen_Q_injection()
 
                 base = self.Grid.S_base
                 common_data = {
