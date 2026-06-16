@@ -205,7 +205,7 @@ Export Results
 
    .. code-block:: python
 
-       pyf.export_TEP_TS_results_to_excel(grid, "results.xlsx")
+       pyf.export_TEP_multiScenario_results_to_excel(grid, "results.xlsx")
 
 **References**
 

@@ -1,6 +1,4 @@
-"""
-Solver availability helper functions.
-"""
+"""Probe installed Pyomo solvers and OR-Tools backends in the current environment."""
 
 DEFAULT_PYOMO_SOLVERS = [
     "cbc",
@@ -132,8 +130,23 @@ def check_ortools_backends(verbose=True):
 
 
 def check_available_solvers(pyomo_solvers=None, include_ortools=True, verbose=True):
-    """
-    Orchestrate solver/backend checks for Pyomo and OR-Tools.
+    """Report which Pyomo solvers and OR-Tools backends are installed and available.
+
+    Parameters
+    ----------
+    pyomo_solvers : list of str, optional
+        Solver names to probe; defaults to a built-in list (cbc, glpk, ipopt,
+        bonmin, gurobi, …).
+    include_ortools : bool, optional
+        When ``True``, also report OR-Tools LP/MIP backend availability.
+    verbose : bool, optional
+        Print a human-readable report to stdout.
+
+    Returns
+    -------
+    dict
+        Keys include ``pyomo_available``, ``pyomo_errors``, and (when
+        ``include_ortools``) ``ortools_installed``, ``ortools_available``.
     """
     result = {}
 

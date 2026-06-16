@@ -119,6 +119,25 @@ def _parse_geojson_context(geojson_path):
 
 
 def load_case_grid_and_geo(case_name, source_tag="gebco"):
+    """Load a bundled wind-farm grid and attach GeoJSON geographic context.
+
+    Locates ``{case_name}_{source_tag}.pkl.gz`` (or ``{case_name}.pkl.gz``) under
+    the packaged ``example_grids/wind_farm_data`` tree or ``PYFLOW_WINDFARM_DATA_DIR``.
+    Optionally loads ``{case_name}.geojson`` and attaches polygons/lines to ``grid``
+    (``dev_polygon``, ``export_cables``, ``exclusion_zones``, ``soft_exclusion_zones``).
+
+    Parameters
+    ----------
+    case_name : str
+        Wind-farm case name (matched case-insensitively against bundled files).
+    source_tag : str, optional
+        Pickle filename tag (default ``"gebco"``).
+
+    Returns
+    -------
+    tuple
+        ``(grid, res)`` from :func:`create_grid_from_pickle`.
+    """
     grid_pickle = _find_grid_pickle(case_name, source_tag=source_tag)
     grid, res = create_grid_from_pickle(str(grid_pickle), use_dill=True)
 

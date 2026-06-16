@@ -70,9 +70,11 @@ API Documentation
    :caption: Transmission Expansion Planning:
 
    api/tep
+   api/sequential_step
    api/tep_pymoo
    api/tep_dynamic
    api/wf_array
+   
 
 .. toctree::
    :maxdepth: 3
@@ -88,6 +90,8 @@ API Documentation
    :caption: Development:
 
    architecture
+   api/solver_utils
+   api/windfarm_loader
 
 Quick Start
 -----------

@@ -181,9 +181,14 @@ except ImportError:
 
 # --- Static TEP (requires pyomo) ------------------------------------------
 try:
-    from .ACDC_Static_TEP import expand_element, translate_pd_tep
+    from .ACDC_Static_TEP import (
+        expand_element,
+        translate_pd_tep,
+        export_TEP_multiScenario_results_to_excel,
+    )
     _register(expand_element, 'Expand_element')
     _register(translate_pd_tep, 'Translate_pd_TEP')
+    _register(export_TEP_multiScenario_results_to_excel, 'export_TEP_TS_results_to_excel')
 except ImportError:
     pass
 

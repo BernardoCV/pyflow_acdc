@@ -530,6 +530,10 @@ def sequential_STEP(
 ):
     """
     Sequentially solve static transmission expansion one investment period at a time.
+
+    Each period calls :func:`transmission_expansion` on the current grid; results
+    are linked across periods as an alternative to 
+    :func:`multi_period_transmission_expansion`.
     """
 
     def _period_solver(k):
@@ -601,6 +605,10 @@ def sequential_MS_STEP(
 ):
     """
     Sequentially solve multi-scenario transmission expansion one investment period at a time.
+
+    Each period calls :func:`multi_scenario_TEP` on the current grid; results are
+    linked across periods as an alternative to 
+    :func:`multi_period_MS_TEP`.
     """
     ms_clustering_options = clustering_options
     if reuse_clustering_cache:

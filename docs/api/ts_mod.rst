@@ -371,6 +371,11 @@ For a dataset of length n, the CSV will follow this format: Position 0 is treate
     pyf.add_TimeSeries(grid, load_data)   
 
 
+TimeSeries Object
+-----------------
+
+.. autoclass:: pyflow_acdc.TimeSeries
+   :no-members:
 
 
 Time-Series Clustering

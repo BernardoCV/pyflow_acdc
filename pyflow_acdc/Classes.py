@@ -1067,6 +1067,39 @@ class Grid:
 
 
 class Gen_AC:
+    """AC generator connected to a bus.
+
+    Attributes
+    ----------
+    name : str
+        Generator identifier
+    node : Node_AC
+        Host bus (also ``_node``)
+    Max_pow_gen, Min_pow_gen : float
+        Active power limits in pu on ``S_base``
+    Max_pow_genR, Min_pow_genR : float
+        Reactive power limits in pu on ``S_base``
+    Pset, Qset : float
+        Per-unit active/reactive setpoints (one parallel unit)
+    PGen, QGen : float
+        Total dispatched active/reactive power (setpoint × ``np_gen``; OPF result after solve)
+    S_base : float
+        Per-unit power base in MVA
+    Max_S : float
+        Apparent-power rating in pu (``S_rated`` constructor argument)
+    gen_type : str
+        Fuel/technology label (e.g. ``'natural gas'``, ``'hydro'``)
+    lf, qf, fc : float
+        Linear, quadratic, and fixed cost coefficients
+    np_gen : int
+        Number of parallel generator units
+    base_cost : float
+        Installation cost (TEP); scaled by ``lambda_capex``
+    price_zone_link : bool
+        If True, ``lf``/``qf`` track the host price zone
+    is_ext_grid : bool
+        External-grid (slack) generator flag
+    """
     genNumber =0
     names = set()
 
@@ -1362,6 +1395,37 @@ class Ren_Source:
     solar, with its rated capacity, base/installation cost, and number of
     parallel units (``np_rsgen``). Powers and limits are tracked in per-unit on
     the source's own ``S_base``.
+
+    Attributes
+    ----------
+    name : str
+        Renewable-source identifier
+    node : Node_AC or Node_DC
+        Host bus; node name stored as ``Node``
+    PGi_ren_base : float
+        Rated active power in pu on ``S_base`` (constructor ``PGi_ren_base``)
+    PGi_ren : float
+        Available active power in pu (``PGi_ren_base * PRGi_available``)
+    rs_type : str
+        Technology label for plotting (e.g. ``'Wind'``, ``'solar'``)
+    S_base : float
+        Per-unit power base in MVA
+    np_rsgen : int
+        Number of parallel renewable units
+    PRGi_available : float
+        Availability factor in [0, 1]
+    gamma : float
+        Curtailment factor in [``min_gamma``, 1]
+    min_gamma : float
+        Minimum allowed curtailment factor
+    curtailable : bool
+        Whether the source may be curtailed in OPF
+    Qmin, Qmax : float
+        Reactive power limits in pu (AC-connected sources)
+    Max_S : float
+        Apparent-power rating in pu
+    base_cost : float
+        Installation cost (TEP); scaled by ``lambda_capex``
     """
     rsNumber =0
     names = set()
@@ -1539,22 +1603,24 @@ class Node_AC:
 
     Attributes
     ----------
+    name : str
+        Bus identifier
     node_type : str
-        Node type ('Slack' or 'PQ' or 'PV')
+        Node type ('Slack' or 'PQ' or 'PV'); stored as ``type``
     Voltage_0 : float
-        Initial voltage magnitude in pu
+        Initial voltage magnitude in pu; stored as ``V_ini``
     theta_0 : float
-        Initial voltage angle in radians
+        Initial voltage angle in radians; stored as ``theta_ini``
     kV_base : float
         Base voltage in kV
     Power_Gained : float
-        Active power injection in pu
+        Active power injection in pu; stored as ``PGi``
     Reactive_Gained : float
-        Reactive power injection in pu
+        Reactive power injection in pu; stored as ``QGi``
     Power_load : float
-        Active power demand in pu
+        Active power demand in pu; stored as ``PLi`` (via load factors)
     Reactive_load : float
-        Reactive power demand in pu
+        Reactive power demand in pu; stored as ``QLi``
     Umin : float
         Minimum voltage magnitude in p.u.
     Umax : float
@@ -1567,6 +1633,12 @@ class Node_AC:
         x-coordinate, preferably in longitude decimal format
     y_coord : float
         y-coordinate, preferably in latitude decimal format
+    price : float
+        Nodal energy price (when assigned to a price zone)
+    PLi_factor : float
+        Time-series/scenario load scaling factor
+    PLi_inv_factor : float
+        Investment-period load scaling factor
     """
     nodeNumber = 0
     names = set()
@@ -1776,14 +1848,16 @@ class Node_DC:
 
     Attributes
     ----------
+    name : str
+        Bus identifier
     node_type : str
-        Node type ('Slack' or 'P' or 'Droop' or 'PAC')
+        Node type ('Slack' or 'P' or 'Droop' or 'PAC'); stored as ``type``
     Voltage_0 : float
-        Initial voltage magnitude in pu
+        Initial voltage magnitude in pu; stored as ``V_ini``
     Power_Gained : float
-        Active power injection in pu
+        Active power injection in pu; stored as ``PGi``
     Power_load : float
-        Active power demand in pu
+        Active power demand in pu; stored as ``PLi`` (via load factors)
     kV_base : float
         Base voltage in kV
     Umin : float
@@ -1794,6 +1868,12 @@ class Node_DC:
         x-coordinate, preferably in longitude decimal format
     y_coord : float
         y-coordinate, preferably in latitude decimal format
+    price : float
+        Nodal energy price (when assigned to a price zone)
+    PLi_factor : float
+        Time-series/scenario load scaling factor
+    PLi_inv_factor : float
+        Investment-period load scaling factor
     """
     nodeNumber = 0
     names = set()
@@ -1909,34 +1989,34 @@ class Node_DC:
          self.PLi = self._PLi_base * self._PLi_factor * self._PLi_inv_factor
 
 class Line_AC:
-    """AC transmission line or cable (optionally a tap-changing transformer).
+    """AC non-expandable branch.
 
     Attributes
     ----------
+    name : str
+        Line identifier
     fromNode : Node_AC
         The starting node of the line
     toNode : Node_AC
         The ending node of the line
     r : float
-        Resistance of the line in pu
+        Resistance of the line in pu; stored as ``R``
     x : float
-        Reactance of the line in pu
+        Reactance of the line in pu; stored as ``X``
     g : float
-        Conductance of the line in pu
+        Conductance of the line in pu; stored as ``G``
     b : float
-        Susceptance of the line in pu
+        Susceptance of the line in pu; stored as ``B``
     MVA_rating : float
         MVA rating of the line
     Length_km : float
         Length of the line in km
     m : float
-        Number of conductors in the line
+        Tap magnitude (transformer lines)
     shift : float
         Phase shift of the line in radians
     N_cables : int
-        Number of cables in the line
-    name : str
-        Name of the line
+        Number of parallel cables (TEP: ``np_line``)
     geometry : str
         Geometry of the line
     isTf : bool
@@ -1945,7 +2025,6 @@ class Line_AC:
         Base power of the line in MVA
     Cable_type : str
         Type of cable in the line
-
     """
     lineNumber = 0
     names = set()
@@ -2731,20 +2810,22 @@ class Line_DC:
 
     Attributes
     ----------
+    name : str
+        Line identifier
     fromNode : Node_DC
         The starting node of the line
     toNode : Node_DC
         The ending node of the line
     r : float
-        Resistance of the line in pu
+        Resistance of the line in pu; stored as ``R``
     MW_rating : float
-        MVA rating of the line
-    km : float
-        Length of the line in km
+        MW rating of one cable
+    Length_km : float
+        Length of the line in km (constructor argument ``km``)
     polarity : str
-        Polarity of the line ('m' or 'b' or 'sm')
+        Polarity of the line ('m', 'b', or 'sm')
     N_cables : int
-        Number of cables in the line
+        Number of parallel cables; stored as ``np_line``
     Cable_type : str
         Type of cable in the line
     S_base : float
@@ -2972,14 +3053,16 @@ class AC_DC_converter:
 
     Attributes
     ----------
+    name : str
+        Converter identifier
     AC_type : str
         Type of AC node ('Slack' or 'PV' or 'PQ')
     DC_type : str
-        Type of DC node ('Slack' or 'P' or 'Droop' or 'PAC')
+        Type of DC node ('Slack' or 'P' or 'Droop' or 'PAC'); stored as ``type``
     AC_node : Node_AC
-        AC node connected to the converter
+        AC node connected to the converter; stored as ``Node_AC``
     DC_node : Node_DC
-        DC node connected to the converter
+        DC node connected to the converter; stored as ``Node_DC``
     P_AC : float
         Active power injection in AC node in pu
     Q_AC : float
@@ -2987,39 +3070,39 @@ class AC_DC_converter:
     P_DC : float
         Active power injection in DC node in pu
     Transformer_resistance : float
-        Transformer resistance in pu
+        Transformer resistance in pu; stored as ``R_t`` (scaled by polarity)
     Transformer_reactance : float
-        Transformer reactance in pu
+        Transformer reactance in pu; stored as ``X_t``
     Phase_Reactor_R : float
-        Phase reactor resistance in pu
+        Phase reactor resistance in pu; stored as ``PR_R``
     Phase_Reactor_X : float
-        Phase reactor reactance in pu
+        Phase reactor reactance in pu; stored as ``PR_X``
     Filter : float
-        Filter in pu
+        Filter susceptance in pu; stored as ``Bf``
     Droop : float
-        Droop in pu
+        Droop rate; stored as ``Droop_rate``
     kV_base : float
-        Base voltage in kV
+        AC-side base voltage in kV; stored as ``AC_kV_base``
     MVA_max : float
-        Maximum MVA rating of the converter
+        Maximum MVA rating of one converter
     nConvP : float
-        Number of parallel converters
+        Number of parallel converters; stored as ``np_conv``
     polarity : int
-        Polarity of the converter (1 or -1)
+        Polarity of the converter (1 or -1); stored as ``cn_pol``
     lossa : float
-        No load loss factor for active power
+        No-load loss coefficient for active power
     lossb : float
-        Linear currentr loss factor
+        Linear current loss coefficient
     losscrect : float
-        Switching loss factor for rectifier
+        Switching loss coefficient for rectifier
     losscinv : float
-        Switching loss factor for inverter
+        Switching loss coefficient for inverter
     Ucmin : float
-        Minimum voltage magnitude in pu
+        Minimum converter voltage in pu
     Ucmax : float
-        Maximum voltage magnitude in pu
-    name : str
-        Name of the converter
+        Maximum converter voltage in pu
+    S_base : float
+        Per-unit power base in MVA
     """
 
     ConvNumber = 0
@@ -3390,6 +3473,49 @@ class Price_Zone:
     nodes. Setting ``price`` propagates to the zone's nodes and their
     price-zone-linked generators, and to any linked MTDC/offshore price zones.
     Specialised subclasses model MTDC and offshore zones.
+
+    Attributes
+    ----------
+    name : str
+        Price-zone identifier
+    price : float
+        Zonal energy price (propagates to member nodes and linked zones)
+    a_base : float
+        Base quadratic cost coefficient (constructor argument ``a``)
+    a : float
+        Effective quadratic coefficient after curvature/import-expand adjustments
+    b, c : float
+        Linear and constant cost-curve coefficients (see ``Market_Coeff``)
+    import_pu_L, export_pu_G : float
+        Per-unit import load and export generation limits
+    import_expand : float
+        Import expansion offset in pu (used when ``expand_import`` is True)
+    expand_import : bool
+        Use import-expand mode to derive ``a`` and ``PGL_min``
+    curvature_factor : float
+        Scales ``a_base`` when computing effective ``a``
+    positive_price_delta : float, optional
+        Maximum allowed price increase; caps ``PGL_max`` when set
+    S_base : float
+        Base power in MVA
+    nodes_AC, nodes_DC : list
+        Member AC and DC buses in the zone
+    ConvACDC : list
+        AC/DC converters assigned to the zone
+    PLi : float
+        Aggregated zone load in pu
+    PLi_factor, PLi_inv_factor : float
+        Time-series and investment load scaling (propagate to linked nodes)
+    PGL_min, PGL_max : float
+        Minimum and maximum generation limits in pu
+    PGL_min_base : float
+        Base lower generation limit before curve adjustments
+    PN : float
+        Net active power at the zone
+    linked_price_zone : Price_Zone, optional
+        Linked offshore or coupled price zone
+    mtdc_price_zones : list
+        MTDC price zones notified when this zone's price changes
     """
     price_zone_num = 0
     names = set()

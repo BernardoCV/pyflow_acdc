@@ -15,6 +15,20 @@ For now you have to run the time series to have results to plot. Then run the da
 
 .. autofunction:: pyflow_acdc.run_mp_ts_dash
 
+Plot Helpers
+^^^^^^^^^^^^
+
+Low-level Plotly figure builders used by the Dash apps (also usable standalone).
+
+.. autofunction:: pyflow_acdc.plot_TS_res_from_ts
+
+.. autofunction:: pyflow_acdc.plot_TS_res_dash
+
+Multi-Period Dash Builder
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.create_mp_ts_dash
+
    Creates and runs an interactive Dash web application for visualizing time series results.
 
    .. list-table::
@@ -76,7 +90,7 @@ Once the dashboard is created, you can see it in your browser under the url:
     TS_wl = pd.read_csv(wind_load_url)
     pyf.add_TimeSeries(grid,TS_wl)
 
-       times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)  
+       times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)
 
        pyf.run_dash(grid)
 

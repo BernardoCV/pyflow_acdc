@@ -64,57 +64,8 @@ The AC node is modeled using a complex voltage phasor :math:`V_i = V_i \angle \t
 
 Class Reference: :class:`pyflow_acdc.Classes.Node_AC`
 
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1
-
-   * - Attribute
-     - Type
-     - Description
-   * - ``node_type``
-     - str
-     - Node type ('Slack' or 'PQ' or 'PV')
-   * - ``Voltage_0``
-     - float
-     - Initial voltage magnitude in p.u.
-   * - ``theta_0``
-     - float
-     - Initial voltage angle in degrees
-   * - ``kV_base``
-     - float
-     - Base voltage in kV
-   * - ``Power_Gained``
-     - float
-     - Active power injection in MW
-   * - ``Reactive_Gained``
-     - float
-     - Reactive power injection in MVAr
-   * - ``Power_load``
-     - float
-     - Active power demand in MW
-   * - ``Reactive_load``
-     - float
-     - Reactive power demand in MVAr
-   * - ``Umin``
-     - float
-     - Minimum voltage magnitude in p.u.
-   * - ``Umax``
-     - float
-     - Maximum voltage magnitude in p.u.
-   * - ``Gs``
-     - float
-     - Shunt conductance in p.u.
-   * - ``Bs``
-     - float
-     - Shunt susceptance in p.u.
-   * - ``x_coord``
-     - float
-     - x-coordinate preferably in decimal longitude
-   * - ``y_coord``
-     - float
-     - y-coordinate preferably in decimal latitude
+.. autoclass:: pyflow_acdc.Node_AC
+   :no-members:
 
 Example Usage:
     .. code-block:: python
@@ -172,63 +123,8 @@ The AC branch is modeled with pi model from [1]_, [2]_ :
 
 Class Reference: :class:`pyflow_acdc.Classes.Line_AC`
 
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1  
-
-   * - Attribute
-     - Type
-     - Description  
-   * - ``fromNode``
-     - :class:`Node_AC`
-     - The starting node of the line
-   * - ``toNode``
-     - :class:`Node_AC`
-     - The ending node of the line
-   * - ``r``
-     - (float)
-     - Resistance of the line in pu
-   * - ``x``
-     - (float)
-     - Reactance of the line in pu
-   * - ``g``
-     - (float)
-     - Conductance of the line in pu
-   * - ``b``
-     - (float)
-     - Susceptance of the line in pu
-   * - ``MVA_rating``
-     - (float)
-     - MVA rating of the line
-   * - ``Length_km``
-     - (float)
-     - Length of the line in km
-   * - ``m``
-     - (float)
-     - Number of conductors in the line
-   * - ``shift``
-     - (float)
-     - Phase shift of the line in radians
-   * - ``N_cables``
-     - (int)
-     - Number of cables in the line
-   * - ``name``
-     - (str)
-     - Name of the line
-   * - ``geometry``
-     - (str)
-     - Geometry of the line
-   * - ``isTf``
-     - (bool)
-     - True if the line is a transformer, False otherwise
-   * - ``S_base``
-     - (float)
-     - Base power of the line in MVA
-   * - ``Cable_type``
-     - (str)
-     - Type of cable in the line
+.. autoclass:: pyflow_acdc.Line_AC
+   :no-members:
 
 Example Usage:
     .. code-block:: python
@@ -526,42 +422,8 @@ The AC node is modeled using voltage :math:`U_d` where [1]_:
 
 Class Reference: :class:`pyflow_acdc.Classes.Node_DC`
 
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1
-
-   * - Attribute
-     - Type
-     - Description
-   * - ``node_type``
-     - str
-     - Node type ('Slack' or 'P' or 'Droop' or 'PAC')
-   * - ``Voltage_0``
-     - float
-     - Initial voltage magnitude in pu
-   * - ``Power_Gained``
-     - float
-     - Active power injection in pu
-   * - ``Power_load``
-     - float
-     - Active power demand in pu
-   * - ``kV_base``
-     - float
-     - Base voltage in kV
-   * - ``Umin``
-     - float
-     - Minimum voltage magnitude in p.u.
-   * - ``Umax``
-     - float
-     - Maximum voltage magnitude in p.u.
-   * - ``x_coord``
-     - float
-     - x-coordinate, preferably in longitude decimal format
-   * - ``y_coord``
-     - float
-     - y-coordinate, preferably in latitude decimal format
+.. autoclass:: pyflow_acdc.Node_DC
+   :no-members:
 
 Example Usage:
     .. code-block:: python
@@ -600,44 +462,10 @@ DC line
         -P_{e, rating} \leq& P_{to/from} \leq P_{e,rating} \qquad \forall e \in \mathcal{B}_{dc}
     \end{align}
 
+Class Reference: :class:`pyflow_acdc.Classes.Line_DC`
 
-
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1
-
-   * - Attribute
-     - Type
-     - Description
-   * - ``fromNode``
-     - Node_DC
-     - The starting node of the line
-   * - ``toNode``
-     - Node_DC
-     - The ending node of the line
-   * - ``r``
-     - float
-     - Resistance of the line in pu
-   * - ``MW_rating``
-     - float
-     - MW rating of the line
-   * - ``km``
-     - float
-     - Length of the line in km
-   * - ``polarity``
-     - str
-     - Polarity of the line ('m' or 'b' or 'sm')
-   * - ``N_cables``
-     - int
-     - Number of parallelcables in the line
-   * - ``Cable_type``
-     - str
-     - Type of cable in the line
-   * - ``S_base``
-     - float
-     - Base power of the line in MVA
+.. autoclass:: pyflow_acdc.Line_DC
+   :no-members:
 
 Example Usage:
     .. code-block:: python
@@ -664,7 +492,7 @@ DC line expansion
 
    DC expansion model
 
-The expanded branch object is inside the :class:`Line_DC` class. 
+The expanded branch object is inside the :class:`Line_DC` class.
 
 The expanded branch :math:`e` is modelled as:
 
@@ -850,87 +678,8 @@ Equivalent converter model is taken from [1]_.
 
 Class Reference: :class:`pyflow_acdc.Classes.AC_DC_converter`
 
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1
-
-   * - Attribute
-     - Type
-     - Description
-   * - ``AC_type``
-     - str
-     - Type of AC node ('Slack' or 'PV' or 'PQ')
-   * - ``DC_type``
-     - str
-     - Type of DC node ('Slack' or 'P' or 'Droop' or 'PAC')
-   * - ``AC_node``
-     - Node_AC
-     - AC node connected to the converter
-   * - ``DC_node``
-     - Node_DC
-     - DC node connected to the converter
-   * - ``P_AC``
-     - float
-     - Active power injection in AC node in pu
-   * - ``Q_AC``
-     - float
-     - Reactive power injection in AC node in pu
-   * - ``P_DC``
-     - float
-     - Active power injection in DC node in pu
-   * - ``Transformer_resistance``
-     - float
-     - Transformer resistance in pu
-   * - ``Transformer_reactance``
-     - float
-     - Transformer reactance in pu
-   * - ``Phase_Reactor_R``
-     - float
-     - Phase reactor resistance in pu
-   * - ``Phase_Reactor_X``
-     - float
-     - Phase reactor reactance in pu
-   * - ``Filter``
-     - float
-     - Filter in pu
-   * - ``Droop``
-     - float
-     - Droop in pu
-   * - ``kV_base``
-     - float
-     - Base voltage in kV
-   * - ``MVA_max``
-     - float
-     - Maximum MVA rating of the converter
-   * - ``nConvP``
-     - float
-     - Number of parallel converters
-   * - ``polarity``
-     - int
-     - Polarity of the converter (1 or -1)
-   * - ``lossa``
-     - float
-     - No load loss factor for active power
-   * - ``lossb``
-     - float
-     - Linear currentr loss factor
-   * - ``losscrect``
-     - float
-     - Switching loss factor for rectifier
-   * - ``losscinv``
-     - float
-     - Switching loss factor for inverter
-   * - ``Ucmin``
-     - float
-     - Minimum voltage magnitude in pu
-   * - ``Ucmax``
-     - float
-     - Maximum voltage magnitude in pu
-   * - ``name``
-     - str
-     - Name of the converter
+.. autoclass:: pyflow_acdc.AC_DC_converter
+   :no-members:
 
 Renewable Source
 ----------------
@@ -962,23 +711,9 @@ For renewables sources connected to AC nodes:
 
 Class Reference: :class:`pyflow_acdc.Classes.RenSource`
 
+.. autoclass:: pyflow_acdc.Ren_Source
+   :no-members:
 
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1
-
-   * - Attribute
-     - Type
-     - Description  
-   * - ``node``
-     - Node_AC or Node_DC
-     - Node connected to the renewable source
-   * - ``P_MW``
-     - float
-     - Active power injection in MW
-   
 .. list-table::
    :widths: 20 50
    :header-rows: 1
@@ -1038,27 +773,8 @@ Generator
 
 Class Reference: :class:`pyflow_acdc.Classes.Gen_AC`
 
-Key Attributes:
-
-.. list-table::
-   :widths: 20 10 70
-   :header-rows: 1
-
-   * - Attribute
-     - Type
-     - Description  
-   * - ``node``
-     - Node_AC or Node_DC
-     - Node connected to the generator
-   * - ``P_MW``
-     - float
-     - Active power injection in MW
-   * - ``Q_MVAr``
-     - float
-     - Reactive power injection in MVAr
-   * - ``P_MW``
-     - float
-     - Active power injection in MW
+.. autoclass:: pyflow_acdc.Gen_AC
+   :no-members:
 
 .. list-table::
    :widths: 20 30 20
@@ -1172,9 +888,8 @@ Price zone model is taken from [3]_. The cost of generation quadratic curve is c
 
 Class Reference: :class:`pyflow_acdc.Classes.Price_Zone`
 
-Key Attributes:
-
-
+.. autoclass:: pyflow_acdc.Price_Zone
+   :no-members:
 
 **References**
 

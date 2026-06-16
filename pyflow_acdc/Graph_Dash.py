@@ -202,6 +202,7 @@ def plot_TS_res_from_ts(
 
 
 def plot_TS_res_dash(grid, plotting_choice, selected_rows, x_limits=None, y_limits=None):
+    """Build one Plotly figure from ``grid.time_series_results`` (Dash callback helper)."""
     return plot_TS_res_from_ts(
         grid.time_series_results,
         grid.S_base,
