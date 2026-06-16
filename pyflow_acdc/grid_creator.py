@@ -1,3 +1,11 @@
+"""Grid construction and import.
+
+Builds a :class:`~pyflow_acdc.Classes.Grid` from data tables, MATPOWER ``.mat``
+files, pickles, or a turbine graph.
+
+Owns: import/parsing of external inputs into the grid data model.
+Does not own: post-creation mutation (see ``grid_modifications``) or analysis.
+"""
 from scipy.io import loadmat
 import pandas as pd
 import numpy as np

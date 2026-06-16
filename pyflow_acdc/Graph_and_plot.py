@@ -1,3 +1,12 @@
+"""Static and Plotly network/result plotting.
+
+Renders grid topology and analysis results as Matplotlib/Plotly figures and
+network SVGs.
+
+Owns: non-interactive figure generation.
+Does not own: interactive Dash apps (see ``Graph_Dash``) or geographic maps
+(see ``Mapping``).
+"""
 import networkx as nx
 import pandas as pd
 import plotly.graph_objs as go

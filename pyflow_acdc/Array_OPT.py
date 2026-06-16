@@ -1,3 +1,12 @@
+"""Offshore-array inter-array cable sizing.
+
+Solves the inter-array cable layout/sizing problem via MIP path graphs and the
+cable-string-sizing (CSS) loop, with ``pyomo`` and ``ortools`` backends.
+
+Owns: array-sizing optimization orchestration and backend dispatch.
+Does not own: solver-specific linear cable-sizing models (see
+``AC_L_CSS_gurobi`` / ``AC_L_CSS_ortools``).
+"""
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor

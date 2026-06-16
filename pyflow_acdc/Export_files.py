@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Dec  2 18:23:52 2024
+"""Grid export and loader code generation.
 
-@author: BernardoCastro
+Exports a :class:`~pyflow_acdc.Classes.Grid` to runnable Python, MATLAB, or
+pickle, including generation of loader code that reconstructs the grid.
+
+Owns: serialization/export and code generation.
+Does not own: the in-memory data model (see ``Classes``).
 """
 
 import numpy as np

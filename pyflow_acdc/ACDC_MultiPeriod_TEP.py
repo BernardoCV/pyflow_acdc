@@ -893,6 +893,58 @@ def multi_period_transmission_expansion(
     n_init_install=None,
     initiate_max=None,
 ):
+    """Build and solve the multi-period (investment-horizon) TEP.
+
+    Optimises staged expansion decisions across several investment periods,
+    discounting per-period CAPEX and OPEX to present value over the horizon and
+    optionally enforcing a CAPEX budget. Exports the per-period expansion plan
+    and operating points back onto ``grid``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    inv_periods : sequence or None, optional
+        Investment-period definition; ``None`` uses the grid's configured
+        periods.
+    n_years : int, optional
+        Length of each investment period in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for present-value discounting.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo (MINLP/NLP) solver name.
+    time_limit : float or None, optional
+        Solver time limit in seconds.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    solver_options : dict or None, optional
+        Extra solver options.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    alpha : float or None, optional
+        Weighting between CAPEX (``alpha``) and OPEX (``1-alpha``).
+    capex_budget : float or None, optional
+        Optional cap on total investment cost.
+    nlp_warmstart : bool, optional
+        Warm-start the NLP from a relaxed/previous solution.
+    build_only : bool, optional
+        Build and return the model without solving.
+    n_init_install : {None, "max", "mean"}, optional
+        Pre-installation level used to initialise expandable elements.
+    initiate_max : bool or None, optional
+        Deprecated alias for ``n_init_install`` (``True`` maps to ``"max"``).
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats)``.
+    """
     if initiate_max is not None:
         if n_init_install is not None:
             raise ValueError("Provide only one of 'n_init_install' or deprecated 'initiate_max'.")
@@ -1635,6 +1687,70 @@ def multi_period_MS_TEP(
     build_only=False,
     n_init_install=None,
 ):
+    """Build and solve the multi-period, multi-scenario (clustered) TEP.
+
+    Combines the staged investment horizon of
+    :func:`multi_period_transmission_expansion` with the representative-scenario
+    operating-cost evaluation of multi-scenario TEP, so each period's operating
+    cost is averaged over clustered scenarios. Exports the per-period plan and
+    results onto ``grid`` and optionally writes per-period SVG snapshots.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    inv_periods : sequence or None, optional
+        Investment-period definition; ``None`` uses the grid's configured
+        periods.
+    NPV : bool, optional
+        Discount OPEX to present value over the horizon.
+    n_years : int, optional
+        Length of each investment period in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for present-value discounting.
+    clustering_options : dict or None, optional
+        Options passed to the representative-period clustering.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo (MINLP/NLP) solver name.
+    time_limit : float or None, optional
+        Solver time limit in seconds.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    alpha : float or None, optional
+        Weighting between CAPEX (``alpha``) and OPEX (``1-alpha``).
+    limit_flow_rate : bool, optional
+        Enforce line flow-rate limits.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    solver_options : dict or None, optional
+        Extra solver options.
+    nlp_warmstart : bool, optional
+        Warm-start the NLP from a relaxed/previous solution.
+    capex_budget : float or None, optional
+        Optional cap on total investment cost.
+    save_period_svgs : bool, optional
+        Write an SVG snapshot of the grid for each investment period.
+    period_svg_prefix : str, optional
+        Filename prefix for the per-period SVGs.
+    period_svg_kwargs : dict or None, optional
+        Extra keyword arguments for the SVG export.
+    build_only : bool, optional
+        Build and return the model without solving.
+    n_init_install : {None, "max", "mean"}, optional
+        Pre-installation level used to initialise expandable elements.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats,
+        MP_MS_TEP_results)``.
+    """
     if n_init_install not in (None, "max", "mean"):
         raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
     grid.reset_run_flags()

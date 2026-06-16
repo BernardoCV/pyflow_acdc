@@ -19,6 +19,22 @@ __all__ = [
 
 
 def opf_create_l_model_ac(model,grid,TEP=False):
+    """Populate ``model`` with the linear (DC-style) AC OPF formulation.
+
+    Adds the linear OPF variables and constraints (AC network with McCormick
+    linearisations for cable-type selection and generation) onto the given
+    Pyomo model, using data translated from ``grid``. Mutates ``model`` in
+    place; does not add the objective or solve.
+
+    Parameters
+    ----------
+    model : pyomo.ConcreteModel
+        Empty model to populate (mutated in place).
+    grid : Grid
+        Source of network data.
+    TEP : bool, optional
+        Add transmission-expansion (cable-type selection) variables.
+    """
     from .ACDC_OPF import translate_pyf_opf
 
 

@@ -1,3 +1,12 @@
+"""Representative-period clustering of time-series inputs.
+
+Reduces full time-series data to representative periods (k-means, k-medoids,
+Ward, PAM) for use in clustered TEP/OPF studies, with cluster weights.
+
+Owns: clustering algorithms, cluster evaluation, and writing clusters onto the
+grid.
+Does not own: time-series power flow / OPF execution (see ``Time_series``).
+"""
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.metrics import pairwise_distances,davies_bouldin_score
 from sklearn.preprocessing import StandardScaler,RobustScaler

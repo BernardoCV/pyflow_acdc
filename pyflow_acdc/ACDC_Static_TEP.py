@@ -1026,6 +1026,55 @@ def transmission_expansion(
     nlp_warmstart=False,
     initiate_max=False,
 ):
+    """Build and solve the (non-linear) static transmission-expansion problem.
+
+    Combines the TEP investment cost with the OPF operating cost in a single
+    objective (OPEX discounted to present value when ``NPV`` is set, optionally
+    weighted by ``alpha``), solves the resulting non-linear model, and exports
+    the expansion decisions and operating point back onto ``grid``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    NPV : bool, optional
+        Discount OPEX to present value over the planning horizon.
+    n_years : int, optional
+        Planning horizon in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for the present-value factor.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo (MINLP/NLP) solver name.
+    time_limit : float or None, optional
+        Solver time limit in seconds.
+    tee : bool, optional
+        Stream raw solver output.
+    export : bool, optional
+        Write the solution back onto ``grid``.
+    PV_set : bool, optional
+        Fix PV-bus setpoints instead of optimising them.
+    alpha : float or None, optional
+        Weighting between CAPEX (``alpha``) and OPEX (``1-alpha``).
+    callback : bool, optional
+        Enable the solver-progress callback.
+    solver_options : dict or None, optional
+        Extra solver options.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    nlp_warmstart : bool, optional
+        Warm-start the NLP from a relaxed/previous solution.
+    initiate_max : bool, optional
+        Initialise expandable elements at their maximum allowed installation.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats)``.
+    """
     grid.reset_run_flags()
     t1 = time.perf_counter()
     model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(
@@ -1095,6 +1144,46 @@ def transmission_expansion(
     return model, model_results , timing_info, solver_stats
 
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0):
+    """Build and solve the linear (MILP) static transmission-expansion problem.
+
+    Linear counterpart of :func:`transmission_expansion`: combines TEP
+    investment cost with the linear OPF operating cost (OPEX discounted to
+    present value when ``NPV`` is set), solves the MILP, and exports the
+    expansion decisions and operating point back onto ``grid``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    NPV : bool, optional
+        Discount OPEX to present value over the planning horizon.
+    n_years : int, optional
+        Planning horizon in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for the present-value factor.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo MILP solver name.
+    time_limit : float, optional
+        Solver time limit in seconds.
+    tee : bool, optional
+        Stream raw solver output.
+    export : bool, optional
+        Write the solution back onto ``grid``.
+    fs : bool, optional
+        Enable the solver-progress callback.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats)``; all ``None`` if
+        the solve fails.
+    """
     grid.reset_run_flags()
     analyse_grid(grid)
 
@@ -1570,7 +1659,55 @@ def multi_scenario_TEP(
     nlp_warmstart=False,
     initiate_max=False,
 ):
+    """Build and solve a multi-scenario (clustered) static TEP.
 
+    Like :func:`transmission_expansion`, but the operating cost is evaluated
+    over several representative scenarios (from time-series clustering) with
+    weights summing to one, so a single set of expansion decisions is optimal
+    across all scenarios. Exports decisions and per-scenario results onto
+    ``grid``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    NPV : bool, optional
+        Discount OPEX to present value over the planning horizon.
+    n_years : int, optional
+        Planning horizon in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for the present-value factor.
+    clustering_options : dict or None, optional
+        Options passed to the representative-period clustering.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo (MINLP/NLP) solver name.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    alpha : float or None, optional
+        Weighting between CAPEX (``alpha``) and OPEX (``1-alpha``).
+    limit_flow_rate : bool, optional
+        Enforce line flow-rate limits.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    solver_options : dict or None, optional
+        Extra solver options.
+    nlp_warmstart : bool, optional
+        Warm-start the NLP from a relaxed/previous solution.
+    initiate_max : bool, optional
+        Initialise expandable elements at their maximum allowed installation.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats,
+        TEP_multiScenario_res)``.
+    """
     analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)

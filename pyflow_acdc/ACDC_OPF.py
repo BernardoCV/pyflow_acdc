@@ -76,6 +76,37 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0):
+    """Build and solve the linear (DC-style) OPF for ``grid``.
+
+    Constructs the linear Pyomo model, minimises the weighted objective, solves
+    it, and exports the solution back onto ``grid``. The linear model only
+    accounts for AC-generator energy cost; non-zero weights on other objective
+    components trigger a warning.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network to optimise (mutated in place).
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    OnlyGen : bool, optional
+        Restrict the objective to generator-based costs.
+    Price_Zones : bool, optional
+        Enable price-zone pricing (resolved from the objective rule).
+    solver : str, optional
+        Pyomo solver name.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_res, timing_info, solver_stats)``.
+    """
     grid.reset_run_flags()
     analyse_grid(grid)
 
@@ -137,6 +168,40 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     return model, model_res , timing_info, solver_stats
 
 def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0):
+    """Build and solve the non-linear AC/DC OPF for ``grid``.
+
+    Constructs the full non-linear Pyomo model (AC/DC physics, converters,
+    optional price zones), minimises the weighted objective, solves it, and
+    exports the solution back onto ``grid``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network to optimise (mutated in place).
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    PV_set : bool, optional
+        Fix PV-bus setpoints instead of optimising them.
+    OnlyGen : bool, optional
+        Restrict the objective to generator-based costs.
+    Price_Zones : bool, optional
+        Enable price-zone pricing (resolved from the objective rule).
+    limit_flow_rate : bool, optional
+        Enforce line thermal/flow-rate limits.
+    solver : str, optional
+        Pyomo solver name.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_res, timing_info, solver_stats)``.
+    """
     grid.reset_run_flags()
     analyse_grid(grid)
 

@@ -60,6 +60,23 @@ __all__ = [
 
 
 class Grid:
+    """In-memory AC/DC power-system model.
+
+    Central container for all network elements (AC/DC nodes and lines,
+    converters, generators, renewable sources, price zones, time series) and
+    the derived electrical quantities (e.g. ``Ybus``) consumed by the
+    power-flow, OPF, planning and plotting layers. Usually built via the
+    ``grid_creator`` / ``grid_modifications`` helpers rather than constructed
+    directly.
+
+    Parameters
+    ----------
+    S_base : float
+        System power base in MVA.
+    nodes_AC, lines_AC, Converters, nodes_DC, lines_DC : list, optional
+        Initial element lists; default to empty and are normally populated via
+        the ``add_*`` helpers.
+    """
     DEFAULT_GENERATION_TYPES = list(DEFAULT_GENERATION_TYPES)
     DEFAULT_RENEWABLE_TYPES = list(DEFAULT_RENEWABLE_TYPES)
 
@@ -1339,6 +1356,13 @@ class Gen_DC:
         Gen_DC.names.add(self.name)
 
 class Ren_Source:
+    """Renewable generation source attached to a node.
+
+    Represents a (by default curtailable) renewable injection such as wind or
+    solar, with its rated capacity, base/installation cost, and number of
+    parallel units (``np_rsgen``). Powers and limits are tracked in per-unit on
+    the source's own ``S_base``.
+    """
     rsNumber =0
     names = set()
 
@@ -1511,7 +1535,8 @@ class Ren_Source:
 
 
 class Node_AC:
-    """
+    """AC bus in the network.
+
     Attributes
     ----------
     node_type : str
@@ -1747,7 +1772,8 @@ class Node_AC:
         return self.PGi + self.PGi_ren + self.PGi_opt
 
 class Node_DC:
-    """
+    """DC bus in the network.
+
     Attributes
     ----------
     node_type : str
@@ -1883,7 +1909,8 @@ class Node_DC:
          self.PLi = self._PLi_base * self._PLi_factor * self._PLi_inv_factor
 
 class Line_AC:
-    """
+    """AC transmission line or cable (optionally a tap-changing transformer).
+
     Attributes
     ----------
     fromNode : Node_AC
@@ -2700,7 +2727,8 @@ class TF_Line_AC:
 
 
 class Line_DC:
-    """
+    """DC transmission line or cable.
+
     Attributes
     ----------
     fromNode : Node_DC
@@ -2940,7 +2968,8 @@ class CFC_DC:
         cls.names = set()
 
 class AC_DC_converter:
-    """
+    """AC/DC converter station (e.g. VSC) linking an AC and a DC node.
+
     Attributes
     ----------
     AC_type : str
@@ -3355,6 +3384,13 @@ class Ren_source_zone:
                self._name = name
 
 class Price_Zone:
+    """Market price zone grouping AC nodes.
+
+    Holds a zonal price and demand-curve coefficients shared by its member
+    nodes. Setting ``price`` propagates to the zone's nodes and their
+    price-zone-linked generators, and to any linked MTDC/offshore price zones.
+    Specialised subclasses model MTDC and offshore zones.
+    """
     price_zone_num = 0
     names = set()
 
@@ -3766,6 +3802,12 @@ class MTDCPrice_Zone(Price_Zone):
 
 
 class TimeSeries:
+    """Time-series data bound to a grid element.
+
+    Associates a sequence of values (``data``) with a specific element,
+    identified by its type (``element_type``) and name (``element_name``), for
+    use in time-series power-flow / OPF studies and clustering.
+    """
     TS_num = 0
     names = set()
 

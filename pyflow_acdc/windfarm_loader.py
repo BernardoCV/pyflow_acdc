@@ -1,3 +1,11 @@
+"""Wind-farm case loading.
+
+Loads a bundled wind-farm case grid together with its GeoJSON geographic
+context.
+
+Owns: locating and loading bundled wind-farm case data.
+Does not own: grid construction (delegates to ``grid_creator``).
+"""
 import json
 import os
 from pathlib import Path

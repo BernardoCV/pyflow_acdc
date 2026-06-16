@@ -30,6 +30,31 @@ def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
 
 
 def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
+    """Populate ``model`` with the non-linear AC/DC OPF formulation.
+
+    Adds the variables and constraints for the full non-linear AC/DC OPF (bus
+    voltages/angles, generation, converters, DC network, and optionally price
+    zones and TEP investment variables) onto the given Pyomo model, using data
+    translated from ``grid``. Mutates ``model`` in place; does not add the
+    objective or solve.
+
+    Parameters
+    ----------
+    model : pyomo.ConcreteModel
+        Empty model to populate (mutated in place).
+    grid : Grid
+        Source of network data.
+    PV_set : bool
+        Fix PV-bus setpoints instead of optimising them.
+    Price_Zones : bool
+        Include price-zone pricing variables/constraints.
+    TEP : bool, optional
+        Add transmission-expansion investment variables.
+    limit_flow_rate : bool or float, optional
+        Enforce line flow-rate limits (``True`` is treated as a factor of 1).
+    n_init_install : optional
+        Number of pre-installed parallel circuits for TEP, when applicable.
+    """
     from .ACDC_OPF import translate_pyf_opf
 
     if limit_flow_rate is True:

@@ -1,3 +1,11 @@
+"""Geographic (folium) maps.
+
+Renders grids onto interactive geographic maps using folium, with node/line
+geometry derived from element coordinates.
+
+Owns: folium map generation and geographic styling.
+Does not own: non-geographic plots (see ``Graph_and_plot``).
+"""
 import networkx as nx
 import numpy as np
 import os

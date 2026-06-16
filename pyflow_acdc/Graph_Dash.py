@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 18 12:03:23 2024
+"""Interactive Dash applications.
 
-@author: BernardoCastro
+Builds interactive (Dash/Plotly) apps for exploring grids and time-series /
+multi-period results.
+
+Owns: interactive web-app figures and callbacks.
+Does not own: static plotting (see ``Graph_and_plot``).
 """
 
 import dash

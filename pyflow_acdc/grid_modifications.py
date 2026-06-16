@@ -1,7 +1,11 @@
-"""
-Created on Fri Dec 15 15:24:42 2023
+"""Post-creation grid modification.
 
-@author: BernardoCastro
+Adds or mutates elements of an existing :class:`~pyflow_acdc.Classes.Grid`
+(``add_*`` helpers, line-type conversions, price-zone assignment, and
+time/investment-series wiring).
+
+Owns: mutation of an already-constructed grid.
+Does not own: initial grid construction (see ``grid_creator``).
 """
 
 import pandas as pd

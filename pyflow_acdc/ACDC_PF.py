@@ -18,6 +18,25 @@ __all__ = [
 ]
 
 def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    """Run power flow on ``grid``, dispatching on its AC/DC content.
+
+    Picks the AC-only, DC-only, or sequential AC/DC solver based on the grid's
+    ``ACmode``/``DCmode``. Results are written back onto the grid in place.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network to solve (mutated in place).
+    tol_lim : float, optional
+        Convergence tolerance on the mismatch.
+    maxIter : int, optional
+        Maximum Newton iterations.
+
+    Returns
+    -------
+    tuple
+        ``(elapsed_seconds, final_tolerance)``.
+    """
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
         t,tol,_=acdc_sequential(grid,tol_lim, maxIter)
@@ -29,6 +48,16 @@ def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
 
 
 def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    """Solve the AC-side Newton-Raphson power flow.
+
+    Builds ``Ybus``, solves the AC network, and writes bus voltages and line
+    flows back onto ``grid``.
+
+    Returns
+    -------
+    tuple
+        ``(elapsed_seconds, final_tolerance)``.
+    """
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.update_pq_ac()
@@ -42,6 +71,20 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     return time_2-time_1,ac_tol
 
 def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
+    """Solve the DC-side power flow.
+
+    Writes DC bus voltages and line flows back onto ``grid``.
+
+    Parameters
+    ----------
+    Droop_PF : bool, optional
+        If ``True``, include droop-controlled nodes in the solve.
+
+    Returns
+    -------
+    tuple
+        ``(elapsed_seconds, final_tolerance)``.
+    """
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.update_p_dc()
@@ -52,6 +95,31 @@ def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
     return time_2-time_1,dc_tol
 
 def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, internal_tol=PF_INNER_TOLERANCE,change_slack2Droop=False, QLimit=False,Droop_PF=True):
+    """Solve a coupled AC/DC system by sequential iteration.
+
+    Alternates AC power flow, DC power flow, and converter solves until the
+    outer AC/DC interface mismatch converges. Results are written back onto
+    ``grid`` in place.
+
+    Parameters
+    ----------
+    tol_lim : float, optional
+        Outer (interface) convergence tolerance.
+    internal_tol : float, optional
+        Inner AC/DC solve tolerance.
+    change_slack2Droop : bool, optional
+        Convert slack-controlled DC nodes to droop control during the solve.
+    QLimit : bool, optional
+        Enforce converter reactive-power limits.
+    Droop_PF : bool, optional
+        Include droop-controlled nodes in the DC solve.
+
+    Returns
+    -------
+    tuple
+        ``(elapsed_seconds, final_tolerance, tolerance_tracker)`` where
+        ``tolerance_tracker`` is a dict of per-iteration convergence detail.
+    """
     time_1 = time.perf_counter()
     tolerance = 1
     grid.reset_run_flags()
