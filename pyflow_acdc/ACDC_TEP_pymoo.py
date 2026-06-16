@@ -19,7 +19,7 @@ __all__ = [
     
 
 class TEPOuterProblem(ElementwiseProblem):
-    def __init__(self, grid, weights_def, n_years, Hy, r, pv_set=False, pz=False, time_limit=60,objective_type='sum'):
+    def __init__(self, grid, weights_def, n_years, Hy, r, NPV=True, pv_set=False, pz=False, time_limit=60,objective_type='sum'):
         if objective_type == 'sum':
             n_obj = 1
         elif objective_type == 'pareto':
@@ -37,6 +37,7 @@ class TEPOuterProblem(ElementwiseProblem):
         super().__init__(n_var=n_var, n_obj=n_obj, xl=xl, xu=xu, vtype=vtype)  # mix with bools if needed
         
         self.weights_def = weights_def
+        self.NPV = NPV
         self.present_value = present_value_factor(Hy, r, n_years)
         self.pv_set = pv_set
         self.pz = pz
@@ -368,12 +369,13 @@ class TEPOuterProblem(ElementwiseProblem):
                 out["F"] = 1e24
                 return
             
-            capex = self._capex_from_model()
+            capex = self._capex_from_model(NPV=self.NPV)
             opex = pyo.value(self.model.obj)
             if results.solver.termination_condition == pyo.TerminationCondition.optimal or results.solver.termination_condition == pyo.TerminationCondition.feasible:
                 self.pyomo_feasible_solutions += 1
 
-            opex  = self.present_value * opex
+            if self.NPV:
+                opex  = self.present_value * opex
             if results.solver.termination_condition == pyo.TerminationCondition.infeasible:
                 capex = 1e12
                 opex = 1e12
@@ -425,7 +427,7 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,disc
     else:
         raise ValueError("solver must be 'GA' or 'NSGA2'")
 
-    problem = TEPOuterProblem(grid, weights_def, n_years=n_years, Hy=Hy, r=discount_rate,objective_type=objective_type)
+    problem = TEPOuterProblem(grid, weights_def, n_years=n_years, Hy=Hy, r=discount_rate, NPV=NPV,objective_type=objective_type)
 
     # Run optimization
     

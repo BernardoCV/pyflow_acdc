@@ -7,11 +7,36 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.5.1**.
+> packaged version is **0.6.0**.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-16
+
 ### Added
+- **Sequential STEP** (`ACDC_sequential_STEP.py`): `sequential_STEP` and
+  `sequential_MS_STEP` run static transmission expansion sequentially across
+  time frames (single- and multi-scenario), tracking per-element installation
+  (`np_gen`/`np_rsgen`/`np_line`/`np_conv`) over the horizon; `export_results_to_csv`
+  persists the run results.
+- **Solver utilities** (`solver_utils.py`): `check_available_solvers` detects which
+  Pyomo solvers and OR-Tools backends are actually installed.
+- **Multi-period TEP — time-series OPF per investment period**:
+  `run_ts_opf_for_investment_period` (alongside the existing
+  `run_opf_for_investment_period`).
+- **Dash / interactive visualization** (`Graph_Dash.py`): `run_ts_dash`,
+  `run_mp_ts_dash`, `create_mp_ts_dash`, `plot_TS_res_from_ts`, `plot_TS_res_dash`
+  for time-series and multi-period result exploration.
+- **Folium map plotting**: `plot_folium` and `plot_folium_network` for geographic
+  network rendering.
+- **Clustering**: `load_precomputed_clusters_to_grid` plus forced-cluster support
+  and correlation-identification improvements in `Time_series_clustering.py`.
+- **Example grids reorganized** into `PF/`, `OPF/`, `TEP/`, and `Wind_Array/`
+  subfolders; the case loader now walks these folders (qualified module names).
+  New cases: `case1888rte`, `case3120sp_acdc` (OPF) and `CigreB4_ACDC` (PF). Added
+  `Moray_East` wind-farm data; removed the obsolete `generate_grids.py`.
+- **Tests**: fast fake-solve harness (`_quick_fake_solve.py`,
+  `test_OPF_quick_runner.py`) and plotting tests (`test_plot.py`).
 - `CONTRIBUTING.md`, `CHANGELOG.md`, and `docs/architecture.md`.
 - Centralised string-as-enum constants in `pyflow_acdc/constants.py`:
   `ObjComponent`, `CssMode`, `MIPBackend`, `PricingStrategy`, `TSType`
@@ -26,6 +51,19 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   helpers (mirroring `ts_acdc_pf`), exported at the top level.
 
 ### Changed
+- **`pyomo_model_solve` reworked**: supports solver options and callbacks, a
+  robust retry path, constraint-tightening/feasibility handling for hard
+  multi-period runs, and richer solver-statistics reporting.
+- **Multi-period TEP substantially extended** (`ACDC_MultiPeriod_TEP.py`):
+  installation ranges over planned values, decommissioning periods, time-series
+  net-power reporting, and per-investment-period result exports / SVG output.
+- **PGL min/max physical constraints** added for renewable/load power bounds in
+  the OPF/TEP formulations.
+- **Array optimization** (`Array_OPT.py`): added an array-loss objective term and
+  fixed cable-sizing/CSS behavior.
+- **OPF/TS multiplicity (`np`) handling aligned** across the OPF and time-series
+  paths, and time-series line outputs were cleaned up for consistent reporting.
+- **Mapping/Folium cleanup**: planar-layout fix and SVG export scaling.
 - Objective-weight defaults are now built from a single factory instead of
   three duplicated literal dicts.
 - Node active/reactive generation expressions are centralized on `Node_AC`
@@ -95,6 +133,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   “missing `Hy`” was incorrect (looked at the helper body, not the caller).
 
 ### Fixed
+- `plot_model_feasebility` renamed to `plot_model_feasibility` (public typo;
+  old name kept as a deprecated alias).
+- DC power-flow corrections and renewable/generator parallel-unit (`np_rsgen` /
+  `np_gen`) export fixes.
+- Sequential/multi-period solver robustness: `bonmin` exit handling and retry on
+  solver failures during STEP/MP runs.
 - `Export_files` no longer emits an unquoted `pricing_strategy=` value in
   generated loader code (which raised `NameError` when re-run).
 - Removed a duplicate/unreachable `PZ_cost_of_generation` branch in
@@ -104,6 +148,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - `kappa_sensitivity` no longer references undefined `model.discount_rate`;
   it now uses `present_value_factor(Hy, discount_rate, n_years)` like the other
   TEP sensitivity helpers (fixes `AttributeError` at runtime).
+- `Gen_set_dev` objective now compares like units: the setpoint deviation uses
+  `gen.Pset * gen.np_gen` (total) instead of the per-unit `gen.Pset`, so the
+  penalty is zero at the setpoint for generators with `np_gen > 1` (both the
+  Pyomo objective and the post-solve `calculate_objective` path).
+- `transmission_expansion_pymoo` now wires its `NPV` flag into
+  `TEPOuterProblem`: when `NPV=False` the OPEX (and CAPEX) are no longer scaled
+  by the present-value factor. Previously the flag was ignored and present value
+  was always applied.
 - `time_series_pf` no longer calls the non-existent `grid.TS_ACDC_PF` attribute
   (which raised `AttributeError` for AC/DC grids); it now routes to the
   module-level `ts_dc_pf` (DC-only), `ts_ac_pf` (AC-only), or `ts_acdc_pf`

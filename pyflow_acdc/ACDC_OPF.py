@@ -1479,7 +1479,7 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
     def formula_Gen_set_dev():
         if weights_def[ObjComponent.GEN_SET_DEV]['w']==0:
             return 0
-        return sum((model.PGi_gen[gen.genNumber]-gen.Pset)**2 for gen in grid.Generators)
+        return sum((model.PGi_gen[gen.genNumber]-gen.Pset*gen.np_gen)**2 for gen in grid.Generators)
     s=1
     for key, entry in weights_def.items():
         if key == ObjComponent.EXT_GEN:
@@ -1995,7 +1995,7 @@ def calculate_objective(grid,obj,OnlyGen=True):
 
 
     if obj==ObjComponent.GEN_SET_DEV:
-        return sum((gen.PGen-gen.Pset)**2 for gen in grid.Generators)
+        return sum((gen.PGen-gen.Pset*gen.np_gen)**2 for gen in grid.Generators)
     
     return 0
 

@@ -1538,7 +1538,7 @@ def create_scenarios(
     
     model.weights = pyo.Param(model.scenario_frames, initialize=w)
     obj_TEP = tep_obj(model,grid,NPV)
-    pv = present_value_factor(Hy, discount_rate, n_years) if NPV else Hy
+    pv = present_value_factor(Hy, discount_rate, n_years) if NPV else 1
     obj_weighted = weighted_subobj(model, pv)
     
     if alpha is None:

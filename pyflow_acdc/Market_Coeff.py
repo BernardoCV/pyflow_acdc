@@ -513,9 +513,11 @@ def plot_curves(data, hour, name=None):
 ### ENTSEO DATA
 
 
-def compute_hour_of_year(df,production_types=[], Area= None):
+def compute_hour_of_year(df,production_types=None, Area= None):
     # Filter the dataframe based on the production type if provided
-    
+    if production_types is None:
+        production_types = []
+
     mtu_substring='MTU'
     
     if production_types and isinstance(production_types, list):
@@ -632,8 +634,10 @@ def compute_hour_of_year(df,production_types=[], Area= None):
 
 
 
-def clean_entsoe_data(key_list, year_list, production_types=[], output_excel=None,path=None):
+def clean_entsoe_data(key_list, year_list, production_types=None, output_excel=None,path=None):
     """Process generation and load data for multiple areas/years and save to Excel"""
+    if production_types is None:
+        production_types = []
     combined_dict_all = {}
     combined_df_all = {}
 

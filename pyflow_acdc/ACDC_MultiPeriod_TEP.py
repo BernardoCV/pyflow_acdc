@@ -1048,21 +1048,21 @@ def multi_period_transmission_expansion(
     for i in model.inv_periods:
         present_value_tep = 1/(1+discount_rate)**(i*n_years)
         
-        opf_obj = inv_opf_objs[i][0]  # Get first element from the list
-        npv_opf_obj = opf_obj*present_value_opf
-        inv_obj = inv_objs[i]
-        economic_step_obj = inv_obj + npv_opf_obj
+        opf_obj_from_list = inv_opf_objs[i][0]  # Get first element from the list
+        npv_opf_obj = opf_obj_from_list*present_value_opf
+        inv_obj_from_list = inv_objs[i]
+        economic_step_obj = inv_obj_from_list + npv_opf_obj
         if alpha is None:
             step_obj = economic_step_obj
         else:
-            step_obj = alpha * inv_obj + (1 - alpha) * npv_opf_obj
+            step_obj = alpha * inv_obj_from_list + (1 - alpha) * npv_opf_obj
         npv_step_obj = step_obj*present_value_tep
         npv_economic_step_obj = economic_step_obj*present_value_tep
         obj_rows.append({
             'Investment_Period': i+1,
-            'OPF_Objective': opf_obj,
+            'OPF_Objective': opf_obj_from_list,
             'NPV_OPF_Objective': npv_opf_obj,
-            'TEP_Objective': inv_obj,
+            'TEP_Objective': inv_obj_from_list,
             'STEP_Objective': step_obj,
             'NPV_STEP_Objective': npv_step_obj,
             'STEP_Objective_Economic': economic_step_obj,
@@ -1196,7 +1196,7 @@ def _MP_TEP_obj(model,grid,n_years,discount_rate,alpha=None):
         try:
             alpha = float(alpha)
         except (TypeError, ValueError):
-            raise ValueError("alpha must be None or a numeric value in [0, 1].")
+            raise ValueError("alpha must be None or a numeric value in [0, 1].") from None
         if alpha < 0.0 or alpha > 1.0:
             raise ValueError("alpha must be in [0, 1].")
     
@@ -1645,7 +1645,7 @@ def multi_period_MS_TEP(
         try:
             alpha = float(alpha)
         except (TypeError, ValueError):
-            raise ValueError("alpha must be None or a numeric value in [0, 1].")
+            raise ValueError("alpha must be None or a numeric value in [0, 1].") from None
         if alpha < 0.0 or alpha > 1.0:
             raise ValueError("alpha must be in [0, 1].")
 
@@ -2286,8 +2286,8 @@ def calculate_mptep_objective_from_model(model,grid,weights_def,n_years,discount
             if not hasattr(period_block, 'scenario_frames') or not hasattr(period_block, 'scenario_model'):
                 raise ValueError(f"Investment period {i} has no scenario blocks for multi-scenario objective extraction.")
             for t in period_block.scenario_frames:
-                opf_obj = calculate_objective_from_model(period_block.scenario_model[t],grid,weights_def,True)
-                opf_objs.append(opf_obj)
+                opf_obj_from_model = calculate_objective_from_model(period_block.scenario_model[t],grid,weights_def,True)
+                opf_objs.append(opf_obj_from_model)
         else:
             opf_objs = [calculate_objective_from_model(model.inv_model[i],grid,weights_def,True)]
 

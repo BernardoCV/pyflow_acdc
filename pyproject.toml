@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.5.1"
+version = "0.6.0"
 license = {file = "LICENSE"}
 requires-python = ">= 3.10"
 
@@ -124,3 +124,25 @@ packages = ["pyflow_acdc","pyflow_tests"]
 [project.scripts]
 pyflow-acdc-test = "pyflow_tests.run_tests:main"
 pyflow-acdc-check-solvers = "pyflow_acdc.solver_utils:cli_check_solvers"
+
+[tool.ruff]
+line-length = 100          # dense numerical/Pyomo expressions; relax from default 88
+# Bundled example/case grids are generated data tables (long literal node/line
+# rows); linting them is noise, so they are excluded from style checks.
+extend-exclude = ["pyflow_acdc/example_grids"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B"]
+# E/W pycodestyle, F pyflakes, I isort, N pep8-naming, UP pyupgrade, B bugbear
+
+[tool.ruff.lint.per-file-ignores]
+# Class names intentionally keep underscores/mixed case (owner decision, Tier F WON'T DO).
+"pyflow_acdc/Classes.py" = ["N801"]   # class name should use CapWords
+"pyflow_acdc/__init__.py" = ["F401", "F403"]  # re-export surface + controlled star imports
+
+[tool.pytest.ini_options]
+markers = [
+    "fast: quick tests that do not require optional solver/backends",
+    "examples: tests that exercise bundled example_grids",
+    "solver_optional: tests requiring an optional solver/backend (pyomo, ortools, gurobi, ...)",
+]

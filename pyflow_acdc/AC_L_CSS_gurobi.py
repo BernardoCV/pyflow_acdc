@@ -972,15 +972,6 @@ def create_master_problem_gurobi(grid, crossings=False, max_flow=None):
         line_cost = line.Length_km
         investment_cost += line_vars[l] * line_cost
           
-    
-    # Spanning tree constraint: exactly numNodes-numSinkNodes connections (multiple trees for multiple substations)
-    total_connections = sum(line_vars[line] for line in lista_lineas_AC_ct)
-    master.addConstr(
-        total_connections == len(lista_nodos_AC) - len(sink_nodes),
-        name="spanning_tree_connections"
-    )
-    
-  
     # Find sink nodes (nodes with generators) and source nodes (nodes with renewable resources)
     sink_nodes = []
     source_nodes = []
@@ -991,6 +982,15 @@ def create_master_problem_gurobi(grid, crossings=False, max_flow=None):
             sink_nodes.append(node)
         if nAC.connected_RenSource:  # Node has renewable resources (source)
             source_nodes.append(node)
+    
+    # Spanning tree constraint: exactly numNodes-numSinkNodes connections (multiple trees for multiple substations)
+    total_connections = sum(line_vars[line] for line in lista_lineas_AC_ct)
+    master.addConstr(
+        total_connections == len(lista_nodos_AC) - len(sink_nodes),
+        name="spanning_tree_connections"
+    )
+    
+  
     
     if not sink_nodes:
         raise ValueError("No generator nodes found!")
