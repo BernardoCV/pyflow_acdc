@@ -139,10 +139,3 @@ select = ["E", "W", "F", "I", "N", "UP", "B"]
 # Class names intentionally keep underscores/mixed case (owner decision, Tier F WON'T DO).
 "pyflow_acdc/Classes.py" = ["N801"]   # class name should use CapWords
 "pyflow_acdc/__init__.py" = ["F401", "F403"]  # re-export surface + controlled star imports
-
-[tool.pytest.ini_options]
-markers = [
-    "fast: quick tests that do not require optional solver/backends",
-    "examples: tests that exercise bundled example_grids",
-    "solver_optional: tests requiring an optional solver/backend (pyomo, ortools, gurobi, ...)",
-]

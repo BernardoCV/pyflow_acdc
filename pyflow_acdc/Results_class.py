@@ -91,21 +91,21 @@ class Results:
             self.ac_voltage(print_table=print_table)
             self.ac_lines_current(print_table=print_table)
             self.ac_lines_power(print_table=print_table)
-        
+
         if self.Grid.nodes_DC != []:
             if self.Grid.nconv != 0:
                 self.converter(print_table=print_table)
             self.dc_bus(print_table=print_table)
             self.dc_lines_current(print_table=print_table)
             self.dc_lines_power(print_table=print_table)
-            
+
 
             if self.Grid.Converters_DCDC != []:
                 self.dc_converter(print_table=print_table)
-        
+
         if self.Grid.nodes_AC != [] and self.Grid.nodes_DC != []:
             self.slack_all(print_table=print_table)
-            
+
         elif self.Grid.nodes_AC != []:
             self.slack_ac(print_table=print_table)
 
@@ -117,11 +117,11 @@ class Results:
                 self.ext_ren(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.obj_res(print_table=print_table)
-            if self.Grid.Price_Zones != []: 
-                self.price_zone(print_table=print_table)    
+            if self.Grid.Price_Zones != []:
+                self.price_zone(print_table=print_table)
         if self.Grid.lines_AC_exp+self.Grid.lines_AC_rec+self.Grid.lines_AC_ct != []:
             self.ac_exp_lines_power(print_table=print_table)
-        if self.Grid.TEP_run:    
+        if self.Grid.TEP_run:
             self.tep_n(print_table=print_table)
             if self.Grid.TEP_multiScenario_res is not None:
                 self.tep_ts_norm(print_table=print_table)
@@ -254,7 +254,7 @@ class Results:
 
     def power_loss(self, print_table=True):
         rows = []
-        generation=0 
+        generation=0
         grid_loads = 0
         tot=0
 
@@ -266,7 +266,7 @@ class Results:
             self.Grid.load_grid_AC = np.zeros(self.Grid.Num_Grids_AC)
         if getattr(self.Grid, "load_grid_DC", None) is not None and self.Grid.Num_Grids_DC > 0:
             self.Grid.load_grid_DC = np.zeros(self.Grid.Num_Grids_DC)
-        
+
         if self.Grid.nodes_AC != []:
             if self.Grid.OPF_run:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
@@ -277,7 +277,7 @@ class Results:
                 P_AC = np.vstack([node.PGi+sum(rs.PGi_ren*rs.gamma for rs in node.connected_RenSource)
                                         +sum(gen.Pset for gen in node.connected_gen if gen.Pset >0) for node in self.Grid.nodes_AC])
                 Q_AC = np.vstack([node.QGi+sum(gen.Qset for gen in node.connected_gen) for node in self.Grid.nodes_AC])
-            
+
             for node in self.Grid.nodes_AC:
                 if not self.Grid.OPF_run and node.type == NodeType.SLACK:
                       ps = node.P_s.item() if hasattr(node.P_s, 'item') else node.P_s
@@ -287,10 +287,10 @@ class Results:
                       else:
                         PGi = 0
                         grid_loads+=abs(net_power)*self.Grid.S_base
-    
+
                 else:
                       PGi = P_AC[node.nodeNumber].item()
-                generation += PGi*self.Grid.S_base      
+                generation += PGi*self.Grid.S_base
                 if self.Grid.OPF_run:
                     grid_loads += (node.PLi-sum(gen.PGen for gen in node.connected_gen if gen.PGen <0))*self.Grid.S_base
                 else:
@@ -298,71 +298,71 @@ class Results:
 
             self.lossP_AC = np.zeros(self.Grid.Num_Grids_AC)
             effective_rating_AC = np.zeros(self.Grid.Num_Grids_AC)
-            
+
             for line in self.Grid.lines_AC:
                 node = line.fromNode
                 G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                 Ploss = np.real(line.loss)*self.Grid.S_base
-            
+
                 Sfrom = abs(line.fromS)*self.Grid.S_base
                 Sto   = abs(line.toS)*self.Grid.S_base
 
                 load = max(Sfrom, Sto)
-                
+
                 self.Grid.load_grid_AC[G] += load
                 effective_rating_AC[G] += line.capacity_MVA
-                
+
                 self.lossP_AC[G] += Ploss
 
-            
+
             for line in self.Grid.lines_AC_exp:
                 if line.np_line>0.01:
                     node = line.fromNode
                     G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                     Ploss = np.real(line.loss)*self.Grid.S_base
-                    
+
                     Sfrom = abs(line.fromS)*self.Grid.S_base
                     Sto   = abs(line.toS)*self.Grid.S_base
-    
+
                     load = max(Sfrom, Sto)
-                    
+
                     self.Grid.load_grid_AC[G] += load
                     effective_rating_AC[G] += line.capacity_MVA
-                    
+
                     self.lossP_AC[G] += Ploss
 
             for line in self.Grid.lines_AC_tf:
                 node = line.fromNode
                 G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                 Ploss = np.real(line.loss)*self.Grid.S_base
-                
+
                 Sfrom = abs(line.fromS)*self.Grid.S_base
                 Sto   = abs(line.toS)*self.Grid.S_base
 
                 load = max(Sfrom, Sto)
-                
+
                 self.Grid.load_grid_AC[G] += load
                 effective_rating_AC[G] += line.capacity_MVA
-                
+
                 self.lossP_AC[G] += Ploss
 
             for line in (self.Grid.lines_AC_rec + self.Grid.lines_AC_ct):
                 node = line.fromNode
                 G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
                 Ploss = np.real(line.loss)*self.Grid.S_base
-                
+
                 Sfrom = abs(line.fromS)*self.Grid.S_base
                 Sto   = abs(line.toS)*self.Grid.S_base
 
                 load = max(Sfrom, Sto)
-                
+
                 self.Grid.load_grid_AC[G] += load
                 effective_rating_AC[G] += line.capacity_MVA
-                
+
                 self.lossP_AC[G] += Ploss
 
-           
-            
+
+
             for g in range(self.Grid.Num_Grids_AC):
                 if effective_rating_AC[g]!=0:
                     gload=self.Grid.load_grid_AC[g]/effective_rating_AC[g]*100
@@ -390,20 +390,20 @@ class Results:
                 G = self.Grid.Graph_node_to_Grid_index_DC[node.nodeNumber]
 
                 Ploss = np.real(line.loss)*self.Grid.S_base
-                
+
                 self.lossP_DC[G] += Ploss
-                
-                       
+
+
                 i = line.fromNode.nodeNumber
                 j = line.toNode.nodeNumber
                 p_to = self.Grid.Pij_DC[j, i]*self.Grid.S_base
                 p_from = self.Grid.Pij_DC[i, j]*self.Grid.S_base
 
                 load = max(p_to, p_from)
-                
+
                 self.Grid.load_grid_DC[G] += load
-                
-                
+
+
             for g in range(self.Grid.Num_Grids_DC):
                 gload=self.Grid.load_grid_DC[g]/self.Grid.rating_grid_DC[g]*100
                 rows.append({
@@ -418,7 +418,7 @@ class Results:
             for conv in self.Grid.Converters_ACDC:
                 P_loss_ACDC += (conv.P_loss_tf+conv.P_loss)*self.Grid.S_base
                 tot += (conv.P_loss_tf+conv.P_loss)*self.Grid.S_base
-         
+
             rows.append({
                 "Grid": 'AC DC Converters',
                 "Power Loss (MW)": np.round(P_loss_ACDC, decimals=self.dec),
@@ -427,7 +427,7 @@ class Results:
 
 
         eff = grid_loads/generation*100
-        
+
         rows.append({
             "Grid": "Total loss",
             "Power Loss (MW)": np.round(tot, decimals=self.dec),
@@ -471,7 +471,7 @@ class Results:
             node = line.fromNode
             G = self.Grid.Graph_node_to_Grid_index_AC[node.nodeNumber]
             Ploss = np.real(line.loss)*self.Grid.S_base
-            
+
             self.lossP_AC[G] += Ploss
 
         tot = 0
@@ -800,7 +800,7 @@ class Results:
                     i_from = line.i_from*I_base/SQRT_3
 
                     i_to = line.i_to*I_base/SQRT_3
-                    
+
                     load = line.loading
                     rows.append({
                         "Line": line.name,
@@ -994,12 +994,12 @@ class Results:
                     ])
                 print(tablep)
 
-        
+
         return df_all
 
 
     def ac_lines_power(self, Grid=None, print_table=True):
-        
+
         rows = []
         base = self.Grid.S_base
 
@@ -1083,19 +1083,19 @@ class Results:
         Ltot=0
         costtot=0
         for gen in self.Grid.Generators:
-          if gen.np_gen>0.001:  
+          if gen.np_gen>0.001:
             n_units = float(gen.np_gen)
             Pgi=gen.PGen*self.Grid.S_base
             Qgi=gen.QGen*self.Grid.S_base
             S= np.sqrt(Pgi**2+Qgi**2)
             Pgi_unit = Pgi / n_units
-            
+
             load=gen.loading
             qf=gen.qf
             fc=gen.fc
             cost_unit=(Pgi_unit**2*qf+Pgi_unit*gen.lf+fc)/1000
             cost_total=cost_unit*n_units
-           
+
             rows.append({
                 "Generator": gen.name,
                 "Node": gen.Node_AC,
@@ -1118,17 +1118,17 @@ class Results:
             Ltot+=gen.capacity_MVA
 
         for gen in self.Grid.Generators_DC:
-          if gen.np_gen>0.001:  
+          if gen.np_gen>0.001:
             n_units = float(gen.np_gen)
             Pgi=gen.PGen*self.Grid.S_base
             Pgi_unit = Pgi / n_units
-            
+
             load=gen.loading
             qf=gen.qf
             fc=gen.fc
             cost_unit=(Pgi_unit**2*qf+Pgi_unit*gen.lf+fc)/1000
             cost_total=cost_unit*n_units
-           
+
             rows.append({
                 "Generator": gen.name,
                 "Node": gen.Node_DC,
@@ -1197,9 +1197,9 @@ class Results:
             for _, row in df.iterrows():
                 table.add_row([row[col] for col in columns])
             print(table)
-    
+
         return df
-    
+
     def ext_ren(self, print_table=True):
         rows = []
         bp=0
@@ -1218,9 +1218,9 @@ class Results:
                 QGi=rs.QGi_ren*self.Grid.S_base*rs.np_rsgen
                 bp_total += Pgi * rs.np_rsgen
                 tcur_total += Pgi * (1-rs.gamma) * rs.np_rsgen
-                
+
                 if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
-                   
+
                     if rs.connected == AcDcSide.AC:
                         node_num = self.Grid.rs2node[AcDcSide.AC.value][rs.rsNumber]
                         node = self.Grid.nodes_AC[node_num]
@@ -1231,10 +1231,10 @@ class Results:
                         price=node.price
                     cost=PGicur*price/1000
                 else:
-                    cost=0 
+                    cost=0
                 if self.Grid.CurtCost==False:
                     curcost=0
-                else:    
+                else:
                     curcost= (Pgi*rs.np_rsgen-PGicur)*price*(self.Grid.sigma)/1000
                 rows.append({
                     "Name": rs.name,
@@ -1250,10 +1250,10 @@ class Results:
                 })
                 totcost+=cost
                 totcurcost+=curcost
-        
+
         PGicur=bp_total-tcur_total
         cur=(tcur_total)/bp_total*100 if bp_total != 0 else 0
-        
+
         rows.append({
             "Name": "Total",
             "Bus": "",
@@ -1345,11 +1345,11 @@ class Results:
         if len(all_dfs) == 1:
             return list(all_dfs.values())[0]
         return all_dfs
-                
+
     def clustering_technique(self, key, print_table=True):
         """
         Display clustering results for a specific technique.
-        
+
         Parameters:
         -----------
         key : str
@@ -1360,28 +1360,28 @@ class Results:
         technique = key.split('_')[1]
         n_clusters = key.split('_')[2]
         clustering_result = self.Grid.Clustering_information[key]
-        
+
         if print_table:
             # Print in the same format as print_clustering_results
             algorithm_name = clustering_result.get('algorithm', technique)
             print(f"\n{algorithm_name} clustering results:")
             print(f"- Number of clusters: {n_clusters}")
-            
+
             # Print time taken if available
             if 'time taken' in clustering_result:
                 print(f"- Time taken: {np.round(clustering_result['time taken'], decimals=self.dec)} seconds")
-            
+
             # Get specific_info and print all key-value pairs
             specific_info = clustering_result.get('specific_info', {})
             for key, value in specific_info.items():
                 # Skip derived statistics that are already included
                 if key in ["Cluster sizes average", "Cluster sizes std"]:
                     continue
-                
+
                 # Format value based on type
                 if isinstance(value, list):
                     # Convert numpy types in lists to native Python types
-                    formatted_value = [int(v) if isinstance(v, (np.integer, np.int64, np.int32)) 
+                    formatted_value = [int(v) if isinstance(v, (np.integer, np.int64, np.int32))
                                       else float(v) if isinstance(v, (np.floating, np.float64, np.float32))
                                       else v for v in value]
                     print(f"- {key}: {formatted_value}")
@@ -1399,7 +1399,7 @@ class Results:
                         print(f"- {key}: {value}")
                 else:
                     print(f"- {key}: {value}")
-        
+
         # Store in tables dict for Excel export
         technique_name = f"Clustering_{technique}_{n_clusters}"
         rows = []
@@ -1408,7 +1408,7 @@ class Results:
             "Number of clusters": n_clusters,
             "CoV": clustering_result.get('CoV', None)
         }
-        
+
         # Add specific_info to row
         specific_info = clustering_result.get('specific_info', {})
         for info_key, info_value in specific_info.items():
@@ -1421,41 +1421,41 @@ class Results:
                     row_data[info_key] = str(info_value)
                 else:
                     row_data[info_key] = info_value
-        
+
         rows.append(row_data)
         df = pd.DataFrame(rows)
         self.tables[technique_name] = df
-        
+
         return clustering_result
 
     def clustering_time_series_statistics(self, print_table=True):
         """
         Display time series statistics (Mean, Std, Var, CV) from clustering analysis.
-        
+
         Parameters:
         -----------
         print_table : bool, default=True
             If True, print the statistics table
         """
-        if (not hasattr(self.Grid, 'Clustering_information') or 
-            self.Grid.Clustering_information is None or 
+        if (not hasattr(self.Grid, 'Clustering_information') or
+            self.Grid.Clustering_information is None or
             'Time_series_statistics' not in self.Grid.Clustering_information):
             if print_table:
                 print('--------------')
                 print('Time series statistics')
                 print('No time series statistics available. Run clustering analysis first.')
             return pd.DataFrame()
-        
+
         df = self.Grid.Clustering_information['Time_series_statistics'].copy()
-        
+
         # Round numeric columns for display
         numeric_cols = ['Mean', 'Std', 'Var', 'CV']
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = df[col].apply(lambda x: np.round(x, decimals=self.dec) if isinstance(x, (int, float, np.number)) and pd.notna(x) and np.isfinite(x) else x)
-        
+
         self.tables["Time_series_statistics"] = df
-        
+
         if print_table:
             print('--------------')
             print('Time series statistics (sorted by CV)')
@@ -1464,7 +1464,7 @@ class Results:
             for _, row in df.iterrows():
                 # Check if this is a separator row (has string values)
                 is_separator = isinstance(row['Mean'], str) or row['Name'] in ['---', 'Not']
-                
+
                 if is_separator:
                     # For separator row, use values as-is
                     table.add_row([
@@ -1480,7 +1480,7 @@ class Results:
                     std_val = f"{row['Std']:.{self.dec}f}" if isinstance(row['Std'], (int, float, np.number)) and pd.notna(row['Std']) and np.isfinite(row['Std']) else str(row['Std'])
                     var_val = f"{row['Var']:.{self.dec}f}" if isinstance(row['Var'], (int, float, np.number)) and pd.notna(row['Var']) and np.isfinite(row['Var']) else str(row['Var'])
                     cv_val = f"{row['CV']:.{self.dec}f}" if isinstance(row['CV'], (int, float, np.number)) and pd.notna(row['CV']) and np.isfinite(row['CV']) else str(row['CV'])
-                    
+
                     table.add_row([
                         row['Name'],
                         mean_val,
@@ -1489,15 +1489,15 @@ class Results:
                         cv_val,
                     ])
             print(table)
-        
-        
-        
+
+
+
         return df
-    
+
     def tep_multi_scenario_res(self, print_table=True):
         if self.Grid.TEP_multiScenario_res is None:
             return None
-        
+
         TEP_multiScenario_res = self.Grid.TEP_multiScenario_res
         PN   = TEP_multiScenario_res['PN']
         SC   = TEP_multiScenario_res['PZ_cost_of_generation']
@@ -1565,7 +1565,7 @@ class Results:
                 for index, row in data.iterrows():
                     table.add_row([index] + row.tolist())
                 print(table)
-            
+
             # SC
             if not _is_empty(SC):
                 table = pt()
@@ -1575,7 +1575,7 @@ class Results:
                 for index, row in data_SC.iterrows():
                     table.add_row([index] + row.tolist())
                 print(table)
-            
+
             # price
             if not _is_empty(price):
                 table = pt()
@@ -1585,7 +1585,7 @@ class Results:
                 for index, row in data_price.iterrows():
                     table.add_row([index] + row.tolist())
                 print(table)
-            
+
             # curtailment
             if not _is_empty(curt):
                 table = pt()
@@ -1595,7 +1595,7 @@ class Results:
                 for index, row in data_curt.iterrows():
                     table.add_row([index] + row.tolist())
                 print(table)
-            
+
             # lines
             if not _is_empty(lines):
                 table = pt()
@@ -1605,7 +1605,7 @@ class Results:
                 for index, row in data_lines.iterrows():
                     table.add_row([index] + row.tolist())
                 print(table)
-            
+
             # converters
             if not _is_empty(conv):
                 table = pt()
@@ -1629,7 +1629,7 @@ class Results:
     def tep_n(self, print_table=True):
         rows = []
         tot=0
-        
+
         for l in self.Grid.lines_AC_exp:
             if l.np_line_opf:
                 if (l.np_line-l.np_line_b)>0.01:
@@ -1642,7 +1642,7 @@ class Results:
                     maxn=l.np_line_max
                     rows.append([element, "AC Line" ,ini, np.round(opt, decimals=2),maxn,
                                  float(np.round(pr, decimals=0)), float(cost)])
-        
+
         for l in self.Grid.lines_AC_rec:
             if l.rec_line_opf:
                 if l.rec_branch:
@@ -1679,8 +1679,8 @@ class Results:
                     maxn=l.np_line_max
                     rows.append([element, "DC Line" ,ini, np.round(opt, decimals=2),maxn,
                                  float(np.round(pr, decimals=0)), float(cost)])
-                
-        
+
+
         for cn in self.Grid.Converters_ACDC:
             if cn.np_conv_opf:
                 if (cn.np_conv-cn.np_conv_b)>0.01:
@@ -1693,7 +1693,7 @@ class Results:
                     maxn=cn.np_conv_max
                     rows.append([element, "ACDC Conv" ,ini,np.round(opt, decimals=2),maxn,
                                  float(np.round(pr, decimals=0)), float(cost)])
-        
+
 
         for gen in self.Grid.Generators:
             if gen.np_gen_opf:
@@ -1733,7 +1733,7 @@ class Results:
             "Optimized Power Rating [MW]","Expansion Cost [€]"
         ])
         self.tables["TEP_N"] = df
-        
+
         if print_table:
             print('--------------')
             print('Transmission Expansion Problem')
@@ -1766,7 +1766,7 @@ class Results:
         df = df[cols] if all(c in df.columns for c in cols[1:]) else df
 
         self.tables["TEP_norm"] = df
-        
+
         if print_table:
             table=pt()
             table.field_names = ["Objective","Weight" ,"Value","Weighted Value","NPV"]
@@ -1796,7 +1796,7 @@ class Results:
         df = df[cols] if all(c in df.columns for c in cols[1:]) else df
 
         self.tables["OBJ_res"] = df
-       
+
         if print_table:
             table=pt()
             table.field_names = ["Objective","Weight" ,"Value","Weighted Value"]
@@ -1812,7 +1812,7 @@ class Results:
             print(table)
 
         return df
-        
+
     def tep_ts_norm(self, print_table=True):
         if not self.Grid.OPF_obj['PZ_cost_of_generation']['w'] > 0:
             return None
@@ -1821,7 +1821,7 @@ class Results:
 
         for l in self.Grid.lines_AC_exp:
             if l.np_line_opf:
-                
+
                 opt=l.np_line
                 cost=((opt)*l.MVA_rating*l.Length_km*l.phi)*l.life_time*HOURS_PER_YEAR/(10**6)
                 tot+=cost
@@ -1833,27 +1833,27 @@ class Results:
                 cost=((opt)*l.MW_rating*l.Length_km*l.phi)*l.life_time*HOURS_PER_YEAR/(10**6)
                 tot+=cost
                 tot_n+=((opt)*l.MW_rating*l.Length_km*l.phi)/1000
-                
-        
+
+
         for cn in self.Grid.Converters_ACDC:
             if cn.np_conv_opf:
                 opt=cn.np_conv
                 cost=((opt)*cn.MVA_max*cn.phi)*cn.life_time*HOURS_PER_YEAR/(10**6)
                 tot+=cost
                 tot_n+=((opt)*cn.MVA_max*cn.phi)/1000
-        
+
         TEP_multiScenario_res = self.Grid.TEP_multiScenario_res
         SC = TEP_multiScenario_res['PZ_cost_of_generation']
         weight = TEP_multiScenario_res['weights']
         price = TEP_multiScenario_res['price']
         OPF_obj = TEP_multiScenario_res['OPF_obj']
-       
+
         # Per-price-zone normalized costs
         rows_zones = []
         n_years = self.Grid.TEP_n_years
         discount_rate = self.Grid.TEP_discount_rate
-        
-        
+
+
         for m in self.Grid.Price_Zones:
             if type(m) is Price_Zone:
                 price_zone_weighted = SC.loc[m.name]
@@ -1865,7 +1865,7 @@ class Results:
                 for year in range(1, n_years + 1):
                     # Discount each yearly cash flow and add to the present value
                     present_value += (weighted_total * HOURS_PER_YEAR) / ((1 + discount_rate) ** year)/1000
-                
+
                 rows_zones.append([m.name, weighted_total, weighted_price, present_value])
 
         df_zones = pd.DataFrame(rows_zones, columns=[
@@ -1902,7 +1902,7 @@ class Results:
                     np.round(row["Present Value Cost Gen [M€]"], decimals=2),
                 ])
             print(table)
-            
+
             # Normalized summary
             table=pt()
             table.field_names = ["Normalized Cost Generation[k€/h]","Normalized investment [k€/h]","Normalized Total cost [k€/h]"]
@@ -1913,7 +1913,7 @@ class Results:
                 np.round(t_tot, decimals=2),
             ])
             print(table)
-            
+
             # NPV summary
             table=pt()
             table.field_names = ["Present Value Cost Generation[M€]","Investment [M€]","NPV [M€]"]
@@ -1922,7 +1922,7 @@ class Results:
                 f"{np.round(pv, decimals=2):,}".replace(',', ' '),
                 f"{np.round(inv, decimals=2):,}".replace(',', ' '),
                 f"{-np.round(npv, decimals=2):,}".replace(',', ' '),
-            ])  
+            ])
             print(table)
 
         return {
@@ -2133,7 +2133,7 @@ class Results:
         }])
         self.tables["MP_MS_TEP_results_meta"] = meta_df
         self.add_period_results_to_tables(period_results)
-        
+
         if print_table:
             print('--------------')
             print('Dynamic Transmission Expansion Problem (MP+MS)')
@@ -2199,7 +2199,7 @@ class Results:
                     formatted_npv_cost = npv_cost
                 table2.add_row([inv, formatted_npv_cost])
                 tot_npv_cost+=npv_cost
-            table2.add_row(['',''])    
+            table2.add_row(['',''])
             # Format total with thousand separators (spaces) and decimal places
             formatted_total = f"{np.round(tot_npv_cost, decimals=self.dec):,.{self.dec}f}".replace(',', ' ')
             table2.add_row(['Total', formatted_total])
@@ -2342,7 +2342,7 @@ class Results:
         self.tables["MP_TEP_fuel_type_distribution_number_of_gen"] = metric_tables["number of gen"]
         self.tables["MP_TEP_fuel_type_distribution_total_install_cap"] = metric_tables["total install cap"]
         self.tables["MP_TEP_fuel_type_distribution_percentage"] = metric_tables["percentage"]
-        self.tables["MP_TEP_fuel_type_distribution_current_limit"] = metric_tables["current limit"] 
+        self.tables["MP_TEP_fuel_type_distribution_current_limit"] = metric_tables["current limit"]
 
         # Stacked export table (one metric section under another)
         stacked_blocks = []
@@ -2520,44 +2520,44 @@ class Results:
 
     def price_zone(self, print_table=True):
         rows = []
-        
+
         tot_sc=0
         tot_Rgen_cost=0
         tot_gen_cost=0
         tot_curt_cost=0
         tot_m_tot=0
-        
+
         for m in self.Grid.Price_Zones:
-            
+
             Rgen = sum(rs.PGi_ren * rs.gamma *rs.np_rsgen for node in m.nodes_AC for rs in node.connected_RenSource) * self.Grid.S_base
-            
+
             gen = sum(node.PGi+node.PGi_opt for node in m.nodes_AC)*self.Grid.S_base
             load = sum(node.PLi for node in m.nodes_AC)*self.Grid.S_base
             ie = Rgen+gen-load
             price=m.price
-            
+
             sc = (m.a*ie**2+ie*m.b)/1000
             if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
                 Rgen_cost=Rgen*m.price/1000
             else:
-                Rgen_cost= 0          
+                Rgen_cost= 0
             gen_cost = gen*m.price/1000
             if self.Grid.CurtCost==False:
                 curt_cost=0
-            else:  
+            else:
                 curt_cost= sum((rs.PGi_ren-rs.PGi_ren * rs.gamma)*rs.np_rsgen*rs.sigma*node.price for node in m.nodes_AC for rs in node.connected_RenSource)*self.Grid.S_base
             m_tot= Rgen_cost+gen_cost+curt_cost+sc
-            
+
             tot_sc+=sc
             tot_Rgen_cost+=Rgen_cost
             tot_gen_cost+=gen_cost
             tot_curt_cost+=curt_cost
             tot_m_tot+=m_tot
-            
+
             if ie >=0:
                 export = ie
                 imp = 0
-            else: 
+            else:
                 export = 0
                 imp = abs(ie)
 
@@ -2595,7 +2595,7 @@ class Results:
                 "Generation Cost [k€]": np.round(gen_cost, decimals=self.dec),
                 "Total Cost [k€]": np.round(m_tot, decimals=self.dec),
             })
-        
+
         if rows:
             rows.append({
                 "Price_Zone": "Total",
@@ -2623,7 +2623,7 @@ class Results:
             ]
         )
         self.tables["Price_Zone"] = df
-        
+
         if print_table and not df.empty:
             print('--------------')
             print('Price_Zone')
@@ -2668,10 +2668,10 @@ class Results:
                 ])
             print(table)
             print(table2)
-            
+
         return df
     def dc_lines_current(self, print_table=True):
-        
+
         rows = []
         base = self.Grid.S_base
 
@@ -2745,11 +2745,11 @@ class Results:
         if self.save_res and self.export_type == "csv":
             csv_filename = f'{self.export_location}/DC_line_current.csv'
             df_all.to_csv(csv_filename, index=False)
-                
+
         return df_all
 
     def dc_lines_power(self, print_table=True):
-        
+
         rows = []
         base = self.Grid.S_base
 

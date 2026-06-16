@@ -83,12 +83,12 @@ def identify_standalone_rs_conv_pairs(grid, ren_source_ids=None, conv_ids=None):
 def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
     idx=t-1
     typ = ts.type
-    
+
     if clustering:
         ts_data = ts.data_clustered[n_clusters]
     else:
         ts_data = ts.data
-    
+
     if typ == TSType.A_CG:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
@@ -122,8 +122,8 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
         for node in grid.nodes_AC:
             if ts.element_name == node.name:
                 node.price = ts_data[idx]
-                break  # Stop after assigning to the correct node    
-    
+                break  # Stop after assigning to the correct node
+
     elif typ == TSType.LOAD:
         for price_zone in grid.Price_Zones:
             if ts.element_name == price_zone.name:
@@ -151,14 +151,14 @@ def update_grid_scenario_frame(grid,ts,t,n_clusters,clustering):
 
 def expand_elements_from_pd(grid,exp_elements):
     """
-    This function iterates over exp_elements and applies expand_element 
+    This function iterates over exp_elements and applies expand_element
     with the corresponding columns (N_i, life_time, and base_cost) if available.
-    
+
     Parameters:
     exp_elements: DataFrame containing element data.
     grid: The grid object to be passed to expand_element.
     """
-    
+
     # Normalize CSV headers to lowercase so lookups are case-insensitive.
     exp_elements = exp_elements.rename(columns=lambda c: str(c).strip().lower())
 
@@ -212,7 +212,7 @@ def expand_elements_from_pd(grid,exp_elements):
             allow_planned_decrease=parse_optional_bool(get_column_value(row, 'allow_planned_decrease')),
         )
     grid.update_graph_ac()
-    grid.create_Ybus_AC() 
+    grid.create_Ybus_AC()
 
 
 def _rebuild_expand_element_index(grid):
@@ -257,10 +257,10 @@ def repurpose_element_from_pd(grid,rec_elements):
 
     # Normalize CSV headers to lowercase so lookups are case-insensitive.
     rec_elements = rec_elements.rename(columns=lambda c: str(c).strip().lower())
-    
+
     def get_column_value(row, col_name,default_value=None):
         return row[col_name] if col_name in row.index else default_value
-    
+
     # Apply the expand_element function for each element in exp_elements
     rec_elements.iloc[:, 0].apply(lambda name: change_line_AC_to_reconducting(
         grid,
@@ -273,10 +273,10 @@ def repurpose_element_from_pd(grid,rec_elements):
         get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'life_time',default_value=1),
         get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'base_cost',default_value=0),
         False
-            
+
     ))
     grid.update_graph_ac()
-    grid.create_Ybus_AC()    
+    grid.create_Ybus_AC()
 
 
 def update_attributes(
@@ -324,7 +324,7 @@ def update_attributes(
            element.np_line_b = n_b
            element.np_line = n_b
        if hasattr(element, 'np_conv'):
-           element.np_conv_b = n_b  
+           element.np_conv_b = n_b
            element.np_conv = n_b
        if hasattr(element, 'np_gen'):
            element.np_gen_b = n_b
@@ -332,7 +332,7 @@ def update_attributes(
        if hasattr(element, 'np_rsgen'):
            element.np_rsgen_b = n_b
            element.np_rsgen = n_b
-       
+
    def _apply_max_rule(max_attr, current_attr):
        if not hasattr(element, max_attr):
            return
@@ -358,7 +358,7 @@ def update_attributes(
        _sync_inv0('planned_installation', planned_installation)
    if allow_planned_decrease is not None:
        element.allow_planned_decrease = allow_planned_decrease
-    
+
    # MP max_inv is driven by n_inv_max (when provided), not by static np_*_max.
    if n_inv_max is not None:
        _sync_inv0('max_inv', n_inv_max)
@@ -375,12 +375,12 @@ def update_attributes(
 
    if life_time is not None:
        element.life_time = life_time
-   
+
    if per_unit_cost is not None:
        if hasattr(element, 'cost_perMWkm'):
            element.cost_perMWkm = per_unit_cost
        if hasattr(element, 'cost_perMVAkm'):
-           element.cost_perMVAkm = per_unit_cost    
+           element.cost_perMVAkm = per_unit_cost
        if hasattr(element, 'cost_perMVA'):
            element.cost_perMVA = per_unit_cost
    if base_cost is not None:
@@ -446,18 +446,18 @@ def expand_element(
         allow_planned_decrease=allow_planned_decrease
     )
 def base_cost_calculation(element):
-    from .Classes import Exp_Line_AC 
+    from .Classes import Exp_Line_AC
     if isinstance(element, Exp_Line_AC):
         element.base_cost= element.cost_perMVAkm*element.Length_km*element.MW_rating
 
-    from .Classes import Line_DC 
+    from .Classes import Line_DC
     if isinstance(element, Line_DC):
         element.base_cost= element.cost_perMWkm*element.Length_km*element.MW_rating
 
     from .Classes import AC_DC_converter
     if isinstance(element, AC_DC_converter):
         element.base_cost= element.cost_perMVA*element.MVA_max
-    
+
     from .Classes import Gen_AC
     if isinstance(element, Gen_AC):
         if element.Max_S is not None:
@@ -475,7 +475,7 @@ def translate_pd_tep(grid):
     # Price_Zones
     price_zone2node, price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max, PL_price_zone = {}, {}, {}, {}, {}, {}, {}
     nn_M, node2price_zone, lista_M = 0, {}, []
-    
+
     for m in grid.Price_Zones:
         price_zone2node[m.price_zone_num] = []
         nn_M += 1
@@ -498,13 +498,13 @@ def translate_pd_tep(grid):
     Price_Zone_Lists = pack_variables(lista_M, node2price_zone, price_zone2node)
     Price_Zone_lim = pack_variables(price_zone_as, price_zone_bs, PGL_min, PGL_max)
 
-   
+
     Price_Zone_info = pack_variables(Price_Zone_Lists, Price_Zone_lim)
 
     return Price_Zone_info
 
 def get_TEP_variables(grid):
-    
+
     np_conv, np_conv_model_first_guess, np_conv_max = {}, {}, {}
     np_conv_planned_install = {}
     S_limit_conv={}
@@ -538,11 +538,11 @@ def get_TEP_variables(grid):
     ct_ini = {}
     for l in grid.lines_AC_ct:
         for ct in range(len(l._cable_types)):
-            ct_ini[l.lineNumber, ct] = 1 if ct == l.active_config else 0  
-             
+            ct_ini[l.lineNumber, ct] = 1 if ct == l.active_config else 0
+
     for conv in grid.Converters_ACDC:
         planned_install = getattr(conv, 'planned_installation', 0)
-        np_conv [conv.ConvNumber]  = conv.np_conv 
+        np_conv [conv.ConvNumber]  = conv.np_conv
         np_conv_model_first_guess[conv.ConvNumber] = _init_with_planned(
             conv.np_conv, conv.np_conv_max, planned_install, conv.np_conv_opf
         )
@@ -552,14 +552,14 @@ def get_TEP_variables(grid):
     for l in grid.lines_DC:
         planned_install = getattr(l, 'planned_installation', 0)
         P_lineDC_limit[l.lineNumber]  = l.MW_rating/grid.S_base
-        NP_lineDC[l.lineNumber]     = l.np_line 
+        NP_lineDC[l.lineNumber]     = l.np_line
         NP_lineDC_model_first_guess[l.lineNumber] = _init_with_planned(
             l.np_line, l.np_line_max, planned_install, l.np_line_opf
         )
         NP_lineDC_max[l.lineNumber]   = l.np_line_max
         NP_lineDC_planned_install[l.lineNumber] = planned_install
         Line_length[l.lineNumber]     = l.Length_km
-        
+
     np_gen={}
     np_gen_model_first_guess={}
     np_gen_max={}
@@ -572,7 +572,7 @@ def get_TEP_variables(grid):
             gen.np_gen, gen.np_gen_max, planned_install, gen.np_gen_opf
         )
         np_gen_planned_install[gen.genNumber] = planned_install
-    
+
     np_gen_DC={}
     np_gen_DC_model_first_guess={}
     np_gen_max_DC={}
@@ -585,7 +585,7 @@ def get_TEP_variables(grid):
             gen.np_gen, gen.np_gen_max, planned_install, gen.np_gen_opf
         )
         np_gen_DC_planned_install[gen.genNumber_DC] = planned_install
-    
+
     np_rsgen={}
     np_rsgen_model_first_guess={}
     np_rsgen_max={}
@@ -598,7 +598,7 @@ def get_TEP_variables(grid):
             rs.np_rsgen, rs.np_rsgen_max, planned_install, rs.np_rsgen_opf
         )
         np_rsgen_planned_install[rs.rsNumber] = planned_install
-    
+
     # Return as dictionary for easier extension and maintenance
     return {
         'converters': {
@@ -849,15 +849,15 @@ def _TEP_install_constraints(model, grid):
 
 
 def MS_TEP_constraints(model,grid):
-    
-    
+
+
     def NP_ACline_link(model,line,t):
         element=grid.lines_AC_exp[line]
         if element.np_line_opf:
             return model.NumLinesACP[line] ==model.scenario_model[t].NumLinesACP[line]
         else:
             return pyo.Constraint.Skip
-    
+
     def NP_line_link(model,line,t):
         element=grid.lines_DC[line]
         if element.np_line_opf:
@@ -870,21 +870,21 @@ def MS_TEP_constraints(model,grid):
             return model.np_conv[conv] ==model.scenario_model[t].np_conv[conv]
         else:
             return pyo.Constraint.Skip
-    
+
     def NP_gen_AC_link(model,g,t):
         gen = grid.Generators[g]
         if gen.np_gen_opf:
             return model.np_gen[g] == model.scenario_model[t].np_gen[g]
         else:
             return pyo.Constraint.Skip
-    
+
     def NP_gen_DC_link(model,g,t):
         gen = grid.Generators_DC[g]
         if gen.np_gen_opf:
             return model.np_gen_DC[g] == model.scenario_model[t].np_gen_DC[g]
         else:
             return pyo.Constraint.Skip
-    
+
     def NP_rsgen_link(model,rs,t):
         source = grid.RenSources[rs]
         if source.np_rsgen_opf:
@@ -905,7 +905,7 @@ def MS_TEP_constraints(model,grid):
         model.NP_gen_DC_link_constraint = pyo.Constraint(model.gen_DC, model.scenario_frames, rule=NP_gen_DC_link)
     if grid.rs_GPR:
         model.NP_rsgen_link_constraint = pyo.Constraint(model.ren_sources, model.scenario_frames, rule=NP_rsgen_link)
-    
+
     def NP_ACline_rec_link(model,line,t):
         element=grid.lines_AC_rec[line]
         if element.rec_line_opf:
@@ -913,7 +913,7 @@ def MS_TEP_constraints(model,grid):
         else:
             return pyo.Constraint.Skip
     if grid.REC_AC:
-        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.scenario_frames, rule=NP_ACline_rec_link) 
+        model.NP_ACline_rec_link_constraint = pyo.Constraint(model.lines_AC_rec,model.scenario_frames, rule=NP_ACline_rec_link)
 
 
     def NP_ACline_ct_link(model,line,ct,t):
@@ -937,12 +937,12 @@ def _prepare_TEP_model(
 ):
 
     analyse_grid(grid)
-    
+
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
-   
+
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC AC/DC hybrid OPF"
 
@@ -953,58 +953,58 @@ def _prepare_TEP_model(
     limits_map = getattr(grid, "current_generation_type_limits", {}) or {}
     if any(float(v) != 1.0 for v in limits_map.values()):
         GEN_balance_constraints(model, grid)
-    
+
 
     obj_TEP = tep_obj(model,grid,NPV)
     obj_OPF = opf_obj(model,grid,weights_def,True)
-    
+
 
     return model, obj_TEP, obj_OPF,weights_def,PZ
 
 
 def GEN_balance_constraints(model,grid):
-    
+
     if all(v == 1 for v in grid.current_generation_type_limits.values()):
         return  # All limits are 1, no constraints needed
-    
+
     gen_type_limits = {k.lower(): v for k, v in grid.current_generation_type_limits.items()}
     model.gen_types = pyo.Set(initialize=list(gen_type_limits.keys()))
     model.gen_type_limits = pyo.Param(model.gen_types,initialize=gen_type_limits)
-    
+
     # Helper function to normalize type names to lowercase
     def normalize_type(type_name):
         return type_name.lower() if type_name else None
-    
+
     # Calculate max installed capacity for each type
     def gen_type_max_capacity_rule(model, gen_type):
         # Sum generator max capacities for this type (normalize gen.gen_type to lowercase)
         gen_capacity = sum(
-            gen.Max_pow_gen * model.np_gen[gen.genNumber] 
-            for gen in grid.Generators 
+            gen.Max_pow_gen * model.np_gen[gen.genNumber]
+            for gen in grid.Generators
             if normalize_type(gen.gen_type) == gen_type
         )
-        
+
         # Sum renewable source max capacities for this type (normalize rs.rs_type to lowercase)
         ren_capacity = sum(
             rs.PGi_ren_base * model.np_rsgen[rs.rsNumber]
             for rs in grid.RenSources
             if normalize_type(rs.rs_type) == gen_type
         )
-        
+
         return gen_capacity + ren_capacity
-    
+
     model.gen_type_max_capacity = pyo.Expression(model.gen_types, rule=gen_type_max_capacity_rule)
-    
+
     # Calculate total max capacity across all types
     def total_max_capacity_rule(model):
         return sum(model.gen_type_max_capacity[gt] for gt in model.gen_types)
-    
+
     model.total_max_capacity = pyo.Expression(rule=total_max_capacity_rule)
-    
+
     # Constraint: each type's max capacity <= total_max_capacity * type_limit
     def gen_type_balance_rule(model, gen_type):
         return model.gen_type_max_capacity[gen_type] <= model.total_max_capacity * model.gen_type_limits[gen_type]
-    
+
     model.gen_type_balance_constraint = pyo.Constraint(model.gen_types, rule=gen_type_balance_rule)
 
 def transmission_expansion(
@@ -1038,7 +1038,7 @@ def transmission_expansion(
         PV_set,
         initiate_max,
     )
-    
+
     present_value = present_value_factor(Hy, discount_rate, n_years)
     if NPV:
         obj_OPF *=present_value
@@ -1053,9 +1053,9 @@ def transmission_expansion(
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
 
-    t2 = time.perf_counter()  
+    t2 = time.perf_counter()
     t_modelcreate = t2-t1
-    
+
     # model.obj.pprint()
 
     model_results,solver_stats = pyomo_model_solve(
@@ -1068,22 +1068,22 @@ def transmission_expansion(
         solver_options=solver_options,
         nlp_warmstart=nlp_warmstart,
     )
-    
+
     t1 = time.perf_counter()
     if export:
         if grid.ACmode:
             grid.create_Ybus_AC()
         if grid.DCmode:
-            grid.create_Ybus_DC()   
+            grid.create_Ybus_DC()
         export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ,TEP=True)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t2 = time.perf_counter() 
+    t2 = time.perf_counter()
 
     t_modelexport = t2-t1
 
-      
+
     grid.TEP_run=True
     grid.OPF_obj = weights_def
 
@@ -1097,26 +1097,26 @@ def transmission_expansion(
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0):
     grid.reset_run_flags()
     analyse_grid(grid)
-    
+
     weights_def, _ = obj_w_rule(grid,ObjRule,True)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
-   
+
     t1 = time.perf_counter()
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
     opf_create_l_model_ac(model,grid,TEP=True)
-    
+
 
     obj_TEP = tep_obj(model,grid,NPV)
     obj_OPF = opf_obj_l(model,grid,weights_def)
-    
+
     present_value = present_value_factor(Hy, discount_rate, n_years)
     if NPV:
         obj_OPF *=present_value
-    
+
 
     total_cost = obj_TEP + obj_OPF
     if obj_scaling != 1.0:
@@ -1124,29 +1124,29 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
 
-    t2 = time.perf_counter()  
+    t2 = time.perf_counter()
     t_modelcreate = t2-t1
 
-   
+
     # model.obj.pprint()
     t3 = time.perf_counter()
     model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=fs)
-    
+
     if model_results is None:
         return None, None, None, None
 
-    
+
     t1 = time.perf_counter()
     if export:
         export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=model_results, tee=tee)
         for obj in weights_def:
             weights_def[obj]['v']=calculate_objective(grid,obj,True)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t2 = time.perf_counter() 
+    t2 = time.perf_counter()
 
     t_modelexport = t2-t1
 
-      
+
     grid.TEP_run=True
     grid.OPF_obj = weights_def
 
@@ -1156,10 +1156,10 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
     "export": t_modelexport,
     }
     return model, model_results , timing_info, solver_stats
-    
 
 
-def _initialize_MS_STEP_sets_model(model,grid):    
+
+def _initialize_MS_STEP_sets_model(model,grid):
     if grid.DCmode:
         model.lines_DC    = pyo.Set(initialize=list(range(0, grid.nl_DC)))
     if grid.ACmode and grid.DCmode:
@@ -1191,15 +1191,15 @@ def alpha_pareto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discou
         total_cost = total_cost / obj_scaling
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
-    
+
     # Store initial values for resetting
-    
+
     initial_values = {}
     for var_obj in model.component_objects(pyo.Var, active=True):
         initial_values[var_obj.name] = {}
         for index in var_obj:
             initial_values[var_obj.name][index] = var_obj[index].value
-    
+
     # Allow either an integer (count) or an iterable of alphas
     if isinstance(steps, int):
         steps_iter = np.linspace(0.0, 1.0, steps)
@@ -1212,7 +1212,7 @@ def alpha_pareto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discou
         reset_to_initialize(model, initial_values)
         model.alpha.set_value(a)
         model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit)
-        
+
         row = {
             'alpha': a,
             'obj_TEP': pyo.value(obj_TEP),
@@ -1220,7 +1220,7 @@ def alpha_pareto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discou
             'Total_cost': pyo.value(model.obj) * obj_scaling,
             'Time': solver_stats.get('time', None) if solver_stats is not None else None
         }
-        
+
         results.append(row)
 
         if save_name is not None:
@@ -1238,26 +1238,26 @@ def alpha_pareto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discou
                 conv.NUmConvP = pyo.value(model.np_conv[c])
 
             save_network_svg(grid,save_path)
-    
-    
+
+
     df = pd.DataFrame(results)
-    
+
     # Add normalized columns
     df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
     df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
-    
-    
-    
+
+
+
     return df
 
 def rate_sensitivity(grid,steps,ObjRule,min_rate=0.0,max_rate=0.1,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,solver='bonmin',time_limit=None,tee=False,obj_scaling=1.0):
-   
+
     model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,min_rate,ObjRule)
-    
+
     results = []
     model.discount_rate = pyo.Param(initialize=min_rate,mutable=True)
     present_value =   Hy*(1 - (1 + model.discount_rate) ** -n_years) / model.discount_rate
-    
+
 
     obj_OPF  *= present_value
 
@@ -1266,15 +1266,15 @@ def rate_sensitivity(grid,steps,ObjRule,min_rate=0.0,max_rate=0.1,NPV=True,n_yea
         total_cost = total_cost / obj_scaling
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
-    
+
     # Store initial values for resetting
-    
+
     initial_values = {}
     for var_obj in model.component_objects(pyo.Var, active=True):
         initial_values[var_obj.name] = {}
         for index in var_obj:
             initial_values[var_obj.name][index] = var_obj[index].value
-    
+
     # Allow either an integer (count) or an iterable of alphas
     if isinstance(steps, int):
         steps_iter = np.linspace(min_rate, max_rate, steps)
@@ -1287,7 +1287,7 @@ def rate_sensitivity(grid,steps,ObjRule,min_rate=0.0,max_rate=0.1,NPV=True,n_yea
         reset_to_initialize(model, initial_values)
         model.discount_rate.set_value(rate)
         model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit)
-        
+
         row = {
             'rate': rate,
             'obj_TEP': pyo.value(obj_TEP),
@@ -1295,28 +1295,28 @@ def rate_sensitivity(grid,steps,ObjRule,min_rate=0.0,max_rate=0.1,NPV=True,n_yea
             'Total_cost': pyo.value(model.obj) * obj_scaling,
             'Time': solver_stats.get('time', None) if solver_stats is not None else None
         }
-        
+
         results.append(row)
-    
-    
+
+
     df = pd.DataFrame(results)
-    
+
     # Add normalized columns
     df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
     df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
-    
-    
-    
+
+
+
     return df
 
 def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,solver='bonmin',time_limit=None,tee=False,obj_scaling=1.0):
-   
+
     model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule)
-    
+
     results = []
     model.kappa = pyo.Param(initialize=min_kappa,mutable=True)
     present_value =  present_value_factor(Hy, discount_rate, n_years)
-    
+
 
     obj_OPF  *= present_value
     obj_TEP *= model.kappa
@@ -1325,15 +1325,15 @@ def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_
         total_cost = total_cost / obj_scaling
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
-    
+
     # Store initial values for resetting
-    
+
     initial_values = {}
     for var_obj in model.component_objects(pyo.Var, active=True):
         initial_values[var_obj.name] = {}
         for index in var_obj:
             initial_values[var_obj.name][index] = var_obj[index].value
-    
+
     # Allow either an integer (count) or an iterable of alphas
     if isinstance(steps, int):
         steps_iter = np.linspace(min_kappa, max_kappa, steps)
@@ -1346,7 +1346,7 @@ def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_
         reset_to_initialize(model, initial_values)
         model.kappa.set_value(kappa)
         model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit)
-        
+
         row = {
             'kappa': kappa,
             'obj_TEP': pyo.value(obj_TEP),
@@ -1354,72 +1354,72 @@ def kappa_sensitivity(grid,steps,ObjRule,min_kappa=0.0,max_kappa=1.0,NPV=True,n_
             'Total_cost': pyo.value(model.obj) * obj_scaling,
             'Time': solver_stats.get('time', None) if solver_stats is not None else None
         }
-        
+
         results.append(row)
-    
-    
+
+
     df = pd.DataFrame(results)
-    
+
     # Add normalized columns
     df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
     df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
-    
-    
-    
+
+
+
     return df
 
 
 def comprehensive_sensitivity_analysis(
-    grid, 
+    grid,
     ObjRule,
-    alpha_steps=None, 
-    rate_steps=None, 
+    alpha_steps=None,
+    rate_steps=None,
     kappa_steps=None,
     alpha_range=(0.0, 1.0),
-    rate_range=(0.01, 0.1), 
+    rate_range=(0.01, 0.1),
     kappa_range=(0.0, 1.0),
-    n_years=25, 
-    Hy=HOURS_PER_YEAR, 
+    n_years=25,
+    Hy=HOURS_PER_YEAR,
     discount_rate=DEFAULT_DISCOUNT_RATE,
-    solver='bonmin', 
-    time_limit=None, 
+    solver='bonmin',
+    time_limit=None,
     tee=False,
     obj_scaling=1.0
 ):
     """
     Comprehensive sensitivity analysis combining alpha, rate, and kappa variations.
-    
+
     Parameters:
     - alpha_steps, rate_steps, kappa_steps: Number of steps or specific values for each parameter
     - alpha_range, rate_range, kappa_range: (min, max) tuples for parameter ranges
     """
     # Prepare base model
     model, obj_TEP, obj_OPF, weights_def, PZ = _prepare_TEP_model(grid, True, n_years, Hy, discount_rate, ObjRule)
-    
+
     # Create mutable parameters
     model.alpha = pyo.Param(initialize=0.5, mutable=True)
-    model.discount_rate = pyo.Param(initialize=discount_rate, mutable=True) 
+    model.discount_rate = pyo.Param(initialize=discount_rate, mutable=True)
     model.kappa = pyo.Param(initialize=0.5, mutable=True)
-    
+
     # Store initial values
     initial_values = {}
     for var_obj in model.component_objects(pyo.Var, active=True):
         initial_values[var_obj.name] = {}
         for index in var_obj:
             initial_values[var_obj.name][index] = var_obj[index].value
-    
+
     results = []
-    
+
     # Generate parameter ranges
     alpha_values = _generate_steps(alpha_steps, alpha_range) if alpha_steps is not None else [None]
-    rate_values = _generate_steps(rate_steps, rate_range) if rate_steps is not None else [None] 
+    rate_values = _generate_steps(rate_steps, rate_range) if rate_steps is not None else [None]
     kappa_values = _generate_steps(kappa_steps, kappa_range) if kappa_steps is not None else [None]
     # Set parameters
-    
+
     # Calculate present value with current discount rate
-    
+
     present_value = Hy * (1 - (1 + model.discount_rate) ** -n_years) / model.discount_rate
-    
+
     obj_OPF  *= present_value
     obj_TEP *= model.kappa
 
@@ -1427,13 +1427,13 @@ def comprehensive_sensitivity_analysis(
     # Modify objectives
     modified_obj_TEP = obj_TEP * model.alpha
     modified_obj_OPF = obj_OPF * (1 - model.alpha)
-    
+
     total_cost = modified_obj_TEP + modified_obj_OPF
     if obj_scaling != 1.0:
         total_cost = total_cost / obj_scaling
     model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
-                
+
     # Nested loops
     for alpha in alpha_values:
         print(f'Running alpha: {alpha}')
@@ -1449,15 +1449,15 @@ def comprehensive_sensitivity_analysis(
                     model.kappa.set_value(kappa)
                 # Reset model
                 reset_to_initialize(model, initial_values)
-                
-                
+
+
                 # Solve
                 model_results, solver_stats = pyomo_model_solve(model, grid, solver, tee, time_limit)
-                
+
                 # Store results
                 row = {
                     'alpha': alpha,
-                    'rate': rate, 
+                    'rate': rate,
                     'kappa': kappa,
                     'obj_TEP': pyo.value(obj_TEP),
                     'obj_OPF': pyo.value(obj_OPF),
@@ -1465,13 +1465,13 @@ def comprehensive_sensitivity_analysis(
                     'Time': solver_stats.get('time', None) if solver_stats is not None else None
                 }
                 results.append(row)
-    
+
     df = pd.DataFrame(results)
-    
+
     # Add normalized columns
     df['norm_TEP'] = df['obj_TEP'] / df['obj_TEP'].max()
     df['norm_OPF'] = df['obj_OPF'] / df['obj_OPF'].max()
-    
+
     return df
 
 def _generate_steps(steps, range_tuple):
@@ -1479,7 +1479,7 @@ def _generate_steps(steps, range_tuple):
     if isinstance(steps, int):
         return np.linspace(range_tuple[0], range_tuple[1], steps)
     else:
-        return np.asarray(steps, dtype=float).ravel()   
+        return np.asarray(steps, dtype=float).ravel()
 
 def create_scenarios(
     model,
@@ -1497,10 +1497,10 @@ def create_scenarios(
     obj_scaling=1.0,
     initiate_max=False,
 ):
-       
-    
-    from .Time_series import  _modify_parameters    
-    
+
+
+    from .Time_series import  _modify_parameters
+
     w={}
 
     base_model = pyo.ConcreteModel()
@@ -1511,12 +1511,12 @@ def create_scenarios(
             s=1
         base_model_copy = base_model.clone()
         model.scenario_model[t].transfer_attributes_from(base_model_copy)
-        
+
         for ts in grid.Time_series:
             update_grid_scenario_frame(grid,ts,t,n_clusters,clustering)
-        
+
         _modify_parameters(grid,model.scenario_model[t],Price_Zones)
-        
+
         tep_sub_obj(model.scenario_model[t],grid,weights_def)
         if clustering:
             w[t]= float(grid.Clusters[n_clusters]['Weight'][t-1])
@@ -1526,24 +1526,24 @@ def create_scenarios(
         else:
             num_scenario_frames = len(model.scenario_frames)
             w[t]=1/num_scenario_frames
-    
+
     _initialize_MS_STEP_sets_model(model,grid)
     TEP_variables(model,grid)
     _TEP_install_variables(model, grid, initiate_max=initiate_max)
     _TEP_install_constraints(model, grid)
-    
-    MS_TEP_constraints(model,grid)
-    
 
-    
+    MS_TEP_constraints(model,grid)
+
+
+
     model.weights = pyo.Param(model.scenario_frames, initialize=w)
     obj_TEP = tep_obj(model,grid,NPV)
     pv = present_value_factor(Hy, discount_rate, n_years) if NPV else 1
     obj_weighted = weighted_subobj(model, pv)
-    
+
     if alpha is None:
         total_cost = obj_TEP + obj_weighted
-    else:    
+    else:
         total_cost = obj_TEP*alpha + obj_weighted*(1-alpha)
     if obj_scaling != 1.0:
         total_cost = total_cost / obj_scaling
@@ -1570,7 +1570,7 @@ def multi_scenario_TEP(
     nlp_warmstart=False,
     initiate_max=False,
 ):
-    
+
     analyse_grid(grid)
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
@@ -1592,10 +1592,10 @@ def multi_scenario_TEP(
     model = pyo.ConcreteModel()
     model.name        ="TEP TS MTDC AC/DC hybrid OPF"
     model.scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
-    
+
     #print(list(model.scenario_frames))
     model.scenario_model    = pyo.Block(model.scenario_frames)
-    
+
     create_scenarios(
         model,
         grid,
@@ -1613,32 +1613,32 @@ def multi_scenario_TEP(
         initiate_max=initiate_max,
     )
 
-    t2 = time.time()  
+    t2 = time.time()
     t_modelcreate = t2-t1
-    if tee : 
-        print('Model loaded') 
+    if tee :
+        print('Model loaded')
     model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback,solver_options=solver_options,nlp_warmstart=nlp_warmstart)
-    
+
     t1 = time.perf_counter()
-    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zones)   
-    
+    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zones)
+
     TEP_multiScenario_res['OPF_obj'] = weights_def
-    
-    t2 = time.perf_counter()  
+
+    t2 = time.perf_counter()
     t_modelexport = t2-t1
-        
+
     # TEP_multiScenario_res ={}
-    
+
     grid.TEP_run=True
     grid.TEP_multiScenario_res = TEP_multiScenario_res
     grid.OPF_obj = weights_def
-    
+
     timing_info = {
     "create": t_modelcreate,
     "solve": solver_stats.get('time', None),
     "export": t_modelexport,
     }
-    
+
     return model, model_results , timing_info, solver_stats , TEP_multiScenario_res
 
 
@@ -1648,10 +1648,10 @@ def tep_sub_obj(scenario_model,grid,ObjRule):
     obj_rule= opf_obj(scenario_model,grid,ObjRule,OnlyGen)
     scenario_model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
     s=1
-    
+
 
 def tep_obj(model,grid,NPV):
-  
+
     def Gen_investments():
         Gen_Inv=0
         for g in model.gen_AC:
@@ -1670,14 +1670,14 @@ def tep_obj(model,grid,NPV):
         AC_Inv_lines=0
         for l in model.lines_AC_exp:
             line = grid.lines_AC_exp[l]
-            if line.np_line_opf: 
+            if line.np_line_opf:
                if NPV:
                    AC_Inv_lines += model.NumLinesACP_install[l] * line.base_cost
-               else: 
+               else:
                    AC_Inv_lines += model.NumLinesACP_install[l] * line.base_cost / line.life_time_hours
-    
+
         return AC_Inv_lines
-    
+
     def Repurposing_investments():
         Rep_Inv_lines=0
         for l in model.lines_AC_rec:
@@ -1688,12 +1688,12 @@ def tep_obj(model,grid,NPV):
                 else:
                     Rep_Inv_lines+=model.rec_branch[l]*line.base_cost/line.life_time_hours
         return Rep_Inv_lines
-    
+
     def Cables_investments():
         Inv_lines=0
         for l in model.lines_DC:
            line= grid.lines_DC[l]
-           if line.np_line_opf: 
+           if line.np_line_opf:
              if NPV:
                  Inv_lines+=model.NumLinesDCP_install[l]*line.base_cost
              else:
@@ -1711,32 +1711,32 @@ def tep_obj(model,grid,NPV):
                 else:
                     for ct in model.ct_set:
                         Inv_array+=(model.ct_branch[l,ct])*line.base_cost[ct]/line.life_time_hours
-        
+
         return Inv_array
-        
-    
+
+
     def Converter_investments():
         Inv_conv=0
         for cn in model.conv:
             conv= grid.Converters_ACDC[cn]
             if conv.np_conv_opf:
-               if NPV: 
+               if NPV:
                  Inv_conv += model.np_conv_install[cn] * conv.base_cost
                else:
                  Inv_conv += model.np_conv_install[cn] * conv.base_cost / conv.life_time_hours
         return Inv_conv
-    
+
     if grid.GPR:
         inv_gen= Gen_investments()
     else:
         inv_gen=0
-    
+
     if grid.rs_GPR:
         inv_rs = Renewable_investments()
     else:
         inv_rs = 0
 
-    if grid.TEP_AC: 
+    if grid.TEP_AC:
         inv_line_AC = AC_Line_investments()
     else:
         inv_line_AC=0
@@ -1749,7 +1749,7 @@ def tep_obj(model,grid,NPV):
     def CT_limit_rule(model):
             # Upper bound: limit total cable types used
             return sum(model.ct_types[ct] for ct in model.ct_set) <= grid.cab_types_allowed
-    
+
     def CT_limit_lower_bound_rule(model):
             # Lower bound: at least 1 cable type must be used (matching image formulation)
             return 1 <= sum(model.ct_types[ct] for ct in model.ct_set)
@@ -1759,20 +1759,20 @@ def tep_obj(model,grid,NPV):
             return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 1
         else:
             return sum(model.ct_branch[line, ct] for ct in model.ct_set) == 0
-    
-    
+
+
     def ct_types_upper_bound(model, ct):
         return sum(model.ct_branch[l, ct] for l in model.lines_AC_ct) <= len(model.lines_AC_ct) * model.ct_types[ct]
 
     def ct_types_lower_bound(model, ct):
         return model.ct_types[ct] <= sum(model.ct_branch[l, ct] for l in model.lines_AC_ct)
     if grid.CT_AC:
-        
+
         model.ct_types_upper_bound = pyo.Constraint(model.ct_set, rule=ct_types_upper_bound)
         model.ct_types_lower_bound = pyo.Constraint(model.ct_set, rule=ct_types_lower_bound)
         model.CT_limit_constraint = pyo.Constraint(rule=CT_limit_rule)
         model.CT_limit_lower_bound_constraint = pyo.Constraint(rule=CT_limit_lower_bound_rule)
-        model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)    
+        model.ct_cable_type_constraint = pyo.Constraint(model.lines_AC_ct, rule=ct_cable_type_rule)
         inv_array = Array_investments()
     else:
         inv_array = 0
@@ -1807,11 +1807,11 @@ def get_price_zone_data(t, model, grid,n_clusters,clustering):
     row_data_PN = {'Time_Frame': t}
     row_data_GEN = {'Time_Frame': t}
     # Collect price_zone data
-    
+
     for m in grid.Price_Zones:
         nM = m.price_zone_num
         row_data_price[m.name] = np.round(np.float64(pyo.value(model.scenario_model[t].price_zone_price[nM])), decimals=2)
-        
+
         from .Classes import Price_Zone
         from .Classes import MTDCPrice_Zone
         from .Classes import OffshorePrice_Zone
@@ -1826,21 +1826,21 @@ def get_price_zone_data(t, model, grid,n_clusters,clustering):
                     z  = grid.RenSource_zones[grid.RenSource_zones_dic[rz]]
                 else:
                     z= rs
-                try:    
+                try:
                     if clustering:
                         factor = grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters][t-1]
                     else:
                         factor = grid.Time_series[z.TS_dict['PRGi_available']].data[t-1]
-          
+
                     PGi_ren+=rs.PGi_ren_base*factor
                 except KeyError:
                     PGi_ren+=rs.PGi_ren_base*rs.PRGi_available
-                    print(f'Key {z} not found in Time series')   
-                
-                
+                    print(f'Key {z} not found in Time series')
+
+
             gen+=node.PGi +PGi_ren+PGi_opt
-            
-        row_data_GEN[m.name] = np.round(gen * grid.S_base, decimals=2)    
+
+        row_data_GEN[m.name] = np.round(gen * grid.S_base, decimals=2)
 
         if type(m) is Price_Zone:
             SC = np.float64(pyo.value(model.scenario_model[t].SocialCost[nM]))
@@ -1893,17 +1893,17 @@ def get_curtailment_data(t, model, grid,n_clusters,clustering):
             z  = grid.RenSource_zones[grid.RenSource_zones_dic[rz]]
         else:
             z= rs
-        try:    
+        try:
             if clustering:
                 factor = grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters][t-1]
             else:
                 factor = grid.Time_series[z.TS_dict['PRGi_available']].data[t-1]
-  
+
             PGi_ren=rs.PGi_ren_base*factor*pyo.value(model.np_rsgen[rs.rsNumber])
         except KeyError:
             PGi_ren=rs.PGi_ren_base*rs.PRGi_available*pyo.value(model.np_rsgen[rs.rsNumber])
-            print(f'Key {z} not found in Time series')    
-         
+            print(f'Key {z} not found in Time series')
+
         curt_value = np.round((1 - pyo.value(model.scenario_model[t].gamma[rs.rsNumber])) *PGi_ren* grid.S_base, decimals=2)
         row_data_curt[rs.name] = curt_value
         row_data_curt_per[rs.name] =  np.round(1 - pyo.value(model.scenario_model[t].gamma[rs.rsNumber]), decimals=2)*100
@@ -1912,7 +1912,7 @@ def get_curtailment_data(t, model, grid,n_clusters,clustering):
 
 def get_line_data(t, model, grid):
     row_data_lines = {'Time_Frame': t}
-    
+
     if grid.TEP_AC:
         for l in grid.lines_AC_exp:
             if l.np_line_opf:
@@ -1942,10 +1942,10 @@ def get_line_data(t, model, grid):
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 if state == 1:
                     load = max(S_to, S_from) / l.MVA_rating_new * 100
-                else:   
-                    load = max(S_to, S_from) / l.MVA_rating * 100 
+                else:
+                    load = max(S_to, S_from) / l.MVA_rating * 100
                 row_data_lines[l.name] = np.round(load, decimals=0).astype(int)
-                
+
     if grid.CT_AC:
         for l in grid.lines_AC_ct:
             if l.array_opf:
@@ -1964,7 +1964,7 @@ def get_line_data(t, model, grid):
                     P_from = 0
                     Q_to = 0
                     Q_from = 0
-                
+
                 S_to = np.sqrt(P_to**2 + Q_to**2)
                 S_from = np.sqrt(P_from**2 + Q_from**2)
                 load = max(S_to, S_from) / l.MVA_rating_list[active_config] * 100
@@ -2002,7 +2002,7 @@ def get_converter_data(t, model, grid):
                 p_dc = abs(p_c + p_loss)
                 loading = max(s_ac, p_dc) / (conv.MVA_max * nconv) * 100
                 row_data_conv[conv.name] = np.round(loading, decimals=0)
-                
+
 
     return row_data_conv
 
@@ -2033,7 +2033,7 @@ def get_gen_data(t, model, grid):
             ) * grid.S_base
             row_data_gen[f'R_{rg.name}'] = np.round(PGen, decimals=2)
             row_data_qgen[f'R_{rg.name}'] = np.round(QGen, decimals=2)
-    
+
     return row_data_gen,row_data_qgen
 
 
@@ -2043,9 +2043,9 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         grid.Theta_V_AC=np.zeros(grid.nn_AC)
         grid.V_DC=np.zeros(grid.nn_DC)
 
-    grid.OPF_run=True  
+    grid.OPF_run=True
 
-   
+
     SW= sum(pyo.value(model.weights[t]) for t in model.scenario_frames)
     def process_ren_source(renSource):
         rs = renSource.rsNumber
@@ -2060,13 +2060,13 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         renSource.QGi_ren = np.float64(
             sum(pyo.value(model.scenario_model[t].QGi_ren[rs]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW
         )
-    
+
     def process_gen(gen):
         gn = gen.genNumber
         gen.PGen =  np.float64(sum(pyo.value(model.scenario_model[t].PGi_gen[gn]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         gen.QGen =  np.float64(sum(pyo.value(model.scenario_model[t].QGi_gen[gn]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-    
-    
+
+
     def process_ac_node(node):
         nAC = node.nodeNumber
         node.V = np.float64(
@@ -2076,17 +2076,17 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         if grid.DCmode:
             node.P_s = np.float64(sum(pyo.value(model.scenario_model[t].P_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
             node.Q_s = np.float64(sum(pyo.value(model.scenario_model[t].Q_conv_AC[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-    
+
         node.PGi_opt = np.float64(sum(pyo.value(model.scenario_model[t].PGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         node.QGi_opt = np.float64(sum(pyo.value(model.scenario_model[t].QGi_opt[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         # Keep OPF export contract consistent with single-scenario OPF export:
         # Results_class expects node.PGi_ren and node.QGi_ren to exist after OPF.
         node.PGi_ren = np.float64(sum(pyo.value(model.scenario_model[t].PGi_ren[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         node.QGi_ren = np.float64(sum(pyo.value(model.scenario_model[t].QGi_ren[nAC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-    
+
         grid.V_AC[nAC] = node.V
         grid.Theta_V_AC[nAC] = node.theta
-    
+
     # Helper function for DC nodes
     def process_dc_node(node):
         nDC = node.nodeNumber
@@ -2094,7 +2094,7 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         node.P = np.float64(sum(pyo.value(model.scenario_model[t].P_conv_DC[nDC]) * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
         node.P_INJ = node.PGi - node.PLi + node.P
         grid.V_DC[nDC] = node.V
-    
+
     # Helper function for converters
     def process_converter(conv):
         nconv = conv.ConvNumber
@@ -2120,39 +2120,39 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         s=1
         from .Classes import Price_Zone
         if type(m) is Price_Zone:
-       
+
             if clustering:
                 m.a          = np.float64(sum(grid.Time_series[m.TS_dict['a_CG']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
                 m.b          = np.float64(sum(grid.Time_series[m.TS_dict['b_CG']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
                 m.PLi_factor = np.float64(sum(grid.Time_series[m.TS_dict['Load']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-        
+
             else:
                 m.a = np.float64(sum(grid.Time_series[m.TS_dict['a_CG']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
                 m.b = np.float64(sum(grid.Time_series[m.TS_dict['b_CG']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
                 m.PLi_factor = np.float64(sum(grid.Time_series[m.TS_dict['Load']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-        
-    
+
+
     if mutate_grid:
         with ThreadPoolExecutor() as executor:
             # Submit all tasks
             futures = []
             futures.extend([executor.submit(process_ac_node, node) for node in grid.nodes_AC])
-            
+
             if grid.DCmode:
                 futures.extend([executor.submit(process_dc_node, node) for node in grid.nodes_DC])
             if grid.ACmode and grid.DCmode:
                 futures.extend([executor.submit(process_converter, conv) for conv in grid.Converters_ACDC])
-                
+
             if Price_Zones:
                 futures.extend([executor.submit(process_price_zone, m) for m in grid.Price_Zones])
-                
+
             futures.extend([executor.submit(process_ren_source, m) for m in grid.RenSources])
             futures.extend([executor.submit(process_gen, m) for m in grid.Generators])
-            
+
             # Wait for all tasks to complete
             for future in futures:
                 future.result()
-        
+
         Pf = np.zeros((grid.nn_AC, 1))
         Qf = np.zeros((grid.nn_AC, 1))
         grid.create_Ybus_AC()
@@ -2162,21 +2162,21 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         Theta = grid.Theta_V_AC
         # Compute differences in voltage angles
         Theta_diff = Theta[:, None] - Theta
-        
+
         # Calculate power flow
         Pf = (V[:, None] * V * (G * np.cos(Theta_diff) + B * np.sin(Theta_diff))).sum(axis=1)
         Qf = (V[:, None] * V * (G * np.sin(Theta_diff) - B * np.cos(Theta_diff))).sum(axis=1)
-        
+
 
         for node in grid.nodes_AC:
             i = node.nodeNumber
             node.P_INJ = Pf[i]
             node.Q_INJ = Qf[i]
 
-        if grid.TEP_AC:  
-            NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}    
+        if grid.TEP_AC:
+            NumLinesACP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}
             for line in grid.lines_AC_exp:
-                line.np_line=NumLinesACP_values[line.lineNumber] 
+                line.np_line=NumLinesACP_values[line.lineNumber]
         if grid.REC_AC:
             lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in model.rec_branch.items()}
             for line in grid.lines_AC_rec:
@@ -2193,9 +2193,9 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
                 else:
                     line.active_config = -1  # or None, or handle appropriately
                     # This line has no conductor type selected
-        
+
         if grid.DCmode:
-            NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}   
+            NumLinesDCP_values= {k: np.float64(pyo.value(v)) for k, v in model.NumLinesDCP.items()}
             for line in grid.lines_DC:
                 line.np_line = NumLinesDCP_values[line.lineNumber]
         if grid.GPR:
@@ -2206,14 +2206,14 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
             np_rsgen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_rsgen.items()}
             for ren_source in grid.RenSources:
                 ren_source.np_rsgen = np_rsgen_values[ren_source.rsNumber]
-        
+
 
         for z in grid.RenSource_zones:
             if clustering:
-                z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)      
+                z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters][t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
             else:
                 z.PRGi_available = np.float64(sum(grid.Time_series[z.TS_dict['PRGi_available']].data[t-1] * pyo.value(model.weights[t]) for t in model.scenario_frames) / SW)
-           
+
     # Multithreading the time frame processing
     data_rows_PN = []
     data_rows_PZGEN= []
@@ -2231,12 +2231,12 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
     data_rows_b = []
     data_rows_load = []
     weights_row = []
-    
+
     with ThreadPoolExecutor() as executor:
         futures = []
-        
+
         for t in model.scenario_frames:
-            
+
             futures.append(executor.submit(get_curtailment_data, t, model, grid,n_clusters,clustering))
             futures.append(executor.submit(get_line_data, t, model, grid))
             futures.append(executor.submit(get_converter_data, t, model, grid))
@@ -2254,7 +2254,7 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
             conv_data = futures[i+2].result()
             weight_data = futures[i+3].result()
             pgen_data, qgen_data = futures[i+4].result()
-            
+
             if Price_Zones:
                 (
                     price_data,
@@ -2284,7 +2284,7 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
             weights_row.append(weight_data)
             data_rows_pgen.append(pgen_data)
             data_rows_qgen.append(qgen_data)
-    
+
     # Convert to DataFrames
     if Price_Zones:
         data_PN = pd.DataFrame(data_rows_PN)
@@ -2297,16 +2297,16 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         data_b = pd.DataFrame(data_rows_b)
         data_load = pd.DataFrame(data_rows_load)
         # Transpose the DataFrame to flip rows and columns
-        flipped_data_PN = data_PN.set_index('Time_Frame').T 
-        flipped_data_PZGEN = data_PZGEN.set_index('Time_Frame').T 
-        flipped_data_SC = data_SC.set_index('Time_Frame').T 
-        flipped_data_price = data_price.set_index('Time_Frame').T 
-        flipped_data_pz_lb = data_pz_lb.set_index('Time_Frame').T 
-        flipped_data_pz_ub = data_pz_ub.set_index('Time_Frame').T 
-        flipped_data_a = data_a.set_index('Time_Frame').T 
-        flipped_data_b = data_b.set_index('Time_Frame').T 
+        flipped_data_PN = data_PN.set_index('Time_Frame').T
+        flipped_data_PZGEN = data_PZGEN.set_index('Time_Frame').T
+        flipped_data_SC = data_SC.set_index('Time_Frame').T
+        flipped_data_price = data_price.set_index('Time_Frame').T
+        flipped_data_pz_lb = data_pz_lb.set_index('Time_Frame').T
+        flipped_data_pz_ub = data_pz_ub.set_index('Time_Frame').T
+        flipped_data_a = data_a.set_index('Time_Frame').T
+        flipped_data_b = data_b.set_index('Time_Frame').T
         flipped_data_load = data_load.set_index('Time_Frame').T
-    
+
     else:
         # Create empty DataFrames with the same structure
         flipped_data_PN = pd.DataFrame()
@@ -2325,12 +2325,12 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
     data_qgen = pd.DataFrame(data_rows_qgen)
 
     # Transpose the remaining DataFrames
-    flipped_data_curt = data_curt.set_index('Time_Frame').T 
-    flipped_data_curt_per = data_curt_per.set_index('Time_Frame').T 
-    flipped_data_lines = data_lines.set_index('Time_Frame').T 
-    flipped_data_conv = data_conv.set_index('Time_Frame').T 
-    flipped_data_pgen = data_pgen.set_index('Time_Frame').T 
-    flipped_data_qgen = data_qgen.set_index('Time_Frame').T 
+    flipped_data_curt = data_curt.set_index('Time_Frame').T
+    flipped_data_curt_per = data_curt_per.set_index('Time_Frame').T
+    flipped_data_lines = data_lines.set_index('Time_Frame').T
+    flipped_data_conv = data_conv.set_index('Time_Frame').T
+    flipped_data_pgen = data_pgen.set_index('Time_Frame').T
+    flipped_data_qgen = data_qgen.set_index('Time_Frame').T
 
     # Calculate Total SC and related calculations only if Price_Zones is True
     if Price_Zones:
@@ -2345,7 +2345,7 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
 
         # Single authoritative weighted SC (per scenario frame)
         weighted_sc = (total_sc * weights_series).round(2)
-        
+
         # Additional rows using that same weighted_sc
         additional_rows = pd.DataFrame({
             'Total SC': total_sc,
@@ -2353,13 +2353,13 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
             'Weight': weights_series,
             'Weighted SC': weighted_sc
         }).T
-        
+
         # Combine original data with additional rows
         flipped_data_SC = pd.concat([flipped_data_SC, additional_rows])
     else:
         # Create empty DataFrame with the same structure for consistency
         flipped_data_SC = pd.DataFrame()
-    
+
     frames = [int(t) for t in model.scenario_frames]
     weights_df = pd.DataFrame(
         [[float(pyo.value(model.weights[t])) for t in frames]],
@@ -2367,7 +2367,7 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         columns=frames
         )
 
-    
+
 
     # Pack all variables into the final result
     TEP_multiScenario_res =     {
@@ -2391,10 +2391,10 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
     'pgen': flipped_data_pgen,
     'qgen': flipped_data_qgen,
     }
-    
+
     if not_transposed:
         TEP_multiScenario_res =     {
-        
+
 
         'PN': data_PN.set_index('Time_Frame') if data_PN is not None else None,
         'PZ_GEN': data_PZGEN.set_index('Time_Frame') if data_PZGEN is not None else None,
@@ -2411,26 +2411,26 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         'converters': data_conv.set_index('Time_Frame'),
         'price': data_price.set_index('Time_Frame'),
         }
-    
+
     if mutate_grid:
         grid.line_ac_calc()
         grid.create_Ybus_DC()
         grid.line_dc_calc()
-    
+
     return TEP_multiScenario_res
 
-      
+
 
 def export_TEP_multiScenario_results_to_excel(grid,export):
-    
+
     [clustering,n_clusters,flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_multiScenario_res
            # Define the column names for the DataFrame
     columns = ["Element", "Type", "Initial", "Optimized N", "Optimized Power Rating [MW]", "Expansion Cost [k€]"]
-    
+
     # Create an empty list to hold the data
     data = []
-    
+
     tot = 0
 
     if grid.TEP_AC:
@@ -2467,7 +2467,7 @@ def export_TEP_multiScenario_results_to_excel(grid,export):
                 cost = l.base_cost[opt] / 1000
                 tot += cost
                 data.append([element, "Cable type Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
-                
+
 
     if grid.DCmode:
         # Loop through DC lines and add data to the list
@@ -2478,10 +2478,10 @@ def export_TEP_multiScenario_results_to_excel(grid,export):
                 opt = l.np_line
                 pr = opt * l.MW_rating
                 cost = ((opt - ini) * l.base_cost)  / 1000
-                
+
                 tot += cost
                 data.append([element, "DC Line", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
-    
+
     if grid.ACmode and grid.DCmode:
         # Loop through ACDC converters and add data to the list
         for cn in grid.Converters_ACDC:
@@ -2492,23 +2492,23 @@ def export_TEP_multiScenario_results_to_excel(grid,export):
                 pr = opt * cn.MVA_max
                 cost = ((opt - ini) * cn.base_cost)  / 1000
                 tot += cost
-                
+
                 if cn.cost_perMVA is not None:
                     unit_cost= cn.cost_perMVA
                 elif cn.base_cost is not None:
                     unit_cost= cn.base_cost /cn.MVA_max
                 else:
                     unit_cost = np.nan
-                    
-                
+
+
                 data.append([element, "ACDC Conv", ini, np.round(opt, decimals=2), np.round(pr, decimals=0).astype(int), np.round(cost, decimals=2)])
-        
+
     # Create a pandas DataFrame with the collected data
-    df = pd.DataFrame(data, columns=columns)    
-    
-    
-    
-    
+    df = pd.DataFrame(data, columns=columns)
+
+
+
+
 
     data = {}
 
@@ -2521,10 +2521,10 @@ def export_TEP_multiScenario_results_to_excel(grid,export):
             time_series_data = grid.Time_series[z.TS_dict['PRGi_available']].data_clustered[n_clusters]
         else:
             time_series_data = grid.Time_series[z.TS_dict['PRGi_available']].data
-        
+
         # Append the zone name and corresponding data as a row in the data list
         data[zone_name]= time_series_data
-    
+
     # Create a DataFrame named Availability_factors from the collected data
     Availability_factors = pd.DataFrame(data)
 
@@ -2532,7 +2532,7 @@ def export_TEP_multiScenario_results_to_excel(grid,export):
 
     # Loop through
     for z in grid.Price_Zones:
-        
+
         # Extract the zone name
         zone_name = z.name
         # Access the time series data for the specific 'PGRi' from the zone's TS_dict
@@ -2542,18 +2542,18 @@ def export_TEP_multiScenario_results_to_excel(grid,export):
             time_series_data = grid.Time_series[z.TS_dict['Load']].data_clustered[n_clusters]
         else:
             time_series_data = grid.Time_series[z.TS_dict['Load']].data
-        
+
         # Append the zone name and corresponding data as a row in the data list
-        
-        data_L[zone_name]= time_series_data 
-    
+
+        data_L[zone_name]= time_series_data
+
     # Create a DataFrame named Availability_factors from the collected data
     Load_factors = pd.DataFrame(data)
 
     flipped_AV=Availability_factors.T
     flipped_LF = Load_factors.T
-    
-    
+
+
     if export.endswith('.xlsx'):
         export=export
     else:
@@ -2583,6 +2583,6 @@ def calculate_STEP_objective_from_model(model,grid,weights_def,multi_scenario=Fa
     else:
         opf_objs = [calculate_objective_from_model(model,grid,weights_def,True)]
 
-    tep_obj_expr = tep_obj(model,grid,True)  
+    tep_obj_expr = tep_obj(model,grid,True)
     tep_obj_value = pyo.value(tep_obj_expr)
     return opf_objs, tep_obj_value

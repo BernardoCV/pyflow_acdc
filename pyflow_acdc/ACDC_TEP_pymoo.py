@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-    
+
 
 class TEPOuterProblem(ElementwiseProblem):
     def __init__(self, grid, weights_def, n_years, Hy, r, NPV=True, pv_set=False, pz=False, time_limit=60,objective_type='sum'):
@@ -26,16 +26,16 @@ class TEPOuterProblem(ElementwiseProblem):
             n_obj = 2
         else:
             raise ValueError("optimization_type must be 'sum' or 'pareto'")
-        
+
         self.objective_type = objective_type
         t1=time.perf_counter()
         analyse_grid(grid)
         self.grid = grid
         self._store_TEP_flags()
         n_var, xl, xu, vtype, self.bound_names = self._create_pymoo_bounds()
-         
+
         super().__init__(n_var=n_var, n_obj=n_obj, xl=xl, xu=xu, vtype=vtype)  # mix with bools if needed
-        
+
         self.weights_def = weights_def
         self.NPV = NPV
         self.present_value = present_value_factor(Hy, r, n_years)
@@ -58,7 +58,7 @@ class TEPOuterProblem(ElementwiseProblem):
         vtype = []  # variable types
         self.idx_to_object = {}  # NEW: mapping from pymoo index to object info
         idx = 0
-        
+
         # AC expansions (integer variables)
         for l in self.grid.lines_AC_exp:
             if self.original_np_line_opf.get(l.lineNumber, False):
@@ -68,7 +68,7 @@ class TEPOuterProblem(ElementwiseProblem):
                 bounds.append(f"AC_exp_{l.lineNumber}")
                 self.idx_to_object[idx] = (l.lineNumber, "np_line_AC")
                 idx += 1
-        
+
         # DC lines (integer variables)
         for l in self.grid.lines_DC:
             if self.original_np_line_opf_DC.get(l.lineNumber, False):  # Check current flag (should be True for DC lines)
@@ -99,7 +99,7 @@ class TEPOuterProblem(ElementwiseProblem):
         # Array cable type (integer variables: -1 to max_cable_type)
         for l in self.grid.lines_AC_ct:
             if self.original_array_opf.get(l.lineNumber, False):
-                if self.grid.Array_opf: 
+                if self.grid.Array_opf:
                     xl.append(-1)  # -1 means no cable
                     self.idx_to_object[idx] = (l.lineNumber, "Array_ct_AC")
                 elif l.active_config < 0:
@@ -110,7 +110,7 @@ class TEPOuterProblem(ElementwiseProblem):
                 xu.append(len(l._cable_types) - 1)  # max cable type index
                 vtype.append(int)
                 bounds.append(f"Array_ct_{l.lineNumber}")
-                
+
                 idx += 1
         # AC generators (if GPR is enabled)
         if self.grid.GPR:
@@ -132,7 +132,7 @@ class TEPOuterProblem(ElementwiseProblem):
                     bounds.append(f"Gen_DC_{g.genNumber_DC}")
                     self.idx_to_object[idx] = (g.genNumber_DC, "dc_gen")
                     idx += 1
-        return len(xl), xl, xu, vtype, bounds 
+        return len(xl), xl, xu, vtype, bounds
 
 
     def _store_TEP_flags(self):
@@ -146,26 +146,26 @@ class TEPOuterProblem(ElementwiseProblem):
 
         self.original_np_line_opf_DC = {}
         self.original_np_conv_opf = {}
-        
+
         for g in self.grid.Generators:
             self.original_np_gen_opf[g.genNumber] = g.np_gen_opf
             g.np_gen_opf = False
-        
+
         # AC expansions
         for l in self.grid.lines_AC_exp:
             self.original_np_line_opf[l.lineNumber] = l.np_line_opf
             l.np_line_opf = False
-        
+
         # AC repurposing
         for l in self.grid.lines_AC_rec:
             self.original_rec_line_opf[l.lineNumber] = l.rec_line_opf
             l.rec_line_opf = False
-        
+
         # Array cable type
         for l in self.grid.lines_AC_ct:
             self.original_array_opf[l.lineNumber] = l.array_opf
             l.array_opf = False
-        
+
 
         for g in self.grid.Generators_DC:
             self.original_np_gen_opf_DC[g.genNumber_DC] = g.np_gen_opf
@@ -174,7 +174,7 @@ class TEPOuterProblem(ElementwiseProblem):
         for l in self.grid.lines_DC:
             self.original_np_line_opf_DC[l.lineNumber] = l.np_line_opf
             l.np_line_opf = False
-    
+
         # Converters
         for c in self.grid.Converters_ACDC:
             self.original_np_conv_opf[c.ConvNumber] = c.np_conv_opf
@@ -193,28 +193,28 @@ class TEPOuterProblem(ElementwiseProblem):
 
         for l in self.grid.lines_DC:
             l.np_line_opf = self.original_np_line_opf_DC[l.lineNumber]
-       
+
 
         for c in self.grid.Converters_ACDC:
             c.np_conv_opf = self.original_np_conv_opf[c.ConvNumber]
-    
+
     def _build_model(self):
         model = pyo.ConcreteModel()
         model.name = "TEP pymoo OPF"
-        
+
         # Import the OPF builder
         from .ACDC_OPF_NL_model import opf_create_nl_model_acdc
-        
+
         # Build with TEP=False so investments are Params
-        opf_create_nl_model_acdc(model, self.grid, PV_set=self.pv_set, 
+        opf_create_nl_model_acdc(model, self.grid, PV_set=self.pv_set,
                                Price_Zones=self.pz, TEP=False)
-        
+
         obj_OPF = opf_obj(model,self.grid,self.weights_def)
-    
+
         model.obj = pyo.Objective(rule=obj_OPF, sense=pyo.minimize)
         return model
 
-    
+
 
     def _capex_from_model(self,NPV=True):
         capex = 0.0
@@ -240,7 +240,7 @@ class TEPOuterProblem(ElementwiseProblem):
                         else:
                             AC_Inv_lines += (lines_AC_TEP[l] - line.np_line) * line.base_cost / line.life_time_hours
             return AC_Inv_lines
-        
+
         def Repurposing_investments():
             Rep_Inv_lines = 0
             lines_AC_REP = {k: np.float64(pyo.value(v)) for k, v in self.model.rec_branch.items()}
@@ -253,7 +253,7 @@ class TEPOuterProblem(ElementwiseProblem):
                         else:
                             Rep_Inv_lines += lines_AC_REP[l] * line.base_cost / line.life_time_hours
             return Rep_Inv_lines
-        
+
         def Cables_investments():
             lines_DC_TEP = {k: np.float64(pyo.value(v)) for k, v in self.model.NumLinesDCP.items()}
             Inv_lines = 0
@@ -281,7 +281,7 @@ class TEPOuterProblem(ElementwiseProblem):
                             for ct in self.model.ct_set:
                                 Inv_array += lines_AC_CT[l, ct] * line.base_cost[ct] / line.life_time_hours
             return Inv_array
-            
+
         def Converter_investments():
             Inv_conv = 0
             np_conv_TEP = {k: np.float64(pyo.value(v)) for k, v in self.model.np_conv.items()}
@@ -305,25 +305,25 @@ class TEPOuterProblem(ElementwiseProblem):
             return Inv_gen
 
         if self.grid.GPR:
-            capex += Gen_investments()      
+            capex += Gen_investments()
             capex += DC_Gen_investments()
         if self.grid.TEP_AC:
-            capex += AC_Line_investments()     
+            capex += AC_Line_investments()
         if self.grid.REC_AC:
-            capex += Repurposing_investments()        
+            capex += Repurposing_investments()
         if self.grid.CT_AC:
-            capex += Cables_investments()       
+            capex += Cables_investments()
         if self.grid.Array_opf:
-            capex += Array_investments()       
+            capex += Array_investments()
         if self.grid.ACmode and self.grid.DCmode:
             capex += Converter_investments()
-        
+
         return capex
 
     def _update_model_from_vector(self, x):
         for idx, value in enumerate(x):
             obj_id, obj_type = self.idx_to_object[idx]
-            
+
             if obj_type == 'np_line_AC':
                 self.model.NumLinesACP[obj_id].set_value(int(value))
             elif obj_type == 'np_line_DC':
@@ -338,7 +338,7 @@ class TEPOuterProblem(ElementwiseProblem):
                     self.model.ct_branch[obj_id, ct].set_value(1 if ct == int(value) else 0)
             elif obj_type == 'Array_ct_AC':
                 if int(value) == -1:
-                    # No cable type selected - set all to 0 
+                    # No cable type selected - set all to 0
                     for ct in self.model.ct_set:
                         self.model.ct_branch[obj_id, ct].set_value(0)
                 else:
@@ -350,25 +350,25 @@ class TEPOuterProblem(ElementwiseProblem):
                 self.model.np_gen[obj_id].set_value(int(value))
             elif obj_type == 'dc_gen':
                 self.model.np_gen_DC[obj_id].set_value(int(value))
-        
-    
+
+
     def _evaluate(self, x, out, *args, **kwargs):
         try:
             # Suppress Pyomo logging warnings
             import logging
             pyomo_logger = logging.getLogger('pyomo')
             original_level = pyomo_logger.level
-            pyomo_logger.setLevel(logging.ERROR) 
+            pyomo_logger.setLevel(logging.ERROR)
             # Refresh Pyomo Params instead of rebuilding
             self._update_model_from_vector(x)
             self.pyomo_runs += 1
-            
+
             results, stats = pyomo_model_solve(self.model, self.grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
             self.pyomo_time += stats['time']
             if results is None:
                 out["F"] = 1e24
                 return
-            
+
             capex = self._capex_from_model(NPV=self.NPV)
             opex = pyo.value(self.model.obj)
             if results.solver.termination_condition == pyo.TerminationCondition.optimal or results.solver.termination_condition == pyo.TerminationCondition.feasible:
@@ -383,22 +383,22 @@ class TEPOuterProblem(ElementwiseProblem):
                 out["F"] = capex +  opex
             elif self.objective_type == 'pareto':
                 out["F"] = [capex,  opex]
-            
-            
+
+
         except Exception:
             if self.objective_type == 'sum':
                 out["F"] = 1e12
             else:
                 out["F"] = [1e12, 1e12]
-            
+
 
     def export_solution_to_grid(self, x,grid):
         """Export the best pymoo solution back to the grid object"""
-        
+
         # Update model with the solution
         self._update_model_from_vector(x)
         results, stats = pyomo_model_solve(self.model, grid, solver='ipopt', tee=False, time_limit=self.time_limit, suppress_warnings=True)
-            
+
 
         # Get price zones info (you might need to pass this from __init__)
         PZ = getattr(self, 'pz', False)
@@ -406,16 +406,16 @@ class TEPOuterProblem(ElementwiseProblem):
         self._restore_TEP_flags()
         # Export the solved model to grid
         export_acdc_nl_model_to_pyflow_acdc(self.model, grid, PZ, TEP=True)
-            
-        
-        
-        
+
+
+
+
 
 def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='GA',time_limit=DEFAULT_TIME_LIMIT,tee=False,n_gen=10):
-    
-            
+
+
     analyse_grid(grid)
-    
+
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
     # Create problem
     if solver == 'GA':
@@ -430,13 +430,13 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,disc
     problem = TEPOuterProblem(grid, weights_def, n_years=n_years, Hy=Hy, r=discount_rate, NPV=NPV,objective_type=objective_type)
 
     # Run optimization
-    
-    
-    res = minimize(problem, algorithm, 
+
+
+    res = minimize(problem, algorithm,
                   ('n_gen', n_gen), ('f_tol', 1e-6),
                   save_history=True,
                   verbose=tee)
-  
+
     if objective_type == 'sum':
         return _handle_single_objective_result(res, problem, grid)
     else:
@@ -448,25 +448,25 @@ def _handle_single_objective_result(res, problem, grid):
     # Export best solution to grid
     t1 = time.perf_counter()
     best_solution = res.X  # Best decision vector
-    
+
     problem.export_solution_to_grid(best_solution,grid)
     for obj in problem.weights_def:
         problem.weights_def[obj]['v']=calculate_objective(grid,obj,True)
         problem.weights_def[obj]['NPV']=problem.weights_def[obj]['v']*problem.present_value
     grid.TEP_run=True
     grid.OPF_obj = problem.weights_def
-    t2 = time.perf_counter() 
+    t2 = time.perf_counter()
 
     t_modelexport = t2-t1
 
-    
+
 
 
     # Now grid contains the optimized solution
     print(f"Best objective: {res.F[0]}")
     print(f"Grid now has optimized investments")
 
-    
+
 
     print(f"Number of Pyomo runs: {problem.pyomo_runs}")
     print(f"Pyomo time: {problem.pyomo_time}")
@@ -482,7 +482,7 @@ def _handle_single_objective_result(res, problem, grid):
         "solve": res.exec_time,  # Optimization time
         "export": t_modelexport,  # Export time (negligible)
     }
-    
+
     solver_stats = {
         'iterations': len(val),
         'best_objective': res.F[0],
@@ -498,12 +498,12 @@ def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
     # Get Pareto front
     pareto_front = res.F  # Shape: (n_solutions, 2)
     pareto_solutions = res.X  # Shape: (n_solutions, n_variables)
-    
+
     # Find different trade-off solutions
     min_capex_idx = np.argmin(pareto_front[:, 0])
     min_opex_idx = np.argmin(pareto_front[:, 1])
     balanced_idx = np.argmin(np.sum(pareto_front, axis=1))
-    
+
     # Export balanced solution to grid (or let user choose)
     if pareto_result == 'balanced':
         chosen_solution = pareto_solutions[balanced_idx]
@@ -545,7 +545,7 @@ def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
         "solve": res.exec_time,
         "export": 0,
     }
-    
+
     solver_stats = {
         'iterations': res.algorithm.n_gen,
         'best_objective': pareto_front[balanced_idx],
@@ -553,7 +553,7 @@ def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
         'termination_condition': 'optimal',
         'feasible_solutions': pareto_front.tolist()
     }
-    
+
     # Add Pareto-specific information
     pareto_info = {
         'pareto_front': pareto_front,
@@ -565,8 +565,7 @@ def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
         'min_opex_values': pareto_front[min_opex_idx],
         'balanced_values': pareto_front[balanced_idx]
     }
-    
+
     return problem, pareto_info, timing_info, solver_stats
 
 
-    

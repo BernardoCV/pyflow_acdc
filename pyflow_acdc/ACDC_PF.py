@@ -40,7 +40,7 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     grid.line_ac_calc_exp()
     time_2 = time.perf_counter()
     return time_2-time_1,ac_tol
-    
+
 def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
     time_1 = time.perf_counter()
     grid.reset_run_flags()
@@ -56,7 +56,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
     tolerance = 1
     grid.reset_run_flags()
     grid.iter_num_seq = 0
-    
+
     # Initialize comprehensive tolerance tracker dictionary
     tolerance_tracker = {
         'sequential_iterations': [],
@@ -72,7 +72,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             'sequential_converged': True
         }
     }
-    
+
     for conv in grid.Converters_ACDC:
         if conv.type!= ConverterDCType.PAC:
             AC_node = conv.Node_AC
@@ -82,20 +82,20 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             conv.P_AC = -P_DC
             AC_node.P_s = conv.P_AC
             s = 1
-            
+
     grid.update_pq_ac()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
     # Initialize ps_iterations as a numpy array with shape (maxIter, nn_AC)
     ps_iterations = np.zeros((maxIter, grid.nn_AC))
-    
+
     while tolerance > tol_lim and grid.iter_num_seq < maxIter:
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
-        
+
         # Track AC power flow tolerance
         ac_tol = load_flow_ac(grid, tol_lim=internal_tol)
         tolerance_tracker['ac_pf_tolerances'].append(ac_tol)
-        
+
         for conv in grid.Converters_ACDC:
             if conv.type== ConverterDCType.PAC:
                 PGi_ren = conv.Node_AC.PGi_ren
@@ -103,11 +103,11 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
                 PGi_opt = conv.Node_AC.PGi_opt
                 QGi_opt = conv.Node_AC.QGi_opt
                 if conv.Node_AC.stand_alone == True:
-                    conv.P_AC = -(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
+                    conv.P_AC = -(PGi_ren+PGi_opt-conv.Node_AC.PLi)
                     conv.Q_AC = -(conv.Node_AC.QGi+QGi_opt+QGi_ren-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                 else:
                     if conv.AC_type == NodeType.SLACK:
-                        conv.P_AC = conv.Node_AC.P_INJ-(PGi_ren+PGi_opt-conv.Node_AC.PLi) 
+                        conv.P_AC = conv.Node_AC.P_INJ-(PGi_ren+PGi_opt-conv.Node_AC.PLi)
                         conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt+QGi_ren-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
                     if conv.AC_type == NodeType.PV:
                         conv.Q_AC = conv.Node_AC.Q_INJ-(conv.Node_AC.QGi+QGi_opt-conv.Node_AC.QLi+conv.Node_AC.Q_s_fx)
@@ -142,26 +142,26 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
                 conv.Q_AC = AC_node.Q_INJ-(AC_node.QGi+AC_node.QGi_opt+AC_node.QGi_ren-AC_node.QLi+AC_node.Q_s_fx)
             conv.U_s = AC_node.V
             conv.th_s = AC_node.theta
-            
+
             # Get converter tolerance
             conv_tol = flow_conv(grid, conv, tol_lim=internal_tol*1e-4)
             conv_tolerances.append(conv_tol)
             conv_names.append(conv.name)
-          
+
         tolerance_tracker['converter_tolerances'].append(conv_tolerances)
         if grid.iter_num_seq == 0:  # Store converter names only once
             tolerance_tracker['converter_names'] = conv_names
-        
+
         Ps = np.copy(grid.Ps_AC)
         Ps_AC_new = np.copy(grid.Ps_AC_new)
         P_dif = Ps-Ps_AC_new
 
         tolerance = np.max(abs(P_dif))
         tolerance_tracker['sequential_iterations'].append(tolerance)
-        
+
         # Store the current iteration's Ps values
         ps_iterations[grid.iter_num_seq, :] = Ps_AC_new.flatten()
-        
+
         s = 1
         for node in grid.nodes_AC:
             node.P_s = Ps_AC_new[node.nodeNumber]
@@ -173,19 +173,19 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
 
     # Store final tolerance and convergence status
     tolerance_tracker['final_sequential_tolerance'] = tolerance
-    
+
     if grid.iter_num_seq == maxIter:
         if tolerance > tol_lim*100:
             warnings.warn(f'Sequential flow did not converge in {maxIter} iterations. Lowest tolerance: {np.round(tolerance, decimals=6)}')
             tolerance_tracker['convergence_status']['sequential_converged'] = False
-    
+
     grid.line_ac_calc()
     grid.line_ac_calc_exp()
     grid.line_dc_calc()
-    
+
     time_2=time.perf_counter()
     t = time_2-time_1
-    
+
     return t, tolerance_tracker,ps_iterations
 
 def jacobian_dc(grid, V_DC, P,Droop_PF):
@@ -227,16 +227,16 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
 
     iter_num = 0
 
-   
+
     V = np.zeros(grid.nn_DC)
     s = 1
 
     for node in grid.nodes_DC:
         V[node.nodeNumber] = node.V
     tol = 1
-    
-    
-    
+
+
+
     P_known = np.copy(grid.P_DC+grid.Pconv_DC)
     while tol > tol_lim and iter_num < maxIter:
         iter_num += 1
@@ -260,7 +260,7 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
                     n = node.nodeNumber
                     Droop_change = (node.V_ini-V[n])*node.Droop_rate
                     P_known[n] = np.copy(grid.P_DC[n]+grid.Pconv_DC[n]) + Droop_change
-                    s = 1        
+                    s = 1
 
         dPa = P_known-P
 
@@ -327,13 +327,13 @@ def jacobian_ac(grid, Voltages, Angles,P,Q):
 
     V = Voltages
     th = Angles
-    
+
     slack_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == NodeType.SLACK], dtype=int)
     pv_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == NodeType.PV], dtype=int)
     pq_indices = np.array([i for i, node in enumerate(grid.nodes_AC) if node.type == NodeType.PQ], dtype=int)
     non_slack_indices = np.sort(np.concatenate((pv_indices, pq_indices)))
 
-    
+
     grid.slack_bus_number_AC = [grid.nodes_AC[i].nodeNumber for i in slack_indices]
 
     Gm = np.real(grid.Ybus_AC_full)
@@ -343,29 +343,29 @@ def jacobian_ac(grid, Voltages, Angles,P,Q):
     angle_diff = th[:, None] - th[None, :]
     sin_theta = np.sin(angle_diff)
     cos_theta = np.cos(angle_diff)
-    
-   
+
+
     # Compute non-diagonal elements of J_11
     J_11 = V[:, None] * V[None, :] * (Gm * sin_theta - Bm * cos_theta)
     np.fill_diagonal(J_11, -Q - V**2 * Bm.diagonal())
     J_11 = J_11[np.ix_(non_slack_indices, non_slack_indices)]
-    
+
 
     J_12 = V[:, None] * (Gm * cos_theta + Bm * sin_theta)
     np.fill_diagonal(J_12, P / V + np.diag(Gm) * V)
     J_12 = J_12[np.ix_(non_slack_indices, pq_indices)]
 
-    
+
     J_21 = -V[:, None] * V[None, :] * (Gm * cos_theta + Bm * sin_theta)
     np.fill_diagonal(J_21, P - V**2 * np.diag(Gm))
     J_21 = J_21[np.ix_(pq_indices, non_slack_indices)]
-    
-    
-    
+
+
+
     J_22 = V[:, None] * (Gm * sin_theta - Bm * cos_theta)
     np.fill_diagonal(J_22, Q / V - np.diag(Bm) * V)
     J_22 = J_22[np.ix_(pq_indices, pq_indices)]
-    
+
 
     J_AC = np.vstack((np.hstack((J_11, J_12)), np.hstack((J_21, J_22))))
 
@@ -386,11 +386,11 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
 
     V = np.array([node.V for node in grid.nodes_AC])
     angles = np.array([node.theta for node in grid.nodes_AC])
-    
+
     G = np.real(grid.Ybus_AC_full)
     B = np.imag(grid.Ybus_AC_full)
 
-    
+
     tol = 1
     iter_num = 0
     while tol > tol_lim and iter_num < maxIter:
@@ -398,21 +398,21 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
 
         P = np.zeros((grid.nn_AC, 1))
         Q = np.zeros((grid.nn_AC, 1))
-        
+
         # Compute pairwise angle differences
         angle_diff = angles[:, None] - angles[None, :]  # Shape: (nn_AC, nn_AC)
-    
+
         # Compute power components
         cos_term = np.cos(angle_diff)
         sin_term = np.sin(angle_diff)
-        
+
         P = V[:, None] * V[None, :] * (G * cos_term + B * sin_term)
         Q = V[:, None] * V[None, :] * (G * sin_term - B * cos_term)
-    
+
         # Sum across rows to get the net P and Q for each node
         P = P.sum(axis=1)
         Q = Q.sum(axis=1)
-        
+
         # for node in grid.nodes_AC:
         #     i = node.nodeNumber
         #     for k in range(grid.nn_AC):
@@ -456,7 +456,7 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
             raise RuntimeError("NaN detected in AC load flow solver — linear results not available")
         dTh = X[0:(grid.nn_AC-nps)]
         dV = X[grid.nn_AC-nps:]
-      
+
         # Recall the updated voltage vector into the correct place
         k = 0  # Index for dV vector
         for i in range(grid.nn_AC):
@@ -535,7 +535,7 @@ def flow_conv_P_AC(grid, conv):
         Uf_cart = Us_cart+Ztf*Is
         Ic_cart = Us_cart/Zf+Is*(Zf+Ztf)/Zf
         Uc_cart = Uf_cart+Zc*Ic_cart
-        
+
     else:
         Uf_cart = 0 + 1j*0
         Ic_cart = Is
@@ -544,16 +544,16 @@ def flow_conv_P_AC(grid, conv):
     [Uc, th_c] = cartz2pol(Uc_cart)
     [Uf, th_f] = cartz2pol(Uf_cart)
     [Ic, th_Ic] = cartz2pol(Ic_cart)
-    
+
 
     Sc = Uc_cart*np.conj(Ic_cart)
 
     Pc = np.real(Sc)
-    
+
     if conv.power_loss_model == PowerLossModel.MMC:
-         
+
          P_loss,I= mmc_loss(conv,Pc)
-        
+
     else:
         if conv.P_AC > 0:  # DC to AC
             P_loss = conv.a_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic
@@ -670,12 +670,12 @@ def flow_conv(grid, conv, tol_lim=CONV_TOLERANCE, maxIter=DEFAULT_CONV_MAX_ITER)
     return tol
 
 def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
-    
+
     Ztf = conv.Ztf / conv.np_conv
     Zc = conv.Zc / conv.np_conv
 
     Zeq = Ztf+Zc
-     
+
     Uc = conv.U_c
     th_c = conv.th_c
 
@@ -689,63 +689,63 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
     while tol2 > tol_lim:
         tol = 1
         iter_num = 0
-        
+
         if Zeq != 0:
             Yeq = 1/Zeq
             Gc = np.real(Yeq)
             Bc = np.imag(Yeq)
             while tol > tol_lim and iter_num < maxIter:
-                
+
                 iter_num += 1
-    
+
                 Ps = -Us*Us*Gc+Us*Uc * \
                     (Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
                 Qs = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
-    
+
                 Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
                 Qc = -Uc*Uc*Bc+Us*Uc * \
                     (Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
-    
+
                 J_conv = jacobian_conv_no_filter(grid,conv, Uc, Pc, Qc, Ps, Qs)
-    
+
                 dPc = Pc_known-Pc
                 dQs = Qs_known-Qs
-    
+
                 M = np.array([dPc, dQs])
-    
+
                 X = np.linalg.solve(J_conv, M)
-    
+
                 th_c += X[0].item()
-    
+
                 Uc += X[1].item()*Uc
-    
+
                 tol = max(abs(M))
-    
+
             Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
             Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
         else:
-            Uc  =Us 
+            Uc  =Us
             th_c=th_s
             Pc  = Pc_known
             Qc  = Qs_known
-            
+
         if iter_num > maxIter:
             warnings.warn(f'Converter {conv.name} did not converge. Lowest tolerance: {np.round(tol, decimals=6)}')
 
-        
+
         if conv.power_loss_model == PowerLossModel.MMC:
-           
+
             P_loss,I= mmc_loss(conv,Pc)
-           
+
         else:
 
             Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
-        
+
             if conv.P_DC < 0:  # DC to AC
                 P_loss = conv.a_conv* conv.np_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.np_conv
             else:  # AC to DC
                 P_loss = conv.a_conv* conv.np_conv+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.np_conv
-        
+
         Pc_new = -conv.P_DC-P_loss
 
         tol2 = abs(Pc_known-Pc_new)
@@ -758,7 +758,7 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
         Bc = np.imag(Yeq)
         Ps = -Us*Us*Gc+Us*Uc*(Gc*np.cos(th_s-th_c)+Bc*np.sin(th_s-th_c))
         Qs = Us*Us*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)-Bc*np.cos(th_s-th_c))
-    
+
         Pc = Uc*Uc*Gc-Us*Uc*(Gc*np.cos(th_s-th_c)-Bc*np.sin(th_s-th_c))
         Qc = -Uc*Uc*Bc+Us*Uc*(Gc*np.sin(th_s-th_c)+Bc*np.cos(th_s-th_c))
     else:
@@ -767,19 +767,19 @@ def flow_conv_no_filter(grid, conv, tol_lim, maxIter):
     if conv.type!= ConverterDCType.PAC:
         conv.P_AC = Ps
     conv.Q_AC = Qs
-    
+
     conv.Pc = Pc
     conv.Qc = Qc
-    
+
     conv.U_c = Uc
-   
+
     conv.th_c = th_c
-    
+
     Ps_old = conv.Node_AC.P_s
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
     n = conv.Node_AC.nodeNumber
-    
+
     grid.Ps_AC_new[n] += Ps
     s=1
     return tol2
@@ -789,14 +789,14 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     Gc = conv.Gc
 
     th_c = conv.th_c
-    
+
 
     Bf = conv.Bf    * conv.np_conv
     Gc  = conv.Gc   * conv.np_conv
     Bc  = conv.Bc   * conv.NumConv
     Bf  = conv.Bf   * conv.np_conv
-    
-    
+
+
     Pc_known = -np.copy(conv.P_DC)
     Qs_known = np.copy(conv.Q_AC)
     Us = conv.U_s
@@ -839,22 +839,22 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
 
         if iter_num > maxIter:
             warnings.warn(f'Converter {conv.name} did not converge. Lowest tolerance: {np.round(tol, decimals=6)}')
-            
+
         if conv.power_loss_model == PowerLossModel.MMC:
-            
-            
+
+
             P_loss,I= mmc_loss(conv,Pc)
-            
+
         else:
 
             Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
-        
+
             if conv.P_DC < 0:  # DC to AC
                 P_loss = conv.a_conv* conv.np_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.np_conv
             else:  # AC to DC
-                P_loss = conv.a_conv* conv.np_conv+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.np_conv    
-            
-        
+                P_loss = conv.a_conv* conv.np_conv+conv.b_conv*Ic+conv.c_rect*Ic*Ic/ conv.np_conv
+
+
 
         Pc_new = -conv.P_DC-P_loss
 
@@ -873,35 +873,35 @@ def flow_conv_no_transformer(grid, conv, tol_lim, maxIter):
     if conv.type!= ConverterDCType.PAC:
         conv.P_AC = Ps
     conv.Q_AC = Qs
-    
+
     conv.Pc = Pc
     conv.Qc = Qc
 
     conv.U_c = Uc
     conv.th_c = th_c
-   
+
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
-  
+
     grid.Ps_AC_new[conv.Node_AC.nodeNumber] += Ps
     return tol2
-   
+
 def flow_conv_complete(grid, conv, tol_lim, maxIter):
     Uc = conv.U_c
-    
+
     Uf = conv.U_f
-    
+
     th_f = conv.th_f
     th_c = conv.th_c
-   
+
     Bf = conv.Bf    * conv.np_conv
     Gc  = conv.Gc   * conv.np_conv
     Bc  = conv.Bc   * conv.np_conv
     Gtf = conv.Gtf  * conv.np_conv
     Btf = conv.Btf  * conv.np_conv
     Bf  = conv.Bf   * conv.np_conv
-    
-    
+
+
     Pc_known = -np.copy(conv.P_DC)
     Qs_known = conv.Q_AC
     Us = conv.U_s
@@ -962,13 +962,13 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
 
         if conv.power_loss_model == PowerLossModel.MMC:
 
-    
+
             P_loss,I= mmc_loss(conv,Pc)
-         
+
         else:
 
             Ic = np.sqrt(Pc*Pc+Qc*Qc)/Uc
-        
+
             if conv.P_DC < 0:  # DC to AC
                 P_loss = conv.a_conv* conv.np_conv+conv.b_conv*Ic+conv.c_inver*Ic*Ic/ conv.np_conv
             else:  # AC to DC
@@ -986,7 +986,7 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
     if conv.type!= ConverterDCType.PAC:
         conv.P_AC = Ps
     conv.Q_AC = Qs
-    
+
     conv.Pc = Pc
     conv.Qc = Qc
 
@@ -997,17 +997,17 @@ def flow_conv_complete(grid, conv, tol_lim, maxIter):
 
     conv.P_loss = P_loss
     conv.P_loss_tf = abs(Ps-Pc)
-    
+
 
     conv.Ic =  np.sqrt(Pc*Pc+Qc*Qc)/Uc
-    
+
     grid.Ps_AC_new[conv.Node_AC.nodeNumber] += Ps
     s=1
     return tol2
 def mmc_loss(conv,Pc):
     Vdc = conv.Node_DC.V
     Ra = conv.ra
-    
+
     I = (-Vdc +np.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
     P_loss = 3*I**2*Ra
@@ -1044,8 +1044,8 @@ def converter_qlimit(grid, conv):
         rVmin = Us*conv.Ucmin*np.abs(Y2)
         rVmax = Us*conv.Ucmax*np.abs(Y2)
     elif conj_Ztf+conj_Zc ==0:
-        
-        
+
+
         S0 = 0
         S0v = 0
         r = Us*Icmax
@@ -1120,6 +1120,5 @@ def converter_qlimit(grid, conv):
             elif Q_req < Qs_min:
                 conv.Node_AC.Q_s = Qs_min
         conv.AC_type = NodeType.PQ
-        
 
-        
+

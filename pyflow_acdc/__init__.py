@@ -23,7 +23,7 @@ __all__ = [
     # Results
     'Results',
     # Grid
-    'Grid', 
+    'Grid',
     'Node_AC',
     'Node_DC',
     'Line_AC',
@@ -42,40 +42,40 @@ __all__ = [
     'add_extgrid',
     'add_RenSource',
     'add_generators',
-    
+
     # Add Zones
     'add_RenSource_zone',
     'add_price_zone',
     'add_MTDC_price_zone',
     'add_offshore_price_zone',
-    
+
     # Add Time Series
     'add_TimeSeries',
-    
+
     #Add investment series
     'add_inv_series',
     'add_gen_mix_limits',
-    
+
     # Grid Creation and Import
     'create_grid_from_data',
     'create_grid_from_mat',
     'create_grid_from_turbine_graph',
     'extend_grid_from_data',
     'create_grid_from_pickle',
-    
+
     # Line Modifications
     'change_line_AC_to_expandable',
     'change_line_AC_to_tap_transformer',
-    
+
     # Zone Assignments
     'assign_RenToZone',
     'assign_nodeToPrice_Zone',
     'assign_ConvToPrice_Zone',
-    
+
     # Parameter Calculations
     'cable_parameters',
     'converter_parameters',
-    
+
     # Utility Functions
     'pol2cart',
     'cart2pol',
@@ -86,13 +86,13 @@ __all__ = [
     'initialize_pyflowacdc',
     'create_inv_csv_template',
     'create_gen_limit_csv_template',
-    
+
     # Power Flow
     'ac_power_flow',
     'dc_power_flow',
     'acdc_sequential',
     'power_flow',
-    
+
     # Time Series Analysis
     'time_series_pf',
     'ts_acdc_pf',
@@ -100,7 +100,7 @@ __all__ = [
     'ts_dc_pf',
     'time_series_statistics',
     'update_grid_data',
-    
+
     # Export
     'save_grid_to_file',
     'save_grid_to_matlab',
@@ -117,7 +117,7 @@ __all__ = [
     'save_network_svg',
     'plot_model_feasibility',
     'plot_3D',
-    
+
     # Market Analysis
     'price_zone_data_pd',
     'price_zone_coef_data',
@@ -142,7 +142,7 @@ try:
         'ts_acdc_opf', 'results_ts_opf'
     ])
     HAS_OPF = True
-    
+
     # ACDC_Static_TEP also requires OPF/pyomo
     try:
         from .ACDC_Static_TEP import *
@@ -161,14 +161,14 @@ try:
             pass
     except ImportError:
         pass
-    
+
     # Array_OPT depends on both OPF and Static_TEP modules
     try:
         from .Array_OPT import *
         __all__.extend(['simple_CSS', 'sequential_CSS', 'MIP_path_graph', 'simple_assign_cable_types'])
     except ImportError:
         pass
-    
+
 except ImportError:
     HAS_OPF = False
 
@@ -183,7 +183,7 @@ try:
     ])
 except ImportError:
     pass
-    
+
 try:
     from .ACDC_TEP_pymoo import *
     __all__.append('transmission_expansion_pymoo')
@@ -204,7 +204,7 @@ try:
     HAS_DASH = True
 except ImportError:
     HAS_DASH = False
-    
+
 try:
     from .AC_L_CSS_gurobi import *
     __all__.extend(['optimal_l_css_gurobi'])
@@ -268,9 +268,9 @@ for folder in _case_folders:
         spec = importlib.util.spec_from_file_location(module_name, case_file)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)  # Trust boundary: only loads .py from bundled example_grids/
-        
+
         # Add all public functions from the module to the `cases` namespace
         cases.update({name: obj for name, obj in vars(module).items() if not name.startswith("_")})
 
-    
+
 

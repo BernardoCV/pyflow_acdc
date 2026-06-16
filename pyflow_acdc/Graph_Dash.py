@@ -128,7 +128,7 @@ def plot_TS_res_from_ts(
                 if cumulative_sum is None:
                     cumulative_sum = y_values.copy()
                     fig.add_trace(
-                        go.Scatter(x=time, y=y_values, name=trace_name, hoverinfo='x+y+name', 
+                        go.Scatter(x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
                                  fill='tozeroy', line=dict(color=color), fillcolor=f'rgba{tuple(list(int(color.lstrip("#")[i:i+2], 16) for i in (0, 2, 4)) + [0.5])}')
                     )
                 else:
@@ -191,7 +191,7 @@ def plot_TS_res_from_ts(
     if x_limits is None:
         x_limits = (df.index[0], df.index[-1])
     fig.update_xaxes(range=x_limits)
-    
+
     if y_limits and len(y_limits) == 2:
         fig.update_yaxes(range=y_limits)
 
@@ -222,9 +222,9 @@ def create_dash_app(grid):
         'fontFamily': 'Arial, sans-serif',
         'backgroundColor': '#f5f6fa'
     }, children=[
-        html.H1(f"{grid.name} Time Series Dashboard", 
+        html.H1(f"{grid.name} Time Series Dashboard",
                 style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '30px'}),
-        
+
         # First Plot Controls
         html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
             html.H3("Plot 1", style={'color': '#2c3e50', 'marginBottom': '15px'}),
@@ -245,7 +245,7 @@ def create_dash_app(grid):
                 value='Power Generation by price zone',
                 style={'marginBottom': '20px'}
             ),
-            
+
             html.Label("Select Components:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
             dcc.Checklist(
                 id='subplot-selection-1',
@@ -254,7 +254,7 @@ def create_dash_app(grid):
                 inline=True,
                 style={'marginBottom': '20px'}
             ),
-            
+
             html.Div(style={'display': 'flex', 'gap': '20px', 'marginBottom': '20px'}, children=[
                 html.Div(style={'flex': 1}, children=[
                     html.Label('Y-axis limits:', style={'fontWeight': 'bold'}),
@@ -301,7 +301,7 @@ def create_dash_app(grid):
                     value='Market Prices',
                     style={'marginBottom': '20px'}
                 ),
-                
+
                 html.Label("Select Components:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
                 dcc.Checklist(
                     id='subplot-selection-2',
@@ -310,7 +310,7 @@ def create_dash_app(grid):
                     inline=True,
                     style={'marginBottom': '20px'}
                 ),
-                
+
                 html.Div(style={'display': 'flex', 'gap': '20px', 'marginBottom': '20px'}, children=[
                     html.Div(style={'flex': 1}, children=[
                         html.Label('Y-axis limits:', style={'fontWeight': 'bold'}),
@@ -331,7 +331,7 @@ def create_dash_app(grid):
                 dcc.Input(id='x-max', type='number', placeholder='Max', style={'flex': 1, 'padding': '5px'})
             ])
         ]),
-        
+
         # Plots
         html.Div(style={
             'backgroundColor': 'white',
@@ -374,10 +374,10 @@ def create_dash_app(grid):
 
         cols_1 = get_columns(plotting_choice_1)
         cols_2 = get_columns(plotting_choice_2)
-        
+
         options_1 = [{'label': col, 'value': col} for col in cols_1]
         options_2 = [{'label': col, 'value': col} for col in cols_2]
-        
+
         return options_1, cols_1, options_2, cols_2
 
     @app.callback(
@@ -408,7 +408,7 @@ def create_dash_app(grid):
 
         y_min_1, y_max_1 = get_limits(plotting_choice_1)
         y_min_2, y_max_2 = get_limits(plotting_choice_2)
-        
+
         return y_min_1, y_max_1, y_min_2, y_max_2
 
     @app.callback(
@@ -426,20 +426,20 @@ def create_dash_app(grid):
          Input('y-max-2', 'value'),
          Input('show-plot-2', 'value')]
     )
-    def update_graphs(plotting_choice_1, plotting_choice_2, selected_rows_1, selected_rows_2, 
+    def update_graphs(plotting_choice_1, plotting_choice_2, selected_rows_1, selected_rows_2,
                      x_min, x_max, y_min_1, y_max_1, y_min_2, y_max_2, show_plot_2):
         x_limits = (x_min, x_max) if x_min is not None and x_max is not None else None
         y_limits_1 = (y_min_1, y_max_1) if y_min_1 is not None and y_max_1 is not None else None
         y_limits_2 = (y_min_2, y_max_2) if y_min_2 is not None and y_max_2 is not None else None
-        
+
         fig1 = plot_TS_res_dash(grid, plotting_choice_1, selected_rows_1, x_limits=x_limits, y_limits=y_limits_1)
-        
+
         # Only create second plot if it's enabled
         if show_plot_2:
             fig2 = plot_TS_res_dash(grid, plotting_choice_2, selected_rows_2, x_limits=x_limits, y_limits=y_limits_2)
         else:
             fig2 = go.Figure()  # Empty figure when plot 2 is disabled
-        
+
         return fig1, fig2
 
     return app

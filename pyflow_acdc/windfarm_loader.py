@@ -122,6 +122,6 @@ def load_case_grid_and_geo(case_name, source_tag="gebco"):
     grid.export_cables = export_lines
     grid.exclusion_zones = exclusion_zones
     grid.soft_exclusion_zones = soft_exclusion_zones
-    
+
 
     return grid, res

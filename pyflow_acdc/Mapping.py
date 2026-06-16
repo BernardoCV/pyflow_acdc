@@ -28,11 +28,11 @@ __all__ = [
 def darken_color(color, factor=0.6):
     """
     Darken a CSS color by reducing its brightness.
-    
+
     Args:
         color: CSS color name (e.g., 'royalblue', 'black') or hex string
         factor: How much to darken (0.0 to 1.0). Lower = darker. Default 0.6.
-    
+
     Returns:
         Hex color string (e.g., '#4a5a7f')
     """
@@ -82,26 +82,26 @@ def darken_color(color, factor=0.6):
         'paleturquoise': (0.686, 0.933, 0.933),
         'darkorange': (1, 0.549, 0)
     }
-    
+
     # Get RGB value
     rgb = css_colors.get(color.lower(), (0.5, 0.5, 0.5))  # Default to gray if not found
-    
+
     # Convert RGB to HSV (Hue, Saturation, Value)
     hsv = colorsys.rgb_to_hsv(rgb[0], rgb[1], rgb[2])
-    
+
     # Reduce the Value (brightness) component
     new_v = max(0.0, hsv[2] * factor)  # Ensure we don't go negative
-    
+
     # Convert back to RGB
     new_rgb = colorsys.hsv_to_rgb(hsv[0], hsv[1], new_v)
-    
+
     # Convert to hex
     hex_color = '#{:02x}{:02x}{:02x}'.format(
         int(new_rgb[0] * 255),
         int(new_rgb[1] * 255),
         int(new_rgb[2] * 255)
     )
-    
+
     return hex_color
 
 def create_geometries_from_coords(grid):
@@ -141,64 +141,64 @@ def plot_folium_network(
     add_marine_regions_wms=False,
     line_size_factor=1.0,
 ):
-    # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter" 
+    # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter"
     if name is None:
         name = grid.name
-    update_hovertexts(grid, text) 
+    update_hovertexts(grid, text)
 
     create_geometries_from_coords(grid)
-  
-    
+
+
     G = grid.Graph_toPlot  # Assuming this is your main graph object
     subgraph_colors= create_subgraph_color_dict(G)
-    subgraph_dict = {} 
-    
+    subgraph_dict = {}
+
     # Map each line to its subgraph index
     for idx, subgraph_nodes in enumerate(nx.connected_components(G)):
         for edge in G.subgraph(subgraph_nodes).edges(data=True):
             line = edge[2]['line']
             subgraph_dict[line] = idx
-        for node in subgraph_nodes:    
+        for node in subgraph_nodes:
             subgraph_dict[node] = idx
-            connected_gens = getattr(node, 'connected_gen', [])  
-            connected_renSources = getattr(node, 'connected_RenSource', [])  
+            connected_gens = getattr(node, 'connected_gen', [])
+            connected_renSources = getattr(node, 'connected_RenSource', [])
             subgraph_dict.update({gen: idx for gen in connected_gens})
             subgraph_dict.update({rs:  idx for rs  in connected_renSources})
-    
+
     # Extract line data (AC and HVDC) into a GeoDataFrame
     def extract_line_data(lines, line_type):
         line_data = []
 
-        if line_type == 'DC': 
+        if line_type == 'DC':
             subgraph_dc_counts = {}
             for line_obj in lines:
                 subgraph_idx = subgraph_dict.get(line_obj)  # Avoid KeyError
                 if subgraph_idx is not None:  # Ensure the line is in subgraph_dict
                     subgraph_dc_counts[subgraph_idx] = subgraph_dc_counts.get(subgraph_idx, 0) + 1
-        
+
         if coloring == 'loss':
             min_loss = min(np.real(line.loss) for line in lines)
             max_loss = max(np.real(line.loss) for line in lines)
             if min_loss == max_loss:
-                max_loss += 0.1 
+                max_loss += 0.1
             colormap = branca.colormap.LinearColormap(
                 colors=["green", "yellow", "red"],
-                vmin=min_loss, 
+                vmin=min_loss,
                 vmax=max_loss
                 )
         elif coloring in ['loading','ts_max_loading','ts_avg_loading']:
             colormap = branca.colormap.LinearColormap(
                 colors=["green", "yellow", "red"],
-                vmin=0, 
+                vmin=0,
                 vmax=100
                 )
         elif coloring == 'Efficiency':
            colormap = branca.colormap.LinearColormap(
                colors=["red", "yellow","green"],
-               vmin=70, 
+               vmin=70,
                vmax=100
                )
-        
+
         # test_values = [min_loss, (min_loss + max_loss) / 2, max_loss]
         # for val in test_values:
         #     print(f"Loss: {val}, Color: {colormap(val)}")
@@ -209,16 +209,16 @@ def plot_folium_network(
                  'HV' if line_obj.toNode.kV_base < 300 else \
                  'EHV' if line_obj.toNode.kV_base < 500 else \
                  'UHV'
-                 
-            line_type_indv= line_type    
-            
+
+            line_type_indv= line_type
+
             if line_type_indv == 'DC' and subgraph_dc_counts.get(subgraph_idx, 0) >= 2:
                line_type_indv = 'MTDC'
-            
-            
+
+
             area = line_obj.toNode.PZ if line_obj.toNode.PZ == line_obj.fromNode.PZ else 'ICL'
             ant_v = False
-            
+
             if area == 'ICL' or line_type == 'DC':
                 ant_v = True
             if ant_path == 'All' and VL != 'MV':
@@ -239,7 +239,7 @@ def plot_folium_network(
                     color = 'blue'
                 else:
                     color = colormap(np.real(load_show))
-                    
+
             elif coloring == 'Efficiency':
                 loss =np.real(line_obj.loss)
                 if line_type== 'DC':
@@ -251,19 +251,19 @@ def plot_folium_network(
                 # print(f'{eff} - {color}')
             elif line_type == 'CSS':
                 cable_type_colors = {
-                    0: 'cyan', 
-                    1: 'magenta', 
-                    2: 'brown', 
-                    3: 'gray', 
-                    4: 'lime', 
-                    5: 'navy', 
-                    6: 'teal', 
-                    7: 'violet', 
-                    8: 'indigo', 
-                    9: 'turquoise', 
-                    10: 'beige', 
-                    11: 'coral', 
-                    12: 'salmon', 
+                    0: 'cyan',
+                    1: 'magenta',
+                    2: 'brown',
+                    3: 'gray',
+                    4: 'lime',
+                    5: 'navy',
+                    6: 'teal',
+                    7: 'violet',
+                    8: 'indigo',
+                    9: 'turquoise',
+                    10: 'beige',
+                    11: 'coral',
+                    12: 'salmon',
                     13: 'olive'
                 }
                 if line_obj.active_config != -1:
@@ -273,18 +273,18 @@ def plot_folium_network(
                     thck= 0
             else:
                 color=('black' if getattr(line_obj, 'isTf', False)  # Defaults to False if 'isTF' does not exist/
-                        else subgraph_colors[VL].get(subgraph_idx, "black") if line_type == 'AC' or line_type == 'rec_AC' 
-                        else 'darkblue' if line_type_indv == 'MTDC' 
+                        else subgraph_colors[VL].get(subgraph_idx, "black") if line_type == 'AC' or line_type == 'rec_AC'
+                        else 'darkblue' if line_type_indv == 'MTDC'
                         else 'royalblue')
             if line_type == 'rec_AC' and line_obj.rec_branch:
-                color = darken_color(color, factor=0.6) 
+                color = darken_color(color, factor=0.6)
             if geometry and not geometry.is_empty:
                 line_data.append({
                     "geometry": geometry,
                     "type": line_type_indv,
                     "name": getattr(line_obj, 'name', 'Unknown'),
                     "Direction": line_obj.direction,
-                    "ant_viable": ant_v, 
+                    "ant_viable": ant_v,
                     "thck": thck,
                     "VL" :VL,
                     "area":area,
@@ -292,16 +292,16 @@ def plot_folium_network(
                     "hover_text": getattr(line_obj, 'hover_text', 'No info'),
                     "color":color
                 })
-        
+
         if lines:  # Using if lines instead of if lines != [] is more pythonic
             return gpd.GeoDataFrame(line_data, geometry="geometry")
         else:
             # Create an empty GeoDataFrame with the expected columns
-            return gpd.GeoDataFrame(columns=['geometry', 'type', 'name', 'Direction', 'ant_viable', 
-                                           'thck', 'VL', 'area', 'tf', 'hover_text', 'color'], 
+            return gpd.GeoDataFrame(columns=['geometry', 'type', 'name', 'Direction', 'ant_viable',
+                                           'thck', 'VL', 'area', 'tf', 'hover_text', 'color'],
                                   geometry='geometry')
-   
-   
+
+
     # Create GeoDataFrames for AC and HVDC lines
     gdf_lines_AC = extract_line_data(grid.lines_AC+grid.lines_AC_tf, "AC")
     if grid.lines_AC_exp != []:
@@ -317,27 +317,27 @@ def plot_folium_network(
         gdf_lines_AC_ct = extract_line_data(grid.lines_AC_ct, "CSS")
     else:
         gdf_lines_AC_ct = gpd.GeoDataFrame(columns=["geometry", "type", "name", "VL", "tf", "hover_text", "color"])
-    
+
     def filter_vl_and_tf(gdf):
     # Filter lines based on Voltage Level (VL)
-        AC_mv = gdf[gdf['VL'] == 'MV']    
+        AC_mv = gdf[gdf['VL'] == 'MV']
         AC_hv = gdf[gdf['VL'] == 'HV']
         AC_ehv = gdf[gdf['VL'] == 'EHV']
         AC_uhv = gdf[gdf['VL'] == 'UHV']
-    
+
         # Filter transformer lines (isTf == True)
         AC_tf = gdf[gdf['tf'] == True] if 'tf' in gdf.columns else None
 
         return AC_mv,AC_hv, AC_ehv, AC_uhv, AC_tf
-   
+
     gdf_lines_AC_mv,gdf_lines_AC_hv, gdf_lines_AC_ehv, gdf_lines_AC_uhv, gdf_lines_AC_tf=filter_vl_and_tf(gdf_lines_AC)
- 
+
     if grid.lines_DC != []:
         gdf_lines_HVDC = extract_line_data(grid.lines_DC, "DC")
     else:
         gdf_lines_HVDC = gpd.GeoDataFrame(columns=["geometry", "type", "name", "VL", "tf", "hover_text", "color"])
-        
-        
+
+
     def extract_conv_data(converters):
         line_data = []
         for conv_obj in converters:
@@ -354,16 +354,16 @@ def plot_folium_network(
                     "color": 'purple'
                 })
         return gpd.GeoDataFrame(line_data, geometry="geometry")
-    
-    
+
+
     if grid.Converters_ACDC != []:
         gdf_conv = extract_conv_data(grid.Converters_ACDC)
     else:
         gdf_conv = gpd.GeoDataFrame(columns=["geometry", "type", "area", "name","hover_text", "color"])
-    
+
     # Extract node data into a GeoDataFrame
     def extract_node_data(nodes):
-        
+
         node_data = []
         for node in nodes:
             subgraph_idx = subgraph_dict.get(node, None)
@@ -387,15 +387,15 @@ def plot_folium_network(
 
     # Create GeoDataFrame for nodes
     gdf_nodes_AC = extract_node_data(grid.nodes_AC)
-    
+
     gdf_nodes_AC_mv,gdf_nodes_AC_hv, gdf_nodes_AC_ehv, gdf_nodes_AC_uhv, _=filter_vl_and_tf(gdf_nodes_AC)
-    
+
     if grid.nodes_DC != []:
         gdf_nodes_DC = extract_node_data(grid.nodes_DC)
     else:
         gdf_nodes_DC = gpd.GeoDataFrame(columns=["geometry", "name", "VL", "area","hover_text","type","color"])
-        
-        
+
+
     def extract_gen_data(gens):
         gen_data = []
         for gen in gens:
@@ -425,14 +425,14 @@ def plot_folium_network(
             columns=["geometry", "name", "VL", "area", "hover_text", "type", "color", "mw_size"],
             geometry="geometry",
         )
-    
-    
+
+
     if grid.Generators != []:
         gdf_gens = extract_gen_data(grid.Generators)
     else:
         gdf_gens = gpd.GeoDataFrame(columns=["geometry", "name", "VL", "area","hover_text","type","color"])
-    
-    
+
+
     def extract_renSource_data(renSources):
         gen_data = []
         for rs in renSources:
@@ -461,14 +461,14 @@ def plot_folium_network(
             columns=["geometry", "name", "VL", "area", "hover_text", "type", "color", "mw_size"],
             geometry="geometry",
         )
-    
-    
+
+
     if grid.RenSources != []:
         gdf_rsSources = extract_renSource_data(grid.RenSources)
     else:
         gdf_rsSources = gpd.GeoDataFrame(columns=["geometry", "name", "VL", "area","hover_text","type","color"])
 
-   
+
     BASE_ICON_SIZE = float(base_icon_size)
     MIN_ICON_SIZE = BASE_ICON_SIZE * 0.5
     MAX_ICON_SIZE = BASE_ICON_SIZE * 2
@@ -507,19 +507,19 @@ def plot_folium_network(
         norm = max(0.0, min(1.0, norm))
         return int(round(MIN_ICON_SIZE + norm * (MAX_ICON_SIZE - MIN_ICON_SIZE)))
 
-    
+
     # Function to add LineString geometries to the map
     line_size_factor = float(line_size_factor)
     if line_size_factor <= 0:
         raise ValueError("line_size_factor must be > 0.")
 
     def add_lines(gdf, tech_name,ant):
-        
+
         for _, row in gdf.iterrows():
-            
+
             # Support both 2D (x,y) and 3D (x,y,z) coordinates.
             coords = [(pt[1], pt[0]) for pt in row.geometry.coords if len(pt) >= 2]  # Folium needs (lat, lon) order
-            
+
             if ant and row["ant_viable"]:
                 if row["Direction"] == "to":
                     coords = coords[::-1]
@@ -534,11 +534,11 @@ def plot_folium_network(
                     delay=400,  # Adjust animation speed
                     popup=folium.Popup(row["hover_text"], max_width=360, min_width=220)
                 ).add_to(tech_name)
-    
+
             else:
                 base_weight = 3 * row["thck"] if row["type"] == "HVDC" else 2 * row["thck"]
                 weight = float(base_weight) / line_size_factor
-        
+
                 folium.PolyLine(
                     coords,
                     color=row["color"],
@@ -558,7 +558,7 @@ def plot_folium_network(
     else:
         # Fallback to North Sea if no nodes
         map_center = [56, 10]
-    
+
     # Initialize the map, centred around the nodes
     if planar:
         # In planar coordinates, marker clustering can hide markers/layers unexpectedly.
@@ -588,7 +588,7 @@ def plot_folium_network(
             overlay=True,
             control=True,
         ).add_to(m)
-    
+
     # Function to add nodes with filtering by type and zone
     def add_nodes(gdf, tech_name):
         for _, row in gdf.iterrows():
@@ -620,7 +620,7 @@ def plot_folium_network(
                     icon_anchor=(0, 0),
                 ),
             ).add_to(tech_name)
-    
+
     default_type_keys = _default_type_keys()
 
     try:
@@ -630,8 +630,8 @@ def plot_folium_network(
         base_icon_dir = os.path.join(os.path.dirname(__file__), 'folium_images')
         use_importlib_resources = False
 
-    def add_markers(gdf, tech_name):  
-        
+    def add_markers(gdf, tech_name):
+
         if clustering == True:
             cluster = MarkerCluster().add_to(tech_name)  # Add clustering per type
         else:
@@ -678,9 +678,9 @@ def plot_folium_network(
                         icon_anchor=icon_anchor,
                     )
                 ).add_to(cluster)
-                
-    
-    
+
+
+
     mv_AC  = folium.FeatureGroup(name="MVAC Lines <110kV")
     hv_AC  = folium.FeatureGroup(name="HVAC Lines <300kV")
     ehv_AC = folium.FeatureGroup(name="HVAC Lines <500kV")
@@ -692,13 +692,13 @@ def plot_folium_network(
     exp_lines = folium.FeatureGroup(name="Exp Lines")
     rec_lines = folium.FeatureGroup(name="Rec Lines")
     loads_fg = folium.FeatureGroup(name="Loads", show=bool(show_all))
-    
+
     if ant_path == 'All' or ant_path == 'Reduced':
         ant = True
     else:
         ant = False
-        
-    add_lines(gdf_lines_AC_mv, mv_AC,ant)    
+
+    add_lines(gdf_lines_AC_mv, mv_AC,ant)
     add_lines(gdf_lines_AC_hv, hv_AC,ant)
     add_lines(gdf_lines_AC_ehv, ehv_AC,ant)
     add_lines(gdf_lines_AC_uhv, uhv_AC,ant)
@@ -708,7 +708,7 @@ def plot_folium_network(
     add_lines(gdf_lines_AC_tf, transformers,ant)
     add_lines(gdf_lines_HVDC, hvdc,ant)
     add_lines(gdf_conv, convs, ant)
-    
+
     add_nodes(gdf_nodes_AC_mv, mv_AC)
     add_nodes(gdf_nodes_AC_hv, hv_AC)
     add_nodes(gdf_nodes_AC_ehv, ehv_AC)
@@ -718,12 +718,12 @@ def plot_folium_network(
         add_load_markers(gdf_nodes_AC, loads_fg)
         add_load_markers(gdf_nodes_DC, loads_fg)
 
-    
+
     layer_names = grid.generation_types
     # Dictionary to store FeatureGroups for each generation type (lowercase key for robust matching)
     layers = {name.lower(): folium.FeatureGroup(name=name, show=bool(show_all)) for name in layer_names}
-    
-    
+
+
     # Add filtered layers to map
     mv_AC.add_to(m)  if len(mv_AC._children) > 0 else None
     hv_AC.add_to(m)  if len(hv_AC._children) > 0 else None
@@ -736,14 +736,14 @@ def plot_folium_network(
     exp_lines.add_to(m)    if len(exp_lines._children) > 0 else None
     rec_lines.add_to(m) if len(rec_lines._children) > 0 else None
     loads_fg.add_to(m) if plot_load and len(loads_fg._children) > 0 else None
-        
+
     # Split gdf_gens by type and add markers for each type
     for gen_type, subset in gdf_gens.groupby('type'):  # Split by 'type'
         key = str(gen_type).lower()
         if key not in layers:
             layers[key] = folium.FeatureGroup(name=str(gen_type), show=bool(show_all))
         add_markers(subset, layers[key])
-    
+
     for gen_type, subset in gdf_rsSources.groupby('type'):  # Split by 'type'
         key = str(gen_type).lower()
         if key not in layers:
@@ -769,9 +769,9 @@ def plot_folium_network(
         # Handle both single linestring and list of linestrings
         if not isinstance(linestrings, list):
             linestrings = [linestrings]
-        
+
         for linestring in linestrings:
-            
+
             coords = [(y, x) for x, y in linestring.coords]  # convert (lon, lat) → (lat, lon)
 
             folium.PolyLine(
@@ -780,7 +780,7 @@ def plot_folium_network(
                 weight=2,
                 opacity=1
             ).add_to(m)
-            
+
 
     Draw(   export=True,  # Allows downloading edited layers
             edit_options={'poly': {'allowIntersection': False}},  # Prevents self-intersecting edits
@@ -792,12 +792,12 @@ def plot_folium_network(
     if coloring == 'Efficiency':
         colormap = branca.colormap.LinearColormap(
             colors=["red","yellow", "green"],
-            vmin=70, 
+            vmin=70,
             vmax=100
             )
         colormap.caption = "Efficiency Scale"  # Optional: Set a caption for clarity
         m.add_child(colormap)
-        
+
     # Add layer control
     folium.LayerControl().add_to(m)
     # Save and display the map
@@ -805,7 +805,7 @@ def plot_folium_network(
     # Save and display the map
     m.save(map_filename)  # Open this file in a browser to viewm
     abs_map_filename = os.path.abspath(map_filename)
-    
+
     # Automatically open the map in the default web browser
     if show:
         webbrowser.open(f"file://{abs_map_filename}")
