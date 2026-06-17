@@ -1,10 +1,10 @@
-<img src="docs/images/logo_dark.svg" align="right" width="200px">
+<img src="docs/images/logos/logo_dark.svg" align="right" width="200px">
 
 # pyflow-acdc
 A python-based tool for the design and analysis of hybrid AC/DC grids
 
 
-pyflow-acdc is a program worked on by ADOreD Project by CITCEA-UPC and Youwind
+pyflow-acdc is a program worked on by ADOreD Project by CITCEA-UPC in collaboration with Youwind
 
 This project has received funding from the European Union’s  Horizon Europe 
 Research and Innovation programme under the Marie Skłodowska-Curie grant 

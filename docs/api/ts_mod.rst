@@ -1,375 +1,35 @@
 Time Series Modifications
 =========================
 
-These functions are used to modify and simplify the use of time series data.
-
-Functions are found in `pyflow_acdc.grid_modifications`.
+Operational and investment time-series helpers in
+:mod:`pyflow_acdc.grid_modifications`. Grid construction and zone definitions
+are covered in :doc:`grid_mod`.
 
 Renewable Source Zone
 ---------------------
 
-Renewable Source Zone is an object designed to unify multiple renewable sources sharing the same time series data. For instance, if multiple wind turbines generate identical power output, they can be grouped into a single wind power plant zone.
-
-
-Add Renewable Source Zone
-^^^^^^^^^^^^^^^^^^^^^^^^^
+Renewable-source zones group turbines or plants that share the same availability
+time series (e.g. several identical wind turbines modelled as one zone).
 
 .. autofunction:: pyflow_acdc.add_RenSource_zone
-
-   **Example**
-
-   .. code-block:: python
-
-       zone = pyf.add_RenSource_zone(grid, "WindZone1")
-
 
 Assign Renewable to Zone
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: pyflow_acdc.assign_RenToZone
 
-   **Example**
-
-   This example shows how to assign two renewable sources to the same zone. Each renewable source has a base power of 22 MW. You can either create the renewbale sources and then the zones to assign them to or create the zone first and then add the renewable sources to it.
-   
-   .. code-block:: python
-
-       grid = pyf.Grid(100)
-
-       node = pyf.add_AC_node(grid,66, name="node1")
-       node2 = pyf.add_AC_node(grid,66, name="node2")
-
-
-
-       pyf.add_RenSource(grid, 'node1', 22, ren_source_name='wind1')
-       pyf.add_RenSource(grid, 'node2', 22, ren_source_name='wind2')
-
-       zone = pyf.add_RenSource_zone(grid, "WindZone1")
-
-       pyf.assign_RenToZone(grid, "wind1", "WindZone1")
-       pyf.assign_RenToZone(grid, "wind2", "WindZone1")
-
-   Or you can create the zone first and then add the renewable sources to it. The assigment of zones will be called when adding the renewable sources.
-  
-   .. code-block:: python
-
-       grid = pyf.Grid(100)
-
-       node = pyf.add_AC_node(grid,66, name="node1")
-       node2 = pyf.add_AC_node(grid,66, name="node2")
-
-       pyf.add_RenSource_zone(grid, "WindZone1")
-
-       pyf.add_RenSource(grid, 'node1', 22, ren_source_name='wind1', zone="WindZone1")
-       pyf.add_RenSource(grid, 'node2', 22, ren_source_name='wind2', zone="WindZone1")
-
-
 Price Zone
 ----------
 
-Price zones function also like renewable sources zone when dealing with time series data. As they allow to group multiple nodes and generators with the same price data. Check the :ref:`price_zones`  and :ref:`price_zone_assignments` for more information.
+Price zones play a similar grouping role for load and price time series across
+multiple buses. Price-zone-only series (``a_CG``, ``b_CG``, ``c_CG``,
+``PGL_min``, ``PGL_max``) follow the market-based OPF formulation in [1]_.
+See :ref:`price_zones` and :ref:`price_zone_assignments` in :doc:`grid_mod`.
 
-
-
-Time Series data
+Time Series Data
 ----------------
 
-Add Time Series
-^^^^^^^^^^^^^^^
-
-Time series data can be added to the grid by using the :py:func:`add_TimeSeries` function. This function allows to add time series data to a specific component. Time series data is imported from csv files.
-
-
-
 .. autofunction:: pyflow_acdc.add_TimeSeries
-
-
-Accepted types
-^^^^^^^^^^^^^^
-
-The time series update will depend on which type it can be associated to, this is why it is important to have different names for each object even if they are in different classes. The following types are accepted:
-
-.. list-table::
-  :widths: 10 50 20 30
-  :header-rows: 1
-
-  * - Type
-    - Description
-    - Object Associated
-    - Affected object variable
-  * - 'Load'
-    - Load time series
-    - :py:class:`Price_Zone`, :py:class:`Node_AC`, :py:class:`Node_DC`
-    - obj.PLi_factor
-  * - 'price'
-    - Price time series
-    - :py:class:`Price_Zone`, :py:class:`Node_AC`,  :py:class:`Node_DC`
-    - obj.price
-  * - 'WPP', 'OWPP', 'SF', 'REN'
-    - Per unit power available of base power
-    - :py:class:`Ren_source_zone`, :py:class:`Ren_Source`
-    - obj.PRGi_available
-
-The following parameters are only available for price zones [1]_.
-
-.. list-table::
-  :widths: 10 50 20 30
-  :header-rows: 1   
-
-  * - Type
-    - Description
-    - Object Associated
-    - Affected object variable
-  * - 'a_CG'
-    - Quadratic factor of cost of generation
-    - :py:class:`Price_Zone`
-    - obj.a_CG
-  * - 'b_CG'
-    - Linear factor of cost of generation
-    - :py:class:`Price_Zone`
-    - obj.b_CG
-  * - 'c_CG'
-    - Constant factor of cost of generation
-    - :py:class:`Price_Zone`
-    - obj.c_CG
-  * - 'PGL_min'
-    - Minimum value of P_N for the price zone
-    - :py:class:`Price_Zone`
-    - obj.PGL_min
-  * - 'PGL_max'
-    - Maximum value of P_N for the price zone
-    - :py:class:`Price_Zone`
-    - obj.PGL_max
-
-Data format
-^^^^^^^^^^^^
-
-Data format depends on the selection of ``associated`` and ``TS_type``. The value in ``associated`` is the name of the object which it refers to, this can be a node, a renewable source, a price zone or a renewable source zone.
-
-For a dataset of length n, the CSV will follow this format: Position 0 is treated as the column name when imported into pandas. The first line should contain only headers and no data. Then there are cases where:
-
-**associated  and TS_type assigned by user**
-
-.. list-table::
-   :class: columns-2
-   :widths: 100 100
-  
-   * - .. list-table::
-         :widths: 10 10 
-         :header-rows: 1   
-         :align: left
-
-         * - position
-           - value
-         * - 0
-           - time series name
-         * - 1
-           - start of the data
-         * - n
-           - end of the data
-
-     - .. list-table::
-         :widths: 10 10 10 10
-         :header-rows: 1   
-         :align: right
-
-         * - 0
-           - Load_n1
-           - Load_n2
-           - price_n1
-         * - 1
-           - 0.95
-           - 0.55
-           - 20
-         * - 2
-           - 0.75
-           - 0.95
-           - 30
-         * - 3
-           - 0.84
-           - 0.72
-           - 30
-
-.. code-block:: python
-
-    n1_load_data = pd.DataFrame({"Load_n1": [0.95, 0.75, 0.84]})
-    n2_load_data = pd.DataFrame({"Load_n2": [0.55, 0.95, 0.72]})
-    price_data   = pd.DataFrame({"price_n1": [20, 30, 40]})
-
-    pyf.add_TimeSeries(grid, n1_load_data,associated="node1", TS_type="Load")
-    pyf.add_TimeSeries(grid, n2_load_data,associated="node2", TS_type="Load")
-    pyf.add_TimeSeries(grid, price_data,associated="node1", TS_type="price")
-
-**only associated assigned by user**
-
-.. list-table::
-   :class: columns-2
-   :widths: 100 100
-  
-   * - .. list-table::
-         :widths: 10 10 
-         :header-rows: 1   
-
-         * - position
-           - value
-         * - 0
-           - time series name
-         * - 1
-           - TS_type
-         * - 2
-           - start of the data
-         * - n+1
-           - end of the data
-
-     - .. list-table::
-         :widths: 10 10 10 10
-         :header-rows: 1   
-         :align: right
-
-         * - 0
-           - Load_n1
-           - Load_n2
-           - price_n1
-         * - 1
-           - Load
-           - Load
-           - price
-         * - 2
-           - 0.95
-           - 0.55
-           - 20
-         * - 3
-           - 0.75
-           - 0.95
-           - 30
-         * - 4
-           - 0.84
-           - 0.72
-           - 40
-
-.. code-block:: python
-
-    n1_data = pd.DataFrame({"Load_n1": ['Load', 0.95, 0.75, 0.84],
-                            "price_n1": ['price', 20, 30, 40]})
-    n2_data = pd.DataFrame({"Load_n2": ['Load', 0.55, 0.95, 0.72]})
-    pyf.add_TimeSeries(grid, n1_data,associated="node1")
-    pyf.add_TimeSeries(grid, n2_data,associated="node2")
-
-**only TS_type assigned by user**
-
-.. list-table::
-   :class: columns-2
-   :widths: 100 100
-  
-   * - .. list-table::
-         :widths: 10 10 
-         :header-rows: 1   
-
-         * - position
-           - value
-         * - 0
-           - time series name
-         * - 1
-           - Object name
-         * - 2
-           - start of the data
-         * - n+1
-           - end of the data
-
-     - .. list-table::
-         :widths: 10 10 10 10
-         :header-rows: 1   
-         :align: right
-
-         * - 0
-           - Load_n1
-           - Load_n2
-           - price_n1
-         * - 1
-           - node1
-           - node2
-           - node1
-         * - 2
-           - 0.95
-           - 0.55
-           - 20
-         * - 3
-           - 0.75
-           - 0.95
-           - 30
-         * - 4
-           - 0.84
-           - 0.72
-           - 40
-
-.. code-block:: python
-
-    load_data  = pd.DataFrame({"Load_n1": ['node1', 0.95, 0.75, 0.84],
-                               "Load_n2": ['node2', 0.55, 0.95, 0.72]})
-    price_data = pd.DataFrame({"price_n1": ['node1', 20, 30, 40]})
-    pyf.add_TimeSeries(grid, load_data, TS_type="Load")    
-    pyf.add_TimeSeries(grid, price_data, TS_type="price")
-
-**associated = None and TS_type = None**
-
-.. list-table::
-   :class: columns-2
-   :widths: 100 100
-  
-   * - .. list-table::
-         :widths: 10 10 
-         :header-rows: 1   
-
-         * - position
-           - value
-         * - 0
-           - time series name
-         * - 1
-           - Object name
-         * - 2
-           - TS type
-         * - 3
-           - start of the data
-         * - n+2
-           - end of the data
-
-     - .. list-table::
-         :widths: 10 10 10 10
-         :header-rows: 1   
-         :align: right
-
-         * - 0
-           - Load_n1
-           - Load_n2
-           - price_n1
-         * - 1
-           - node1
-           - node2
-           - node1
-         * - 2
-           - Load
-           - Load
-           - price
-         * - 3
-           - 0.95
-           - 0.75
-           - 20
-         * - 4
-           - 0.75
-           - 0.84
-           - 30
-         * - 5
-           - 0.84
-           - 0.72
-           - 40
-
-.. code-block:: python
-
-    load_data = pd.DataFrame({"Load_n1": ['node1', 'Load', 0.95, 0.75, 0.84],
-                              "Load_n2": ['node2', 'Load', 0.55, 0.95, 0.72],
-                              "price_n1":['node1', 'price', 20, 30, 40]})
-    pyf.add_TimeSeries(grid, load_data)   
-
 
 TimeSeries Object
 -----------------
@@ -377,11 +37,10 @@ TimeSeries Object
 .. autoclass:: pyflow_acdc.TimeSeries
    :no-members:
 
-
 Time-Series Clustering
 ----------------------
 
-These functions are found in `pyflow_acdc.Time_series_clustering`.
+Functions in :mod:`pyflow_acdc.Time_series_clustering`.
 
 .. autofunction:: pyflow_acdc.identify_correlations
 
@@ -391,7 +50,8 @@ These functions are found in `pyflow_acdc.Time_series_clustering`.
 
 .. autofunction:: pyflow_acdc.cluster_analysis
 
-**References**
+References
+----------
 
 .. [1] B. C. Valerio, V. A. Lacerda, M. Cheah-Mañe, P. Gebraad, and O. Gomis-Bellmunt,
        "Optimizing offshore wind integration through multi-terminal DC grids: a market-based

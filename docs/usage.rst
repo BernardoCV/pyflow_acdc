@@ -9,7 +9,7 @@ Creating a Grid
 ---------------
 This is the basic way to create a grid. This grid is the same as running MATACDC case5_stagg and case5_stagg_MTDC [1]_.
 
-.. figure:: /images/Stagg5MATACDC.svg
+.. themed-figure:: stagg5
    :alt: Case 5 Stagg
    :align: center
 

@@ -94,14 +94,16 @@ This function is used to plot the time series results of the grid.
 
    Plot shown in browser:
 
-   .. figure:: ../images/ts_plot_browser.svg
+   .. themed-figure:: ts_plot_browser
       :alt: Time Series Plot: Power Generation by price zone
+      :align: center
       :width: 70%
 
    Plot saved in current working directory:
 
-   .. figure:: ../images/ts_plot_save.svg
+   .. themed-figure:: ts_plot_save
       :alt: Time Series Plot: Power Generation by price zone
+      :align: center
       :width: 70%
 
 Time series probability
@@ -171,9 +173,12 @@ This function is used to plot the probability of the time series parameters or r
    .. list-table::
       :widths: 50 50 50 
 
-      * - .. figure:: ../images/OWPP_BE_distribution.svg
-        - .. figure:: ../images/BE_price_distribution.svg
-        - .. figure:: ../images/L_BE_distribution.svg
+      * - .. themed-figure:: owpp_be_distribution
+           :align: center
+        - .. themed-figure:: be_price_distribution
+           :align: center
+        - .. themed-figure:: l_be_distribution
+           :align: center
 
 Network Graph Visualization
 ---------------------------
@@ -220,8 +225,9 @@ Full grid visualization as a network graph
 
        pyf.plot_graph(grid)
 
-   .. figure:: ../images/case24acdc_full.svg
+   .. themed-figure:: case24acdc_full
       :alt: case24_3zones_acdc_graph
+      :align: center
       :width: 70%
 
 
@@ -276,8 +282,9 @@ This function is used to plot the neighbor graph of a node. You can either provi
 
        pyf.plot_neighbour_graph(grid,node_name='111.0')
 
-   .. figure:: ../images/case24acdc_neig.svg
+   .. themed-figure:: case24acdc_neig
       :alt: case24_3zones_acdc neighbour graph of node 111.0
+      :align: center
       :width: 70%
 
 Saving the Network Graph
@@ -324,8 +331,9 @@ For this function, you need to have the svgwrite library installed. You can inst
 
        pyf.save_network_svg(grid)
 
-   .. figure:: ../images/grid_network.svg
+   .. themed-figure:: grid_network
       :alt: grid_network
+      :align: center
       :width: 70%
 
 

@@ -94,7 +94,7 @@ Once the dashboard is created, you can see it in your browser under the url:
 
        pyf.run_dash(grid)
 
-.. figure:: ../images/dash_example.svg
+.. themed-figure:: dash_example
    :width: 100%
    :alt: Dash Example
 

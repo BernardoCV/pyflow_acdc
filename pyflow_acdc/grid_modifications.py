@@ -111,12 +111,51 @@ __all__ = [
     'analyse_grid',
     'grid_state',
     'import_orbit_cables',
+    'expand_cable_database',
     'current_fuel_type_distribution'
 ]
 
 "Add main components"
 
 def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1,Gs= 0,Bs=0,x_coord=None,y_coord=None,geometry=None):
+    """Append an AC bus to ``grid.nodes_AC``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify (mutated in place).
+    kV_base : float
+        Base voltage in kV.
+    node_type : str, optional
+        ``'PQ'``, ``'PV'``, or ``'Slack'``.
+    Voltage_0 : float, optional
+        Initial voltage magnitude in p.u.
+    theta_0 : float, optional
+        Initial voltage angle in rad.
+    Power_Gained, Reactive_Gained : float, optional
+        Initial generation setpoints in p.u.
+    Power_load, Reactive_load : float, optional
+        Initial load in p.u.
+    name : str, optional
+        Bus name; auto-generated if omitted.
+    Umin, Umax : float, optional
+        Voltage magnitude limits in p.u.
+    Gs, Bs : float, optional
+        Shunt conductance and susceptance in p.u.
+    x_coord, y_coord : float, optional
+        Plot coordinates; overridden when ``geometry`` is set.
+    geometry : shapely.Geometry or str, optional
+        Shapely geometry or WKT string; sets ``x_coord``/``y_coord`` from centroid.
+
+    Returns
+    -------
+    Node_AC
+        Created node.
+
+    Examples
+    --------
+    >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1', node_type='PQ')
+    """
     node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord)
     if geometry is not None:
        if isinstance(geometry, str):
@@ -130,6 +169,39 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
     return node
 
 def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None,Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC,x_coord=None,y_coord=None,geometry=None):
+    """Append a DC bus to ``grid.nodes_DC``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    kV_base : float
+        Base voltage in kV.
+    node_type : str, optional
+        ``'P'``, ``'Slack'``, or ``'Droop'``.
+    Voltage_0 : float, optional
+        Initial voltage in p.u.
+    Power_Gained, Power_load : float, optional
+        Generation and load in p.u.
+    name : str, optional
+        Bus name.
+    Umin, Umax : float, optional
+        Voltage limits in p.u. Defaults use ``DEFAULT_V_MIN_DC`` /
+        ``DEFAULT_V_MAX_DC``.
+    x_coord, y_coord : float, optional
+        Plot coordinates.
+    geometry : shapely.Geometry or str, optional
+        Shapely geometry or WKT string.
+
+    Returns
+    -------
+    Node_DC
+        Created node.
+
+    Examples
+    --------
+    >>> node = pyf.add_DC_node(grid, kV_base=525, name='dc_bus1')
+    """
     node = Node_DC(node_type, kV_base, Voltage_0, Power_Gained, Power_load, name,Umin, Umax,x_coord,y_coord)
     grid.nodes_DC.append(node)
     if geometry is not None:
@@ -143,6 +215,63 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
     return node
 
 def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm_km=None,L_mH_km=None, C_uF_km=0, G_uS_km=0, A_rating=None ,m=1, shift=0, name=None,tap_changer=False,Expandable=False,N_cables=1,Length_km=1,geometry=None,data_in=DataInput.PU,Cable_type:str =CableType.CUSTOM,update_grid=True):
+    """Append an AC branch (line, expandable line, or tap transformer).
+
+    ``fromNode`` and ``toNode`` may be :class:`~pyflow_acdc.Classes.Node_AC`
+    objects or bus name strings.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    fromNode, toNode : Node_AC or str
+        End buses.
+    MVA_rating : float, optional
+        Thermal rating in MVA (required for ``data_in='pu'`` or ``'Ohm'``).
+    r, x, g, b : float, optional
+        Series/shunt parameters; meaning depends on ``data_in``.
+    R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating : float, optional
+        Physical cable data when ``data_in='Real'`` (``L_mH_km`` alone forces Real).
+    m, shift : float, optional
+        Transformer ratio and phase shift (rad).
+    tap_changer : bool, optional
+        If True, store as :class:`~pyflow_acdc.Classes.TF_Line_AC`.
+    Expandable : bool, optional
+        If True, store as :class:`~pyflow_acdc.Classes.Exp_Line_AC`.
+    N_cables : int, optional
+        Number of parallel circuits.
+    Length_km : float, optional
+        Line length in km.
+    name : str, optional
+        Branch name.
+    geometry : shapely.Geometry or str, optional
+        Line geometry for plotting.
+    data_in : str, optional
+        ``'pu'``, ``'Ohm'``, or ``'Real'`` (see :class:`~pyflow_acdc.constants.DataInput`).
+    Cable_type : str, optional
+        Named cable from the bundled database, or ``'Custom'``.
+    update_grid : bool, optional
+        Rebuild Y-bus and NetworkX graph when True.
+
+    Returns
+    -------
+    Line_AC, Exp_Line_AC, or TF_Line_AC
+        Created branch object.
+
+    Notes
+    -----
+    For ``data_in='pu'``, pass ``r``, ``x``, ``g``, ``b`` in p.u. and ``MVA_rating``.
+    For ``data_in='Ohm'``, pass ``r``, ``x``, ``g``, ``b`` in ohms (converted via
+    ``Z_base``). For ``data_in='Real'``, pass ``R_Ohm_km``, ``L_mH_km``, etc.
+    For a database cable, pass ``Cable_type`` and ``Length_km`` only.
+
+    Examples
+    --------
+    >>> line = pyf.add_line_AC(grid, 'bus1', 'bus2', r=0.029, x=0.0032,
+    ...                        b=0.0022, Length_km=10, MVA_rating=50)
+    >>> line_db = pyf.add_line_AC(grid, 'bus1', 'bus2',
+    ...     Cable_type='NREL_XLPE_185mm_66kV', Length_km=10)
+    """
 
     fromNode = _look_up_node(grid, fromNode, ac_or_dc="AC")
     toNode = _look_up_node(grid, toNode, ac_or_dc="AC")
@@ -193,6 +322,27 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
     return line
 
 def change_line_AC_to_expandable(grid, line_name,update_grid=True):
+    """Convert an existing AC line into an expandable (TEP) branch.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid containing the line.
+    line_name : str
+        Name of the line in ``grid.lines_AC``.
+    update_grid : bool, optional
+        Rebuild Y-bus and graph when True.
+
+    Returns
+    -------
+    Exp_Line_AC
+        New expandable line.
+
+    Raises
+    ------
+    ValueError
+        If ``line_name`` is not found in ``grid.lines_AC``.
+    """
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -238,6 +388,39 @@ def change_line_AC_to_expandable(grid, line_name,update_grid=True):
     return expandable_line
 
 def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_rating_new,Life_time,base_cost,update_grid=True):
+    """Convert an AC line into a reconductoring candidate.
+
+    The original branch is kept as the inactive base case inside the new
+    :class:`~pyflow_acdc.Classes.rec_Line_AC`` (``rec_branch=False`` until
+    reconductoring is selected in OPF/TEP).
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid containing the line.
+    line_name : str
+        Name of the line in ``grid.lines_AC``.
+    r_new, x_new, g_new, b_new : float
+        Reconductored branch parameters in p.u.
+    MVA_rating_new : float
+        New thermal rating in MVA.
+    Life_time : float
+        Economic lifetime in years.
+    base_cost : float
+        Investment cost of reconductoring.
+    update_grid : bool, optional
+        Rebuild Y-bus and graph when True.
+
+    Returns
+    -------
+    rec_Line_AC
+        New reconductoring line object.
+
+    Raises
+    ------
+    ValueError
+        If ``line_name`` is not found.
+    """
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -283,6 +466,25 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
     return rec_line
 
 def change_line_AC_to_tap_transformer(grid, line_name):
+    """Convert an AC line into a tap-changing transformer branch.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid containing the line.
+    line_name : str
+        Name of the line in ``grid.lines_AC``.
+
+    Returns
+    -------
+    TF_Line_AC
+        New transformer object.
+
+    Raises
+    ------
+    ValueError
+        If ``line_name`` is not found.
+    """
     l = None
     for line_to_process in grid.lines_AC:
         if line_name == line_to_process.name:
@@ -319,6 +521,37 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     return trafo
 
 def add_line_sizing(grid, fromNode, toNode,cable_types=None, active_config: int = 0,Length_km=1.0,S_base=100,name=None,cable_option=None,update_grid=True,geometry=None):
+    """Append a conductor-size-selection (array/CT) branch.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    fromNode, toNode : Node_AC or str
+        End buses.
+    cable_types : list, optional
+        Ordered cable type names (smallest to largest capacity).
+    active_config : int, optional
+        Index into ``cable_types`` for the initial active rating.
+    Length_km : float, optional
+        Branch length in km.
+    S_base : float, optional
+        Power base in MVA used for per-unit parameters.
+    name : str, optional
+        Branch name.
+    cable_option : str, optional
+        Name of a :class:`~pyflow_acdc.Classes.Cable_options` entry; links the
+        line via :func:`assign_lineToCable_options`.
+    update_grid : bool, optional
+        Rebuild Y-bus and graph when True.
+    geometry : shapely.Geometry or str, optional
+        Line geometry for plotting.
+
+    Returns
+    -------
+    Size_selection
+        Created sizing line in ``grid.lines_AC_ct``.
+    """
     if cable_types is None:
         cable_types = []
     fromNode = _look_up_node(grid, fromNode, ac_or_dc="AC")
@@ -338,6 +571,47 @@ def add_line_sizing(grid, fromNode, toNode,cable_types=None, active_config: int 
     return line
 
 def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Ohm_km=None,A_rating=None,polarity=Polarity.MONOPOLAR, name=None,geometry=None,Cable_type:str =CableType.CUSTOM,data_in=DataInput.PU,update_grid=True):
+    """Append a DC cable to ``grid.lines_DC``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    fromNode, toNode : Node_DC or str
+        End buses.
+    r : float, optional
+        Resistance in p.u. when ``data_in='pu'``.
+    MW_rating : float, optional
+        Power rating in MW.
+    Length_km : float, optional
+        Cable length in km.
+    R_Ohm_km : float, optional
+        Resistance per km for ``data_in='Real'``.
+    A_rating : float, optional
+        Current rating in A (Real input).
+    polarity : str or int, optional
+        ``'m'`` monopolar, ``'sm'`` symmetric monopolar, or ``'b'`` bipolar.
+    name : str, optional
+        Branch name.
+    geometry : shapely.Geometry or str, optional
+        Line geometry.
+    Cable_type : str, optional
+        Named cable from database, or ``'Custom'``.
+    data_in : str, optional
+        ``'pu'``, ``'Ohm'``, or ``'Real'``.
+    update_grid : bool, optional
+        Rebuild DC Y-bus and graph when True.
+
+    Returns
+    -------
+    Line_DC
+        Created DC line.
+
+    Examples
+    --------
+    >>> line = pyf.add_line_DC(grid, n1, n2, r=0.0000318, MW_rating=1000,
+    ...                        polarity='b', Length_km=10)
+    """
 
     fromNode = _look_up_node(grid, fromNode, ac_or_dc="DC")
     toNode = _look_up_node(grid, toNode, ac_or_dc="DC")
@@ -375,6 +649,65 @@ def add_line_DC(grid, fromNode, toNode, r=0.001, MW_rating=9999,Length_km=1,R_Oh
     return line
 
 def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC_MW=0, Q_AC_MVA=0, P_DC_MW=0, Transformer_resistance=0, Transformer_reactance=0, Phase_Reactor_R=0, Phase_Reactor_X=0, Filter=0, Droop=0, kV_base=None, MVA_max= None,nConvP=1,polarity =1 ,lossa=1.103,lossb= 0.887,losscrect=2.885,losscinv=4.371,Arm_R=None,Ucmin= 0.85, Ucmax= 1.2, name=None,geometry=None):
+    """Append an AC/DC converter to ``grid.Converters_ACDC``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    AC_node : Node_AC or str
+        AC-side bus.
+    DC_node : Node_DC or str
+        DC-side bus.
+    AC_type : str, optional
+        AC control mode: ``'PV'``, ``'PQ'``, or ``'Slack'``.
+    DC_type : str, optional
+        DC control mode: ``'P'``, ``'Slack'``, or ``'Droop'``; defaults to DC
+        node type.
+    P_AC_MW, Q_AC_MVA, P_DC_MW : float, optional
+        Power setpoints in MW / MVAr.
+    Transformer_resistance, Transformer_reactance : float, optional
+        Converter transformer impedance in p.u.
+    Phase_Reactor_R, Phase_Reactor_X, Filter : float, optional
+        Phase reactor and filter parameters in p.u.
+    Droop : float, optional
+        DC droop constant when ``DC_type='Droop'``.
+    kV_base : float, optional
+        AC base voltage in kV; defaults to AC node ``kV_base``.
+    MVA_max : float, optional
+        Converter rating in MVA.
+    nConvP : int, optional
+        Number of parallel converter units.
+    polarity, lossa, lossb, losscrect, losscinv : float, optional
+        MMC loss model coefficients.
+    Arm_R : float, optional
+        Arm resistance in ohms (converted internally).
+    Ucmin, Ucmax : float, optional
+        Submodule capacitor voltage limits in p.u.
+    name : str, optional
+        Converter name.
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+
+    Returns
+    -------
+    AC_DC_converter
+        Created converter.
+
+    Notes
+    -----
+    Power-flow control pairings (AC side vs DC side):
+
+    - ``AC_type='Slack'`` with ``DC_type='P'``: no extra setpoints
+    - ``AC_type='PQ'`` with ``DC_type='P'``: requires ``Q_AC_MVA``
+    - ``AC_type='PV'`` with ``DC_type='P'``: requires ``P_AC_MW``
+    - ``DC_type='Droop'`` with ``AC_type='PQ'`` or ``'PV'``: requires
+      ``P_DC_MW`` and ``Droop``
+
+    Examples
+    --------
+    >>> conv = pyf.add_ACDC_converter(grid, ac_node, dc_node, MVA_max=1000)
+    """
     DC_node = _look_up_node(grid, DC_node, ac_or_dc="DC")
     AC_node = _look_up_node(grid, AC_node, ac_or_dc="AC")
 
@@ -420,6 +753,34 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
     return conv
 
 def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r=0.0001, MW_rating=MAX_RATING_PLACEHOLDER,name=None,geometry=None):
+    """Append a DC/DC converter between two DC buses.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    fromNode, toNode : Node_DC or str
+        DC buses.
+    P_MW : float, optional
+        Power setpoint in MW (converted to p.u.).
+    Pset : float, optional
+        Power setpoint in p.u.; defaults from ``MW_rating`` if omitted.
+    R_Ohm : float, optional
+        Series resistance in ohms (converted to p.u.).
+    r : float, optional
+        Series resistance in p.u. when ``R_Ohm`` is not given.
+    MW_rating : float, optional
+        Converter rating in MW.
+    name : str, optional
+        Converter name.
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+
+    Returns
+    -------
+    DCDC_converter
+        Created converter in ``grid.Converters_DCDC``.
+    """
     fromNode = _look_up_node(grid, fromNode, ac_or_dc="DC")
     toNode = _look_up_node(grid, toNode, ac_or_dc="DC")
 
@@ -438,19 +799,36 @@ def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r
 "Zones"
 
 def add_cable_option(grid, cable_types: list = None, name=None, cable_database=None):
-    """Add cable option to grid.
+    """Register an ordered list of cable types for array / CSS optimisation.
+
+    Links multiple :class:`~pyflow_acdc.Classes.Size_selection` lines to one
+    shared rating ladder so the optimiser limits how many distinct types are used
+    (see ``grid.cab_types_allowed``).
 
     Parameters
     ----------
-    grid : grid
-        The grid object
+    grid : Grid
+        Grid to modify.
     cable_types : list, optional
-        List of cable type names. If None, creates empty cable option.
+        Cable names from the bundled database, smallest to largest capacity.
     name : str, optional
-        Name for the cable option
-    cable_database : pd.DataFrame, optional
-        Custom cable database DataFrame. If provided, uses this instead of loading from YAML.
-        If None and cable_type_ini == "pyflow_acdc", loads from YAML database.
+        Option name; auto-generated if omitted.
+    cable_database : pandas.DataFrame, optional
+        Custom cable database; defaults to the bundled YAML database.
+
+    Returns
+    -------
+    Cable_options
+        Created option in ``grid.Cable_options``.
+
+    Examples
+    --------
+    >>> opt = pyf.add_cable_option(grid, [
+    ...     'ABB_Cu_XLPE_95mm2_66kV',
+    ...     'ABB_Cu_XLPE_120mm2_66kV',
+    ...     'ABB_Cu_XLPE_150mm2_66kV',
+    ... ])
+    >>> grid.cab_types_allowed = 3
     """
     cable_option = Cable_options(cable_types, name, cable_database=cable_database)
     grid.Cable_options.append(cable_option)
@@ -458,7 +836,28 @@ def add_cable_option(grid, cable_types: list = None, name=None, cable_database=N
 
 
 def add_RenSource_zone(grid,name):
+    """Create a renewable-source zone for shared availability time series.
 
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    name : str
+        Zone name.
+
+    Returns
+    -------
+    Ren_source_zone
+        Created zone in ``grid.RenSource_zones``.
+
+    See Also
+    --------
+    assign_RenToZone : assign sources to this zone.
+
+    Examples
+    --------
+    >>> zone = pyf.add_RenSource_zone(grid, 'WindZone1')
+    """
     RSZ = Ren_source_zone(name)
     grid.RenSource_zones.append(RSZ)
     grid.RenSource_zones_dic[name]=RSZ.ren_source_num
@@ -467,9 +866,37 @@ def add_RenSource_zone(grid,name):
 
 
 def add_price_zone(grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand_pu=0,curvature_factor=1,positive_price_delta=None):
+    """Append a market / load price zone.
 
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    name : str
+        Zone name (unique key in ``grid.Price_Zones_dic``).
+    price : float
+        Base energy price; also used as default linear cost coefficient ``b``
+        when ``b==1``.
+    import_pu_L, export_pu_G : float, optional
+        Import/export limits relative to base load in p.u.
+    a, b, c : float, optional
+        Quadratic cost coefficients for OPF (``a*P^2 + b*P + c``).
+    import_expand_pu : float, optional
+        Additional import capacity from linked zones in p.u.
+    curvature_factor : float, optional
+        Price-curvature parameter for multi-period models.
+    positive_price_delta : float, optional
+        Minimum price increment for piecewise pricing.
 
+    Returns
+    -------
+    Price_Zone
+        Created zone.
 
+    Examples
+    --------
+    >>> zone = pyf.add_price_zone(grid, 'Zone1', price=50)
+    """
     if b==1:
         b= price
 
@@ -480,7 +907,26 @@ def add_price_zone(grid,name,price,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,impor
     return M
 
 def add_MTDC_price_zone(grid, name,  linked_price_zones=None,pricing_strategy=PricingStrategy.AVG.value):
-    # Initialize the MTDC price_zone and link it to the given price_zones
+    """Create an MTDC aggregate price zone linked to onshore zones.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    name : str
+        MTDC zone name.
+    linked_price_zones : list, optional
+        Names or objects of linked :class:`~pyflow_acdc.Classes.Price_Zone`
+        instances.
+    pricing_strategy : str, optional
+        Aggregation rule (default average; see
+        :class:`~pyflow_acdc.constants.PricingStrategy`).
+
+    Returns
+    -------
+    MTDCPrice_Zone
+        Created zone in ``grid.Price_Zones``.
+    """
     mtdc_price_zone = MTDCPrice_Zone(name=name, linked_price_zones=linked_price_zones, pricing_strategy=pricing_strategy)
     grid.Price_Zones.append(mtdc_price_zone)
 
@@ -488,6 +934,22 @@ def add_MTDC_price_zone(grid, name,  linked_price_zones=None,pricing_strategy=Pr
 
 
 def add_offshore_price_zone(grid,main_price_zone,name):
+    """Create an offshore price zone linked to a main onshore zone.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    main_price_zone : Price_Zone or str
+        Onshore zone to link (name lookup if string).
+    name : str
+        Offshore zone name (often ``'o_<main>'``).
+
+    Returns
+    -------
+    OffshorePrice_Zone
+        Created zone in ``grid.Price_Zones``.
+    """
     if isinstance(main_price_zone, str):
         main_price_zone = next((M for M in grid.Price_Zones if main_price_zone == M.name), None)
 
@@ -499,6 +961,26 @@ def add_offshore_price_zone(grid,main_price_zone,name):
 "Components for optimal power flow"
 
 def add_generators(grid,Gen_csv,curtailment_allowed=1):
+    """Bulk-add generators or renewable sources from a CSV or DataFrame.
+
+    Rows with ``Fueltype`` in ``grid.renewable_types`` call
+    :func:`add_RenSource`; others call :func:`add_gen`. Expected columns include
+    ``Node``/``node``, ``MWmax``, optional ``MVARmin``/``MVARmax``, cost factors,
+    ``Fueltype``, ``geometry``, ``Ren_zone``, and ``np``/``np_gen``/``np_rsgen``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    Gen_csv : str or pandas.DataFrame
+        Generator table path or in-memory data.
+    curtailment_allowed : float, optional
+        Passed as ``min_gamma=1-curtailment_allowed`` for renewable rows.
+
+    Returns
+    -------
+    None
+    """
     if isinstance(Gen_csv, pd.DataFrame):
         Gen_data = Gen_csv
     else:
@@ -624,6 +1106,46 @@ def _look_up_converter(grid, conv):
     return conv_obj
 
 def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+    """Append an AC generator to ``grid.Generators``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_AC or str
+        Connection bus (name or object).
+    gen_name : str, optional
+        Generator name; defaults to ``'gen_<node>'``.
+    price_zone_link : bool, optional
+        If True, use node price zone marginal cost (``lf=node.price``).
+    lf, qf, fc : float, optional
+        Linear, quadratic, and fixed OPF cost coefficients.
+    MWmax, MWmin : float, optional
+        Active power limits in MW.
+    MVArmin, MVArmax : float, optional
+        Reactive limits in MVAr; default to ``±MWmax``.
+    PsetMW, QsetMVA : float, optional
+        Initial setpoints in MW / MVAr.
+    Smax : float, optional
+        Apparent power limit in MVA.
+    fuel_type : str, optional
+        Generation type label (must match ``grid.gen_ac_types``).
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+    installation_cost : float, optional
+        Capital cost for TEP/CSS workflows.
+    np_gen : int, optional
+        Number of parallel units.
+
+    Returns
+    -------
+    Gen_AC
+        Created generator.
+
+    Examples
+    --------
+    >>> gen = pyf.add_gen(grid, 'bus1', MWmax=500, fuel_type='Natural Gas')
+    """
 
     if MVArmax is None:
         MVArmax=MWmax
@@ -670,6 +1192,38 @@ def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax
     return gen
 
 def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+    """Append a DC generator to ``grid.Generators_DC``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_DC or str
+        Connection bus.
+    gen_name : str, optional
+        Generator name.
+    price_zone_link : bool, optional
+        Link marginal cost to node price zone.
+    lf, qf, fc : float, optional
+        OPF cost coefficients.
+    MWmax, MWmin : float, optional
+        Active power limits in MW.
+    PsetMW : float, optional
+        Initial setpoint in MW.
+    fuel_type : str, optional
+        Generation type label.
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+    installation_cost : float, optional
+        Capital cost.
+    np_gen : int, optional
+        Number of parallel units.
+
+    Returns
+    -------
+    Gen_DC
+        Created generator.
+    """
 
     Max_pow_gen=MWmax/grid.S_base
     Min_pow_gen=MWmin/grid.S_base
@@ -705,6 +1259,37 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
 
 
 def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
+    """Add an external-grid equivalent generator at an AC bus.
+
+    Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
+    ``'Slack'``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_AC or str
+        Connection bus.
+    gen_name : str, optional
+        Generator name; defaults to ``'extgrid_<node>'``.
+    price_zone_link : bool, optional
+        Link marginal cost to price zone.
+    lf, qf : float, optional
+        OPF cost coefficients.
+    MVAmax : float, optional
+        Apparent power rating in MVA (also sets ``MWmax`` when omitted).
+    MWmax, MVArmin, MVArmax : float, optional
+        Power limits in MW / MVAr.
+    Allow_sell : bool, optional
+        Allow negative export ( selling ) through the external grid.
+    P_load_MW : float, optional
+        Fixed load component modelled at the external grid in MW.
+
+    Returns
+    -------
+    Gen_AC
+        External-grid generator in ``grid.Generators``.
+    """
     node = _look_up_node(grid, node, ac_or_dc="AC")
     if MWmax is None:
         MWmax=MVAmax
@@ -750,6 +1335,55 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
     return gen
 
 def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0,Qmin=None,Qmax=None,np_rsgen: int = 1):
+    """Append a renewable source to ``grid.RenSources``.
+
+    Optionally assigns renewable zone, price zone, offshore, or MTDC pricing in
+    the same call (delegates to :func:`assign_RenToZone` and
+    :func:`assign_nodeToPrice_Zone`).
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_AC, Node_DC, or str
+        Connection bus.
+    base_MW : float
+        Nameplate active power in MW.
+    ren_source_name : str, optional
+        Source name; defaults to ``'rsgen_<node>'``.
+    available : float, optional
+        Availability factor in ``[0, 1]`` (``PRGi_available``).
+    zone : str, optional
+        Renewable zone name; triggers zone assignment.
+    price_zone : str, optional
+        Price zone name for market coupling.
+    Offshore : bool, optional
+        Create/link offshore price zone when True.
+    MTDC : str, optional
+        MTDC price zone name for offshore HVDC pricing.
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+    ren_type : str, optional
+        Resource type (e.g. ``'Wind'``, ``'Solar'``).
+    min_gamma : float, optional
+        Minimum dispatch fraction (curtailment floor).
+    Qrel : float, optional
+        Reactive capability as fraction of ``base_MW`` when ``Qmin``/``Qmax``
+        omitted (AC only).
+    Qmin, Qmax : float, optional
+        Reactive limits in MVAr (AC only).
+    np_rsgen : int, optional
+        Number of parallel units.
+
+    Returns
+    -------
+    Ren_Source
+        Created source.
+
+    Examples
+    --------
+    >>> rs = pyf.add_RenSource(grid, 'bus1', 100, ren_type='Wind', np_rsgen=2)
+    """
 
     node = _look_up_node(grid, node, ac_or_dc="any")
 
@@ -910,15 +1544,43 @@ def time_series_dict(grid, ts):
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
     """Attach investment-period time series to grid elements from a CSV file.
 
-    Supported ``inv_type`` keys by element: ``Price_Zone`` (Load,
-    curvature_factor, import_expand); ``Node_AC`` / ``Node_DC`` (Load);
-    ``Gen_AC``, ``Ren_Source``, ``Exp_Line_AC``, ``Line_DC``, ``AC_DC_converter``
-    (planned_installation, planned_decommission, max_inv, np_dynamic).
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    inv_data : str or pathlib.Path
+        CSV path (``header=None``). Each column is one series; layout depends on
+        ``associated`` / ``inv_type`` (see Notes).
+    associated : str or Grid element, optional
+        Target element name or object when type/name come from the CSV or args.
+    inv_type : str, optional
+        Investment key (e.g. ``'Load'``, ``'planned_installation'``).
+    name : str, optional
+        Override series label for the column.
 
-    ``inv_data`` must be a CSV path read with ``header=None``. Each column is
-    one series: row 0 = element name (optional if ``associated`` is passed),
-    row 1 = inv_type (optional if ``inv_type`` is passed), remaining rows =
-    period values. All series in the grid must share the same period length.
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Supported ``inv_type`` keys by element:
+
+    - ``Price_Zone``: ``Load``, ``curvature_factor``, ``import_expand``
+    - ``Node_AC`` / ``Node_DC``: ``Load`` (independent nodes only)
+    - ``Gen_AC``, ``Ren_Source``, ``Exp_Line_AC``, ``Line_DC``, ``AC_DC_converter``:
+      ``planned_installation``, ``planned_decommission``, ``max_inv``, ``np_dynamic``
+
+    CSV layouts:
+
+    - Both ``associated`` and ``inv_type`` given: column = period values only.
+    - ``associated`` only: row 0 = ``inv_type``, rows 1+ = values.
+    - ``inv_type`` only: row 0 = element name, rows 1+ = values.
+    - Neither: row 0 = element, row 1 = ``inv_type``, row 2+ = values.
+
+    Special case ``All``/``Load`` applies one load series to all eligible zones
+    and independent nodes. All multi-period series in one import must share the
+    same period count (scalar length-1 series are always allowed).
     """
     if not isinstance(inv_data, (str, Path)):
         raise TypeError("inv_data must be a CSV file path (str or Path)")
@@ -1088,13 +1750,21 @@ def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
         element.investment_decisions[str(element_type)] = np.array(data, dtype=float).tolist()
 
 def add_gen_mix_limits(grid, mix_data):
-    """
-    Load generation-mix limits per period from CSV and store on grid.
+    """Load per-period generation-type mix limits from CSV onto ``grid``.
 
-    Expected CSV format (header=None):
-    - row 0: generation type (e.g. 'wind', 'natural gas')
-    - row 1+: period limits (one value per investment period)
-    - each column is one generation type series
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    mix_data : str or pathlib.Path
+        CSV path (``header=None``). Each column: row 0 = generation type,
+        rows 1+ = limit per investment period.
+
+    Returns
+    -------
+    dict
+        Mapping ``gen_type -> list`` of period limits stored on
+        ``grid.generation_type_limits``.
     """
     if not isinstance(mix_data, (str, Path)):
         raise TypeError("mix_data must be a CSV file path (str or Path)")
@@ -1147,12 +1817,25 @@ def add_gen_mix_limits(grid, mix_data):
 
 
 def create_gen_limit_csv_template(grid, file_path=None):
-    """
-    Create a generation-mix limit template CSV for active generation types.
+    """Write a generation-mix limit CSV template for active types on ``grid``.
 
-    CSV layout per column (header=None expected by add_gen_mix_limits):
-    - row 0: generation type
-    - row 1+: period limits
+    Parameters
+    ----------
+    grid : Grid
+        Grid whose active AC generators and renewable sources define columns.
+    file_path : str, optional
+        Output path; defaults to ``'{grid.name}_gen_mix_limits.csv'``.
+
+    Returns
+    -------
+    str
+        Path to the written CSV (``header=None`` layout for
+        :func:`add_gen_mix_limits`).
+
+    Raises
+    ------
+    ValueError
+        If no active generation types are found.
     """
     if file_path is None:
         file_path = f'{grid.name}_gen_mix_limits.csv'
@@ -1237,13 +1920,27 @@ def create_gen_limit_csv_template(grid, file_path=None):
     return str(path)
 
 def create_inv_csv_template(grid, file_path=None, exclude=None):
-    """
-    Create an investment-series template CSV for the current grid.
+    """Write an investment-series CSV template from current ``grid`` decisions.
 
-    CSV layout per column (header=None expected by add_inv_series):
-    - row 0: element name
-    - row 1: inv_type
-    - row 2+: current period data from investment_decisions
+    Parameters
+    ----------
+    grid : Grid
+        Grid whose ``investment_decisions`` define template columns.
+    file_path : str, optional
+        Output path; defaults to ``'{grid.name}_inv_series.csv'``.
+    exclude : list, optional
+        ``inv_type`` keys to omit from the template.
+
+    Returns
+    -------
+    str
+        Path to the written CSV (``header=None`` layout for
+        :func:`add_inv_series`).
+
+    Raises
+    ------
+    ValueError
+        If no elements with investment decisions are found.
     """
     if file_path is None:
         file_path = f'{grid.name}_inv_series.csv'
@@ -1309,6 +2006,58 @@ def create_inv_csv_template(grid, file_path=None, exclude=None):
     return str(path)
 
 def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None):
+    """Import operational time-series columns onto ``grid.Time_series``.
+
+    Each column becomes a :class:`~pyflow_acdc.Classes.TimeSeries` entry and is
+    wired to the matching grid element via :func:`time_series_dict`. NaN values
+    are replaced with zero. Sets ``grid.Time_series_ran = False``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    Time_Series_data : pandas.DataFrame or array-like
+        Time-series table; converted to a one-column DataFrame if array-like
+        (requires ``name``).
+    associated : str, optional
+        Target element name when the type and/or name are fixed by arguments.
+    TS_type : str, optional
+        Series type label (see Notes).
+    name : str, optional
+        Column label when ``Time_Series_data`` is not a DataFrame.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    **Accepted ``TS_type`` values** (object names must be unique across classes):
+
+    - ``'Load'`` — load factor on :class:`~pyflow_acdc.Classes.Price_Zone`,
+      :class:`~pyflow_acdc.Classes.Node_AC`, :class:`~pyflow_acdc.Classes.Node_DC`
+      (updates ``PLi_factor``)
+    - ``'price'`` — energy price on price zones or nodes
+    - ``'WPP'``, ``'OWPP'``, ``'SF'``, ``'REN'``, ``'Solar'`` — renewable
+      availability on :class:`~pyflow_acdc.Classes.Ren_source_zone` or
+      :class:`~pyflow_acdc.Classes.Ren_Source`` (``PRGi_available``)
+    - Price-zone-only cost/limit series: ``'a_CG'``, ``'b_CG'``, ``'c_CG'``,
+      ``'PGL_min'``, ``'PGL_max'``
+
+    **CSV column layout** (each column is one series; row 0 is the column header
+    when read by pandas):
+
+    1. ``associated`` and ``TS_type`` both given — rows 0+ are numeric samples.
+    2. ``associated`` only — row 0 = ``TS_type``, rows 1+ = samples.
+    3. ``TS_type`` only — row 0 = element name, rows 1+ = samples.
+    4. Neither given — row 0 = element name, row 1 = ``TS_type``, row 2+ =
+       samples.
+
+    Examples
+    --------
+    >>> load = pd.DataFrame({'Load_n1': [0.95, 0.75, 0.84]})
+    >>> pyf.add_TimeSeries(grid, load, associated='node1', TS_type='Load')
+    """
     # Check if Time_Series_data is a numpy array and convert to pandas DataFrame if needed
     if not isinstance(Time_Series_data, pd.DataFrame):
         TS = pd.DataFrame(Time_Series_data, columns=[name])
@@ -1356,6 +2105,33 @@ def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None
 
 
 def assign_RenToZone(grid,ren_source_name,new_zone_name):
+    """Move a renewable source into ``new_zone_name``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid containing the source and zones.
+    ren_source_name : str
+        :class:`~pyflow_acdc.Classes.Ren_Source` name.
+    new_zone_name : str
+        Target :class:`~pyflow_acdc.Classes.Ren_source_zone` name.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the zone or source is not found.
+
+    Examples
+    --------
+    >>> pyf.assign_RenToZone(grid, 'wind1', 'WindZone1')
+    >>> pyf.assign_RenToZone(grid, 'wind2', 'WindZone1')
+
+    Or assign via :func:`add_RenSource` using ``zone='WindZone1'``.
+    """
     new_zone = None
     old_zone = None
     ren_source_to_reassign = None
@@ -1399,52 +2175,110 @@ def assign_RenToZone(grid,ren_source_name,new_zone_name):
 "Assigning components to zones"
 
 def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_load=True):
-        """ Assign node to a new price_zone and remove it from its previous price_zone """
-        acdc_norm = ACDC if ACDC in ('AC', 'DC') else 'any'
-        nodes_attr = 'nodes_DC' if acdc_norm == 'DC' else 'nodes_AC'
-        node = _look_up_node(grid, node, ac_or_dc=acdc_norm)
-        new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+    """Assign a bus to a price zone (removes it from the previous zone).
 
-        # Remove node from its old price_zone
-        old_price_zone = None
-        for price_zone in grid.Price_Zones:
-            nodes = getattr(price_zone, nodes_attr)
-            if node in nodes:
-                old_price_zone = price_zone
-                break
-        if old_price_zone is not None:
-            old_nodes = getattr(old_price_zone, nodes_attr)
-            setattr(old_price_zone, nodes_attr, [n for n in old_nodes if n is not node])
-            if hasattr(old_price_zone, "recalc_PLi_base_and_total"):
-                old_price_zone.recalc_PLi_base_and_total()
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_AC, Node_DC, or str
+        Bus to assign.
+    new_price_zone_name : str
+        Target :class:`~pyflow_acdc.Classes.Price_Zone` name.
+    ACDC : str, optional
+        ``'AC'``, ``'DC'``, or ``'any'`` for name lookup side.
+    link_load : bool, optional
+        Set ``node.PLi_linked`` on the bus.
 
-        # Add node to the new price_zone
-        new_price_zone_nodes = getattr(new_price_zone, nodes_attr)
-        if node not in new_price_zone_nodes:
-            new_price_zone_nodes.append(node)
-            node.PZ = new_price_zone.name
-            node.price = new_price_zone.price
-            node.PLi_linked = link_load
-            if hasattr(new_price_zone, "recalc_PLi_base_and_total"):
-                new_price_zone.recalc_PLi_base_and_total()
+    Returns
+    -------
+    None
+
+    Examples
+    --------
+    >>> pyf.assign_nodeToPrice_Zone(grid, 'bus1', 'Zone1', ACDC='AC')
+    """
+    acdc_norm = ACDC if ACDC in ('AC', 'DC') else 'any'
+    nodes_attr = 'nodes_DC' if acdc_norm == 'DC' else 'nodes_AC'
+    node = _look_up_node(grid, node, ac_or_dc=acdc_norm)
+    new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+
+    # Remove node from its old price_zone
+    old_price_zone = None
+    for price_zone in grid.Price_Zones:
+        nodes = getattr(price_zone, nodes_attr)
+        if node in nodes:
+            old_price_zone = price_zone
+            break
+    if old_price_zone is not None:
+        old_nodes = getattr(old_price_zone, nodes_attr)
+        setattr(old_price_zone, nodes_attr, [n for n in old_nodes if n is not node])
+        if hasattr(old_price_zone, "recalc_PLi_base_and_total"):
+            old_price_zone.recalc_PLi_base_and_total()
+
+    # Add node to the new price_zone
+    new_price_zone_nodes = getattr(new_price_zone, nodes_attr)
+    if node not in new_price_zone_nodes:
+        new_price_zone_nodes.append(node)
+        node.PZ = new_price_zone.name
+        node.price = new_price_zone.price
+        node.PLi_linked = link_load
+        if hasattr(new_price_zone, "recalc_PLi_base_and_total"):
+            new_price_zone.recalc_PLi_base_and_total()
 
 def assign_ConvToPrice_Zone(grid, conv, new_price_zone_name):
-        """ Assign converter to a new price_zone and remove it from its previous price_zone """
-        new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
-        conv_obj = _look_up_converter(grid, conv)
+    """Assign an AC/DC converter to a price zone.
 
-        # Remove converter from its old price_zone, if any
-        for price_zone in grid.Price_Zones:
-            if conv_obj in price_zone.ConvACDC:
-                price_zone.ConvACDC = [c for c in price_zone.ConvACDC if c is not conv_obj]
-                break
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    conv : AC_DC_converter or str
+        Converter object or name.
+    new_price_zone_name : str
+        Target price zone name.
 
-        # Add converter to the new price_zone
-        if conv_obj not in new_price_zone.ConvACDC:
-            new_price_zone.ConvACDC.append(conv_obj)
+    Returns
+    -------
+    None
+    """
+    new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+    conv_obj = _look_up_converter(grid, conv)
+
+    # Remove converter from its old price_zone, if any
+    for price_zone in grid.Price_Zones:
+        if conv_obj in price_zone.ConvACDC:
+            price_zone.ConvACDC = [c for c in price_zone.ConvACDC if c is not conv_obj]
+            break
+
+    # Add converter to the new price_zone
+    if conv_obj not in new_price_zone.ConvACDC:
+        new_price_zone.ConvACDC.append(conv_obj)
 
 def assign_lineToCable_options(grid, line, new_cable_option_name):
-    """ Assign line to a new cable_type and remove it from its previous cable_type """
+    """Link a sizing line to a :class:`~pyflow_acdc.Classes.Cable_options` entry.
+
+    Removes the line from any previous option and copies ``cable_types`` from
+    the target option onto the line.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid containing the line and options.
+    line : Size_selection or str
+        CT line object or line name in ``grid.lines_AC_ct``.
+    new_cable_option_name : str
+        Name of the target cable option.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the line or cable option is not found.
+    """
     new_cable_option = None
     old_cable_option = None
 
@@ -1488,39 +2322,33 @@ def assign_lineToCable_options(grid, line, new_cable_option_name):
 
 
 def expand_cable_database(data, format='yaml', save_yaml=False):
-    """
-    Expand the cable database by adding new cable specifications.
+    """Merge new cable entries into the bundled AC/DC cable database.
 
-    Args:
-        data: Either a path to YAML file, DataFrame, or dictionary with cable specifications
-        format: 'yaml' or 'pandas' (default: 'yaml')
-        output_path: Optional path to save the new YAML file (default: None)
-        # Cable specifications
+    Parameters
+    ----------
+    data : str, pathlib.Path, dict, or pandas.DataFrame
+        New cable specs. For ``format='yaml'``: YAML file path or dict keyed by
+        cable name. For ``format='pandas'``: DataFrame or CSV path (index =
+        cable name).
+    format : str, optional
+        ``'yaml'`` or ``'pandas'``.
+    save_yaml : bool, optional
+        If True, write each cable as ``Cable_database/<name>.yaml``.
 
-    Units:
-       - Resistance: ohm/km
-       - Inductance: mH/km
-       - Capacitance: uF/km
-       - Conductance: uS/km
-       - Current rating: A
-       - Power rating: MVA
-       - Nominal voltage: kV
-       - conductor_size: mm^2
-       - Type: AC or DC
+    Returns
+    -------
+    None
 
-    Example YAML format:
+    Notes
+    -----
+    Expected fields per cable (units):
 
-    NEW_CABLE_TYPE:
-        R_Ohm_km: 0.001
-        L_mH_km: 0.001
-        C_uF_km: 0.001
-        G_uS_km: 0.001
-        A_rating: 333
-        Nominal_voltage_kV: 60
-        MVA_rating: sqrt(3)*Nominal_voltage_kV*A_rating/1000
-        conductor_size: 100
-        Type: AC or DC
-        Reference: REFERENCE
+    - ``R_Ohm_km`` (ohm/km), ``L_mH_km`` (mH/km), ``C_uF_km`` (µF/km),
+      ``G_uS_km`` (µS/km)
+    - ``A_rating`` (A), ``Nominal_voltage_kV`` (kV), ``MVA_rating`` (MVA)
+    - ``conductor_size`` (mm²), ``Type`` (``'AC'`` or ``'DC'``), ``Reference``
+
+    See also :func:`import_orbit_cables` for bulk import from ORBIT libraries.
     """
 
     # Get the path to the Cable_database directory
@@ -1598,22 +2426,31 @@ def import_orbit_cables(
     save_yaml=False,
     source_url='https://github.com/NLRWindSystems/ORBIT/tree/dev/library/cables',
 ):
-    """
-    Import ORBIT-style cable library data into pyflow cable database.
+    """Import ORBIT-style cable library data into the PyFlow cable database.
 
-    Args:
-        data: pandas DataFrame, CSV path, directory containing CSV files, or URL.
-              If None, source_url is used.
-        column_map: optional dict mapping pyflow field names to source columns
-            (name, R_Ohm_km, L_mH_km, C_uF_km, G_uS_km, A_rating,
-            Nominal_voltage_kV, conductor_size, Type, Cost_per_km, Reference).
-        default_type: fallback cable type when not provided ('AC' or 'DC').
-        name_prefix: prefix used if a source row has no usable name.
-        save_yaml: if True, also save imported entries as YAML files.
-        source_url: ORBIT GitHub directory URL used when data is None.
+    Parameters
+    ----------
+    data : pandas.DataFrame, str, or None, optional
+        Source table, CSV path, directory of CSV files, or URL. If None,
+        ``source_url`` is fetched.
+    column_map : dict, optional
+        Maps PyFlow field names to source columns (``name``, ``R_Ohm_km``,
+        ``L_mH_km``, ``C_uF_km``, ``G_uS_km``, ``A_rating``,
+        ``Nominal_voltage_kV``, ``conductor_size``, ``Type``, ``Cost_per_km``,
+        ``Reference``).
+    default_type : str, optional
+        Fallback cable type when missing (``'AC'`` or ``'DC'``).
+    name_prefix : str, optional
+        Prefix for auto-generated cable names.
+    save_yaml : bool, optional
+        If True, persist imported entries as YAML files.
+    source_url : str, optional
+        ORBIT GitHub directory used when ``data`` is None.
 
-    Returns:
-        DataFrame with pyflow-standard cable schema, indexed by cable name.
+    Returns
+    -------
+    pandas.DataFrame
+        Normalised cable schema indexed by cable name.
     """
 
     def _read_text(url):

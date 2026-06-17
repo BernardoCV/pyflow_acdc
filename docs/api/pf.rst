@@ -212,7 +212,7 @@ The sequential solver will compare the :math:`P_{conv}` of converters in the AC 
 
 
 
-.. figure:: ../images/Sequential_mod_dark.svg
+.. themed-figure:: sequential_mod
    :alt: Sequential AC/DC Power Flow
    :align: center
 

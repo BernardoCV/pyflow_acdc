@@ -15,7 +15,7 @@ AC System Modelling
 AC node
 ^^^^^^^
 
-.. figure:: ../images/AC_node_model.svg
+.. themed-figure:: ac_node_model
    :width: 250
    :alt: AC node model
    :align: center
@@ -81,7 +81,7 @@ Example Usage:
 AC branch
 ^^^^^^^^^
 
-.. figure:: ../images/AC_line_pi.svg
+.. themed-figure:: ac_line_pi
    :width: 400
    :alt: AC line model
    :align: center
@@ -164,7 +164,7 @@ In transmision expansion planning, each branch subject to modification is modele
 AC expandable branch
 ~~~~~~~~~~~~~~~~~~~~
 
-.. figure:: ../images/AC_ybusbranch.svg
+.. themed-figure:: ac_ybusbranch
    :width: 400
    :alt: AC expandable branch model
    :align: center
@@ -227,7 +227,7 @@ Note:
 AC reconducting branch
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. figure:: ../images/AC_reconducting.svg
+.. themed-figure:: ac_reconducting
    :width: 400
    :alt: AC expandable branch model
    :align: center
@@ -292,7 +292,7 @@ AC conductor size selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-.. figure:: ../images/AC_array.svg
+.. themed-figure:: ac_array
    :width: 400
    :alt: AC expandable branch model
    :align: center
@@ -391,7 +391,7 @@ DC System Modelling
 DC node
 ^^^^^^^
 
-.. figure:: ../images/DC_node_model.svg
+.. themed-figure:: dc_node_model
    :width: 250
    :alt: DC node model
    :align: center
@@ -438,7 +438,7 @@ Example Usage:
 DC line
 ^^^^^^^
 
-.. figure:: ../images/DC_line.svg
+.. themed-figure:: dc_line
    :width: 400
    :alt: DC line model
    :align: center
@@ -485,7 +485,7 @@ Example Usage:
 DC line expansion
 ^^^^^^^^^^^^^^^^^
 
-.. figure:: ../images/DC_expbranch.svg
+.. themed-figure:: dc_expbranch
    :width: 400
    :alt: DC expansion model
    :align: center
@@ -510,7 +510,7 @@ DCDC converter
 
 
 
-.. figure:: ../images/DCDC_conv.svg
+.. themed-figure:: dcdc_conv
    :width: 400
    :alt: DCDC converter model
    :align: center
@@ -594,28 +594,28 @@ Inputs can be given in MW or pu. For pu use the ``r`` and ``Pset`` parameters. F
 ACDC Converter
 --------------
 
-.. figure:: ../images/assymetrical.svg
+.. themed-figure:: assymetrical
    :width: 400
    :alt: Asymmetrical monopolar converter configuration
    :align: center
 
    Asymmetrical monopolar converter configuration
 
-.. figure:: ../images/symetrical.svg
+.. themed-figure:: symetrical
    :width: 400
    :alt: Symmetrical monopolar converter configuration
    :align: center
 
    Symmetrical monopolar converter configuration
 
-.. figure:: ../images/bipolar_exp.svg
+.. themed-figure:: bipolar_exp
    :width: 400
    :alt: Bipolar converter configuration
    :align: center
 
    Bipolar converter configuration
 
-.. figure:: ../images/Converter_model.svg
+.. themed-figure:: converter_model
    :width: 400
    :alt: Equivalent converter model
    :align: center
@@ -684,7 +684,7 @@ Class Reference: :class:`pyflow_acdc.Classes.AC_DC_converter`
 Renewable Source
 ----------------
 
-.. figure:: ../images/Ren_sources_model.svg
+.. themed-figure:: ren_sources_model
    :width: 250
    :alt: Renewable source model
    :align: center
@@ -708,6 +708,12 @@ For renewables sources connected to AC nodes:
         (\gamma_{rg} P_{rg})^2 + Q_{rg}^2 \leq S_{rg,rating}^{2^{max}} & \qquad \forall g \in \mathcal{RG}_{ac}
     \end{align}
 
+.. themed-figure:: ren_source_limits
+   :width: 250
+   :alt: Renewable source limits
+   :align: center
+
+   Renewable source limits
 
 Class Reference: :class:`pyflow_acdc.Classes.RenSource`
 
@@ -721,22 +727,22 @@ Class Reference: :class:`pyflow_acdc.Classes.RenSource`
    * - Type
      - Figure for folium plotting
    * - wind
-     - .. image:: ../images/wind.svg
+     - .. image:: ../images/modelling/icons/wind.svg
          :width: 100
          :alt: Wind source icon
          :align: center
    * - offshore wind
-     - .. image:: ../images/offshore_wind.svg
+     - .. image:: ../images/modelling/icons/offshore_wind.svg
          :width: 100
          :alt: Wind source icon
          :align: center
    * - onshore wind
-     - .. image:: ../images/onshore_wind.svg
+     - .. image:: ../images/modelling/icons/onshore_wind.svg
          :width: 100
          :alt: Wind source icon
          :align: center
    * - solar
-     - .. image:: ../images/solar.svg
+     - .. image:: ../images/modelling/icons/solar.svg
          :width: 100
          :alt: Solar source icon
          :align: center
@@ -748,7 +754,7 @@ Class Reference: :class:`pyflow_acdc.Classes.RenSource`
 Generator
 ---------
 
-.. figure:: ../images/Gen_model.svg
+.. themed-figure:: gen_model
    :width: 250
    :alt: Generator model
    :align: center
@@ -764,7 +770,7 @@ Generator
         P_{g}^2+Q_{g}^2 \leq   S_{g,rating}^{2} & \qquad \forall g \in \mathcal{G}_{ac}  
     \end{align}
 
-.. figure:: ../images/Gen_limits.svg
+.. themed-figure:: gen_limits
    :width: 250
    :alt: Generator limits
    :align: center
@@ -784,85 +790,85 @@ Class Reference: :class:`pyflow_acdc.Classes.Gen_AC`
      - Figure for folium plotting
      - Default cost
    * - hydro
-     - .. image:: ../images/hydro.svg
+     - .. image:: ../images/modelling/icons/hydro.svg
           :width: 100
           :alt: Hydro source icon
           :align: center
      -
    * - nuclear
-     - .. image:: ../images/nuclear.svg
+     - .. image:: ../images/modelling/icons/nuclear.svg
           :width: 100
           :alt: Nuclear source icon
           :align: center
      -
    * - hard coal
-     - .. image:: ../images/coal.svg
+     - .. image:: ../images/modelling/icons/coal.svg
           :width: 100
           :alt: Hard Coal source icon
           :align: center
      -
    * - solid biomass
-     - .. image:: ../images/Solid_Biomass.svg
+     - .. image:: ../images/modelling/icons/Solid_Biomass.svg
           :width: 100
           :alt: Solid Biomass source icon
           :align: center
      -
    * - geothermal
-     - .. image:: ../images/Geothermal.svg
+     - .. image:: ../images/modelling/icons/Geothermal.svg
           :width: 100
           :alt: Geothermal source icon
           :align: center
      -
    * - lignite
-     - .. image:: ../images/Lignite.svg
+     - .. image:: ../images/modelling/icons/Lignite.svg
           :width: 100
           :alt: Lignite source icon
           :align: center
      -
    * - natural gas
-     - .. image:: ../images/Natural_Gas.svg
+     - .. image:: ../images/modelling/icons/Natural_Gas.svg
           :width: 100
           :alt: Natural Gas source icon
           :align: center
      -
    * - oil
-     - .. image:: ../images/Oil.svg
+     - .. image:: ../images/modelling/icons/Oil.svg
           :width: 100
           :alt: Oil source icon
           :align: center
      -
    * - waste
-     - .. image:: ../images/Waste.svg
+     - .. image:: ../images/modelling/icons/Waste.svg
           :width: 100
           :alt: Waste source icon
           :align: center
      -
    * - biogas
-     - .. image:: ../images/Biogas.svg
+     - .. image:: ../images/modelling/icons/Biogas.svg
           :width: 100
           :alt: Biogas source icon
           :align: center
      -
    * - ccgt
-     - .. image:: ../images/CCGT.svg
+     - .. image:: ../images/modelling/icons/CCGT.svg
           :width: 100
           :alt: CCGT source icon
           :align: center
      -
    * - diesel
-     - .. image:: ../images/diesel.svg
+     - .. image:: ../images/modelling/icons/diesel.svg
           :width: 100
           :alt: Diesel source icon
           :align: center
      -
    * - shunt reactor
-     - .. image:: ../images/reactor.svg
+     - .. image:: ../images/modelling/icons/reactor.svg
           :width: 100
           :alt: Shunt reactor source icon
           :align: center
      -
    * - other
-     - .. image:: ../images/gen.svg
+     - .. image:: ../images/modelling/icons/gen.svg
           :width: 100
           :alt: Other source icon
           :align: center
@@ -877,7 +883,7 @@ Price Zone
 
 
 
-.. figure:: ../images/prize_zone_model.svg
+.. themed-figure:: prize_zone_model
    :width: 400
    :alt: Price zone model
    :align: center

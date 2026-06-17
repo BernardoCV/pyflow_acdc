@@ -22,14 +22,40 @@ __all__ = [
 
 
 def pol2cart(r, theta):
-    """Convert polar coordinates to Cartesian. Returns ``(x, y)``."""
+    """Convert polar coordinates to Cartesian.
+
+    Parameters
+    ----------
+    r : float
+        Radius.
+    theta : float
+        Angle in radians.
+
+    Returns
+    -------
+    tuple
+        ``(x, y)``.
+    """
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     return x, y
 
 
 def pol2cartz(r, theta):
-    """Convert polar coordinates to a complex number ``x + jy``."""
+    """Convert polar coordinates to a complex number.
+
+    Parameters
+    ----------
+    r : float
+        Radius.
+    theta : float
+        Angle in radians.
+
+    Returns
+    -------
+    complex
+        ``x + j y``.
+    """
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     z = x + 1j * y
@@ -37,14 +63,36 @@ def pol2cartz(r, theta):
 
 
 def cart2pol(x, y):
-    """Convert Cartesian coordinates to polar. Returns ``(rho, theta)``."""
+    """Convert Cartesian coordinates to polar.
+
+    Parameters
+    ----------
+    x, y : float
+        Cartesian components.
+
+    Returns
+    -------
+    tuple
+        ``(rho, theta)`` with ``theta`` in radians.
+    """
     rho = np.sqrt(x**2 + y**2)
     theta = np.arctan2(y, x)
     return rho, theta
 
 
 def cartz2pol(z):
-    """Convert a complex number to polar coordinates. Returns ``(r, theta)``."""
+    """Convert a complex number to polar coordinates.
+
+    Parameters
+    ----------
+    z : complex
+        Complex value ``x + j y``.
+
+    Returns
+    -------
+    tuple
+        ``(r, theta)`` with ``theta`` in radians.
+    """
     r = np.abs(z)
     theta = np.angle(z)
     return r, theta
@@ -170,9 +218,10 @@ def cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
 def grid_state(grid):
     """Return aggregate load and generation bounds for the current grid.
 
-    Sums AC+DC load and the min/max dispatchable generation (conventional
-    generators and renewable sources, accounting for unit counts and external
-    grids).
+    Parameters
+    ----------
+    grid : Grid
+        Network to summarise.
 
     Returns
     -------
@@ -204,13 +253,16 @@ def grid_state(grid):
 
 
 def analyse_grid(grid):
-    """Detect enabled grid features and store them on the grid object.
+    """Detect enabled grid features and store boolean flags on ``grid``.
 
-    Sets boolean flags on ``grid`` describing which subsystems/features are
-    present (``ACmode``, ``DCmode``, ``TEP_AC``, ``REC_AC``, ``TAP_tf``,
-    ``CT_AC``, ``CFC``, ``CDC``, ``GPR``, ``rs_GPR``, ``act_gen``). Called at the
-    start of the power-flow / OPF / TEP entry points to configure model
-    building.
+    Sets ``ACmode``, ``DCmode``, ``TEP_AC``, ``REC_AC``, ``TAP_tf``, ``CT_AC``,
+    ``CFC``, ``CDC``, ``GPR``, ``rs_GPR``, and ``act_gen``. Called at the start
+    of power-flow, OPF, and TEP entry points.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network to analyse (mutated in place).
 
     Returns
     -------
@@ -251,11 +303,19 @@ def analyse_grid(grid):
 
 
 def current_fuel_type_distribution(grid, output="df"):
-    """
-    Build current generation-type distribution summary.
+    """Summarise installed capacity by generation type (Static TEP style).
 
-    The summary follows Static TEP style normalization (lowercase types) and
-    includes both conventional generators and renewable sources.
+    Parameters
+    ----------
+    grid : Grid
+        Network whose generators and renewable sources are counted.
+    output : str, optional
+        ``'df'`` for a :class:`pandas.DataFrame`, ``'dict'`` for a nested dict.
+
+    Returns
+    -------
+    pandas.DataFrame or dict
+        Rows per fuel/technology plus ``'All'`` and system-load summary.
     """
 
     def _norm(t):

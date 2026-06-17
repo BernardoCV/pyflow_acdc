@@ -84,7 +84,7 @@ Network map (static topology)
 
        pyf.plot_folium(grid)
 
-   .. figure:: ../images/north_sea_folium.svg
+   .. themed-figure:: north_sea_folium
       :alt: Example of the Folium map.
       :align: center
       :width: 80%

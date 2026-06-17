@@ -1,10 +1,9 @@
 Grid Analysis
 =============
 
-This module provides utility and grid-analysis helpers used by power-flow and
-optimization workflows.
-
-Functions are found in `pyflow_acdc.grid_analysis`.
+Utility and analysis helpers re-exported from :mod:`pyflow_acdc.grid_analysis`
+(also available via :mod:`pyflow_acdc.grid_modifications`). Used by power-flow
+and optimisation workflows.
 
 Coordinate Conversion Utilities
 -------------------------------

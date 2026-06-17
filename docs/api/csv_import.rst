@@ -12,7 +12,7 @@ In this page the column names for importing data from CSV files are described. I
    :noindex:
 
 
-.. figure:: ../images/Stagg5MATACDC.svg
+.. themed-figure:: stagg5
    :alt: Case 5 Stagg
    :align: center
 

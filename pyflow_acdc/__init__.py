@@ -82,6 +82,7 @@ __all__ = [
     'pol2cartz',
     'cartz2pol',
     'import_orbit_cables',
+    'expand_cable_database',
     'current_fuel_type_distribution',
     'initialize_pyflowacdc',
     'create_inv_csv_template',

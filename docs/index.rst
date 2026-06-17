@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. figure:: images/logo_dark.svg
+.. themed-figure:: pyflowacdc_logo
    :align: right
    :width: 300px
 
@@ -14,9 +14,9 @@ Welcome to PyFlow ACDC's documentation!
 
 This is a  python-based tool for the design and analysis of hybrid AC/DC grids
 
-PyFlow ACDC is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_. By `CITCEA-UPC <https://www.linkedin.com/company/citcea>`_ and `Youwind <https://youwindrenewables.com/>`_.
+PyFlow ACDC is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_ by `CITCEA-UPC <https://www.linkedin.com/company/citcea>`_ in collaboration with `Youwind <https://youwindrenewables.com/>`_.
 
-.. figure:: images/ADOreD_logo_colours.png
+.. figure:: images/logos/ADOreD_logo_colours.png
    :align: right
    :width: 250px
 
@@ -46,6 +46,7 @@ API Documentation
    api/grid
    api/csv_import
    api/grid_mod
+   api/cable_database
    api/grid_analysis
    api/results
 

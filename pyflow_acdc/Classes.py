@@ -3264,7 +3264,7 @@ class AC_DC_converter:
             lossa:float=1.103,lossb:float= 0.887,losscrect:float=2.885,losscinv:float=4.371,Ucmin: float = 0.85, Ucmax: float = 1.2,arm_res:float=0.001, S_base:float=100, name=None):
         self.ConvNumber = AC_DC_converter.ConvNumber
         AC_DC_converter.ConvNumber += 1
-        # type: (1=P, 2=droop, 3=Slack)
+        # DC_type codes: 1=P, 2=droop, 3=Slack
         self.S_base = S_base
         self._np_conv= nConvP
 
