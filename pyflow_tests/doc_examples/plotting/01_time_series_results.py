@@ -11,4 +11,5 @@ pyf.add_TimeSeries(grid,TS_MK)
 TS_wl = pd.read_csv(NS_MTDC_WIND_LOAD_URL)
 pyf.add_TimeSeries(grid,TS_wl)
 times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)  
+#show is set to False for testing suit, change it to True to see the plot
 pyf.plot_TS_res(grid, start, end, save_format='svg', show=False)

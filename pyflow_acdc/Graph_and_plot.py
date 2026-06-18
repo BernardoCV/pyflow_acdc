@@ -663,7 +663,7 @@ def plot_neighbour_graph(grid, node=None, base_node_size=10, proximity=1):
     plot_graph(grid, base_node_size=base_node_size, G=Gn)
 
 
-def plot_graph(Grid,text='inPu',base_node_size=10,G=None):
+def plot_graph(Grid,text='inPu',base_node_size=10,G=None,show=True):
 
     if G is None:
         G = Grid.Graph_toPlot
@@ -836,7 +836,8 @@ def plot_graph(Grid,text='inPu',base_node_size=10,G=None):
 
 
     # Display plot
-    pio.show(fig)
+    if show:
+        pio.show(fig)
     s=1
     return fig
 

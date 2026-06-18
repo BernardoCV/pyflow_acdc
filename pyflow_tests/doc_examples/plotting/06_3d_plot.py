@@ -8,5 +8,5 @@ cable_index = {name: idx for idx, name in enumerate(CABLE_TYPES_OFF66)}
 for line in grid.lines_AC_ct:
     line.cable_types = list(CABLE_TYPES_OFF66)
     line.active_config = cable_index.get(MORAY_EAST_CABLE_DECISIONS.get(str(line.name), ""), -1)
-
-pyf.plot_3D(grid, show=True)
+#show is set to False for testing suit, change it to True to see the plot
+pyf.plot_3D(grid, show=False)
