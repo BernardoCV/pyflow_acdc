@@ -16,4 +16,3 @@ flag, high_flow, model_MIP, feasible_solutions_MIP = pyf.MIP_path_graph(
     tee=False,
     callback=False,
 )
-pyf.ACDC_TEP.plot_feasible_solutions(feasible_solutions_MIP, "MIP", show=False)

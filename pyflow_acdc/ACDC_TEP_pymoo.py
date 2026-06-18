@@ -411,7 +411,7 @@ class TEPOuterProblem(ElementwiseProblem):
 
 
 
-def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='GA',time_limit=DEFAULT_TIME_LIMIT,tee=False,n_gen=10):
+def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='GA',time_limit=DEFAULT_TIME_LIMIT,tee=False,n_gen=10,show_plot=False):
 
 
     analyse_grid(grid)
@@ -438,11 +438,11 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,disc
                   verbose=tee)
 
     if objective_type == 'sum':
-        return _handle_single_objective_result(res, problem, grid)
+        return _handle_single_objective_result(res, problem, grid, show_plot=show_plot)
     else:
-        return _handle_pareto_result(res, problem, grid,pareto_result='balanced')
+        return _handle_pareto_result(res, problem, grid, pareto_result='balanced', show_plot=show_plot)
 
-def _handle_single_objective_result(res, problem, grid):
+def _handle_single_objective_result(res, problem, grid,show_plot=False):
     """Handle single-objective optimization results"""
     # Export best solution to grid
     # Export best solution to grid
@@ -475,8 +475,10 @@ def _handle_single_objective_result(res, problem, grid):
     else:
         print("mean Pyomo time: N/A (no runs)")
     val = [e.opt.get("F")[0] for e in res.history]
-    plt.plot(np.arange(len(val)), val)
-    plt.show()
+    if show_plot:
+        plt.plot(np.arange(len(val)), val)
+        plt.show()
+        plt.close()
     timing_info = {
         "create": problem.t_modelcreate,  # Model creation time (negligible for pymoo)
         "solve": res.exec_time,  # Optimization time
@@ -493,7 +495,7 @@ def _handle_single_objective_result(res, problem, grid):
     # Return same format as original: model, results, timing_info, solver_stats
     return problem, res, timing_info, solver_stats
 
-def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
+def _handle_pareto_result(res, problem, grid, pareto_result='balanced', show_plot=False):
     """Handle multi-objective optimization results"""
     # Get Pareto front
     pareto_front = res.F  # Shape: (n_solutions, 2)
@@ -534,12 +536,14 @@ def _handle_pareto_result(res, problem, grid,pareto_result='balanced'):
     pareto_capex = pf_sorted[:, 0] / 1_000_000
     pareto_opex  = pf_sorted[:, 1] / (1000 * problem.present_value)
 
-    plt.scatter(capex_all, opex_all, s=10, alpha=0.25, color='gray')
-    plt.plot(pareto_capex, pareto_opex, '-o', markersize=4, linewidth=1.5, color='r')
-    plt.xlabel('CAPEX (M€)')
-    plt.ylabel('NPV OPEX (k€)')
-    plt.title('Pareto Front')
-    plt.show()
+    if show_plot:
+        plt.scatter(capex_all, opex_all, s=10, alpha=0.25, color='gray')
+        plt.plot(pareto_capex, pareto_opex, '-o', markersize=4, linewidth=1.5, color='r')
+        plt.xlabel('CAPEX (M€)')
+        plt.ylabel('NPV OPEX (k€)')
+        plt.title('Pareto Front')
+        plt.show()
+        plt.close()
     timing_info = {
         "create": problem.t_modelcreate,
         "solve": res.exec_time,
