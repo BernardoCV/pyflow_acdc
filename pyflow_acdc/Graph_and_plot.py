@@ -621,17 +621,46 @@ def calculate_positions(G, Grid):
     return pos
 
 
-def plot_neighbour_graph(grid,node=None,node_name=None,base_node_size=10, proximity=1):
+def plot_neighbour_graph(grid, node=None, base_node_size=10, proximity=1):
+    """Plot the ego graph of a node and its neighbours.
+
+    Builds a subgraph within ``proximity`` hops of ``node`` on ``grid.Graph_toPlot``
+    and opens an interactive Plotly view via :func:`plot_graph`.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid whose topology is plotted.
+    node : Node_AC, Node_DC, or str, optional
+        Centre node object, or its ``name`` string (searched on AC then DC nodes).
+    base_node_size : int, optional
+        Base marker size passed to :func:`plot_graph`.
+    proximity : int, optional
+        Hop radius for :func:`networkx.ego_graph`.
+
+    Raises
+    ------
+    ValueError
+        If ``node`` is omitted, not found, or absent from ``grid.Graph_toPlot``.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> grid, _ = pyf.cases['case24_3zones_acdc']()
+    >>> pyf.plot_neighbour_graph(grid, node='111')
+    """
     G = grid.Graph_toPlot
-    if node is not None:
-        Gn = nx.ego_graph(G,node,proximity)
-    elif node_name is not None:
-        node= next((node for node in grid.nodes_AC if node.name == node_name), None)
-        Gn = nx.ego_graph(G,node,proximity)
+    node_ref = node
+    if isinstance(node, str):
+        node = next((n for n in grid.nodes_AC if n.name == node), None)
+        if node is None and grid.nodes_DC is not None:
+            node = next((n for n in grid.nodes_DC if n.name == node_ref), None)
     if node is None:
-        print('Node name provided not found')
-        return
-    plot_graph(grid,base_node_size=base_node_size,G=Gn)
+        raise ValueError(f"Node {node_ref!r} not found in grid.")
+    if node not in G:
+        raise ValueError(f"Node {node.name!r} is not in the plot graph.")
+    Gn = nx.ego_graph(G, node, proximity)
+    plot_graph(grid, base_node_size=base_node_size, G=Gn)
 
 
 def plot_graph(Grid,text='inPu',base_node_size=10,G=None):
@@ -877,6 +906,10 @@ def plot_TS_res(grid, start, end, plotting_choices=None,show=True,path=None,save
             df = df.reindex(full_index)
 
         columns = df.columns
+        if len(columns) == 0:
+            print(f"Skipping '{plotting_choice}': no data in time series results.")
+            continue
+
         time = df.index  # Assuming the DataFrame index is time
 
         if show:
@@ -957,7 +990,7 @@ def plot_TS_res(grid, start, end, plotting_choices=None,show=True,path=None,save
             i = 0
 
             stack_areas = plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']
-            cumulative_sum = 0*df[columns[0]]
+            cumulative_sum = pd.Series(0.0, index=df.index)
             for col in columns:
                 y_values = df[col]
                 current_line = '-' if i < max_colors else line_markers[((i - max_colors) % len(line_markers))]
@@ -1001,84 +1034,105 @@ def plot_TS_res(grid, start, end, plotting_choices=None,show=True,path=None,save
             plt.close()
 
 
-def time_series_prob(grid, element_name, save_format=None, path=None):
+def time_series_prob(grid, element_name, save_format=None, path=None, show=True):
+    """Plot the PDF/CDF of a time-series input or OPF result column.
 
-        a = grid.Time_series
+    Parameters
+    ----------
+    grid : Grid
+        Grid with ``Time_series`` and/or ``time_series_results`` populated.
+    element_name : str
+        ``Time_series`` name or column in merged OPF result tables.
+    save_format : str, optional
+        File format extension (e.g. ``'svg'``). If omitted, nothing is saved.
+    path : str, optional
+        Directory for saved figures; defaults to the current working directory.
+    show : bool, optional
+        Open an interactive matplotlib window after plotting.
 
-        df_gen = grid.time_series_results['real_power_opf']
-        df_prices = grid.time_series_results['prices_by_zone']
-        df_AC_line_res = grid.time_series_results['ac_loading']
-        df_DC_line_res = grid.time_series_results['dc_loading']
-        df_conv_res = grid.time_series_results['converter_loading']
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.time_series_prob(grid, 'OWPP_BE', save_format='svg', show=False)
+    """
 
-        merged_df = pd.concat([df_gen, df_prices, df_AC_line_res, df_DC_line_res, df_conv_res], axis=1)
+    a = grid.Time_series
+
+    df_gen = grid.time_series_results['real_power_opf']
+    df_prices = grid.time_series_results['prices_by_zone']
+    df_AC_line_res = grid.time_series_results['ac_loading']
+    df_DC_line_res = grid.time_series_results['dc_loading']
+    df_conv_res = grid.time_series_results['converter_loading']
+
+    merged_df = pd.concat([df_gen, df_prices, df_AC_line_res, df_DC_line_res, df_conv_res], axis=1)
 
 
-        width_cm = 8  # Doubled for side-by-side plots
-        ratio = 6/10
-        width_inches = width_cm / 2.54
-        height_inches = width_inches * ratio
+    width_cm = 8  # Doubled for side-by-side plots
+    ratio = 6/10
+    width_inches = width_cm / 2.54
+    height_inches = width_inches * ratio
 
-        plt.style.use('seaborn-v0_8-whitegrid')
-        plt.rcParams.update({
-            'figure.figsize': (width_inches, height_inches),
-            'font.family': 'sans-serif',
-            'font.size': 8,
-            'axes.labelsize': 8,
-            'axes.titlesize': 8,
-            'xtick.labelsize': 7,
-            'ytick.labelsize': 7,
-            'legend.fontsize': 6,
-            'lines.markersize': 4,
-            'lines.linewidth': 1,
-            'grid.alpha': 0.3
-        })
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.rcParams.update({
+        'figure.figsize': (width_inches, height_inches),
+        'font.family': 'sans-serif',
+        'font.size': 8,
+        'axes.labelsize': 8,
+        'axes.titlesize': 8,
+        'xtick.labelsize': 7,
+        'ytick.labelsize': 7,
+        'legend.fontsize': 6,
+        'lines.markersize': 4,
+        'lines.linewidth': 1,
+        'grid.alpha': 0.3
+    })
 
-        found = False
-        for ts in a:
-             if ts.name == element_name:
-                    data = ts.data
-                    found = True
-                    break
-        if not found:
-            for col in merged_df.columns:
-                if col == element_name:
-                    data = merged_df[col]
-                    break
+    found = False
+    for ts in a:
+            if ts.name == element_name:
+                data = ts.data
+                found = True
+                break
+    if not found:
+        for col in merged_df.columns:
+            if col == element_name:
+                data = merged_df[col]
+                break
 
-        fig, ax1 = plt.subplots()
+    fig, ax1 = plt.subplots()
 
-        # Plot histogram on primary y-axis
-        ax1.hist(data, bins=100, density=True, alpha=0.5, color='b', label='PDF')
-        ax1.set_xlabel(element_name)
-        ax1.set_ylabel('Probability Density', color='b')
-        ax1.tick_params(axis='y', labelcolor='b')
+    # Plot histogram on primary y-axis
+    ax1.hist(data, bins=100, density=True, alpha=0.5, color='b', label='PDF')
+    ax1.set_xlabel(element_name)
+    ax1.set_ylabel('Probability Density', color='b')
+    ax1.tick_params(axis='y', labelcolor='b')
 
-        # Create secondary y-axis and plot CDF
-        ax2 = ax1.twinx()
-        sorted_data = np.sort(data)
-        cumulative_prob = np.linspace(0, 1, len(sorted_data))
-        ax2.plot(sorted_data, cumulative_prob, color='r', label='CDF')
-        ax2.set_ylabel('Cumulative Probability', color='r')
-        ax2.tick_params(axis='y', labelcolor='r')
+    # Create secondary y-axis and plot CDF
+    ax2 = ax1.twinx()
+    sorted_data = np.sort(data)
+    cumulative_prob = np.linspace(0, 1, len(sorted_data))
+    ax2.plot(sorted_data, cumulative_prob, color='r', label='CDF')
+    ax2.set_ylabel('Cumulative Probability', color='r')
+    ax2.tick_params(axis='y', labelcolor='r')
 
-        # Adjust layout to prevent label cutoff
-        plt.tight_layout()
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
 
-        # Save before showing
-        if save_format:
-            if path is None:
-                plt.savefig(f"{element_name}_distribution.{save_format}",
-                        bbox_inches='tight',
-                        dpi=300)
-            else:
-                plt.savefig(f"{path}/{element_name}_distribution.{save_format}",
-                        bbox_inches='tight',
-                        dpi=300)
+    # Save before showing
+    if save_format:
+        if path is None:
+            plt.savefig(f"{element_name}_distribution.{save_format}",
+                    bbox_inches='tight',
+                    dpi=300)
+        else:
+            plt.savefig(f"{path}/{element_name}_distribution.{save_format}",
+                    bbox_inches='tight',
+                    dpi=300)
 
+    if show:
         plt.show()
-        plt.close()
-        return
+    plt.close()
+    return
 
 
 

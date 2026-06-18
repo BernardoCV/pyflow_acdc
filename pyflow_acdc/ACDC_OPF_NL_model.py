@@ -54,6 +54,13 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
         Enforce line flow-rate limits (``True`` is treated as a factor of 1).
     n_init_install : optional
         Number of pre-installed parallel circuits for TEP, when applicable.
+
+    Examples
+    --------
+    >>> import pyomo.environ as pyo
+    >>> from pyflow_acdc.ACDC_OPF_NL_model import opf_create_nl_model_acdc
+    >>> model = pyo.ConcreteModel()
+    >>> opf_create_nl_model_acdc(model, grid, PV_set=False, Price_Zones=False)
     """
     from .ACDC_OPF import translate_pyf_opf
 

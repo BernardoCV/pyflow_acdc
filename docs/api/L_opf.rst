@@ -15,12 +15,6 @@ This flow sets up and solves the AC 'dc linear' OPF. It creates the :ref:`model 
 
 .. autofunction:: pyflow_acdc.optimal_l_pf
 
-.. code-block:: python
-
-   import pyflow_acdc as pyf
-
-   pyf.optimal_l_pf(grid, ObjRule=None, OnlyGen=True, Price_Zones=False, solver='glpk', tee=False)
-
 .. _L_model_creation:
 
 Creating the Linear OPF model
@@ -50,11 +44,6 @@ The model enforces constraints for:
 - Optional array network-flow conservation and investment-linking
 - Optional investment bounds for generators and lines (if TEP)
 
-.. code-block:: python
-
-   from pyflow_acdc.AC_OPF_L_model import opf_create_l_model_ac
-   opf_create_l_model_ac(model, grid, TEP=False)
-
 TEP/REC/CT Parameters and Variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -83,15 +72,6 @@ Exporting Results
    - AC line flows and losses (linearized, zero reactive)
    - TEP/REC/CT selections and flows (including optional array network-flow)
    - Optional post-processing for time-limit cases (oversizing analysis and fixes)
-
-   **Example**
-
-   .. code-block:: python
-
-      from pyflow_acdc.AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc
-      export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=results, tee=True)
-
-
 
 Solvers
 ^^^^^^^

@@ -90,30 +90,10 @@ Transmission Expansion (pymoo)
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/tep_pymoo/01_transmission_expansion_pymoo.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-
-      grid,res = pyf.case39_acdc(TEP=True,exp='All',N_b_dc=0,N_b_ac=0,N_i=0,N_max=5,Increase=1.5)
-
-      obj = {'Energy_cost': 1}
-
-
-
-      model, model_results , timing_info, solver_stats= pyf.transmission_expansion_pymoo(grid,NPV=True,ObjRule=obj,solver='GA',n_gen=300,tee=True)
-
-
-   
-
-   **Notes**
-
-   - The OPF model is built once (nonlinear ACDC OPF) and re-evaluated across candidate
-     solutions by updating Pyomo Params; this avoids model rebuild overhead.
-   - Decision variable bounds mirror the grid's candidate objects and their
-     ``*_max`` attributes. Ensure these are set appropriately before running.
-   - For Pareto runs (``solver='NSGA2'``), the function returns Pareto information and
-     exports the balanced solution by default. Alternative selections can be chosen via
-     ``pareto_result`` inside the returned information.
 
 **References**
 ^^^^^^^^^^^^^^

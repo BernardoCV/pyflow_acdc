@@ -106,6 +106,11 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     -------
     tuple
         ``(model, model_res, timing_info, solver_stats)``.
+
+    Examples
+    --------
+    >>> pyf.optimal_l_pf(
+    ...     grid, ObjRule=None, OnlyGen=True, Price_Zones=False, solver='glpk', tee=False)
     """
     grid.reset_run_flags()
     analyse_grid(grid)
@@ -1044,6 +1049,14 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         Solver results object
     solver_stats : dict or None
         Dictionary with solver statistics including feasible_solutions
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> model = pyo.ConcreteModel()
+    >>> grid = pyf.Grid(S_base=100)
+    >>> opf_create_nl_model_acdc(model, grid, PV_set=False, Price_Zones=False)
+    >>> results, solver_stats = pyf.pyomo_model_solve(model, grid)
     """
     solver = solver.lower()
     if solver == 'maingo':
@@ -1428,6 +1441,26 @@ def opf_obj_l(model,grid,ObjRule):
 
 
 def opf_obj(model,grid,weights_def,OnlyGen=True):
+    """Build the weighted OPF objective from component weights.
+
+    Parameters
+    ----------
+    model : pyomo.ConcreteModel
+        OPF model returned by :func:`~pyflow_acdc.ACDC_OPF_NL_model.opf_create_nl_model_acdc`.
+    grid : Grid
+        Network being optimised.
+    weights_def : dict
+        Mapping of objective component names to ``{'w': weight}`` entries.
+    OnlyGen : bool, optional
+        Restrict energy-cost terms to generators only.
+
+    Returns
+    -------
+    pyomo expression
+        Weighted sum of the active sub-objectives.
+
+
+    """
     np_den_eps = 1e-3
 
     def formula_Min_Ext_Gen():

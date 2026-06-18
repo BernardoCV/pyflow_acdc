@@ -76,6 +76,11 @@ class Grid:
     nodes_AC, lines_AC, Converters, nodes_DC, lines_DC : list, optional
         Initial element lists; default to empty and are normally populated via
         the ``add_*`` helpers.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> grid = pyf.Grid(S_base=100)
     """
     DEFAULT_GENERATION_TYPES = list(DEFAULT_GENERATION_TYPES)
     DEFAULT_RENEWABLE_TYPES = list(DEFAULT_RENEWABLE_TYPES)
@@ -2966,7 +2971,7 @@ class Line_DC:
         r, _, _, _, MW_rating = cable_parameters(S_base, R_Ohm, L_mH, C_uF, G_uS, A_rating, kV_base, km,1)
         return r, MW_rating
 
-    def __init__(self, fromNode: Node_DC, toNode: Node_DC, r: float=0.001, MW_rating: float=9999,km:float=1, polarity=Polarity.MONOPOLAR, name=None,N_cables=1,Cable_type:str=CableType.CUSTOM,S_base:float=100):
+    def __init__(self, fromNode: Node_DC, toNode: Node_DC, r: float=0.001, MW_rating: float=9999,Length_km:float=1, polarity=Polarity.MONOPOLAR, name=None,N_cables=1,Cable_type:str=CableType.CUSTOM,S_base:float=100):
         self.lineNumber = Line_DC.lineNumber
         Line_DC.lineNumber += 1
 
@@ -3002,7 +3007,7 @@ class Line_DC:
 
         self.r = r
         self.MW_rating = MW_rating
-        self.Length_km=km
+        self.Length_km=Length_km
 
         self._Cable_type = Cable_type
 

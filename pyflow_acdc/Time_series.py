@@ -55,6 +55,27 @@ def find_value_from_cdf(cdf, x):
     return None
 
 def time_series_pf(grid):
+    """Run PF over attached time series (auto-dispatch).
+
+    Calls :func:`ts_dc_pf`, :func:`ts_ac_pf`, or :func:`ts_acdc_pf` depending on
+    whether ``grid`` is DC-only, AC-only, or hybrid.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid with ``Time_series`` data attached.
+
+    Returns
+    -------
+    None
+        Populates ``grid.time_series_results`` by the dispatched
+        function (:func:`ts_ac_pf`, :func:`ts_dc_pf`, or :func:`ts_acdc_pf`).
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.time_series_pf(grid)
+    """
     if grid.nodes_AC is None:
         print("only DC")
         ts_dc_pf(grid)
@@ -387,6 +408,28 @@ def calculate_net_price_zone_power_from_model(grid, model, idx):
         for m in grid.Price_Zones:
             if m.price_zone_num in pn_values:
                 net_price_zone_power[m.name] = pn_values[m.price_zone_num] * grid.S_base
+        return net_price_zone_power
+
+    if not getattr(grid, 'Price_Zones', None):
+        return net_price_zone_power
+
+    for m in grid.Price_Zones:
+        pm_pu = 0.0
+        for node in m.nodes_AC:
+            n = node.nodeNumber
+            if hasattr(model, 'P_known_AC'):
+                pm_pu += pyo.value(model.P_known_AC[n])
+            if hasattr(model, 'PGi_ren'):
+                pm_pu += pyo.value(model.PGi_ren[n])
+            if hasattr(model, 'PGi_opt'):
+                pm_pu += pyo.value(model.PGi_opt[n])
+        for node in m.nodes_DC:
+            n = node.nodeNumber
+            if hasattr(model, 'P_known_DC'):
+                pm_pu += pyo.value(model.P_known_DC[n])
+            if hasattr(model, 'PGi_ren_DC'):
+                pm_pu += pyo.value(model.PGi_ren_DC[n])
+        net_price_zone_power[m.name] = pm_pu * grid.S_base
     return net_price_zone_power
 def calculate_res_available_from_model(grid, model, idx):
     res_available = {'time': idx + 1}
@@ -427,6 +470,44 @@ def calculate_pn_min_max_from_model(grid, model, idx):
 
 
 def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    """Run sequential AC/DC power flow over a time-series window.
+
+    Updates grid data each hour, runs :func:`~pyflow_acdc.acdc_sequential`, and
+    stores results in ``grid.time_series_results``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Hybrid AC/DC grid with ``Time_series`` data attached.
+    start : int, optional
+        First hour (1-based).
+    end : int, optional
+        Last hour (inclusive); defaults to the series length.
+    print_step : bool, optional
+        Print the current hour index while running.
+    tol_lim : float, optional
+        Power-flow tolerance.
+    maxIter : int, optional
+        Maximum power-flow iterations per hour.
+
+    Returns
+    -------
+    None
+        Populates ``grid.time_series_results`` with:
+
+        - ``PF_results``: node voltages and power flows
+        - ``ac_loading``: AC line loading percentages
+        - ``dc_loading``: DC line loading percentages
+        - ``ac_MW_to``: AC line active power flows
+        - ``dc_MW_to``: DC line active power flows
+        - ``converter_loading``: converter loading percentages
+        - ``grid_loading``: overall grid loading
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.ts_acdc_pf(grid, start=1, end=24)
+    """
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     if end is None:
@@ -518,6 +599,38 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
 
 
 def ts_ac_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    """Run AC-only power flow over a time-series window.
+
+    Parameters
+    ----------
+    grid : Grid
+        AC grid with ``Time_series`` data attached.
+    start : int, optional
+        First hour (1-based).
+    end : int, optional
+        Last hour (inclusive); defaults to the series length.
+    print_step : bool, optional
+        Print the current hour index while running.
+    tol_lim : float, optional
+        Power-flow tolerance.
+    maxIter : int, optional
+        Maximum power-flow iterations per hour.
+
+    Returns
+    -------
+    None
+        Populates ``grid.time_series_results`` with:
+
+        - ``PF_results``: node voltages and power flows
+        - ``ac_loading``: AC line loading percentages
+        - ``ac_MW_to``: AC line active power flows
+        - ``grid_loading``: overall grid loading
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.ts_ac_pf(grid, start=1, end=24)
+    """
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     if end is None:
@@ -568,6 +681,38 @@ def ts_ac_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
 
 
 def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+    """Run DC-only power flow over a time-series window.
+
+    Parameters
+    ----------
+    grid : Grid
+        DC grid with ``Time_series`` data attached.
+    start : int, optional
+        First hour (1-based).
+    end : int, optional
+        Last hour (inclusive); defaults to the series length.
+    print_step : bool, optional
+        Print the current hour index while running.
+    tol_lim : float, optional
+        Power-flow tolerance.
+    maxIter : int, optional
+        Maximum power-flow iterations per hour.
+
+    Returns
+    -------
+    None
+        Populates ``grid.time_series_results`` with:
+
+        - ``PF_results``: node voltages and power flows
+        - ``dc_loading``: DC line loading percentages
+        - ``dc_MW_to``: DC line active power flows
+        - ``grid_loading``: overall grid loading
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.ts_dc_pf(grid, start=1, end=24)
+    """
     idx = start-1
     TS_len = len(grid.Time_series[0].data)
     if end is None:
@@ -712,6 +857,66 @@ def ts_acdc_opf(
     warm_start_mode='roll',
     export_to_grid=True,
 ):
+    """Run sequential AC/DC OPF over a time-series window.
+
+    Parameters
+    ----------
+    grid : Grid
+        Hybrid AC/DC grid with ``Time_series`` data attached.
+    start : int, optional
+        First hour (1-based).
+    end : int, optional
+        Last hour (inclusive); defaults to the series length.
+    ObjRule : dict, optional
+        Objective-component weights; see :ref:`Objective Functions <obj_functions>`.
+    price_zone_restrictions : bool, optional
+        Add price-zone restrictions to the model [1]_.
+    expand : bool, optional
+        Enable price-zone import expansion.
+    print_step : bool, optional
+        Print the current hour index while running.
+    limit_flow_rate : bool, optional
+        Enforce line thermal/flow-rate limits in the OPF model.
+    use_clusters : bool, optional
+        Use clustered time-series data instead of hourly data.
+    n_clusters : int, optional
+        Cluster count to use when ``use_clusters`` is True.
+    solver : str, optional
+        Pyomo solver name.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    warm_start_mode : {'roll', 'hard'}, optional
+        Warm-start strategy between hours.
+    export_to_grid : bool, optional
+        Export the final model state back onto ``grid``.
+
+    Returns
+    -------
+    dict
+        Timing information with keys ``Create``, ``Update model Avg``,
+        ``Solve model Avg``, and ``Export``.
+
+        Also populates ``grid.time_series_results`` with:
+
+        - ``converter_p_dc``: converter active power on the DC side
+        - ``converter_q_ac``: converter reactive power on the AC side
+        - ``converter_p_ac``: converter active power on the AC side
+        - ``converter_loading``: converter loading percentages
+        - ``real_load_opf``: real load per node
+        - ``real_power_opf``: real power per generator
+        - ``reactive_power_opf``: reactive power per generator
+        - ``curtailment``: curtailment values
+        - ``grid_loading``: loading by unsynchronised grids
+        - ``prices_by_zone``: prices by price zone
+        - ``PZ_cost_of_generation``: price-zone generation cost
+        - ``PZ_load``: price-zone load
+        - ``net_price_zone_power``: net price-zone power
+        - ``PZ_lb``, ``PZ_ub``: price-zone power bounds
+        - ``a``, ``b``: price-zone cost coefficients
+        - ``res_available``: available renewable energy
+        - ``ac_loading``, ``dc_loading``: line loading percentages
+        - ``ac_MW_to``, ``dc_MW_to``: line active power flows
+    """
     idx = start-1
     warm_start_mode = str(warm_start_mode).lower()
     if warm_start_mode not in ('roll', 'hard'):
@@ -891,10 +1096,9 @@ def ts_acdc_opf(
 
         if price_zone_restrictions:
             price_zone_price = calculate_price_zone_price_from_model(grid,model,idx)
-            net_price_zone_power = calculate_net_price_zone_power_from_model(grid, model, idx)
         else:
             price_zone_price = calculate_price_zone_price(grid,idx)
-            net_price_zone_power = {'time': idx + 1}
+        net_price_zone_power = calculate_net_price_zone_power_from_model(grid, model, idx)
 
         pz_cost_kEUR = calculate_pz_social_cost_kEUR_from_model(grid, model, idx)
         pz_load_mw = calculate_pz_p_known_mw_from_model(grid, model, idx)
@@ -1205,6 +1409,31 @@ def time_series_statistics(grid, curtail=0.99,over_loading=0.9):
     return stats
 
 def results_ts_opf(grid,excel_file_path,grid_names=None,stats=None,times=None):
+    """Export time-series OPF results to an Excel workbook.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid with ``time_series_results`` populated by :func:`ts_acdc_opf`.
+    excel_file_path : str
+        Output ``.xlsx`` path (``.xlsx`` is appended if missing).
+    grid_names : dict, optional
+        Rename columns in the ``grid_loading`` sheet.
+    stats : DataFrame, optional
+        Statistics table written to the ``stats`` sheet.
+    times : dict, optional
+        Timing metrics written to the ``Time`` sheet.
+
+    Notes
+    -----
+    Writes one sheet per result table, including AC/DC line loading, flows,
+    converter powers, OPF dispatch, curtailment, price-zone data, and optional
+    ``stats`` / ``Time`` sheets.
+
+    Examples
+    --------
+    >>> pyf.results_ts_opf(grid, "results", stats=stats_df)
+    """
 
     if not excel_file_path.endswith('.xlsx'):
         excel_file_path = f'{excel_file_path}.xlsx'

@@ -4,117 +4,7 @@ import pytest
 import pyflow_acdc as pyf
 from pyflow_acdc.Graph_and_plot import update_hovertexts
 from pyflow_acdc.windfarm_loader import load_case_grid_and_geo
-
-
-MORAY_EAST_CABLE_DECISIONS = {
-    "45_46": "MOF_240",
-    "43_46": "MOF_240",
-    "42_43": "MOF_240",
-    "41_42": "MOF_240",
-    "40_41": "MOF_630",
-    "36_40": "MOF_630",
-    "36_100": "MOF_630",
-    "38_44": "MOF_240",
-    "38_39": "MOF_240",
-    "35_39": "MOF_240",
-    "33_35": "MOF_240",
-    "33_34": "MOF_630",
-    "34_100": "MOF_630",
-    "27_31": "MOF_240",
-    "26_27": "MOF_240",
-    "25_26": "MOF_240",
-    "24_25": "MOF_240",
-    "23_24": "MOF_630",
-    "23_32": "MOF_630",
-    "32_100": "MOF_630",
-    "57_58": "MOF_240",
-    "56_57": "MOF_240",
-    "55_56": "MOF_240",
-    "54_55": "MOF_240",
-    "53_54": "MOF_630",
-    "37_53": "MOF_630",
-    "37_100": "MOF_630",
-    "47_67": "MOF_240",
-    "47_48": "MOF_240",
-    "48_49": "MOF_240",
-    "49_50": "MOF_240",
-    "50_51": "MOF_630",
-    "51_52": "MOF_630",
-    "52_100": "MOF_630",
-    "70_71": "MOF_240",
-    "69_70": "MOF_240",
-    "69_73": "MOF_240",
-    "72_73": "MOF_240",
-    "68_72": "MOF_630",
-    "66_68": "MOF_630",
-    "62_66": "MOF_630",
-    "62_102": "MOF_630",
-    "96_99": "MOF_240",
-    "95_96": "MOF_240",
-    "87_95": "MOF_240",
-    "86_87": "MOF_240",
-    "63_86": "MOF_630",
-    "63_64": "MOF_630",
-    "64_65": "MOF_630",
-    "65_102": "MOF_630",
-    "97_98": "MOF_240",
-    "93_97": "MOF_240",
-    "93_94": "MOF_240",
-    "91_94": "MOF_240",
-    "85_91": "MOF_630",
-    "78_85": "MOF_630",
-    "78_102": "MOF_630",
-    "82_88": "MOF_240",
-    "88_92": "MOF_240",
-    "89_92": "MOF_240",
-    "89_90": "MOF_240",
-    "77_90": "MOF_630",
-    "77_102": "MOF_630",
-    "28_29": "MOF_240",
-    "29_30": "MOF_240",
-    "30_60": "MOF_240",
-    "60_102": "MOF_240",
-    "83_84": "MOF_240",
-    "79_84": "MOF_240",
-    "76_79": "MOF_240",
-    "61_76": "MOF_240",
-    "13_61": "MOF_630",
-    "13_16": "MOF_630",
-    "16_101": "MOF_630",
-    "74_81": "MOF_240",
-    "80_81": "MOF_240",
-    "75_80": "MOF_240",
-    "59_75": "MOF_240",
-    "12_59": "MOF_630",
-    "11_12": "MOF_630",
-    "11_101": "MOF_630",
-    "2_3": "MOF_240",
-    "1_2": "MOF_240",
-    "0_1": "MOF_240",
-    "0_6": "MOF_240",
-    "5_6": "MOF_630",
-    "4_5": "MOF_630",
-    "4_101": "MOF_630",
-    "14_15": "MOF_240",
-    "7_15": "MOF_240",
-    "7_8": "MOF_240",
-    "8_9": "MOF_240",
-    "9_10": "MOF_630",
-    "10_101": "MOF_630",
-    "21_22": "MOF_240",
-    "20_21": "MOF_240",
-    "19_20": "MOF_240",
-    "18_19": "MOF_240",
-    "17_18": "MOF_630",
-    "17_101": "MOF_630",
-}
-
-CABLE_TYPES_OFF66 = [
-    "MOF_240",
-    "MOF_300",
-    "MOF_630",
-    "MOF_800",
-]
+from pyflow_tests.test_constants import CABLE_TYPES_OFF66, MORAY_EAST_CABLE_DECISIONS
 
 
 def _get_plot_context(grid):
@@ -146,8 +36,10 @@ def _get_plot_context(grid):
 
 def _assign_manual_cables(grid):
     # Same cable assignment approach used in Graph_Creation/WES_ComparisonNL_L.py.
+    grid.cab_types_allowed = len(CABLE_TYPES_OFF66)
     cable_index = {name: idx for idx, name in enumerate(CABLE_TYPES_OFF66)}
     for line in grid.lines_AC_ct:
+        line.cable_types = list(CABLE_TYPES_OFF66)
         line.active_config = cable_index.get(MORAY_EAST_CABLE_DECISIONS.get(str(line.name), ""), -1)
 
 

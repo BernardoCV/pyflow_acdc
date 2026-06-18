@@ -1,0 +1,1014 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Dashboards" href="dash.html" /><link rel="prev" title="Wind Farm Array Sizing Module" href="wf_array.html" />
+        <link rel="prefetch" href="../_static/logo_dark.svg" as="image" />
+        <link rel="prefetch" href="../_static/logo_dark.svg" as="image" />
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.07.19 -->
+        <title>Plotting Module - pyflow acdc</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a3de4342" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --color-foreground-primary: #172033;
+  --color-foreground-secondary: #3f4f63;
+  --color-foreground-muted: #6b7788;
+  --color-foreground-border: #c7d0dc;
+  --color-background-primary: #f7f9fc;
+  --color-background-secondary: #eef3f8;
+  --color-background-hover: #e1e8f0;
+  --color-background-border: #d6dee8;
+  --color-brand-primary: #2563eb;
+  --color-brand-content: #1d4ed8;
+  --color-brand-visited: #6d28d9;
+  --color-sidebar-background: #142033;
+  --color-sidebar-background-border: #253a57;
+  --color-sidebar-brand-text: #f1f5f9;
+  --color-sidebar-caption-text: #8da2bb;
+  --color-sidebar-link-text: #d0dbe7;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1a2a;
+  --color-sidebar-search-background--focus: #17263d;
+  --color-sidebar-search-text: #f1f5f9;
+  --color-sidebar-search-border: #314761;
+  --color-sidebar-search-icon: #8da2bb;
+  --color-inline-code-background: #e2e8f0;
+  --color-highlighted-background: #dbeafe;
+  --color-admonition-background: #eef6ff;
+  --color-guilabel-background: #dbeafe80;
+  --color-guilabel-border: #93c5fd80;
+  --color-table-header-background: #dde6f1;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  --color-foreground-primary: #e6edf7;
+  --color-foreground-secondary: #a9b7c8;
+  --color-foreground-muted: #7b8798;
+  --color-foreground-border: #3b4a5f;
+  --color-background-primary: #090f18;
+  --color-background-secondary: #0f1724;
+  --color-background-hover: #172236;
+  --color-background-border: #25344a;
+  --color-brand-primary: #60a5fa;
+  --color-brand-content: #93c5fd;
+  --color-brand-visited: #a78bfa;
+  --color-sidebar-background: #050914;
+  --color-sidebar-background-border: #1e2d44;
+  --color-sidebar-brand-text: #f8fafc;
+  --color-sidebar-caption-text: #7b8da5;
+  --color-sidebar-link-text: #c6d3e2;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1724;
+  --color-sidebar-search-background--focus: #172236;
+  --color-sidebar-search-text: #e6edf7;
+  --color-sidebar-search-border: #25344a;
+  --color-sidebar-search-icon: #7b8da5;
+  --color-inline-code-background: #141d2b;
+  --color-highlighted-background: #1e3a5f;
+  --color-admonition-background: #101a2a;
+  --color-guilabel-background: #1e3a5f80;
+  --color-guilabel-border: #60a5fa40;
+  --color-table-header-background: #141d2b;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  --color-foreground-primary: #e6edf7;
+  --color-foreground-secondary: #a9b7c8;
+  --color-foreground-muted: #7b8798;
+  --color-foreground-border: #3b4a5f;
+  --color-background-primary: #090f18;
+  --color-background-secondary: #0f1724;
+  --color-background-hover: #172236;
+  --color-background-border: #25344a;
+  --color-brand-primary: #60a5fa;
+  --color-brand-content: #93c5fd;
+  --color-brand-visited: #a78bfa;
+  --color-sidebar-background: #050914;
+  --color-sidebar-background-border: #1e2d44;
+  --color-sidebar-brand-text: #f8fafc;
+  --color-sidebar-caption-text: #7b8da5;
+  --color-sidebar-link-text: #c6d3e2;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1724;
+  --color-sidebar-search-background--focus: #172236;
+  --color-sidebar-search-text: #e6edf7;
+  --color-sidebar-search-border: #25344a;
+  --color-sidebar-search-icon: #7b8da5;
+  --color-inline-code-background: #141d2b;
+  --color-highlighted-background: #1e3a5f;
+  --color-admonition-background: #101a2a;
+  --color-guilabel-background: #1e3a5f80;
+  --color-guilabel-border: #60a5fa40;
+  --color-table-header-background: #141d2b;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     This documentation is under active development. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">pyflow acdc</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../_static/logo_dark.svg" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/logo_dark.svg" alt="Dark Logo"/>
+  </div>
+  
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Introduction:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citing.html">Citing PyFlow ACDC</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Grid Management:</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="modelling.html">System Modelling</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of System Modelling</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="modelling_ac.html">AC System Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelling_dc.html">DC System Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelling_acdc_converter.html">AC/DC Converter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelling_sources.html">Sources and Price Zones</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="grid.html">Grid Creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="csv_import.html">CSV files for importing data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid_mod.html">Grid Modifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cable_database.html">Cable Database</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid_analysis.html">Grid Analysis</a></li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Results</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Power Flow Analysis:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pf.html">Power Flow Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="opf.html">Optimal Power Flow Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="L_opf.html">AC ‘dc linear’ Optimal Power Flow Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Time Series &amp; Analysis:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ts_mod.html">Time Series Modifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts.html">Time Series Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="market_coef.html">Market Coefficients Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Transmission Expansion Planning:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tep.html">Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sequential_step.html">Sequential STEP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tep_pymoo.html">Pymoo Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tep_dynamic.html">Multi period Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wf_array.html">Wind Farm Array Sizing Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization &amp; Export:</span></p>
+<ul class="current">
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Plotting Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dash.html">Dashboards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="folium.html">Mapping</a></li>
+<li class="toctree-l1"><a class="reference internal" href="export_files.html">Export Files Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="solver_utils.html">Solver Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="windfarm_loader.html">Wind-Farm Case Loader</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/api/plotting.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="plotting-module">
+<h1>Plotting Module<a class="headerlink" href="#plotting-module" title="Link to this heading">¶</a></h1>
+<p>This page has been pre-filled with the functions that are available in the Plotting module by AI, please check the code for more details.</p>
+<p>This module provides functions for visualizing grid components and results.</p>
+<p>functions are found in pyflow_acdc.Graph_and_plot</p>
+<section id="time-series">
+<h2>Time Series<a class="headerlink" href="#time-series" title="Link to this heading">¶</a></h2>
+<section id="time-series-results">
+<h3>Time series results<a class="headerlink" href="#time-series-results" title="Link to this heading">¶</a></h3>
+<p>This function is used to plot the time series results of the grid.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.plot_TS_res">
+<span class="sig-name descname"><span class="pre">plot_TS_res</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotting_choices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_failed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#plot_TS_res"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.plot_TS_res" title="Link to this definition">¶</a></dt>
+<dd><p>Creates plots for time series results. The possible plotting choices are:</p>
+<ul class="simple">
+<li><p>‘Power Generation by price zone’</p></li>
+<li><p>‘Power Generation by generator’</p></li>
+<li><p>‘Curtailment’</p></li>
+<li><p>‘Market Prices’</p></li>
+<li><p>‘AC line loading’</p></li>
+<li><p>‘DC line loading’</p></li>
+<li><p>‘AC/DC Converters’</p></li>
+<li><p>‘Power Generation by generator area chart’</p></li>
+<li><p>‘Power Generation by price zone area chart’</p></li>
+</ul>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 11.1%" />
+<col style="width: 55.6%" />
+<col style="width: 11.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid with results</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">start</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Start timeframe</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">end</span></code></p></td>
+<td><p>int</p></td>
+<td><p>End timeframe</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">plotting_choices</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Results types to plot</p></td>
+<td><p>All</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">show</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Whether to show the plot in browser</p></td>
+<td><p>True</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">path</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Path to save the plot</p></td>
+<td><p>Current working directory</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">save_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Format to save the plot, if None, the plot are not saved</p></td>
+<td><p>None</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="p">[</span><span class="n">grid</span><span class="p">,</span><span class="n">results</span><span class="p">]</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">NS_MTDC</span><span class="p">()</span>
+
+<span class="n">start</span> <span class="o">=</span> <span class="mi">5750</span>
+<span class="n">end</span> <span class="o">=</span> <span class="mi">6000</span>
+<span class="n">obj</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Energy_cost&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+
+<span class="n">market_prices_url</span> <span class="o">=</span> <span class="s2">&quot;https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv&quot;</span>
+<span class="n">TS_MK</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">market_prices_url</span><span class="p">)</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">add_TimeSeries</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">TS_MK</span><span class="p">)</span>
+
+<span class="n">wind_load_url</span> <span class="o">=</span> <span class="s2">&quot;https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv&quot;</span>
+<span class="n">TS_wl</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">wind_load_url</span><span class="p">)</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">add_TimeSeries</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">TS_wl</span><span class="p">)</span>
+
+<span class="n">times</span><span class="o">=</span><span class="n">pyf</span><span class="o">.</span><span class="n">TS_ACDC_OPF</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">start</span><span class="p">,</span><span class="n">end</span><span class="p">,</span><span class="n">ObjRule</span><span class="o">=</span><span class="n">obj</span><span class="p">)</span>
+
+<span class="n">pyf</span><span class="o">.</span><span class="n">plot_TS_res</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">start</span><span class="p">,</span><span class="n">end</span><span class="p">,</span><span class="n">save_format</span><span class="o">=</span><span class="s1">&#39;svg&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot shown in browser:</p>
+<figure class="only-light align-center">
+<a class="only-light reference internal image-reference" href="../_images/ts_plot_browser.svg"><img alt="Time Series Plot: Power Generation by price zone" class="only-light" src="../_images/ts_plot_browser.svg" style="width: 70%;" />
+</a>
+</figure>
+<figure class="only-dark align-center">
+<a class="only-dark reference internal image-reference" href="../_images/ts_plot_browser.svg"><img alt="Time Series Plot: Power Generation by price zone" class="only-dark" src="../_images/ts_plot_browser.svg" style="width: 70%;" />
+</a>
+</figure>
+<p>Plot saved in current working directory:</p>
+<figure class="only-light align-center">
+<a class="only-light reference internal image-reference" href="../_images/ts_plot_save.svg"><img alt="Time Series Plot: Power Generation by price zone" class="only-light" src="../_images/ts_plot_save.svg" style="width: 70%;" />
+</a>
+</figure>
+<figure class="only-dark align-center">
+<a class="only-dark reference internal image-reference" href="../_images/ts_plot_save.svg"><img alt="Time Series Plot: Power Generation by price zone" class="only-dark" src="../_images/ts_plot_save.svg" style="width: 70%;" />
+</a>
+</figure>
+</dd></dl>
+
+</section>
+<section id="time-series-probability">
+<h3>Time series probability<a class="headerlink" href="#time-series-probability" title="Link to this heading">¶</a></h3>
+<p>This function is used to plot the probability of the time series parameters or results of the grid. Results currently available are:</p>
+<ul class="simple">
+<li><p>‘Power Generation by generator’</p></li>
+<li><p>‘Prices by price zone’</p></li>
+<li><p>‘AC line loading’</p></li>
+<li><p>‘DC line loading’</p></li>
+<li><p>‘AC/DC Converters loading’</p></li>
+</ul>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.time_series_prob">
+<span class="sig-name descname"><span class="pre">time_series_prob</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">element_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#time_series_prob"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.time_series_prob" title="Link to this definition">¶</a></dt>
+<dd><div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 11.1%" />
+<col style="width: 55.6%" />
+<col style="width: 11.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid Class</p></td>
+<td><p>Grid to analyze</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">element_name</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Name of element to analyze</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">save_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Format to save the plot, if None, the plot are not saved</p></td>
+<td><p>None</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">path</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Path to save the plot</p></td>
+<td><p>Current working directory</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="p">[</span><span class="n">grid</span><span class="p">,</span><span class="n">results</span><span class="p">]</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">NS_MTDC</span><span class="p">()</span>
+
+<span class="n">start</span> <span class="o">=</span> <span class="mi">5750</span>
+<span class="n">end</span> <span class="o">=</span> <span class="mi">6000</span>
+<span class="n">obj</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Energy_cost&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+
+<span class="n">market_prices_url</span> <span class="o">=</span> <span class="s2">&quot;https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv&quot;</span>
+<span class="n">TS_MK</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">market_prices_url</span><span class="p">)</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">add_TimeSeries</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">TS_MK</span><span class="p">)</span>
+
+<span class="n">wind_load_url</span> <span class="o">=</span> <span class="s2">&quot;https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv&quot;</span>
+<span class="n">TS_wl</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">wind_load_url</span><span class="p">)</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">add_TimeSeries</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">TS_wl</span><span class="p">)</span>
+
+<span class="n">pyf</span><span class="o">.</span><span class="n">time_series_prob</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="s1">&#39;OWPP_BE&#39;</span><span class="p">,</span><span class="n">save_format</span><span class="o">=</span><span class="s1">&#39;svg&#39;</span><span class="p">)</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">time_series_prob</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="s1">&#39;BE_price&#39;</span><span class="p">,</span><span class="n">save_format</span><span class="o">=</span><span class="s1">&#39;svg&#39;</span><span class="p">)</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">time_series_prob</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="s1">&#39;L_BE&#39;</span><span class="p">,</span><span class="n">save_format</span><span class="o">=</span><span class="s1">&#39;svg&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 33.3%" />
+<col style="width: 33.3%" />
+<col style="width: 33.3%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><figure class="only-light align-center">
+<img alt="" class="only-light" src="../_images/OWPP_BE_distribution.svg" />
+</figure>
+<figure class="only-dark align-center">
+<img alt="" class="only-dark" src="../_images/OWPP_BE_distribution.svg" />
+</figure>
+</td>
+<td><figure class="only-light align-center">
+<img alt="" class="only-light" src="../_images/BE_price_distribution.svg" />
+</figure>
+<figure class="only-dark align-center">
+<img alt="" class="only-dark" src="../_images/BE_price_distribution.svg" />
+</figure>
+</td>
+<td><figure class="only-light align-center">
+<img alt="" class="only-light" src="../_images/L_BE_distribution.svg" />
+</figure>
+<figure class="only-dark align-center">
+<img alt="" class="only-dark" src="../_images/L_BE_distribution.svg" />
+</figure>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</dd></dl>
+
+</section>
+</section>
+<section id="network-graph-visualization">
+<h2>Network Graph Visualization<a class="headerlink" href="#network-graph-visualization" title="Link to this heading">¶</a></h2>
+<section id="full-grid-visualization-as-a-network-graph">
+<h3>Full grid visualization as a network graph<a class="headerlink" href="#full-grid-visualization-as-a-network-graph" title="Link to this heading">¶</a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.plot_graph">
+<span class="sig-name descname"><span class="pre">plot_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'inPu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_node_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">G</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#plot_graph"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.plot_graph" title="Link to this definition">¶</a></dt>
+<dd><p>Creates an interactive network graph visualization using Plotly.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 11.1%" />
+<col style="width: 55.6%" />
+<col style="width: 11.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to visualize</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">text</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Hover text format (‘data’ or ‘inPu’ or ‘abs’)</p></td>
+<td><p>‘inPu’</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">base_node_size</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Base size for nodes</p></td>
+<td><p>10</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">G</span></code></p></td>
+<td><p>Graph</p></td>
+<td><p>Graph to visualize</p></td>
+<td><p>Full grid</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+
+<span class="n">grid</span><span class="p">,</span><span class="n">res</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">case24_3zones_acdc</span><span class="p">()</span>
+
+<span class="n">pyf</span><span class="o">.</span><span class="n">plot_graph</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+</pre></div>
+</div>
+<figure class="only-light align-center">
+<a class="only-light reference internal image-reference" href="../_images/case24acdc_full.svg"><img alt="case24_3zones_acdc_graph" class="only-light" src="../_images/case24acdc_full.svg" style="width: 70%;" />
+</a>
+</figure>
+<figure class="only-dark align-center">
+<a class="only-dark reference internal image-reference" href="../_images/case24acdc_full.svg"><img alt="case24_3zones_acdc_graph" class="only-dark" src="../_images/case24acdc_full.svg" style="width: 70%;" />
+</a>
+</figure>
+</dd></dl>
+
+</section>
+<section id="neighbor-graph">
+<h3>Neighbor Graph<a class="headerlink" href="#neighbor-graph" title="Link to this heading">¶</a></h3>
+<p>This function is used to plot the neighbor graph of a node. You can either provide a node or a node name, one or the other must be provided.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.plot_neighbour_graph">
+<span class="sig-name descname"><span class="pre">plot_neighbour_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_node_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proximity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#plot_neighbour_graph"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.plot_neighbour_graph" title="Link to this definition">¶</a></dt>
+<dd><p>Creates a graph visualization of a node’s neighbors.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 11.1%" />
+<col style="width: 55.6%" />
+<col style="width: 11.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to analyze</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">node</span></code></p></td>
+<td><p>Node</p></td>
+<td><p>Node object</p></td>
+<td><p>None</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">node_name</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Node name</p></td>
+<td><p>None</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">base_node_size</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Base size for nodes</p></td>
+<td><p>10</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">proximity</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Proximity</p></td>
+<td><p>1</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+
+<span class="n">grid</span><span class="p">,</span><span class="n">res</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">case24_3zones_acdc</span><span class="p">()</span>
+
+<span class="n">pyf</span><span class="o">.</span><span class="n">plot_neighbour_graph</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">node_name</span><span class="o">=</span><span class="s1">&#39;111.0&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<figure class="only-light align-center">
+<a class="only-light reference internal image-reference" href="../_images/case24acdc_neig.svg"><img alt="case24_3zones_acdc neighbour graph of node 111.0" class="only-light" src="../_images/case24acdc_neig.svg" style="width: 70%;" />
+</a>
+</figure>
+<figure class="only-dark align-center">
+<a class="only-dark reference internal image-reference" href="../_images/case24acdc_neig.svg"><img alt="case24_3zones_acdc neighbour graph of node 111.0" class="only-dark" src="../_images/case24acdc_neig.svg" style="width: 70%;" />
+</a>
+</figure>
+</dd></dl>
+
+</section>
+<section id="saving-the-network-graph">
+<h3>Saving the Network Graph<a class="headerlink" href="#saving-the-network-graph" title="Link to this heading">¶</a></h3>
+<p>For this function, you need to have the svgwrite library installed. You can install it using pip install svgwrite. <code class="docutils literal notranslate"><span class="pre">geometry</span></code> of objects is required.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.save_network_svg">
+<span class="sig-name descname"><span class="pre">save_network_svg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'grid_network'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">800</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">journal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">legend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">square_ratio</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linestrings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coloring</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">poly_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tee</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">line_size_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">draw_converters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_ac_nodes_with_rs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_dc_nodes_with_conv</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dc_node_size_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#save_network_svg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.save_network_svg" title="Link to this definition">¶</a></dt>
+<dd><p>Save the network as SVG file</p>
+<section id="parameters">
+<h4>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h4>
+<dl class="simple">
+<dt>square_ratio<span class="classifier">bool</span></dt><dd><p>If True, expands the data bounds so both axes span the same range, then scales uniformly.
+If False, uses the true data extent and <strong>one scale factor for both x and y</strong> (one data unit
+in x equals one data unit in y on the figure); the SVG size is then fitted to that extent.</p>
+</dd>
+<dt>poly_size<span class="classifier">tuple or None</span></dt><dd><p>If provided and poly is not None, specifies the target size (width, height) in pixels
+for the polygon. Everything else will be scaled to fit this polygon size.
+Format: (target_width, target_height) in pixels.</p>
+</dd>
+<dt>draw_converters<span class="classifier">bool</span></dt><dd><p>If False, converter line segments are not drawn.</p>
+</dd>
+<dt>scale_ac_nodes_with_rs<span class="classifier">bool</span></dt><dd><p>If True, AC node marker radius is increased when connected renewable sources exist.
+The increase scales with total connected <cite>np_rsgen</cite> and <cite>node_size_factor</cite>.</p>
+</dd>
+<dt>node_size_factor<span class="classifier">float</span></dt><dd><p>Multiplier used for AC node marker scaling with renewable source multiplicity.
+Must be &gt;= 0.</p>
+</dd>
+<dt>scale_dc_nodes_with_conv<span class="classifier">bool</span></dt><dd><p>If True, DC node marker radius is increased based on total connected converter <cite>np_conv</cite>
+and <cite>dc_node_size_factor</cite>.</p>
+</dd>
+<dt>dc_node_size_factor<span class="classifier">float</span></dt><dd><p>Multiplier used for DC node marker scaling with connected converter multiplicity.
+Must be &gt;= 0.</p>
+</dd>
+</dl>
+<p>Saves the network graph as an SVG file.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 11.1%" />
+<col style="width: 55.6%" />
+<col style="width: 11.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">grid</span></code></p></td>
+<td><p>Grid</p></td>
+<td><p>Grid to save</p></td>
+<td><p>Required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Name of the file</p></td>
+<td><p>‘grid_network’</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">width</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Width of the file</p></td>
+<td><p>1000</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">height</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Height of the file</p></td>
+<td><p>800</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+
+<span class="n">grid</span><span class="p">,</span><span class="n">res</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">NS_MTDC</span><span class="p">()</span>
+
+<span class="n">pyf</span><span class="o">.</span><span class="n">save_network_svg</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+</pre></div>
+</div>
+<figure class="only-light align-center">
+<a class="only-light reference internal image-reference" href="../_images/grid_network.svg"><img alt="grid_network" class="only-light" src="../_images/grid_network.svg" style="width: 70%;" />
+</a>
+</figure>
+<figure class="only-dark align-center">
+<a class="only-dark reference internal image-reference" href="../_images/grid_network.svg"><img alt="grid_network" class="only-dark" src="../_images/grid_network.svg" style="width: 70%;" />
+</a>
+</figure>
+</section>
+</dd></dl>
+
+</section>
+</section>
+<section id="solver-diagnostics">
+<h2>Solver Diagnostics<a class="headerlink" href="#solver-diagnostics" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.plot_model_feasibility">
+<span class="sig-name descname"><span class="pre">plot_model_feasibility</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">solver_stats</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'time'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'objective'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_mm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#plot_model_feasibility"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.plot_model_feasibility" title="Link to this definition">¶</a></dt>
+<dd><p>Plots solver feasible-solution progress and objective evolution.</p>
+</dd></dl>
+
+</section>
+<section id="d-grid-plot">
+<h2>3D Grid Plot<a class="headerlink" href="#d-grid-plot" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="pyflow_acdc.plot_3D">
+<span class="sig-name descname"><span class="pre">plot_3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coloring</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cable_type'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">line_width</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_unused</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coords_lonlat</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elevation_grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_elevation_surface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_elevation_points</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elevation_opacity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.35</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elevation_colorscale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Viridis'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_verticals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dev_area</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Graph_and_plot.html#plot_3D"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.plot_3D" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the grid network in 3D using plotly.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">coords_lonlat=True</span></code> (default), node positions and LineString
+geometries are assumed to be in lon/lat and are converted to local
+meters so that X, Y and Z (elevation) share the same unit.
+Set <code class="docutils literal notranslate"><span class="pre">coords_lonlat=True</span></code> when coordinates are in lon/lat.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>grid</strong> (<em>Grid object</em>) – Must contain <code class="docutils literal notranslate"><span class="pre">lines_AC_ct</span></code> with 3D <code class="docutils literal notranslate"><span class="pre">geometry</span></code> (has_z=True).</p></li>
+<li><p><strong>show</strong> (<em>bool</em>) – Whether to display the figure interactively in the browser.</p></li>
+<li><p><strong>save_path</strong> (<em>str</em><em> or </em><em>None</em>) – If given, save the figure as an HTML file.</p></li>
+<li><p><strong>coloring</strong> (<em>str</em>) – ‘cable_type’ colours cables by <code class="docutils literal notranslate"><span class="pre">active_config</span></code>;
+‘loading’ colours by cable loading percentage.</p></li>
+<li><p><strong>line_width</strong> (<em>float</em>) – Width of cable traces.</p></li>
+<li><p><strong>node_size</strong> (<em>float</em>) – Marker size for nodes.</p></li>
+<li><p><strong>title</strong> (<em>str</em><em> or </em><em>None</em>) – Figure title.</p></li>
+<li><p><strong>show_unused</strong> (<em>bool</em>) – If True, draw unused cables (active_config &lt; 0) as thin grey lines.</p></li>
+<li><p><strong>poly</strong> (<em>shapely Polygon/MultiPolygon</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – Development area polygon(s) to draw on the z=0 plane.</p></li>
+<li><p><strong>coords_lonlat</strong> (<em>bool</em>) – If True, convert lon/lat to local meters via equirectangular
+projection.  If False, assume X/Y are already in meters.</p></li>
+<li><p><strong>elevation_grid</strong> (<em>pandas.DataFrame</em><em> or </em><em>dict</em><em>, </em><em>optional</em>) – Optional set of elevation points to plot as a surface/plane.
+Expected columns/keys: <code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">elevation</span></code>.
+Coordinates are assumed to be in the same system as the plot
+(if <code class="docutils literal notranslate"><span class="pre">coords_lonlat=True</span></code>, pass lon/lat so they are converted too).</p></li>
+<li><p><strong>show_elevation_surface</strong> (<em>bool</em>) – If True (default) and <code class="docutils literal notranslate"><span class="pre">elevation_grid</span></code> is provided, draw a triangulated
+surface (Mesh3d) colored by elevation.</p></li>
+<li><p><strong>show_elevation_points</strong> (<em>bool</em>) – If True, also plot the elevation points as markers.</p></li>
+<li><p><strong>elevation_opacity</strong> (<em>float</em>) – Opacity for the elevation surface.</p></li>
+<li><p><strong>elevation_colorscale</strong> (<em>str</em><em> or </em><em>list</em>) – Plotly colorscale for the elevation surface/points.</p></li>
+<li><p><strong>show_verticals</strong> (<em>float</em>) – Opacity of vertical cable segments from 0 (hidden) to 1 (fully visible).</p></li>
+</ul>
+</dd>
+</dl>
+<p>Generates a 3D network visualization of the grid and selected element
+attributes.</p>
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="dash.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Dashboards</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="wf_array.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Wind Farm Array Sizing Module</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025-2026, Bernardo Castro Valerio
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Plotting Module</a><ul>
+<li><a class="reference internal" href="#time-series">Time Series</a><ul>
+<li><a class="reference internal" href="#time-series-results">Time series results</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.plot_TS_res"><code class="docutils literal notranslate"><span class="pre">plot_TS_res()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#time-series-probability">Time series probability</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.time_series_prob"><code class="docutils literal notranslate"><span class="pre">time_series_prob()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#network-graph-visualization">Network Graph Visualization</a><ul>
+<li><a class="reference internal" href="#full-grid-visualization-as-a-network-graph">Full grid visualization as a network graph</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.plot_graph"><code class="docutils literal notranslate"><span class="pre">plot_graph()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#neighbor-graph">Neighbor Graph</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.plot_neighbour_graph"><code class="docutils literal notranslate"><span class="pre">plot_neighbour_graph()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#saving-the-network-graph">Saving the Network Graph</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.save_network_svg"><code class="docutils literal notranslate"><span class="pre">save_network_svg()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#solver-diagnostics">Solver Diagnostics</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.plot_model_feasibility"><code class="docutils literal notranslate"><span class="pre">plot_model_feasibility()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#d-grid-plot">3D Grid Plot</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.plot_3D"><code class="docutils literal notranslate"><span class="pre">plot_3D()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=8a448e45"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

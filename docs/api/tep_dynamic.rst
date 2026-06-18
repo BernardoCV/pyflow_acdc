@@ -74,17 +74,10 @@ Multi-period Multi-scenario Dynamic TEP
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/tep_dynamic/01_multi_period_multi_scenario_dynamic_tep.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-
-      grid, res = pyf.NS_MTDC()
-      obj = {'Energy_cost': 1}
-      model, model_results, timing_info, solver_stats, ts_results = pyf.multi_period_MS_TEP(
-          grid,
-          ObjRule=obj,
-          solver='bonmin'
-      )
 
 Export Dynamic Investment Period Plots
 --------------------------------------

@@ -1,0 +1,1103 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Power Flow Module" href="pf.html" /><link rel="prev" title="Grid Analysis" href="grid_analysis.html" />
+        <link rel="prefetch" href="../_static/logo_dark.svg" as="image" />
+        <link rel="prefetch" href="../_static/logo_dark.svg" as="image" />
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.07.19 -->
+        <title>Results - pyflow acdc</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a3de4342" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --color-foreground-primary: #172033;
+  --color-foreground-secondary: #3f4f63;
+  --color-foreground-muted: #6b7788;
+  --color-foreground-border: #c7d0dc;
+  --color-background-primary: #f7f9fc;
+  --color-background-secondary: #eef3f8;
+  --color-background-hover: #e1e8f0;
+  --color-background-border: #d6dee8;
+  --color-brand-primary: #2563eb;
+  --color-brand-content: #1d4ed8;
+  --color-brand-visited: #6d28d9;
+  --color-sidebar-background: #142033;
+  --color-sidebar-background-border: #253a57;
+  --color-sidebar-brand-text: #f1f5f9;
+  --color-sidebar-caption-text: #8da2bb;
+  --color-sidebar-link-text: #d0dbe7;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1a2a;
+  --color-sidebar-search-background--focus: #17263d;
+  --color-sidebar-search-text: #f1f5f9;
+  --color-sidebar-search-border: #314761;
+  --color-sidebar-search-icon: #8da2bb;
+  --color-inline-code-background: #e2e8f0;
+  --color-highlighted-background: #dbeafe;
+  --color-admonition-background: #eef6ff;
+  --color-guilabel-background: #dbeafe80;
+  --color-guilabel-border: #93c5fd80;
+  --color-table-header-background: #dde6f1;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  --color-foreground-primary: #e6edf7;
+  --color-foreground-secondary: #a9b7c8;
+  --color-foreground-muted: #7b8798;
+  --color-foreground-border: #3b4a5f;
+  --color-background-primary: #090f18;
+  --color-background-secondary: #0f1724;
+  --color-background-hover: #172236;
+  --color-background-border: #25344a;
+  --color-brand-primary: #60a5fa;
+  --color-brand-content: #93c5fd;
+  --color-brand-visited: #a78bfa;
+  --color-sidebar-background: #050914;
+  --color-sidebar-background-border: #1e2d44;
+  --color-sidebar-brand-text: #f8fafc;
+  --color-sidebar-caption-text: #7b8da5;
+  --color-sidebar-link-text: #c6d3e2;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1724;
+  --color-sidebar-search-background--focus: #172236;
+  --color-sidebar-search-text: #e6edf7;
+  --color-sidebar-search-border: #25344a;
+  --color-sidebar-search-icon: #7b8da5;
+  --color-inline-code-background: #141d2b;
+  --color-highlighted-background: #1e3a5f;
+  --color-admonition-background: #101a2a;
+  --color-guilabel-background: #1e3a5f80;
+  --color-guilabel-border: #60a5fa40;
+  --color-table-header-background: #141d2b;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  --color-foreground-primary: #e6edf7;
+  --color-foreground-secondary: #a9b7c8;
+  --color-foreground-muted: #7b8798;
+  --color-foreground-border: #3b4a5f;
+  --color-background-primary: #090f18;
+  --color-background-secondary: #0f1724;
+  --color-background-hover: #172236;
+  --color-background-border: #25344a;
+  --color-brand-primary: #60a5fa;
+  --color-brand-content: #93c5fd;
+  --color-brand-visited: #a78bfa;
+  --color-sidebar-background: #050914;
+  --color-sidebar-background-border: #1e2d44;
+  --color-sidebar-brand-text: #f8fafc;
+  --color-sidebar-caption-text: #7b8da5;
+  --color-sidebar-link-text: #c6d3e2;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1724;
+  --color-sidebar-search-background--focus: #172236;
+  --color-sidebar-search-text: #e6edf7;
+  --color-sidebar-search-border: #25344a;
+  --color-sidebar-search-icon: #7b8da5;
+  --color-inline-code-background: #141d2b;
+  --color-highlighted-background: #1e3a5f;
+  --color-admonition-background: #101a2a;
+  --color-guilabel-background: #1e3a5f80;
+  --color-guilabel-border: #60a5fa40;
+  --color-table-header-background: #141d2b;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     This documentation is under active development. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">pyflow acdc</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../_static/logo_dark.svg" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/logo_dark.svg" alt="Dark Logo"/>
+  </div>
+  
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Introduction:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citing.html">Citing PyFlow ACDC</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Grid Management:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="modelling.html">System Modelling</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of System Modelling</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="modelling_ac.html">AC System Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelling_dc.html">DC System Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelling_acdc_converter.html">AC/DC Converter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelling_sources.html">Sources and Price Zones</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="grid.html">Grid Creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="csv_import.html">CSV files for importing data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid_mod.html">Grid Modifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cable_database.html">Cable Database</a></li>
+<li class="toctree-l1"><a class="reference internal" href="grid_analysis.html">Grid Analysis</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Results</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Power Flow Analysis:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pf.html">Power Flow Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="opf.html">Optimal Power Flow Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="L_opf.html">AC ‘dc linear’ Optimal Power Flow Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Time Series &amp; Analysis:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ts_mod.html">Time Series Modifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts.html">Time Series Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="market_coef.html">Market Coefficients Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Transmission Expansion Planning:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tep.html">Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sequential_step.html">Sequential STEP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tep_pymoo.html">Pymoo Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tep_dynamic.html">Multi period Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wf_array.html">Wind Farm Array Sizing Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization &amp; Export:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="plotting.html">Plotting Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dash.html">Dashboards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="folium.html">Mapping</a></li>
+<li class="toctree-l1"><a class="reference internal" href="export_files.html">Export Files Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="solver_utils.html">Solver Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="windfarm_loader.html">Wind-Farm Case Loader</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/api/results.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="results">
+<h1>Results<a class="headerlink" href="#results" title="Link to this heading">¶</a></h1>
+<p>The Results class provides methods for analyzing and displaying power flow results. Results are printed in the terminal with the use of prettytable.</p>
+<section id="class-reference">
+<h2>Class Reference<a class="headerlink" href="#class-reference" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyflow_acdc.Results">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">decimals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_location</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'csv'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results" title="Link to this definition">¶</a></dt>
+<dd><p>Print and export power-flow / OPF result tables for a <a class="reference internal" href="grid.html#pyflow_acdc.Grid" title="pyflow_acdc.Classes.Grid"><code class="xref py py-class docutils literal notranslate"><span class="pre">Grid</span></code></a>.</p>
+<p>Methods write formatted tables to the terminal (via <code class="docutils literal notranslate"><span class="pre">prettytable</span></code>) and
+optionally persist DataFrames as CSV or a single Excel workbook.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>Grid</strong> (<a class="reference internal" href="grid.html#pyflow_acdc.Grid" title="pyflow_acdc.Grid"><em>Grid</em></a>) – Network whose results are reported.</p></li>
+<li><p><strong>decimals</strong> (<em>int</em><em>, </em><em>optional</em>) – Decimal places for printed numeric values.</p></li>
+<li><p><strong>export_location</strong> (<em>str</em><em>, </em><em>optional</em>) – Output folder; defaults to <code class="docutils literal notranslate"><span class="pre">pyflowacdc_res</span></code>.</p></li>
+<li><p><strong>export_type</strong> (<em>str</em><em>, </em><em>optional</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;csv&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;excel&quot;</span></code>, or other (no automatic file export).</p></li>
+<li><p><strong>save_res</strong> (<em>bool</em><em>, </em><em>optional</em>) – When <code class="docutils literal notranslate"><span class="pre">True</span></code>, write tables to <code class="docutils literal notranslate"><span class="pre">export_location</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="class-methods">
+<h2>Class Methods<a class="headerlink" href="#class-methods" title="Link to this heading">¶</a></h2>
+<section id="options">
+<h3>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h3>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.options">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">options</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.options" title="Link to this definition">¶</a></dt>
+<dd><p>Prints a list of all available results methods.</p>
+</dd></dl>
+
+</section>
+<section id="all">
+<h3>All<a class="headerlink" href="#all" title="Link to this heading">¶</a></h3>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.all">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">decimals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_location</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt_exit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.all"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.all" title="Link to this definition">¶</a></dt>
+<dd><p>Displays all available results for both AC and DC grids including:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#res-ac-powerflow"><span class="std std-ref">AC power flow</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ac-voltage"><span class="std std-ref">AC voltages</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ac-lines-current"><span class="std std-ref">AC line currents and power flows</span></a></p></li>
+<li><p><a class="reference internal" href="#res-dc-bus"><span class="std std-ref">DC bus data</span></a></p></li>
+<li><p><a class="reference internal" href="#res-dc-lines-current"><span class="std std-ref">DC line currents and power flows</span></a></p></li>
+<li><p><a class="reference internal" href="#res-converter"><span class="std std-ref">Converter data</span></a></p></li>
+<li><p><a class="reference internal" href="#res-slack-all"><span class="std std-ref">Slack bus information</span></a></p></li>
+<li><p><a class="reference internal" href="#res-power-loss"><span class="std std-ref">Power losses</span></a></p></li>
+</ul>
+<p>If optimization module is used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#res-ext-gen"><span class="std std-ref">External generator data</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ext-ren"><span class="std std-ref">Renewable energy sources</span></a></p></li>
+<li><p><a class="reference internal" href="#res-objective"><span class="std std-ref">Objective function</span></a></p></li>
+<li><p><a class="reference internal" href="#res-price-zone"><span class="std std-ref">Price zone optimization</span></a></p></li>
+</ul>
+<p>If transmission expansion module is used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#res-tep-n"><span class="std std-ref">Transmission expansion</span></a></p></li>
+<li><p><a class="reference internal" href="#res-tep-norm"><span class="std std-ref">Normalized transmission expansion</span></a></p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.all_ac">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">all_ac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.all_ac"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.all_ac" title="Link to this definition">¶</a></dt>
+<dd><p>Displays results for AC grid only:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#res-ac-powerflow"><span class="std std-ref">AC power flow</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ac-voltage"><span class="std std-ref">AC voltages</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ac-lines-current"><span class="std std-ref">AC line currents and power flows</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ac-slack"><span class="std std-ref">AC slack bus info</span></a></p></li>
+<li><p><a class="reference internal" href="#res-ac-power-loss"><span class="std std-ref">AC power losses</span></a></p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.all_dc">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">all_dc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.all_dc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.all_dc" title="Link to this definition">¶</a></dt>
+<dd><p>Displays results for DC grid only:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#res-dc-bus"><span class="std std-ref">DC bus data</span></a></p></li>
+<li><p><a class="reference internal" href="#res-dc-lines-current"><span class="std std-ref">DC line currents and power flows</span></a></p></li>
+<li><p><a class="reference internal" href="#res-dc-slack"><span class="std std-ref">DC slack bus info</span></a></p></li>
+<li><p><a class="reference internal" href="#res-dc-power-loss"><span class="std std-ref">DC power losses</span></a></p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method" id="res-slack-all">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.slack_all">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">slack_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.slack_all"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.slack_all" title="Link to this definition">¶</a></dt>
+<dd><p>Displays slack bus information for both AC and DC grids.</p>
+</dd></dl>
+
+</section>
+<section id="ac-specific-results">
+<h3>AC Specific Results<a class="headerlink" href="#ac-specific-results" title="Link to this heading">¶</a></h3>
+<p>By running the following code, the results will be printed in the terminal.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyflow_acdc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pyf</span>
+
+<span class="n">grid</span><span class="p">,</span><span class="n">res</span> <span class="o">=</span> <span class="n">pyf</span><span class="o">.</span><span class="n">cases</span><span class="p">[</span><span class="s1">&#39;Stagg5MATACDC&#39;</span><span class="p">]()</span>
+<span class="n">pyf</span><span class="o">.</span><span class="n">acdc_sequential</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+<span class="n">res</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+</pre></div>
+</div>
+<dl class="py method" id="res-ac-powerflow">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.ac_powerflow">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">ac_powerflow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.ac_powerflow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.ac_powerflow" title="Link to this definition">¶</a></dt>
+<dd><p>Displays AC power flow, split into differnet asynchronous grids. Results include:</p>
+<ul class="simple">
+<li><p>Power generation</p></li>
+<li><p>Reactive power generation</p></li>
+<li><p>Power load</p></li>
+<li><p>Reactive power load</p></li>
+<li><p>Real power by converter (if hybrid grid)</p></li>
+<li><p>Reactive power by converter (if hybrid grid)</p></li>
+<li><p>Power injected</p></li>
+<li><p>Reactive power injected</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">AC</span> <span class="n">power</span>
+
+<span class="n">Grid</span> <span class="n">AC</span> <span class="mi">1</span>
+<span class="o">+------+----------------+---------------------+-----------------+----------------------+-------------------------+-------------------------------+----------------------+---------------------------+</span>
+<span class="o">|</span> <span class="n">Node</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">Gen</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reactive</span> <span class="n">Gen</span> <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">Load</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reactive</span> <span class="n">Load</span> <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">converters</span> <span class="n">DC</span><span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reactive</span> <span class="n">converters</span> <span class="n">DC</span> <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">injected</span>  <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reactive</span> <span class="n">injected</span>  <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+------+----------------+---------------------+-----------------+----------------------+-------------------------+-------------------------------+----------------------+---------------------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>   <span class="o">|</span>    <span class="mf">133.619</span>     <span class="o">|</span>        <span class="mf">84.328</span>       <span class="o">|</span>       <span class="mf">0.0</span>       <span class="o">|</span>         <span class="mf">0.0</span>          <span class="o">|</span>           <span class="mf">0.0</span>           <span class="o">|</span>               <span class="mi">0</span>               <span class="o">|</span>       <span class="mf">133.619</span>        <span class="o">|</span>           <span class="mf">84.328</span>          <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>   <span class="o">|</span>      <span class="mf">40.0</span>      <span class="o">|</span>       <span class="o">-</span><span class="mf">32.844</span>       <span class="o">|</span>       <span class="mf">20.0</span>      <span class="o">|</span>         <span class="mf">10.0</span>         <span class="o">|</span>          <span class="o">-</span><span class="mf">60.0</span>          <span class="o">|</span>             <span class="o">-</span><span class="mf">40.0</span>             <span class="o">|</span>        <span class="o">-</span><span class="mf">40.0</span>         <span class="o">|</span>          <span class="o">-</span><span class="mf">82.844</span>          <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>   <span class="o">|</span>      <span class="mf">0.0</span>       <span class="o">|</span>         <span class="o">-</span><span class="mf">0.0</span>        <span class="o">|</span>       <span class="mf">45.0</span>      <span class="o">|</span>         <span class="mf">15.0</span>         <span class="o">|</span>          <span class="mf">20.774</span>         <span class="o">|</span>             <span class="mf">7.131</span>             <span class="o">|</span>       <span class="o">-</span><span class="mf">24.226</span>        <span class="o">|</span>           <span class="o">-</span><span class="mf">7.869</span>          <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">4</span>   <span class="o">|</span>      <span class="mf">0.0</span>       <span class="o">|</span>          <span class="mi">0</span>          <span class="o">|</span>       <span class="mf">40.0</span>      <span class="o">|</span>         <span class="mf">5.0</span>          <span class="o">|</span>           <span class="mf">0.0</span>           <span class="o">|</span>               <span class="mi">0</span>               <span class="o">|</span>        <span class="o">-</span><span class="mf">40.0</span>         <span class="o">|</span>            <span class="o">-</span><span class="mf">5.0</span>           <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">5</span>   <span class="o">|</span>      <span class="mf">0.0</span>       <span class="o">|</span>          <span class="mi">0</span>          <span class="o">|</span>       <span class="mf">60.0</span>      <span class="o">|</span>         <span class="mf">10.0</span>         <span class="o">|</span>           <span class="mf">35.0</span>          <span class="o">|</span>              <span class="mf">5.0</span>              <span class="o">|</span>        <span class="o">-</span><span class="mf">25.0</span>         <span class="o">|</span>            <span class="o">-</span><span class="mf">5.0</span>           <span class="o">|</span>
+<span class="o">+------+----------------+---------------------+-----------------+----------------------+-------------------------+-------------------------------+----------------------+---------------------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-ac-voltage">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.ac_voltage">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">ac_voltage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.ac_voltage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.ac_voltage" title="Link to this definition">¶</a></dt>
+<dd><p>Displays AC voltage results including:</p>
+<ul class="simple">
+<li><p>Voltage magnitude</p></li>
+<li><p>Voltage angle</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">AC</span> <span class="n">bus</span> <span class="n">voltage</span>
+
+<span class="n">Grid</span> <span class="n">AC</span> <span class="mi">1</span>
+<span class="o">+-----+--------------+---------------------+</span>
+<span class="o">|</span> <span class="n">Bus</span> <span class="o">|</span> <span class="n">Voltage</span> <span class="p">(</span><span class="n">pu</span><span class="p">)</span> <span class="o">|</span> <span class="n">Voltage</span> <span class="n">angle</span> <span class="p">(</span><span class="n">deg</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+-----+--------------+---------------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>  <span class="o">|</span>     <span class="mf">1.06</span>     <span class="o">|</span>         <span class="mf">0.0</span>         <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>  <span class="o">|</span>     <span class="mf">1.0</span>      <span class="o">|</span>        <span class="o">-</span><span class="mf">2.383</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>  <span class="o">|</span>     <span class="mf">1.0</span>      <span class="o">|</span>        <span class="o">-</span><span class="mf">3.895</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">4</span>  <span class="o">|</span>    <span class="mf">0.996</span>     <span class="o">|</span>        <span class="o">-</span><span class="mf">4.261</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">5</span>  <span class="o">|</span>    <span class="mf">0.991</span>     <span class="o">|</span>        <span class="o">-</span><span class="mf">4.149</span>       <span class="o">|</span>
+<span class="o">+-----+--------------+---------------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-ac-lines-current">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.ac_lines_current">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">ac_lines_current</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.ac_lines_current"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.ac_lines_current" title="Link to this definition">¶</a></dt>
+<dd><p>Displays AC line current results including:</p>
+<ul class="simple">
+<li><p>Current magnitude</p></li>
+<li><p>Line loading percentage</p></li>
+<li><p>Line capacity</p></li>
+<li><p>Line polarity</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">AC</span> <span class="n">Lines</span> <span class="n">Currents</span>
+<span class="n">Grid</span> <span class="n">AC</span> <span class="mi">1</span>
+<span class="o">+------+----------+--------+-------------+-----------+-----------+----------------+</span>
+<span class="o">|</span> <span class="n">Line</span> <span class="o">|</span> <span class="n">From</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">To</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">I</span> <span class="kn">from</span><span class="w"> </span><span class="p">(</span><span class="n">kA</span><span class="p">)</span> <span class="o">|</span> <span class="n">I</span> <span class="n">to</span> <span class="p">(</span><span class="n">kA</span><span class="p">)</span> <span class="o">|</span> <span class="n">Loading</span> <span class="o">%</span> <span class="o">|</span> <span class="n">Capacity</span> <span class="p">[</span><span class="n">MVA</span><span class="p">]</span> <span class="o">|</span>
+<span class="o">+------+----------+--------+-------------+-----------+-----------+----------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">2</span>    <span class="o">|</span>    <span class="mf">0.192</span>    <span class="o">|</span>   <span class="mf">0.198</span>   <span class="o">|</span>   <span class="mf">81.019</span>  <span class="o">|</span>      <span class="mi">150</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>    <span class="mf">0.059</span>    <span class="o">|</span>   <span class="mf">0.063</span>   <span class="o">|</span>   <span class="mf">37.561</span>  <span class="o">|</span>      <span class="mi">100</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>    <span class="mf">0.024</span>    <span class="o">|</span>   <span class="mf">0.022</span>   <span class="o">|</span>   <span class="mf">14.637</span>  <span class="o">|</span>      <span class="mi">100</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">4</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">4</span>    <span class="o">|</span>     <span class="mf">0.03</span>    <span class="o">|</span>   <span class="mf">0.029</span>   <span class="o">|</span>   <span class="mf">17.841</span>  <span class="o">|</span>      <span class="mi">100</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">5</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">5</span>    <span class="o">|</span>    <span class="mf">0.042</span>    <span class="o">|</span>   <span class="mf">0.042</span>   <span class="o">|</span>   <span class="mf">25.395</span>  <span class="o">|</span>      <span class="mi">100</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">6</span>   <span class="o">|</span>    <span class="mi">3</span>     <span class="o">|</span>   <span class="mi">4</span>    <span class="o">|</span>    <span class="mf">0.039</span>    <span class="o">|</span>    <span class="mf">0.04</span>   <span class="o">|</span>   <span class="mf">23.932</span>  <span class="o">|</span>      <span class="mi">100</span>       <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">7</span>   <span class="o">|</span>    <span class="mi">4</span>     <span class="o">|</span>   <span class="mi">5</span>    <span class="o">|</span>     <span class="mf">0.0</span>     <span class="o">|</span>   <span class="mf">0.008</span>   <span class="o">|</span>   <span class="mf">4.648</span>   <span class="o">|</span>      <span class="mi">100</span>       <span class="o">|</span>
+<span class="o">+------+----------+--------+-------------+-----------+-----------+----------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-ac-lines-power">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.ac_lines_power">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">ac_lines_power</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.ac_lines_power"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.ac_lines_power" title="Link to this definition">¶</a></dt>
+<dd><p>Displays AC line power flow results including:</p>
+<ul class="simple">
+<li><p>Power flow from sending end</p></li>
+<li><p>Power flow to receiving end</p></li>
+<li><p>Power losses</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">AC</span> <span class="n">Lines</span> <span class="n">power</span>
+<span class="n">Grid</span> <span class="n">AC</span> <span class="mi">1</span>
+<span class="o">+------+----------+--------+-------------+---------------+-----------+-----------+-----------------+---------------+</span>
+<span class="o">|</span> <span class="n">Line</span> <span class="o">|</span> <span class="n">From</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">To</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">P</span> <span class="kn">from</span><span class="w"> </span><span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span> <span class="kn">from</span><span class="w"> </span><span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span> <span class="n">P</span> <span class="n">to</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span> <span class="n">to</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">loss</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span> <span class="n">loss</span> <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+------+----------+--------+-------------+---------------+-----------+-----------+-----------------+---------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">2</span>    <span class="o">|</span>    <span class="mf">98.365</span>   <span class="o">|</span>     <span class="mf">71.369</span>    <span class="o">|</span>  <span class="o">-</span><span class="mf">95.648</span>  <span class="o">|</span>   <span class="o">-</span><span class="mf">69.59</span>  <span class="o">|</span>      <span class="mf">2.717</span>      <span class="o">|</span>     <span class="mf">1.779</span>     <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>    <span class="mf">35.254</span>   <span class="o">|</span>     <span class="mf">12.96</span>     <span class="o">|</span>  <span class="o">-</span><span class="mf">34.192</span>  <span class="o">|</span>  <span class="o">-</span><span class="mf">15.083</span>  <span class="o">|</span>      <span class="mf">1.062</span>      <span class="o">|</span>     <span class="o">-</span><span class="mf">2.123</span>    <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>    <span class="mf">13.248</span>   <span class="o">|</span>     <span class="o">-</span><span class="mf">6.223</span>    <span class="o">|</span>  <span class="o">-</span><span class="mf">13.132</span>  <span class="o">|</span>   <span class="mf">2.571</span>   <span class="o">|</span>      <span class="mf">0.116</span>      <span class="o">|</span>     <span class="o">-</span><span class="mf">3.652</span>    <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">4</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">4</span>    <span class="o">|</span>    <span class="mf">17.072</span>   <span class="o">|</span>     <span class="o">-</span><span class="mf">5.181</span>    <span class="o">|</span>  <span class="o">-</span><span class="mf">16.891</span>  <span class="o">|</span>    <span class="mf">1.74</span>   <span class="o">|</span>      <span class="mf">0.181</span>      <span class="o">|</span>     <span class="o">-</span><span class="mf">3.441</span>    <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">5</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">5</span>    <span class="o">|</span>    <span class="mf">25.328</span>   <span class="o">|</span>     <span class="o">-</span><span class="mf">1.85</span>     <span class="o">|</span>  <span class="o">-</span><span class="mf">25.071</span>  <span class="o">|</span>   <span class="o">-</span><span class="mf">0.352</span>  <span class="o">|</span>      <span class="mf">0.257</span>      <span class="o">|</span>     <span class="o">-</span><span class="mf">2.202</span>    <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">6</span>   <span class="o">|</span>    <span class="mi">3</span>     <span class="o">|</span>   <span class="mi">4</span>    <span class="o">|</span>    <span class="mf">23.098</span>   <span class="o">|</span>     <span class="mf">4.643</span>     <span class="o">|</span>  <span class="o">-</span><span class="mf">23.042</span>  <span class="o">|</span>   <span class="o">-</span><span class="mf">6.465</span>  <span class="o">|</span>      <span class="mf">0.057</span>      <span class="o">|</span>     <span class="o">-</span><span class="mf">1.822</span>    <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">7</span>   <span class="o">|</span>    <span class="mi">4</span>     <span class="o">|</span>   <span class="mi">5</span>    <span class="o">|</span>    <span class="o">-</span><span class="mf">0.067</span>   <span class="o">|</span>     <span class="o">-</span><span class="mf">0.275</span>    <span class="o">|</span>   <span class="mf">0.071</span>   <span class="o">|</span>   <span class="o">-</span><span class="mf">4.648</span>  <span class="o">|</span>      <span class="mf">0.004</span>      <span class="o">|</span>     <span class="o">-</span><span class="mf">4.922</span>    <span class="o">|</span>
+<span class="o">+------+----------+--------+-------------+---------------+-----------+-----------+-----------------+---------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-ac-slack">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.slack_ac">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">slack_ac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.slack_ac"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.slack_ac" title="Link to this definition">¶</a></dt>
+<dd><p>Displays slack bus information for AC grid.</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Slack</span> <span class="n">nodes</span>
+<span class="o">+-----------+------------+</span>
+<span class="o">|</span>    <span class="n">Grid</span>   <span class="o">|</span> <span class="n">Slack</span> <span class="n">node</span> <span class="o">|</span>
+<span class="o">+-----------+------------+</span>
+<span class="o">|</span> <span class="n">AC</span> <span class="n">Grid</span> <span class="mi">1</span> <span class="o">|</span>     <span class="mi">1</span>      <span class="o">|</span>
+<span class="o">+-----------+------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-ac-power-loss">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.power_loss_ac">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">power_loss_ac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.power_loss_ac"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.power_loss_ac" title="Link to this definition">¶</a></dt>
+<dd><p>Displays power loss information for AC grid.</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Power</span> <span class="n">loss</span> <span class="n">AC</span>
+<span class="o">+------------+-----------------+</span>
+<span class="o">|</span>    <span class="n">Grid</span>    <span class="o">|</span> <span class="n">Power</span> <span class="n">Loss</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+------------+-----------------+</span>
+<span class="o">|</span> <span class="n">AC</span> <span class="n">Grid</span> <span class="mi">1</span>  <span class="o">|</span>      <span class="mf">4.393</span>      <span class="o">|</span>
+<span class="o">|</span> <span class="n">Total</span> <span class="n">loss</span> <span class="o">|</span>      <span class="mf">4.393</span>      <span class="o">|</span>
+<span class="o">+------------+-----------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="dc-specific-results">
+<h3>DC Specific Results<a class="headerlink" href="#dc-specific-results" title="Link to this heading">¶</a></h3>
+<dl class="py method" id="res-dc-bus">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.dc_bus">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">dc_bus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.dc_bus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.dc_bus" title="Link to this definition">¶</a></dt>
+<dd><p>Displays DC bus results including:</p>
+<ul class="simple">
+<li><p>Power generation</p></li>
+<li><p>Power load</p></li>
+<li><p>Converter power</p></li>
+<li><p>Power injection</p></li>
+<li><p>Voltage</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">DC</span>
+
+<span class="n">Grid</span> <span class="n">DC</span> <span class="mi">1</span>
+<span class="o">+------+----------------+-----------------+---------------------------+---------------------+--------------+</span>
+<span class="o">|</span> <span class="n">Node</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">Gen</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">Load</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">Converter</span> <span class="n">ACDC</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">injected</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Voltage</span> <span class="p">(</span><span class="n">pu</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+------+----------------+-----------------+---------------------------+---------------------+--------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>   <span class="o">|</span>       <span class="mi">0</span>        <span class="o">|</span>        <span class="mi">0</span>        <span class="o">|</span>           <span class="mf">58.652</span>          <span class="o">|</span>        <span class="mf">58.652</span>       <span class="o">|</span>    <span class="mf">1.008</span>     <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>   <span class="o">|</span>       <span class="mi">0</span>        <span class="o">|</span>        <span class="mi">0</span>        <span class="o">|</span>           <span class="o">-</span><span class="mf">21.92</span>          <span class="o">|</span>        <span class="o">-</span><span class="mf">21.92</span>       <span class="o">|</span>     <span class="mf">1.0</span>      <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>   <span class="o">|</span>       <span class="mi">0</span>        <span class="o">|</span>        <span class="mi">0</span>        <span class="o">|</span>          <span class="o">-</span><span class="mf">36.191</span>          <span class="o">|</span>       <span class="o">-</span><span class="mf">36.191</span>       <span class="o">|</span>    <span class="mf">0.998</span>     <span class="o">|</span>
+<span class="o">+------+----------------+-----------------+---------------------------+---------------------+--------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-dc-lines-current">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.dc_lines_current">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">dc_lines_current</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.dc_lines_current"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.dc_lines_current" title="Link to this definition">¶</a></dt>
+<dd><p>Displays DC line current results including:</p>
+<ul class="simple">
+<li><p>Current magnitude</p></li>
+<li><p>Line loading percentage</p></li>
+<li><p>Line capacity</p></li>
+<li><p>Line polarity</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">DC</span> <span class="n">Lines</span> <span class="n">current</span>
+<span class="n">Grid</span> <span class="n">DC</span> <span class="mi">1</span>
+<span class="o">+------+----------+--------+--------+-----------+---------------+------------------------------------+</span>
+<span class="o">|</span> <span class="n">Line</span> <span class="o">|</span> <span class="n">From</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">To</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">I</span> <span class="p">(</span><span class="n">kA</span><span class="p">)</span> <span class="o">|</span> <span class="n">Loading</span> <span class="o">%</span> <span class="o">|</span> <span class="n">Capacity</span> <span class="p">[</span><span class="n">kA</span><span class="p">]</span> <span class="o">|</span> <span class="n">Polarity</span>                           <span class="o">|</span>
+<span class="o">+------+----------+--------+--------+-----------+---------------+------------------------------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">2</span>    <span class="o">|</span> <span class="mf">0.044</span>  <span class="o">|</span>   <span class="mf">30.681</span>  <span class="o">|</span>     <span class="mf">0.145</span>     <span class="o">|</span> <span class="n">Monopolar</span> <span class="p">(</span><span class="n">symmetrically</span> <span class="n">grounded</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span> <span class="mf">0.012</span>  <span class="o">|</span>   <span class="mf">8.519</span>   <span class="o">|</span>     <span class="mf">0.145</span>     <span class="o">|</span> <span class="n">Monopolar</span> <span class="p">(</span><span class="n">symmetrically</span> <span class="n">grounded</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>  <span class="mf">0.04</span>  <span class="o">|</span>   <span class="mf">27.971</span>  <span class="o">|</span>     <span class="mf">0.145</span>     <span class="o">|</span> <span class="n">Monopolar</span> <span class="p">(</span><span class="n">symmetrically</span> <span class="n">grounded</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+------+----------+--------+--------+-----------+---------------+------------------------------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-dc-lines-power">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.dc_lines_power">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">dc_lines_power</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.dc_lines_power"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.dc_lines_power" title="Link to this definition">¶</a></dt>
+<dd><p>Displays DC line power flow results including:</p>
+<ul class="simple">
+<li><p>Power flow from sending end</p></li>
+<li><p>Power flow to receiving end</p></li>
+<li><p>Power losses</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Results</span> <span class="n">DC</span> <span class="n">Lines</span> <span class="n">power</span>
+<span class="n">Grid</span> <span class="n">DC</span> <span class="mi">1</span>
+<span class="o">+------+----------+--------+-------------+-----------+-----------------+---------------+</span>
+<span class="o">|</span> <span class="n">Line</span> <span class="o">|</span> <span class="n">From</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">To</span> <span class="n">bus</span> <span class="o">|</span> <span class="n">P</span> <span class="kn">from</span><span class="w"> </span><span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">P</span> <span class="n">to</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">loss</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Capacity</span> <span class="p">[</span><span class="n">MW</span><span class="p">]</span> <span class="o">|</span>
+<span class="o">+------+----------+--------+-------------+-----------+-----------------+---------------+</span>
+<span class="o">|</span>  <span class="mi">1</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">2</span>    <span class="o">|</span>    <span class="mf">30.681</span>   <span class="o">|</span>   <span class="o">-</span><span class="mf">30.44</span>  <span class="o">|</span>      <span class="mf">0.241</span>      <span class="o">|</span>      <span class="mi">100</span>      <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">2</span>   <span class="o">|</span>    <span class="mi">2</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>    <span class="mf">8.519</span>    <span class="o">|</span>    <span class="o">-</span><span class="mf">8.5</span>   <span class="o">|</span>      <span class="mf">0.019</span>      <span class="o">|</span>      <span class="mi">100</span>      <span class="o">|</span>
+<span class="o">|</span>  <span class="mi">3</span>   <span class="o">|</span>    <span class="mi">1</span>     <span class="o">|</span>   <span class="mi">3</span>    <span class="o">|</span>    <span class="mf">27.971</span>   <span class="o">|</span>   <span class="o">-</span><span class="mf">27.69</span>  <span class="o">|</span>      <span class="mf">0.281</span>      <span class="o">|</span>      <span class="mi">100</span>      <span class="o">|</span>
+<span class="o">+------+----------+--------+-------------+-----------+-----------------+---------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-dc-slack">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.slack_dc">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">slack_dc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.slack_dc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.slack_dc" title="Link to this definition">¶</a></dt>
+<dd><p>Displays slack bus information for DC grid.</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Slack</span> <span class="n">nodes</span>
+<span class="o">+-----------+------------+</span>
+<span class="o">|</span>    <span class="n">Grid</span>   <span class="o">|</span> <span class="n">Slack</span> <span class="n">node</span> <span class="o">|</span>
+<span class="o">+-----------+------------+</span>
+<span class="o">|</span> <span class="n">AC</span> <span class="n">Grid</span> <span class="mi">1</span> <span class="o">|</span>     <span class="mi">1</span>      <span class="o">|</span>
+<span class="o">|</span> <span class="n">DC</span> <span class="n">Grid</span> <span class="mi">1</span> <span class="o">|</span>     <span class="mi">2</span>      <span class="o">|</span>
+<span class="o">+-----------+------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-dc-power-loss">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.power_loss_dc">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">power_loss_dc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.power_loss_dc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.power_loss_dc" title="Link to this definition">¶</a></dt>
+<dd><p>Displays power loss information for DC grid.</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Power</span> <span class="n">loss</span> <span class="n">DC</span>
+<span class="o">+------------+-----------------+</span>
+<span class="o">|</span>    <span class="n">Grid</span>    <span class="o">|</span> <span class="n">Power</span> <span class="n">Loss</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+------------+-----------------+</span>
+<span class="o">|</span> <span class="n">DC</span> <span class="n">Grid</span> <span class="mi">1</span>  <span class="o">|</span>      <span class="mf">0.541</span>      <span class="o">|</span>
+<span class="o">|</span> <span class="n">Total</span> <span class="n">loss</span> <span class="o">|</span>      <span class="mf">0.541</span>      <span class="o">|</span>
+<span class="o">+------------+-----------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="optimization-results">
+<h3>Optimization Results<a class="headerlink" href="#optimization-results" title="Link to this heading">¶</a></h3>
+<dl class="py method" id="res-ext-gen">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.ext_gen">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">ext_gen</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.ext_gen"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.ext_gen" title="Link to this definition">¶</a></dt>
+<dd><p>Displays external generator results including:</p>
+<ul class="simple">
+<li><p>Generator</p></li>
+<li><p>Power (MW)</p></li>
+<li><p>Price (€/MWh)</p></li>
+<li><p>Loading (%)</p></li>
+<li><p>Cost (€)</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>External Generation optimization
++-----------+------+------------+-----------------------+-------------------------+--------------------+-----------+---------+
+| Generator | Node | Power (MW) | Reactive power (MVAR) | Quadratic Price €/MWh^2 | Linear Price €/MWh | Loading % | Cost k€ |
++-----------+------+------------+-----------------------+-------------------------+--------------------+-----------+---------+
+|     1     | 30.0 |  673.041   |         140.0         |           0.01          |        0.3         |   61.695  |   5.0   |
+|     2     | 31.0 |   646.0    |         300.0         |           0.01          |        0.3         |   100.0   |   4.0   |
+|     3     | 32.0 |  672.666   |        285.674        |           0.01          |        0.3         |   93.143  |   5.0   |
++-----------+------+------------+-----------------------+-------------------------+--------------------+-----------+---------+
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-ext-ren">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.ext_ren">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">ext_ren</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.ext_ren"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.ext_ren" title="Link to this definition">¶</a></dt>
+<dd><p>Displays renewable sources results including:</p>
+<ul class="simple">
+<li><p>Base power (MW)</p></li>
+<li><p>Curtailment (%)</p></li>
+<li><p>Power injected (MW)</p></li>
+<li><p>Reactive power injected (MVAR)</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Renewable energy sources
++-------+-----------------+---------------+---------------------+--------------------------------+-------------+---------+-----------------------+
+|  Bus  | Base Power (MW) | Curtailment % | Power Injected (MW) | Reactive Power Injected (MVAR) | Price €/MWh | Cost k€ | Curtailment Cost [k€] |
++-------+-----------------+---------------+---------------------+--------------------------------+-------------+---------+-----------------------+
+|   T1  |       9.5       |     0.152     |        9.486        |             -0.524             |      0      |    0    |           0           |
+|   T2  |       9.5       |     0.154     |        9.485        |             -0.527             |      0      |    0    |           0           |
+|   T3  |       9.5       |     0.156     |        9.485        |             -0.53              |      0      |    0    |           0           |
+|   T4  |       9.5       |     0.159     |        9.485        |             -0.535             |      0      |    0    |           0           |
+|   T5  |       9.5       |     1.095     |        9.396        |             1.402              |      0      |    0    |           0           |
+|   T6  |       9.5       |     1.091     |        9.396        |              1.4               |      0      |    0    |           0           |
+|   T7  |       9.5       |     1.088     |        9.397        |             1.398              |      0      |    0    |           0           |
+|   T8  |       9.5       |     1.085     |        9.397        |             1.396              |      0      |    0    |           0           |
+| Total |       76.0      |     0.623     |        75.527       |                                |             |    0    |           0           |
++-------+-----------------+---------------+---------------------+--------------------------------+-------------+---------+-----------------------+
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-objective">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.obj_res">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">obj_res</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.obj_res"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.obj_res" title="Link to this definition">¶</a></dt>
+<dd><p>Displays function value for all optimization functions.</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Objective</span> <span class="n">function</span> <span class="n">value</span>
+<span class="o">+-----------------------+--------+------------------+------------------+</span>
+<span class="o">|</span>       <span class="n">Objective</span>       <span class="o">|</span> <span class="n">Weight</span> <span class="o">|</span>      <span class="n">Value</span>       <span class="o">|</span>  <span class="n">Weighted</span> <span class="n">Value</span>  <span class="o">|</span>
+<span class="o">+-----------------------+--------+------------------+------------------+</span>
+<span class="o">|</span>        <span class="n">Ext_Gen</span>        <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>    <span class="mi">15</span> <span class="mf">143.85</span>     <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>      <span class="n">Energy_cost</span>      <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>    <span class="mi">172</span> <span class="mf">036.78</span>    <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Curtailment_Red</span>    <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>     <span class="mi">5</span> <span class="mf">851.94</span>     <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>       <span class="n">AC_losses</span>       <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">47.55</span>       <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>       <span class="n">DC_losses</span>       <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">49.34</span>       <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Converter_Losses</span>   <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">156.38</span>      <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>     <span class="n">General_Losses</span>    <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">253.27</span>      <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span> <span class="n">PZ_cost_of_generation</span> <span class="o">|</span>  <span class="mf">1.00</span>  <span class="o">|</span> <span class="mi">2</span> <span class="mi">266</span> <span class="mi">461</span> <span class="mf">478.61</span> <span class="o">|</span> <span class="mi">2</span> <span class="mi">266</span> <span class="mi">461</span> <span class="mf">478.61</span> <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Renewable_profit</span>   <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">|</span>      <span class="n">Gen_set_dev</span>      <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>     <span class="mi">2</span> <span class="mf">089.86</span>     <span class="o">|</span>       <span class="mf">0.00</span>       <span class="o">|</span>
+<span class="o">+-----------------------+--------+------------------+------------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="price-zone-optimization">
+<h3>Price Zone optimization<a class="headerlink" href="#price-zone-optimization" title="Link to this heading">¶</a></h3>
+<dl class="py method" id="res-price-zone">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.price_zone">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">price_zone</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.price_zone"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.price_zone" title="Link to this definition">¶</a></dt>
+<dd><p>Displays price zone results</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Price_Zone
++------------+--------------------------+-----------------+-----------+-------------+-------------+---------------+
+| Price_Zone | Renewable Generation(MW) | Generation (MW) | Load (MW) | Import (MW) | Export (MW) | Price (€/MWh) |
++------------+--------------------------+-----------------+-----------+-------------+-------------+---------------+
+|     BE     |            0             |     2430.355    |  3028.613 |   598.258   |      0      |     18.45     |
+|     DE     |            0             |     7182.182    |  8215.099 |   1032.917  |      0      |      0.0      |
+|     DK     |            0             |     183.954     |  840.161  |   656.207   |      0      |      3.93     |
+|     GB     |            0             |     3880.814    |  5992.166 |   2111.353  |      0      |      24.8     |
+|     NL     |            0             |     1139.034    |  2380.084 |   1241.049  |      0      |     24.71     |
+|     NO     |            0             |     327.514     |  812.459  |   484.945   |      0      |      6.36     |
+|    MTDC    |            0             |        0        |     0     |      0      |      0      |       1       |
+|    o_BE    |          31.268          |       0.0       |    0.0    |      0      |    31.268   |     18.45     |
+|    o_DE    |         2050.71          |       0.0       |    0.0    |      0      |   2050.71   |      0.0      |
+|    o_DK    |         3082.808         |       0.0       |    0.0    |      0      |   3082.808  |      3.93     |
+|    o_NL    |         775.306          |       0.0       |    0.0    |      0      |   775.306   |     24.71     |
+|    o_NO    |         498.419          |       0.0       |    0.0    |      0      |   498.419   |      6.36     |
++------------+--------------------------+-----------------+-----------+-------------+-------------+---------------+
++------------+------------------+-------------------------+-----------------------+----------------------+-----------------+
+| Price_Zone | Social Cost [k€] | Renewable Gen Cost [k€] | Curtailment Cost [k€] | Generation Cost [k€] | Total Cost [k€] |
++------------+------------------+-------------------------+-----------------------+----------------------+-----------------+
+|     BE     |     -38.712      |           0.0           |           0           |        44.845        |      6.133      |
+|     DE     |     -88.381      |           0.0           |           0           |         0.0          |     -88.381     |
+|     DK     |      -6.845      |           0.0           |           0           |        0.723         |      -6.123     |
+|     GB     |     -94.419      |           0.0           |           0           |        96.239        |      1.819      |
+|     NL     |     -99.751      |           0.0           |           0           |        28.148        |     -71.602     |
+|     NO     |      -3.909      |           0.0           |           0           |        2.082         |      -1.826     |
+|    MTDC    |       0.0        |           0.0           |           0           |         0.0          |       0.0       |
+|    o_BE    |       0.0        |          0.577          |           0           |         0.0          |      0.577      |
+|    o_DE    |       0.0        |           0.0           |           0           |         0.0          |       0.0       |
+|    o_DK    |       0.0        |          12.109         |           0           |         0.0          |      12.109     |
+|    o_NL    |       0.0        |          19.16          |           0           |         0.0          |      19.16      |
+|    o_NO    |       0.0        |          3.169          |           0           |         0.0          |      3.169      |
+|   Total    |     -332.017     |          35.015         |           0           |       172.037        |     -124.966    |
++------------+------------------+-------------------------+-----------------------+----------------------+-----------------+
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="treansmission-expansion">
+<h3>Treansmission expansion<a class="headerlink" href="#treansmission-expansion" title="Link to this heading">¶</a></h3>
+<dl class="py method" id="res-tep-n">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.tep_n">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">tep_n</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.tep_n"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.tep_n" title="Link to this definition">¶</a></dt>
+<dd><p>Displays transmission expansion results</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Transmission Expansion Problem
++---------+---------+---------+-------------+---------+-----------------------------+--------------------+
+| Element |   Type  | Initial | Optimized N | Maximum | Optimized Power Rating [MW] | Expansion Cost [€] |
++---------+---------+---------+-------------+---------+-----------------------------+--------------------+
+|   2-6   | AC Line |    0    |     1.0     |    5    |             120             |       30.00        |
+|   3-5   | AC Line |    1    |     3.0     |    5    |             360             |       40.00        |
+|   4-6   | AC Line |    0    |     2.0     |    5    |             240             |       60.00        |
+|  Total  |         |         |             |         |                             |       130.00       |
++---------+---------+---------+-------------+---------+-----------------------------+--------------------+
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-tep-norm">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.tep_norm">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">tep_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.tep_norm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.tep_norm" title="Link to this definition">¶</a></dt>
+<dd><p>Displays NPV objective function value for transmission expansion results</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+-----------------------+--------+--------+----------------+----------------+</span>
+<span class="o">|</span>       <span class="n">Objective</span>       <span class="o">|</span> <span class="n">Weight</span> <span class="o">|</span> <span class="n">Value</span>  <span class="o">|</span> <span class="n">Weighted</span> <span class="n">Value</span> <span class="o">|</span>      <span class="n">NPV</span>       <span class="o">|</span>
+<span class="o">+-----------------------+--------+--------+----------------+----------------+</span>
+<span class="o">|</span>        <span class="n">Ext_Gen</span>        <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span> <span class="mf">774.55</span> <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span> <span class="mi">132</span> <span class="mi">468</span> <span class="mf">266.42</span> <span class="o">|</span>
+<span class="o">|</span>      <span class="n">Energy_cost</span>      <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Curtailment_Red</span>    <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>
+<span class="o">|</span>       <span class="n">AC_losses</span>       <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span> <span class="mf">14.55</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>  <span class="mi">2</span> <span class="mi">488</span> <span class="mf">902.61</span>  <span class="o">|</span>
+<span class="o">|</span>       <span class="n">DC_losses</span>       <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Converter_Losses</span>   <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>
+<span class="o">|</span>     <span class="n">General_Losses</span>    <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span> <span class="mf">14.55</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>  <span class="mi">2</span> <span class="mi">488</span> <span class="mf">902.61</span>  <span class="o">|</span>
+<span class="o">|</span> <span class="n">PZ_cost_of_generation</span> <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Renewable_profit</span>   <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>
+<span class="o">|</span>      <span class="n">Gen_set_dev</span>      <span class="o">|</span>  <span class="mf">0.00</span>  <span class="o">|</span>  <span class="mf">3.36</span>  <span class="o">|</span>      <span class="mf">0.00</span>      <span class="o">|</span>   <span class="mi">575</span> <span class="mf">038.66</span>   <span class="o">|</span>
+<span class="o">+-----------------------+--------+--------+----------------+----------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="other-results">
+<h3>Other Results<a class="headerlink" href="#other-results" title="Link to this heading">¶</a></h3>
+<dl class="py method" id="res-converter">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.converter">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">converter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.converter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.converter" title="Link to this definition">¶</a></dt>
+<dd><p>Displays converter results including:</p>
+<ul class="simple">
+<li><p>AC and DC power</p></li>
+<li><p>Reactive power</p></li>
+<li><p>Power losses</p></li>
+<li><p>Control modes</p></li>
+<li><p>Loading</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">AC</span> <span class="n">DC</span> <span class="n">Converters</span>
+<span class="o">+-----------+---------+---------+-----------------+----------------------+-----------------+--------------+-----------------------+-----------------------+-----------------------------+</span>
+<span class="o">|</span> <span class="n">Converter</span> <span class="o">|</span> <span class="n">AC</span> <span class="n">node</span> <span class="o">|</span> <span class="n">DC</span> <span class="n">node</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">s</span> <span class="n">AC</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reactive</span> <span class="n">s</span> <span class="n">AC</span> <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">c</span> <span class="n">AC</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">DC</span><span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reactive</span> <span class="n">power</span> <span class="p">(</span><span class="n">MVAR</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">loss</span> <span class="n">IGBTs</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Power</span> <span class="n">loss</span> <span class="n">AC</span> <span class="n">elements</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span>
+<span class="o">+-----------+---------+---------+-----------------+----------------------+-----------------+--------------+-----------------------+-----------------------+-----------------------------+</span>
+<span class="o">|</span>     <span class="mi">1</span>     <span class="o">|</span>    <span class="mi">2</span>    <span class="o">|</span>    <span class="mi">1</span>    <span class="o">|</span>      <span class="o">-</span><span class="mf">60.0</span>      <span class="o">|</span>        <span class="o">-</span><span class="mf">40.0</span>         <span class="o">|</span>     <span class="o">-</span><span class="mf">59.916</span>     <span class="o">|</span>    <span class="mf">58.652</span>    <span class="o">|</span>        <span class="o">-</span><span class="mf">32.129</span>        <span class="o">|</span>         <span class="mf">1.264</span>         <span class="o">|</span>            <span class="mf">0.084</span>            <span class="o">|</span>
+<span class="o">|</span>     <span class="mi">2</span>     <span class="o">|</span>    <span class="mi">3</span>    <span class="o">|</span>    <span class="mi">2</span>    <span class="o">|</span>      <span class="mf">20.774</span>     <span class="o">|</span>        <span class="mf">7.131</span>         <span class="o">|</span>      <span class="mf">20.782</span>     <span class="o">|</span>    <span class="o">-</span><span class="mf">21.92</span>    <span class="o">|</span>         <span class="o">-</span><span class="mf">0.621</span>        <span class="o">|</span>         <span class="mf">1.139</span>         <span class="o">|</span>            <span class="mf">0.008</span>            <span class="o">|</span>
+<span class="o">|</span>     <span class="mi">3</span>     <span class="o">|</span>    <span class="mi">5</span>    <span class="o">|</span>    <span class="mi">3</span>    <span class="o">|</span>       <span class="mf">35.0</span>      <span class="o">|</span>         <span class="mf">5.0</span>          <span class="o">|</span>      <span class="mf">35.02</span>      <span class="o">|</span>   <span class="o">-</span><span class="mf">36.191</span>    <span class="o">|</span>         <span class="o">-</span><span class="mf">0.269</span>        <span class="o">|</span>          <span class="mf">1.17</span>         <span class="o">|</span>             <span class="mf">0.02</span>            <span class="o">|</span>
+<span class="o">+-----------+---------+---------+-----------------+----------------------+-----------------+--------------+-----------------------+-----------------------+-----------------------------+</span>
+<span class="o">+-----------+-----------------+-----------------+-----------+----------------+</span>
+<span class="o">|</span> <span class="n">Converter</span> <span class="o">|</span> <span class="n">AC</span> <span class="n">control</span> <span class="n">mode</span> <span class="o">|</span> <span class="n">DC</span> <span class="n">control</span> <span class="n">mode</span> <span class="o">|</span> <span class="n">Loading</span> <span class="o">%</span> <span class="o">|</span> <span class="n">Capacity</span> <span class="p">[</span><span class="n">MVA</span><span class="p">]</span> <span class="o">|</span>
+<span class="o">+-----------+-----------------+-----------------+-----------+----------------+</span>
+<span class="o">|</span>     <span class="mi">1</span>     <span class="o">|</span>        <span class="n">PQ</span>       <span class="o">|</span>       <span class="n">PAC</span>       <span class="o">|</span>   <span class="mf">60.093</span>  <span class="o">|</span>      <span class="mi">120</span>       <span class="o">|</span>
+<span class="o">|</span>     <span class="mi">2</span>     <span class="o">|</span>        <span class="n">PV</span>       <span class="o">|</span>      <span class="n">Slack</span>      <span class="o">|</span>   <span class="mf">18.303</span>  <span class="o">|</span>      <span class="mi">120</span>       <span class="o">|</span>
+<span class="o">|</span>     <span class="mi">3</span>     <span class="o">|</span>        <span class="n">PQ</span>       <span class="o">|</span>       <span class="n">PAC</span>       <span class="o">|</span>   <span class="mf">30.159</span>  <span class="o">|</span>      <span class="mi">120</span>       <span class="o">|</span>
+<span class="o">+-----------+-----------------+-----------------+-----------+----------------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method" id="res-power-loss">
+<dt class="sig sig-object py" id="pyflow_acdc.Results.power_loss">
+<span class="sig-prename descclassname"><span class="pre">Results.</span></span><span class="sig-name descname"><span class="pre">power_loss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">print_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyflow_acdc/Results_class.html#Results.power_loss"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyflow_acdc.Results.power_loss" title="Link to this definition">¶</a></dt>
+<dd><p>Displays power loss information for both AC and DC grids.</p>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Power</span> <span class="n">loss</span>
+<span class="o">+------------------+-----------------+--------+</span>
+<span class="o">|</span>       <span class="n">Grid</span>       <span class="o">|</span> <span class="n">Power</span> <span class="n">Loss</span> <span class="p">(</span><span class="n">MW</span><span class="p">)</span> <span class="o">|</span> <span class="n">Load</span> <span class="o">%</span> <span class="o">|</span>
+<span class="o">+------------------+-----------------+--------+</span>
+<span class="o">|</span>    <span class="n">AC</span> <span class="n">Grid</span> <span class="mi">1</span>     <span class="o">|</span>      <span class="mf">4.393</span>      <span class="o">|</span> <span class="mf">32.739</span> <span class="o">|</span>
+<span class="o">|</span>    <span class="n">DC</span> <span class="n">Grid</span> <span class="mi">1</span>     <span class="o">|</span>      <span class="mf">0.541</span>      <span class="o">|</span> <span class="mf">22.39</span>  <span class="o">|</span>
+<span class="o">|</span> <span class="n">AC</span> <span class="n">DC</span> <span class="n">Converters</span> <span class="o">|</span>      <span class="mf">3.685</span>      <span class="o">|</span>        <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Total</span> <span class="n">loss</span>    <span class="o">|</span>      <span class="mf">8.619</span>      <span class="o">|</span>        <span class="o">|</span>
+<span class="o">|</span>                  <span class="o">|</span>                 <span class="o">|</span>        <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Generation</span>    <span class="o">|</span>     <span class="mf">173.619</span>     <span class="o">|</span>        <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Efficiency</span>    <span class="o">|</span>      <span class="mf">95.0</span><span class="o">%</span>      <span class="o">|</span>        <span class="o">|</span>
+<span class="o">+------------------+-----------------+--------+</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="pf.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Power Flow Module</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="grid_analysis.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Grid Analysis</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025-2026, Bernardo Castro Valerio
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Results</a><ul>
+<li><a class="reference internal" href="#class-reference">Class Reference</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results"><code class="docutils literal notranslate"><span class="pre">Results</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#class-methods">Class Methods</a><ul>
+<li><a class="reference internal" href="#options">Options</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.options"><code class="docutils literal notranslate"><span class="pre">Results.options()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#all">All</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.all"><code class="docutils literal notranslate"><span class="pre">Results.all()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.all_ac"><code class="docutils literal notranslate"><span class="pre">Results.all_ac()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.all_dc"><code class="docutils literal notranslate"><span class="pre">Results.all_dc()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.slack_all"><code class="docutils literal notranslate"><span class="pre">Results.slack_all()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ac-specific-results">AC Specific Results</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.ac_powerflow"><code class="docutils literal notranslate"><span class="pre">Results.ac_powerflow()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.ac_voltage"><code class="docutils literal notranslate"><span class="pre">Results.ac_voltage()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.ac_lines_current"><code class="docutils literal notranslate"><span class="pre">Results.ac_lines_current()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.ac_lines_power"><code class="docutils literal notranslate"><span class="pre">Results.ac_lines_power()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.slack_ac"><code class="docutils literal notranslate"><span class="pre">Results.slack_ac()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.power_loss_ac"><code class="docutils literal notranslate"><span class="pre">Results.power_loss_ac()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dc-specific-results">DC Specific Results</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.dc_bus"><code class="docutils literal notranslate"><span class="pre">Results.dc_bus()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.dc_lines_current"><code class="docutils literal notranslate"><span class="pre">Results.dc_lines_current()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.dc_lines_power"><code class="docutils literal notranslate"><span class="pre">Results.dc_lines_power()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.slack_dc"><code class="docutils literal notranslate"><span class="pre">Results.slack_dc()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.power_loss_dc"><code class="docutils literal notranslate"><span class="pre">Results.power_loss_dc()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#optimization-results">Optimization Results</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.ext_gen"><code class="docutils literal notranslate"><span class="pre">Results.ext_gen()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.ext_ren"><code class="docutils literal notranslate"><span class="pre">Results.ext_ren()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.obj_res"><code class="docutils literal notranslate"><span class="pre">Results.obj_res()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#price-zone-optimization">Price Zone optimization</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.price_zone"><code class="docutils literal notranslate"><span class="pre">Results.price_zone()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#treansmission-expansion">Treansmission expansion</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.tep_n"><code class="docutils literal notranslate"><span class="pre">Results.tep_n()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.tep_norm"><code class="docutils literal notranslate"><span class="pre">Results.tep_norm()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#other-results">Other Results</a><ul>
+<li><a class="reference internal" href="#pyflow_acdc.Results.converter"><code class="docutils literal notranslate"><span class="pre">Results.converter()</span></code></a></li>
+<li><a class="reference internal" href="#pyflow_acdc.Results.power_loss"><code class="docutils literal notranslate"><span class="pre">Results.power_loss()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=8a448e45"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

@@ -419,6 +419,28 @@ def calculate_cost_of_generation(supply_df, min_volume,eq_volume,max_volume,max_
 
 
 def plot_curves(data, hour, name=None):
+    """Plot supply, demand, and price-zone curves for one hour.
+
+    Parameters
+    ----------
+    data : list[dict]
+        Output of :func:`price_zone_coef_data`.
+    hour : int
+        Hour to plot (1-based index into ``data``).
+    name : str, optional
+        Title suffix for the plot window.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The generated figure (also opened in the browser).
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> market_data = pyf.price_zone_coef_data(df, start=1, end=24)
+    >>> pyf.plot_curves(market_data, hour=12, name='Belgium')
+    """
     chosen_entry = data[hour - 1]
     # Extract Sell, Purchase, and Social Cost data
     sell_data = chosen_entry['Sell']

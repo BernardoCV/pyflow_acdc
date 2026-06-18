@@ -34,6 +34,10 @@ def opf_create_l_model_ac(model,grid,TEP=False):
         Source of network data.
     TEP : bool, optional
         Add transmission-expansion (cable-type selection) variables.
+
+    Examples
+    --------
+    >>> opf_create_l_model_ac(model, grid, TEP=False)
     """
     from .ACDC_OPF import translate_pyf_opf
 
@@ -666,15 +670,26 @@ def TEP_variables(model,grid):
 
 
 def export_acdc_l_model_to_pyflow_acdc(model,grid, solver_results=None, tee=False):
-    """
-    Export Pyomo results back to grid object
+    """Export a solved linear OPF Pyomo model back onto ``grid``.
 
-    Args:
-        model: Pyomo model
-        grid: Grid object
-        TEP: Transmission expansion planning flag
-        solver_results: Solver results object (optional, for checking termination condition)
-        tee: Boolean to control printing output
+    Called by :func:`~pyflow_acdc.optimal_l_pf` after solving. Updates generator
+    dispatch, AC angles, line flows, and optional TEP/REC/CT selections on
+    ``grid``.
+
+    Parameters
+    ----------
+    model : pyomo.ConcreteModel
+        Solved linear OPF model.
+    grid : Grid
+        Network to update (mutated in place).
+    solver_results : optional
+        Pyomo solver results (used for time-limit post-processing).
+    tee : bool, optional
+        Print diagnostic output during export.
+
+    Examples
+    --------
+    >>> export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=results, tee=True)
     """
 
     grid.OPF_run=True

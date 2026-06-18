@@ -49,6 +49,11 @@ def initialize_pyflowacdc():
     Needed when constructing grids manually (e.g. after a fresh ``pip`` install)
     to clear class-level numbering/name state between grids. ``create_grid_from_data``
     and ``create_grid_from_mat`` call this automatically.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.initialize_pyflowacdc()
     """
     Node_AC.reset_class()
     Line_AC.reset_class()
@@ -86,6 +91,21 @@ def create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_
     -------
     list
         ``[grid, res]`` — the constructed :class:`Grid` and its :class:`Results`.
+
+    Examples
+    --------
+    CSV paths may be passed directly; see also :doc:`csv_import`.
+
+    >>> import pyflow_acdc as pyf
+    >>> grid, results = pyf.create_grid_from_data(
+    ...     S_base=100,
+    ...     AC_node_data="AC_node_data.csv",
+    ...     AC_line_data="AC_line_data.csv",
+    ...     DC_node_data="DC_node_data.csv",
+    ...     DC_line_data="DC_line_data.csv",
+    ...     Converter_data="Converter_data.csv",
+    ...     data_in="pu",
+    ... )
     """
     if isinstance(AC_node_data, str):
         AC_node_data = pd.read_csv(AC_node_data, delimiter=",", quotechar="'", encoding="utf-8")
@@ -957,6 +977,11 @@ def create_grid_from_mat(matfile):
     -------
     list
         ``[grid, res]`` — the constructed :class:`Grid` and its :class:`Results`.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> grid, results = pyf.create_grid_from_mat("case9.mat")
     """
     if not matfile.endswith('.mat'):
         matfile = matfile + '.mat'
@@ -1551,6 +1576,11 @@ def change_S_base(grid,Sbase_new):
     -------
     Grid
         The modified grid.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> pyf.change_S_base(grid, 100)
     """
     Sbase_old = grid.S_base
     rate = Sbase_old/Sbase_new
@@ -1603,6 +1633,10 @@ def create_sub_grid(grid,Area=None, Area_name = None,polygon_coords=None):
         -------
         list
             ``[grid, res]`` — the sub-grid and its :class:`Results`.
+
+        Examples
+        --------
+        >>> subgrid, results = pyf.create_sub_grid(grid, Area_name="Zone1")
         """
         ac_nodes_list=[]
         dc_nodes_list=[]

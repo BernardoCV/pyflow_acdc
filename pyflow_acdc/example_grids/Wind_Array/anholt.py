@@ -1,7 +1,7 @@
 from pyflow_acdc.windfarm_loader import load_case_grid_and_geo
 
 
-def anholt(cab_types_allowed=3, ns=None, nt=None, curtailment_allowed=0):
+def anholt(cab_types_allowed=3, ns=None):
   
     grid, res = load_case_grid_and_geo("Anholt")
     grid.cab_types_allowed = cab_types_allowed

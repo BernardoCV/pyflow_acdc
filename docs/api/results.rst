@@ -77,13 +77,10 @@ AC Specific Results
 ^^^^^^^^^^^^^^^^^^^	
 By running the following code, the results will be printed in the terminal. 
 
-.. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/results/01_ac_specific_results.py
+   :language: python
+   :lines: 2-
 
-   import pyflow_acdc as pyf
-
-   grid,res = pyf.cases['Stagg5MATACDC']()
-   pyf.acdc_sequential(grid)
-   res.all()
 
 
 .. _res_ac_powerflow:

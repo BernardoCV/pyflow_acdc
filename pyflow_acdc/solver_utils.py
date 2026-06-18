@@ -1,5 +1,7 @@
 """Probe installed Pyomo solvers and OR-Tools backends in the current environment."""
 
+import logging
+
 DEFAULT_PYOMO_SOLVERS = [
     "cbc",
     "glpk",
@@ -71,7 +73,18 @@ def check_pyomo_solvers(pyomo_solvers=None, verbose=True):
         if verbose:
             print(f"checking {solver}")
         try:
-            if pyo.SolverFactory(solver).available(False):
+            if not verbose:
+                pyomo_opt_logger = logging.getLogger("pyomo.opt")
+                previous_level = pyomo_opt_logger.level
+                pyomo_opt_logger.setLevel(logging.ERROR)
+            else:
+                previous_level = None
+            try:
+                available = pyo.SolverFactory(solver).available(False)
+            finally:
+                if previous_level is not None:
+                    pyomo_opt_logger.setLevel(previous_level)
+            if available:
                 pyomo_available.append(solver)
             else:
                 pyomo_errors[solver] = f"Solver ({solver}) not available"
@@ -82,6 +95,17 @@ def check_pyomo_solvers(pyomo_solvers=None, verbose=True):
         "pyomo_available": pyomo_available,
         "pyomo_errors": pyomo_errors,
     }
+
+
+def is_pyomo_solver_available(solver_name):
+    """Return ``True`` if a Pyomo solver is installed and available.
+
+    Uses ``SolverFactory(...).available(False)`` so missing executables are
+    detected without raising (unlike ``available()`` with no argument).
+    """
+    result = check_pyomo_solvers([solver_name], verbose=False)
+    name = _normalize_solver_names([solver_name])[0]
+    return name in result["pyomo_available"]
 
 
 def check_ortools_backends(verbose=True):

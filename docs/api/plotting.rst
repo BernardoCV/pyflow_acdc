@@ -69,42 +69,24 @@ This function is used to plot the time series results of the grid.
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/plotting/01_time_series_results.py
+   :language: python
+   :lines: 2-
 
-       import pyflow_acdc as pyf
-       import pandas as pd
+**Plot shown in browser**
 
-       [grid,results] = pyf.NS_MTDC()
+.. themed-figure:: ts_plot_browser
+   :alt: Time Series Plot: Power Generation by price zone
+   :align: center
+   :width: 70%
 
-       start = 5750
-       end = 6000
-       obj = {'Energy_cost': 1}
+**Plot saved in current working directory**
 
-       market_prices_url = "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
-       TS_MK = pd.read_csv(market_prices_url)
-       pyf.add_TimeSeries(grid,TS_MK)
+.. themed-figure:: ts_plot_save
+   :alt: Time Series Plot: Power Generation by price zone
+   :align: center
+   :width: 70%
 
-       wind_load_url = "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
-       TS_wl = pd.read_csv(wind_load_url)
-       pyf.add_TimeSeries(grid,TS_wl)
-
-       times=pyf.TS_ACDC_OPF(grid,start,end,ObjRule=obj)  
-
-       pyf.plot_TS_res(grid,start,end,save_format='svg')
-
-   Plot shown in browser:
-
-   .. themed-figure:: ts_plot_browser
-      :alt: Time Series Plot: Power Generation by price zone
-      :align: center
-      :width: 70%
-
-   Plot saved in current working directory:
-
-   .. themed-figure:: ts_plot_save
-      :alt: Time Series Plot: Power Generation by price zone
-      :align: center
-      :width: 70%
 
 Time series probability
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -147,38 +129,25 @@ This function is used to plot the probability of the time series parameters or r
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/plotting/02_time_series_probability.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-      import pandas as pd
+.. themed-figure:: owpp_be_distribution
+   :alt: OWPP BE distribution
+   :align: center
+   :width: 70%
 
-      [grid,results] = pyf.NS_MTDC()
+.. themed-figure:: be_price_distribution
+   :alt: BE price distribution
+   :align: center
+   :width: 70%
 
-      start = 5750
-      end = 6000
-      obj = {'Energy_cost': 1}
+.. themed-figure:: l_be_distribution
+   :alt: L BE distribution
+   :align: center
+   :width: 70%
 
-      market_prices_url = "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
-      TS_MK = pd.read_csv(market_prices_url)
-      pyf.add_TimeSeries(grid,TS_MK)
-
-      wind_load_url = "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
-      TS_wl = pd.read_csv(wind_load_url)
-      pyf.add_TimeSeries(grid,TS_wl)
-
-      pyf.time_series_prob(grid,'OWPP_BE',save_format='svg')
-      pyf.time_series_prob(grid,'BE_price',save_format='svg')
-      pyf.time_series_prob(grid,'L_BE',save_format='svg')
-
-   .. list-table::
-      :widths: 50 50 50 
-
-      * - .. themed-figure:: owpp_be_distribution
-           :align: center
-        - .. themed-figure:: be_price_distribution
-           :align: center
-        - .. themed-figure:: l_be_distribution
-           :align: center
 
 Network Graph Visualization
 ---------------------------
@@ -217,19 +186,14 @@ Full grid visualization as a network graph
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/plotting/03_full_grid_visualization_as_a_network_graph.py
+   :language: python
+   :lines: 2-
 
-       import pyflow_acdc as pyf
-
-       grid,res = pyf.case24_3zones_acdc()
-
-       pyf.plot_graph(grid)
-
-   .. themed-figure:: case24acdc_full
-      :alt: case24_3zones_acdc_graph
-      :align: center
-      :width: 70%
-
+.. themed-figure:: case24acdc_full
+   :alt: case24_3zones_acdc_graph
+   :align: center
+   :width: 70%
 
 
 
@@ -241,51 +205,17 @@ This function is used to plot the neighbor graph of a node. You can either provi
 
 .. autofunction:: pyflow_acdc.plot_neighbour_graph
 
-   Creates a graph visualization of a node's neighbors.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to analyze
-        - Required
-      * - ``node``
-        - Node
-        - Node object
-        - None
-      * - ``node_name``
-        - str
-        - Node name
-        - None
-      * - ``base_node_size``
-        - int
-        - Base size for nodes
-        - 10
-      * - ``proximity``
-        - int
-        - Proximity
-        - 1
-
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/plotting/04_neighbor_graph.py
+   :language: python
+   :lines: 2-
 
-       import pyflow_acdc as pyf
+.. themed-figure:: case24acdc_neig
+   :alt: case24_3zones_acdc neighbour graph of node 111
+   :align: center
+   :width: 70%
 
-       grid,res = pyf.case24_3zones_acdc()
-
-       pyf.plot_neighbour_graph(grid,node_name='111.0')
-
-   .. themed-figure:: case24acdc_neig
-      :alt: case24_3zones_acdc neighbour graph of node 111.0
-      :align: center
-      :width: 70%
 
 Saving the Network Graph
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -323,18 +253,14 @@ For this function, you need to have the svgwrite library installed. You can inst
 
    **Example**
 
-   .. code-block:: python 
+.. literalinclude:: ../../pyflow_tests/doc_examples/plotting/05_saving_the_network_graph.py
+   :language: python
+   :lines: 2-
 
-       import pyflow_acdc as pyf
-
-       grid,res = pyf.NS_MTDC()
-
-       pyf.save_network_svg(grid)
-
-   .. themed-figure:: grid_network
-      :alt: grid_network
-      :align: center
-      :width: 70%
+.. themed-figure:: grid_network
+   :alt: grid_network
+   :align: center
+   :width: 70%
 
 
 Solver Diagnostics
@@ -352,3 +278,13 @@ Solver Diagnostics
    Generates a 3D network visualization of the grid and selected element
    attributes.
 
+   **Example**
+
+.. literalinclude:: ../../pyflow_tests/doc_examples/plotting/06_3d_plot.py
+   :language: python
+   :lines: 2-
+
+.. themed-figure:: 3d_plot
+   :alt: 3D plot of Moray East grid
+   :align: center
+   :width: 70%

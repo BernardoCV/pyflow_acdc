@@ -129,6 +129,7 @@ __all__ = [
 try:
     from .solver_utils import *
     __all__.append('check_available_solvers')
+    __all__.append('is_pyomo_solver_available')
 except ImportError:
     pass
 

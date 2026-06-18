@@ -1,0 +1,1276 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
+        <link rel="prefetch" href="../../_static/logo_dark.svg" as="image" />
+        <link rel="prefetch" href="../../_static/logo_dark.svg" as="image" />
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.07.19 -->
+        <title>pyflow_acdc.Export_files - pyflow acdc</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a3de4342" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --color-foreground-primary: #172033;
+  --color-foreground-secondary: #3f4f63;
+  --color-foreground-muted: #6b7788;
+  --color-foreground-border: #c7d0dc;
+  --color-background-primary: #f7f9fc;
+  --color-background-secondary: #eef3f8;
+  --color-background-hover: #e1e8f0;
+  --color-background-border: #d6dee8;
+  --color-brand-primary: #2563eb;
+  --color-brand-content: #1d4ed8;
+  --color-brand-visited: #6d28d9;
+  --color-sidebar-background: #142033;
+  --color-sidebar-background-border: #253a57;
+  --color-sidebar-brand-text: #f1f5f9;
+  --color-sidebar-caption-text: #8da2bb;
+  --color-sidebar-link-text: #d0dbe7;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1a2a;
+  --color-sidebar-search-background--focus: #17263d;
+  --color-sidebar-search-text: #f1f5f9;
+  --color-sidebar-search-border: #314761;
+  --color-sidebar-search-icon: #8da2bb;
+  --color-inline-code-background: #e2e8f0;
+  --color-highlighted-background: #dbeafe;
+  --color-admonition-background: #eef6ff;
+  --color-guilabel-background: #dbeafe80;
+  --color-guilabel-border: #93c5fd80;
+  --color-table-header-background: #dde6f1;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  --color-foreground-primary: #e6edf7;
+  --color-foreground-secondary: #a9b7c8;
+  --color-foreground-muted: #7b8798;
+  --color-foreground-border: #3b4a5f;
+  --color-background-primary: #090f18;
+  --color-background-secondary: #0f1724;
+  --color-background-hover: #172236;
+  --color-background-border: #25344a;
+  --color-brand-primary: #60a5fa;
+  --color-brand-content: #93c5fd;
+  --color-brand-visited: #a78bfa;
+  --color-sidebar-background: #050914;
+  --color-sidebar-background-border: #1e2d44;
+  --color-sidebar-brand-text: #f8fafc;
+  --color-sidebar-caption-text: #7b8da5;
+  --color-sidebar-link-text: #c6d3e2;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1724;
+  --color-sidebar-search-background--focus: #172236;
+  --color-sidebar-search-text: #e6edf7;
+  --color-sidebar-search-border: #25344a;
+  --color-sidebar-search-icon: #7b8da5;
+  --color-inline-code-background: #141d2b;
+  --color-highlighted-background: #1e3a5f;
+  --color-admonition-background: #101a2a;
+  --color-guilabel-background: #1e3a5f80;
+  --color-guilabel-border: #60a5fa40;
+  --color-table-header-background: #141d2b;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  --color-foreground-primary: #e6edf7;
+  --color-foreground-secondary: #a9b7c8;
+  --color-foreground-muted: #7b8798;
+  --color-foreground-border: #3b4a5f;
+  --color-background-primary: #090f18;
+  --color-background-secondary: #0f1724;
+  --color-background-hover: #172236;
+  --color-background-border: #25344a;
+  --color-brand-primary: #60a5fa;
+  --color-brand-content: #93c5fd;
+  --color-brand-visited: #a78bfa;
+  --color-sidebar-background: #050914;
+  --color-sidebar-background-border: #1e2d44;
+  --color-sidebar-brand-text: #f8fafc;
+  --color-sidebar-caption-text: #7b8da5;
+  --color-sidebar-link-text: #c6d3e2;
+  --color-sidebar-link-text--top-level: #60a5fa;
+  --color-sidebar-search-background: #0f1724;
+  --color-sidebar-search-background--focus: #172236;
+  --color-sidebar-search-text: #e6edf7;
+  --color-sidebar-search-border: #25344a;
+  --color-sidebar-search-icon: #7b8da5;
+  --color-inline-code-background: #141d2b;
+  --color-highlighted-background: #1e3a5f;
+  --color-admonition-background: #101a2a;
+  --color-guilabel-background: #1e3a5f80;
+  --color-guilabel-border: #60a5fa40;
+  --color-table-header-background: #141d2b;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     This documentation is under active development. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">pyflow acdc</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../../_static/logo_dark.svg" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../../_static/logo_dark.svg" alt="Dark Logo"/>
+  </div>
+  
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Introduction:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citing.html">Citing PyFlow ACDC</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Grid Management:</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../api/modelling.html">System Modelling</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of System Modelling</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modelling_ac.html">AC System Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modelling_dc.html">DC System Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modelling_acdc_converter.html">AC/DC Converter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modelling_sources.html">Sources and Price Zones</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/grid.html">Grid Creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/csv_import.html">CSV files for importing data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/grid_mod.html">Grid Modifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cable_database.html">Cable Database</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/grid_analysis.html">Grid Analysis</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/results.html">Results</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Power Flow Analysis:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/pf.html">Power Flow Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/opf.html">Optimal Power Flow Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/L_opf.html">AC ‘dc linear’ Optimal Power Flow Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Time Series &amp; Analysis:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/ts_mod.html">Time Series Modifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/ts.html">Time Series Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/market_coef.html">Market Coefficients Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Transmission Expansion Planning:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/tep.html">Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/sequential_step.html">Sequential STEP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/tep_pymoo.html">Pymoo Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/tep_dynamic.html">Multi period Transmission Expansion Planning Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/wf_array.html">Wind Farm Array Sizing Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization &amp; Export:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/plotting.html">Plotting Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/dash.html">Dashboards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/folium.html">Mapping</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/export_files.html">Export Files Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/solver_utils.html">Solver Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/windfarm_loader.html">Wind-Farm Case Loader</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for pyflow_acdc.Export_files</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;Grid export and loader code generation.</span>
+
+<span class="sd">Exports a :class:`~pyflow_acdc.Classes.Grid` to runnable Python, MATLAB, or</span>
+<span class="sd">pickle, including generation of loader code that reconstructs the grid.</span>
+
+<span class="sd">Owns: serialization/export and code generation.</span>
+<span class="sd">Does not own: the in-memory data model (see ``Classes``).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.Classes</span><span class="w"> </span><span class="kn">import</span> <span class="n">MTDCPrice_Zone</span><span class="p">,</span> <span class="n">OffshorePrice_Zone</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.constants</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">NodeType</span><span class="p">,</span>
+    <span class="n">ConverterDCType</span><span class="p">,</span>
+    <span class="n">AcDcSide</span><span class="p">,</span>
+    <span class="n">Polarity</span><span class="p">,</span>
+    <span class="n">DataInput</span><span class="p">,</span>
+    <span class="n">PriceZoneCategory</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gzip</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dill</span>  <span class="c1"># optional fallback</span>
+    <span class="n">_dill</span> <span class="o">=</span> <span class="n">dill</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="n">_dill</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;save_grid_to_file&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;save_grid_to_matlab&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;save_pickle&#39;</span>
+
+<span class="p">]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_dataframe_code_from_dict</span><span class="p">(</span><span class="n">data_list</span><span class="p">,</span> <span class="n">var_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate Python code to recreate a DataFrame from an input dictionary.</span>
+
+<span class="sd">    :param data_dict: Dictionary with column names as keys and lists as values.</span>
+<span class="sd">    :param var_name: The desired variable name for the DataFrame.</span>
+<span class="sd">    :return: Python code to recreate the DataFrame.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data_list</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2"> = None</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+    <span class="n">data_repr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">_data = [</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">data_list</span><span class="p">):</span>
+        <span class="n">data_repr</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;        </span><span class="si">{</span><span class="n">data</span><span class="si">}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">data_list</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;        </span><span class="si">{</span><span class="n">data</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="n">data_repr</span> <span class="o">+=</span> <span class="s2">&quot;    ]</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+    <span class="c1"># Create DataFrame from list of dictionaries</span>
+    <span class="n">df_creation_code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2"> = pd.DataFrame(</span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">_data)</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+    <span class="c1"># Return the complete code</span>
+    <span class="k">return</span> <span class="n">data_repr</span> <span class="o">+</span> <span class="n">df_creation_code</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_add_price_zone_code</span><span class="p">(</span><span class="n">price_zone_data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates Python code with a for loop to call `add_price_zone` for each set of arguments</span>
+<span class="sd">    in the list `price_zone_data`.</span>
+
+<span class="sd">    :param price_zone_data: List of dictionaries with arguments for add_price_zone.</span>
+<span class="sd">    :return: Python code as a string to call add_price_zone for each set of arguments.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">code</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">price_zone_data</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">code</span>
+
+    <span class="c1"># Loop through each entry in the data list and generate the corresponding function call</span>
+    <span class="k">for</span> <span class="n">zone</span> <span class="ow">in</span> <span class="n">price_zone_data</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">zone</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">PriceZoneCategory</span><span class="o">.</span><span class="n">MAIN</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    pyf.add_price_zone(grid,&#39;</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;,</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;price&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,import_pu_L=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;import_pu_L&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,export_pu_G=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;export_pu_G&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,a=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,b=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,c=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;c&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,import_expand_pu=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;import_expand_pu&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="k">for</span> <span class="n">zone</span> <span class="ow">in</span> <span class="n">price_zone_data</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">zone</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">PriceZoneCategory</span><span class="o">.</span><span class="n">OFFSHORE</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    pyf.add_offshore_price_zone(grid,&#39;</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;main_price_zone&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;,&#39;</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;)</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="k">for</span> <span class="n">zone</span> <span class="ow">in</span> <span class="n">price_zone_data</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">zone</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">PriceZoneCategory</span><span class="o">.</span><span class="n">MTDC</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    pyf.add_MTDC_price_zone(grid, &#39;</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;,linked_price_zones=</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;linked_price_zones&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,pricing_strategy=&#39;</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;pricing_strategy&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;)</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+
+    <span class="k">return</span> <span class="n">code</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_add_gen_code</span><span class="p">(</span><span class="n">gens</span><span class="p">,</span><span class="n">S_base</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate Python code with a for loop to call `add_gen` for each generator in the list `gens`.</span>
+
+<span class="sd">    :param gens: List of dictionaries, where each dictionary contains the arguments for add_gen.</span>
+<span class="sd">    :return: Python code as a string to call add_gen for each generator.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">code</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">gens</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">code</span>
+
+    <span class="c1"># Loop through each generator in the list and generate the corresponding function call</span>
+    <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="n">gens</span><span class="p">:</span>
+        <span class="c1"># Start building the add_gen function call</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    pyf.add_gen(grid, &#39;</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;node&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;, &#39;</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;, &quot;</span>
+
+        <span class="c1"># Dynamically handle parameters</span>
+        <span class="k">if</span> <span class="n">gen</span><span class="p">[</span><span class="s1">&#39;price_zone_link&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;price_zone_link=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;price_zone_link&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;np_gen=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;np_gen&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;fc=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;fc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">,lf=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;lf&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, qf=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;qf&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;MWmax=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Max_pow_gen&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">, MWmin=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Min_pow_gen&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;MVArmax=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Max_pow_genR&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">, MVArmin=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Min_pow_genR&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;PsetMW=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Pset&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">, QsetMVA=</span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qset&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+
+    <span class="k">return</span> <span class="n">code</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_add_ren_source_zone_code</span><span class="p">(</span><span class="n">ren_source_zones</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate Python code with a for loop to call `add_RenSource_zone` for each renewable source zone in the list `ren_source_zones`.</span>
+
+<span class="sd">    :param ren_source_zones: List of dictionaries, where each dictionary contains the arguments for add_RenSource_zone.</span>
+<span class="sd">    :return: Python code as a string to call add_RenSource_zone for each renewable source zone.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">code</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ren_source_zones</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">code</span>
+
+    <span class="k">for</span> <span class="n">zone</span> <span class="ow">in</span> <span class="n">ren_source_zones</span><span class="p">:</span>
+        <span class="c1"># Start building the add_RenSource_zone function call</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    pyf.add_RenSource_zone(grid,&#39;</span><span class="si">{</span><span class="n">zone</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;)</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+    <span class="k">return</span> <span class="n">code</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_add_ren_source_code</span><span class="p">(</span><span class="n">ren_sources</span><span class="p">,</span><span class="n">S_base</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate Python code with a for loop to call `add_RenSource` for each renewable source in the list `ren_sources`.</span>
+
+<span class="sd">    :param ren_sources: List of dictionaries, where each dictionary contains the arguments for add_RenSource.</span>
+<span class="sd">    :return: Python code as a string to call add_RenSource for each renewable source.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+
+
+    <span class="n">code</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ren_sources</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">code</span>
+
+    <span class="k">for</span> <span class="n">ren_source</span> <span class="ow">in</span> <span class="n">ren_sources</span><span class="p">:</span>
+        <span class="c1"># Start building the add_RenSource function call</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    pyf.add_RenSource(grid, &#39;</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;node_name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;, </span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;base&#39;</span><span class="p">]</span><span class="o">*</span><span class="n">S_base</span><span class="si">}</span><span class="s2">, &quot;</span>
+
+        <span class="c1"># Dynamically handle optional parameters</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;ren_source_name=&#39;</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;ren_source_name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;, &quot;</span> <span class="k">if</span> <span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;ren_source_name&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;available=</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;available&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;zone=&#39;</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;zone&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;, &quot;</span> <span class="k">if</span> <span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;zone&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;price_zone=&#39;</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;price_zone&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;, &quot;</span> <span class="k">if</span> <span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;price_zone&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Offshore=</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;Offshore&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="n">code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;MTDC=</span><span class="si">{</span><span class="n">ren_source</span><span class="p">[</span><span class="s1">&#39;MTDC&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+    <span class="k">return</span> <span class="n">code</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">create_dictionaries</span><span class="p">(</span><span class="n">grid</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;S_base&quot;</span><span class="p">:</span> <span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+        <span class="s2">&quot;nodes_AC&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;lines_AC&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;nodes_DC&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;lines_DC&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;Converters_ACDC&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;Price_Zone&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;RenSource_zone&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;Generators&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;RenSources&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="p">}</span>
+
+    <span class="c1"># AC Nodes</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">nodes_AC</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;nodes_AC&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">node</span><span class="p">:</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;nodes_AC&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;Node_id&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+                    <span class="s2">&quot;Voltage_0&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">V_ini</span><span class="p">),</span>
+                    <span class="s2">&quot;theta_0&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">theta_ini</span><span class="p">),</span>
+                    <span class="s2">&quot;kV_base&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">kV_base</span><span class="p">),</span>
+                    <span class="s2">&quot;Power_Gained&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">PGi</span><span class="p">),</span>
+                    <span class="s2">&quot;Reactive_Gained&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">QGi</span><span class="p">),</span>
+                    <span class="s2">&quot;Power_load&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">PLi</span><span class="p">),</span>
+                    <span class="s2">&quot;Reactive_load&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">QLi</span><span class="p">),</span>
+                    <span class="s2">&quot;Umin&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Umin</span><span class="p">),</span>
+                    <span class="s2">&quot;Umax&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Umax</span><span class="p">),</span>
+                    <span class="s2">&quot;Gs&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Reactor</span><span class="p">)),</span>
+                    <span class="s2">&quot;Bs&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">imag</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Reactor</span><span class="p">)),</span>
+                    <span class="s2">&quot;x_coord&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">x_coord</span><span class="p">)</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">x_coord</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="s2">&quot;y_coord&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">y_coord</span><span class="p">)</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">y_coord</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="s2">&quot;PZ&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">PZ</span><span class="p">,</span>
+                    <span class="s2">&quot;geometry&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">wkt</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">geometry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">})</span>
+
+    <span class="c1"># AC Lines</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">lines_AC</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;lines_AC&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;lines_AC&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;Line_id&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;fromNode&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">fromNode</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;toNode&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">toNode</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;r&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">r</span><span class="p">),</span>
+                    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">x</span><span class="p">),</span>
+                    <span class="s2">&quot;g&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">g</span><span class="p">),</span>
+                    <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">b</span><span class="p">),</span>
+                    <span class="s2">&quot;MVA_rating&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MVA_rating</span><span class="p">),</span>
+                    <span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">m</span><span class="p">),</span>
+                    <span class="s2">&quot;shift&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">shift</span><span class="p">),</span>
+                    <span class="s2">&quot;Length_km&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">Length_km</span><span class="p">),</span>
+                    <span class="s2">&quot;geometry&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">wkt</span> <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">geometry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">})</span>
+
+    <span class="c1"># DC Nodes</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">nodes_DC</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;nodes_DC&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">node</span><span class="p">:</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;nodes_DC&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+                    <span class="s2">&quot;Voltage_0&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">V_ini</span><span class="p">),</span>
+                    <span class="s2">&quot;Power_Gained&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">PGi</span><span class="p">),</span>
+                    <span class="s2">&quot;Power_load&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">PLi</span><span class="p">),</span>
+                    <span class="s2">&quot;kV_base&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">kV_base</span><span class="p">),</span>
+                    <span class="s2">&quot;Node_id&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;Umin&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Umin</span><span class="p">),</span>
+                    <span class="s2">&quot;Umax&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Umax</span><span class="p">),</span>
+                    <span class="s2">&quot;x_coord&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">x_coord</span><span class="p">)</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">x_coord</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="s2">&quot;y_coord&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">y_coord</span><span class="p">)</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">y_coord</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="s2">&quot;PZ&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">PZ</span><span class="p">,</span>
+                    <span class="s2">&quot;geometry&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">wkt</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">geometry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">})</span>
+
+    <span class="c1"># DC Lines</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">lines_DC</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;lines_DC&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">line</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">pol</span>   <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">pol</span> <span class="o">=</span> <span class="n">Polarity</span><span class="o">.</span><span class="n">MONOPOLAR</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">pol</span> <span class="o">=</span> <span class="n">Polarity</span><span class="o">.</span><span class="n">BIPOLAR</span>
+
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;lines_DC&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;fromNode&quot;</span><span class="p">:</span>   <span class="n">line</span><span class="o">.</span><span class="n">fromNode</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;toNode&quot;</span><span class="p">:</span>     <span class="n">line</span><span class="o">.</span><span class="n">toNode</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;r&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">r</span><span class="p">),</span>
+                    <span class="s2">&quot;MW_rating&quot;</span><span class="p">:</span>  <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MW_rating</span><span class="p">),</span>
+                    <span class="s2">&quot;kV_base&quot;</span><span class="p">:</span>    <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">kV_base</span><span class="p">),</span>
+                    <span class="s2">&quot;Length_km&quot;</span><span class="p">:</span>         <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">Length_km</span><span class="p">),</span>
+                    <span class="s2">&quot;Mono_Bi_polar&quot;</span><span class="p">:</span>   <span class="n">pol</span><span class="p">,</span>
+                    <span class="s2">&quot;Line_id&quot;</span><span class="p">:</span>       <span class="n">line</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;geometry&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">wkt</span> <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">geometry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">})</span>
+
+    <span class="c1"># Converters</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">Converters_ACDC</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">conv</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;Converters_ACDC&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">conv</span><span class="p">:</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Converters_ACDC&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;AC_type&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">AC_type</span><span class="p">,</span>
+                    <span class="s2">&quot;DC_type&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+                    <span class="s2">&quot;AC_node&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Node_AC</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;DC_node&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Node_DC</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;P_AC&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">P_AC</span><span class="p">),</span>
+                    <span class="s2">&quot;Q_AC&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">Q_AC</span><span class="p">),</span>
+                    <span class="s2">&quot;P_DC&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">P_DC</span><span class="p">),</span>
+                    <span class="s2">&quot;T_r&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">r_t</span> <span class="o">*</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;T_x&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">x_t</span> <span class="o">*</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;PR_r&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">pr_r</span> <span class="o">*</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;PR_x&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">pr_x</span> <span class="o">*</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;Filter&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">bf</span> <span class="o">/</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;Droop&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">Droop_rate</span><span class="p">),</span>
+                    <span class="s2">&quot;AC_kV_base&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">AC_kV_base</span><span class="p">),</span>
+                    <span class="s2">&quot;MVA_rating&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">MVA_max</span> <span class="o">/</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;Nconverter&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">_np_conv</span><span class="p">),</span>
+                    <span class="s2">&quot;pol&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;Conv_id&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;lossa&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">a_conv_og</span> <span class="o">/</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;lossb&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">b_conv_og</span><span class="p">),</span>
+                    <span class="s2">&quot;losscrect&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">c_rect_og</span> <span class="o">*</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;losscinv&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">c_inver_og</span> <span class="o">*</span> <span class="n">conv</span><span class="o">.</span><span class="n">cn_pol</span><span class="p">),</span>
+                    <span class="s2">&quot;Ucmin&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">Ucmin</span><span class="p">),</span>
+                    <span class="s2">&quot;Ucmax&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">conv</span><span class="o">.</span><span class="n">Ucmax</span><span class="p">),</span>
+                    <span class="s2">&quot;geometry&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">wkt</span> <span class="k">if</span> <span class="n">conv</span><span class="o">.</span><span class="n">geometry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">})</span>
+
+    <span class="c1"># Step 1: Define sets for the MTDC price_zones and linked price_zones</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">Price_Zones</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">price_zone</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;Price_Zones&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">price_zone</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">price_zone</span><span class="p">,</span> <span class="n">MTDCPrice_Zone</span><span class="p">):</span>
+                    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Price_Zone&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;linked_price_zones&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">linked_price_zones</span><span class="p">,</span>
+                        <span class="s2">&quot;pricing_strategy&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">pricing_strategy</span><span class="p">,</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">PriceZoneCategory</span><span class="o">.</span><span class="n">MTDC</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                    <span class="p">})</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">price_zone</span><span class="p">,</span> <span class="n">OffshorePrice_Zone</span><span class="p">):</span>
+                    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Price_Zone&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s2">&quot;main_price_zone&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">main_price_zone</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">PriceZoneCategory</span><span class="o">.</span><span class="n">OFFSHORE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                    <span class="p">})</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Price_Zone&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span>        <span class="n">price_zone</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;price&quot;</span><span class="p">:</span>       <span class="n">price_zone</span><span class="o">.</span><span class="n">_price</span><span class="p">,</span>
+                        <span class="s2">&quot;import_pu_L&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">import_pu_L</span><span class="p">,</span>
+                        <span class="s2">&quot;export_pu_G&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">export_pu_G</span><span class="p">,</span>
+                        <span class="s2">&quot;a&quot;</span><span class="p">:</span>           <span class="n">price_zone</span><span class="o">.</span><span class="n">a</span><span class="p">,</span>
+                        <span class="s2">&quot;b&quot;</span><span class="p">:</span>           <span class="n">price_zone</span><span class="o">.</span><span class="n">b</span><span class="p">,</span>
+                        <span class="s2">&quot;c&quot;</span><span class="p">:</span>           <span class="n">price_zone</span><span class="o">.</span><span class="n">c</span><span class="p">,</span>
+                        <span class="s2">&quot;import_expand_pu&quot;</span><span class="p">:</span> <span class="n">price_zone</span><span class="o">.</span><span class="n">import_expand</span><span class="p">,</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">PriceZoneCategory</span><span class="o">.</span><span class="n">MAIN</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                    <span class="p">})</span>
+
+    <span class="c1"># RenSource Zones</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">RenSource_zones</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ren_zone</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;RenSource_zones&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">ren_zone</span><span class="p">:</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;RenSource_zone&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">ren_zone</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="p">})</span>
+
+    <span class="c1"># Generators</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">Generators</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;Generators&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">gen</span><span class="p">:</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Generators&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;node&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Node_AC</span><span class="p">,</span>
+                    <span class="s2">&quot;Max_pow_gen&quot;</span><span class="p">:</span>  <span class="n">gen</span><span class="o">.</span><span class="n">Max_pow_gen</span><span class="p">,</span>
+                    <span class="s2">&quot;Min_pow_gen&quot;</span><span class="p">:</span>  <span class="n">gen</span><span class="o">.</span><span class="n">Min_pow_gen</span><span class="p">,</span>
+                    <span class="s2">&quot;Max_pow_genR&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Max_pow_genR</span><span class="p">,</span>
+                    <span class="s2">&quot;Min_pow_genR&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Min_pow_genR</span><span class="p">,</span>
+                    <span class="s2">&quot;np_gen&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">np_gen</span><span class="p">,</span>
+                    <span class="s2">&quot;qf&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">qf</span><span class="p">,</span>
+                    <span class="s2">&quot;lf&quot;</span><span class="p">:</span>  <span class="n">gen</span><span class="o">.</span><span class="n">lf</span><span class="p">,</span>
+                    <span class="s2">&quot;fc&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">fc</span><span class="p">,</span>
+                    <span class="s2">&quot;Pset&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Pset</span><span class="p">,</span>
+                    <span class="s2">&quot;Qset&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Qset</span><span class="p">,</span>
+                    <span class="s2">&quot;S_rated&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Max_S</span><span class="p">,</span>
+                    <span class="s2">&quot;price_zone_link&quot;</span> <span class="p">:</span><span class="n">gen</span><span class="o">.</span><span class="n">price_zone_link</span><span class="p">,</span>
+                <span class="p">})</span>
+
+    <span class="c1"># RenSources</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">RenSources</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ren_source</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;RenSources&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">ren_source</span><span class="p">:</span>
+
+                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;RenSources&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">&quot;ren_source_name&quot;</span> <span class="p">:</span> <span class="n">ren_source</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;node_name&quot;</span><span class="p">:</span> <span class="n">ren_source</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span>
+                    <span class="s2">&quot;base&quot;</span><span class="p">:</span> <span class="n">ren_source</span><span class="o">.</span><span class="n">PGi_ren_base</span><span class="p">,</span>
+                    <span class="s2">&quot;available&quot;</span><span class="p">:</span> <span class="n">ren_source</span><span class="o">.</span><span class="n">_PRGi_available</span><span class="p">,</span>
+                    <span class="s2">&quot;zone&quot;</span><span class="p">:</span>       <span class="nb">getattr</span><span class="p">(</span><span class="n">ren_source</span><span class="p">,</span> <span class="s2">&quot;zone&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+                    <span class="s2">&quot;price_zone&quot;</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ren_source</span><span class="p">,</span> <span class="s2">&quot;price_zone&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+                    <span class="s2">&quot;Offshore&quot;</span><span class="p">:</span>   <span class="nb">getattr</span><span class="p">(</span><span class="n">ren_source</span><span class="p">,</span> <span class="s2">&quot;Offshore&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="s2">&quot;MTDC&quot;</span><span class="p">:</span>       <span class="nb">getattr</span><span class="p">(</span><span class="n">ren_source</span><span class="p">,</span> <span class="s2">&quot;MTDC&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+                <span class="p">})</span>
+
+    <span class="k">return</span> <span class="n">data</span>
+
+
+
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_loading_code</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">file_name</span><span class="p">):</span>
+
+    <span class="n">data_dict</span><span class="o">=</span><span class="n">create_dictionaries</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+    <span class="c1"># Generate the code</span>
+    <span class="n">nodes_AC_code</span> <span class="o">=</span> <span class="n">generate_dataframe_code_from_dict</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;nodes_AC&quot;</span><span class="p">],</span> <span class="s2">&quot;nodes_AC&quot;</span><span class="p">)</span>
+    <span class="n">lines_AC_code</span> <span class="o">=</span> <span class="n">generate_dataframe_code_from_dict</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;lines_AC&quot;</span><span class="p">],</span> <span class="s2">&quot;lines_AC&quot;</span><span class="p">)</span>
+    <span class="n">nodes_DC_code</span> <span class="o">=</span> <span class="n">generate_dataframe_code_from_dict</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;nodes_DC&quot;</span><span class="p">],</span> <span class="s2">&quot;nodes_DC&quot;</span><span class="p">)</span>
+    <span class="n">lines_DC_code</span> <span class="o">=</span> <span class="n">generate_dataframe_code_from_dict</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;lines_DC&quot;</span><span class="p">],</span> <span class="s2">&quot;lines_DC&quot;</span><span class="p">)</span>
+    <span class="n">Converters_ACDC_code</span> <span class="o">=</span> <span class="n">generate_dataframe_code_from_dict</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;Converters_ACDC&quot;</span><span class="p">],</span> <span class="s2">&quot;Converters_ACDC&quot;</span><span class="p">)</span>
+
+
+    <span class="n">pz_code</span> <span class="o">=</span> <span class="n">generate_add_price_zone_code</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;Price_Zone&quot;</span><span class="p">])</span>
+    <span class="n">gen_code</span> <span class="o">=</span> <span class="n">generate_add_gen_code</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;Generators&quot;</span><span class="p">],</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;S_base&#39;</span><span class="p">])</span>
+
+
+    <span class="n">rz_code</span> <span class="o">=</span> <span class="n">generate_add_ren_source_zone_code</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;RenSource_zone&quot;</span><span class="p">])</span>
+    <span class="n">rens_code</span> <span class="o">=</span> <span class="n">generate_add_ren_source_code</span><span class="p">(</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;RenSources&quot;</span><span class="p">],</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;S_base&#39;</span><span class="p">])</span>
+
+
+    <span class="n">main_code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+
+<span class="s2">import pyflow_acdc as pyf</span>
+<span class="s2">import pandas as pd</span>
+
+
+<span class="s2">def </span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s2">():</span>
+
+<span class="s2">    S_base=</span><span class="si">{</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;S_base&#39;</span><span class="p">]</span><span class="si">}</span>
+
+<span class="s2">    # DataFrame Code:</span>
+<span class="s2">    </span><span class="si">{</span><span class="n">nodes_AC_code</span><span class="si">}</span>
+<span class="s2">    </span><span class="si">{</span><span class="n">lines_AC_code</span><span class="si">}</span>
+<span class="s2">    </span><span class="si">{</span><span class="n">nodes_DC_code</span><span class="si">}</span>
+<span class="s2">    </span><span class="si">{</span><span class="n">lines_DC_code</span><span class="si">}</span>
+<span class="s2">    </span><span class="si">{</span><span class="n">Converters_ACDC_code</span><span class="si">}</span>
+
+<span class="s2">    # Create the grid</span>
+<span class="s2">    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in=&#39;</span><span class="si">{</span><span class="n">DataInput</span><span class="o">.</span><span class="n">PU</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;)</span>
+<span class="s2">    grid.name = &#39;</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s2">&#39;</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">pz_code</span><span class="p">:</span>
+        <span class="n">main_code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+
+<span class="s2">    # Add Price Zones:</span>
+<span class="si">{</span><span class="n">pz_code</span><span class="si">}</span>
+
+
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># If nodes_AC code exists, add the code for assigning price zones to nodes_AC</span>
+        <span class="k">if</span> <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;nodes_AC&quot;</span><span class="p">]:</span>
+            <span class="n">main_code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    # Assign Price Zones to Nodes</span>
+<span class="s2">    for index, row in nodes_AC.iterrows():</span>
+<span class="s2">        node_name = nodes_AC.at[index, &#39;Node_id&#39;]</span>
+<span class="s2">        price_zone = nodes_AC.at[index, &#39;PZ&#39;]</span>
+<span class="s2">        ACDC = &#39;</span><span class="si">{</span><span class="n">AcDcSide</span><span class="o">.</span><span class="n">AC</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;</span>
+<span class="s2">        if price_zone is not None:</span>
+<span class="s2">            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># If nodes_DC code exists, add the code for assigning price zones to nodes_DC</span>
+        <span class="k">if</span> <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;nodes_DC&quot;</span><span class="p">]:</span>
+            <span class="n">main_code</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    for index, row in nodes_DC.iterrows():</span>
+<span class="s2">        node_name = nodes_DC.at[index, &#39;Node_id&#39;]</span>
+<span class="s2">        price_zone = nodes_DC.at[index, &#39;PZ&#39;]</span>
+<span class="s2">        ACDC = &#39;</span><span class="si">{</span><span class="n">AcDcSide</span><span class="o">.</span><span class="n">DC</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;</span>
+<span class="s2">        if price_zone is not None:</span>
+<span class="s2">            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+
+    <span class="n">main_code</span><span class="o">+=</span><span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    # Add Generators</span>
+<span class="si">{</span><span class="n">gen_code</span><span class="si">}</span>
+
+<span class="s2">    # Add Renewable Source Zones</span>
+<span class="si">{</span><span class="n">rz_code</span><span class="si">}</span>
+
+<span class="s2">    # Add Renewable Sources</span>
+<span class="si">{</span><span class="n">rens_code</span><span class="si">}</span>
+
+<span class="s2">    # Return the grid</span>
+<span class="s2">    return grid,res</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+
+    <span class="k">return</span> <span class="n">main_code</span>
+
+
+
+
+<div class="viewcode-block" id="save_pickle">
+<a class="viewcode-back" href="../../api/export_files.html#pyflow_acdc.save_pickle">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_pickle</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compress</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_dill</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Serialize ``grid`` to a pickle (or dill) file for reload via :func:`create_grid_from_pickle`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : str</span>
+<span class="sd">        Output file path (parent directories are created if needed).</span>
+<span class="sd">    compress : bool, optional</span>
+<span class="sd">        Write gzip-compressed pickle when ``True``.</span>
+<span class="sd">    use_dill : bool, optional</span>
+<span class="sd">        Use ``dill`` instead of ``pickle`` when ``True``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">lib</span> <span class="o">=</span> <span class="n">_dill</span> <span class="k">if</span> <span class="p">(</span><span class="n">use_dill</span> <span class="ow">and</span> <span class="n">_dill</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="n">pickle</span>
+    <span class="n">protocol</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">HIGHEST_PROTOCOL</span>
+
+    <span class="k">if</span> <span class="n">compress</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">lib</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">protocol</span><span class="o">=</span><span class="n">protocol</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">lib</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">protocol</span><span class="o">=</span><span class="n">protocol</span><span class="p">)</span></div>
+
+
+
+
+<div class="viewcode-block" id="save_grid_to_file">
+<a class="viewcode-back" href="../../api/export_files.html#pyflow_acdc.save_grid_to_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_grid_to_file</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">file_name</span><span class="p">,</span><span class="n">folder_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Export ``grid`` to a runnable Python loader file.</span>
+
+<span class="sd">    Generates Python code that reconstructs the grid (same pattern as the bundled</span>
+<span class="sd">    ``example_grids`` cases) and writes it to ``file_name`` (optionally under</span>
+<span class="sd">    ``folder_name``).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">main_code</span><span class="o">=</span> <span class="n">generate_loading_code</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">file_name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">folder_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Ensure the folder path exists</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">folder_name</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Create folder if it doesn&#39;t exist</span>
+
+        <span class="c1"># Save the file in the specified folder</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">folder_name</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s1">.py&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Save the file in the current directory</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s1">.py&#39;</span>
+
+    <span class="c1"># Write the main code to the file</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">main_code</span><span class="p">)</span></div>
+
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">gather_grid_data</span><span class="p">(</span><span class="n">grid</span><span class="p">):</span>
+    <span class="n">node_ac_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">nodes_AC</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">NodeType</span><span class="o">.</span><span class="n">PQ</span><span class="p">:</span>
+            <span class="n">tp</span><span class="o">=</span><span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">NodeType</span><span class="o">.</span><span class="n">PV</span><span class="p">:</span>
+            <span class="n">tp</span><span class="o">=</span><span class="mi">2</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tp</span><span class="o">=</span><span class="mi">3</span>
+        <span class="n">node_ac_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;bus_i&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">tp</span><span class="p">,</span>
+            <span class="s2">&quot;Pd&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">PLi</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Qd&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">QLi</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Gs&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Reactor</span><span class="p">)</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Bs&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">imag</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">Reactor</span><span class="p">)</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;area&quot;</span><span class="p">:</span> <span class="n">grid</span><span class="o">.</span><span class="n">Graph_node_to_Grid_index_AC</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">nodeNumber</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Vm&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">V_ini</span><span class="p">,</span>
+            <span class="s2">&quot;Va&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">theta_ini</span><span class="p">,</span>
+            <span class="s2">&quot;baseKV&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">kV_base</span><span class="p">,</span>
+            <span class="s2">&quot;zone&quot;</span><span class="p">:</span> <span class="n">grid</span><span class="o">.</span><span class="n">Graph_node_to_Grid_index_AC</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">nodeNumber</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Vmax&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">Umax</span><span class="p">,</span>
+            <span class="s2">&quot;Vmin&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">Umin</span>
+        <span class="p">})</span>
+
+    <span class="n">line_ac_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">lines_AC</span><span class="p">:</span>
+        <span class="n">line_ac_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;fbus&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">fromNode</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;tbus&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">toNode</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;r&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">r</span><span class="p">,</span>
+            <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;rateA&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MVA_rating</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;rateB&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MVA_rating</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;rateC&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MVA_rating</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;ratio&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">m</span>     <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">m</span> <span class="o">!=</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">line</span><span class="o">.</span><span class="n">shift</span> <span class="o">!=</span><span class="mi">0</span>  <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;angle&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">shift</span> <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">m</span> <span class="o">!=</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">line</span><span class="o">.</span><span class="n">shift</span> <span class="o">!=</span><span class="mi">0</span>  <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;angmin&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">360</span><span class="p">,</span>
+            <span class="s2">&quot;angmax&quot;</span><span class="p">:</span> <span class="mi">360</span>
+        <span class="p">})</span>
+
+    <span class="n">node_dc_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">nodes_DC</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">nodes_DC</span><span class="p">:</span>
+            <span class="n">node_dc_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;busdc_i&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;grid&quot;</span><span class="p">:</span> <span class="n">grid</span><span class="o">.</span><span class="n">Graph_node_to_Grid_index_DC</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">nodeNumber</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;Pdc&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">PLi</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+                <span class="s2">&quot;Vdc&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">V_ini</span><span class="p">,</span>
+                <span class="s2">&quot;basekVdc&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">kV_base</span><span class="p">,</span>
+                <span class="s2">&quot;Vdcmax&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">Umax</span><span class="p">,</span>
+                <span class="s2">&quot;Vdcmin&quot;</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">Umin</span><span class="p">,</span>
+                <span class="s2">&quot;Cdc&quot;</span><span class="p">:</span> <span class="mi">0</span>
+            <span class="p">})</span>
+
+
+    <span class="n">line_dc_data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">lines_DC</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">lines_DC</span><span class="p">:</span>
+            <span class="n">pol</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">pol</span>
+
+            <span class="n">line_dc_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;fbusdc&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">fromNode</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;tbusdc&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">toNode</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;r&quot;</span><span class="p">:</span> <span class="n">line</span><span class="o">.</span><span class="n">r</span><span class="p">,</span>
+                <span class="s2">&quot;l&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;c&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;rateA&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MW_rating</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+                <span class="s2">&quot;rateB&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MW_rating</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+                <span class="s2">&quot;rateC&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">MW_rating</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+                <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="mi">1</span>
+            <span class="p">})</span>
+
+    <span class="n">conv_data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">Converters_ACDC</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">conv</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">Converters_ACDC</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">conv</span><span class="o">.</span><span class="n">AC_type</span> <span class="o">==</span> <span class="n">NodeType</span><span class="o">.</span><span class="n">PQ</span><span class="p">:</span>
+                <span class="n">tpac</span><span class="o">=</span><span class="mi">1</span>
+            <span class="k">elif</span> <span class="n">conv</span><span class="o">.</span><span class="n">AC_type</span> <span class="o">==</span> <span class="n">NodeType</span><span class="o">.</span><span class="n">PV</span><span class="p">:</span>
+                <span class="n">tpac</span><span class="o">=</span><span class="mi">2</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tpac</span><span class="o">=</span><span class="mi">1</span>
+
+            <span class="k">if</span> <span class="n">conv</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ConverterDCType</span><span class="o">.</span><span class="n">P</span> <span class="ow">or</span> <span class="n">conv</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ConverterDCType</span><span class="o">.</span><span class="n">PAC</span><span class="p">:</span>
+                <span class="n">tpdc</span><span class="o">=</span><span class="mi">1</span>
+            <span class="k">elif</span> <span class="n">conv</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ConverterDCType</span><span class="o">.</span><span class="n">SLACK</span><span class="p">:</span>
+                <span class="n">tpdc</span><span class="o">=</span><span class="mi">2</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tpdc</span><span class="o">=</span><span class="mi">3</span>
+
+
+            <span class="n">conv_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;busdc_i&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Node_DC</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;busac_i&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Node_AC</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;type_dc&quot;</span><span class="p">:</span> <span class="n">tpdc</span><span class="p">,</span>
+                <span class="s2">&quot;type_ac&quot;</span><span class="p">:</span> <span class="n">tpac</span><span class="p">,</span>
+                <span class="s2">&quot;P_g&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">P_AC</span><span class="p">,</span>
+                <span class="s2">&quot;Q_g&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">P_DC</span><span class="p">,</span>
+                <span class="s2">&quot;islcc&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Vtar&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;rtf&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">r_t</span><span class="o">/</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;xtf&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">x_t</span><span class="o">/</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;transformer&quot;</span><span class="p">:</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">conv</span><span class="o">.</span><span class="n">r_t</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;tm&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;bf&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">bf</span><span class="o">*</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">conv</span><span class="o">.</span><span class="n">bf</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;rc&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">pr_r</span><span class="o">/</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;xc&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">pr_x</span><span class="o">/</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;reactor&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;basekVac&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">AC_kV_base</span><span class="p">,</span>
+                <span class="s2">&quot;Vmmax&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Ucmax</span><span class="p">,</span>
+                <span class="s2">&quot;Vmmin&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Ucmin</span><span class="p">,</span>
+                <span class="s2">&quot;Imax&quot;</span><span class="p">:</span> <span class="mf">1.1</span><span class="p">,</span>
+                <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;LossA&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">a_conv_og</span><span class="o">*</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;LossB&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">b_conv_og</span><span class="p">,</span>
+                <span class="s2">&quot;LossCrec&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">c_rect_og</span><span class="o">/</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;LossCinv&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">c_rect_og</span><span class="o">/</span><span class="n">conv</span><span class="o">.</span><span class="n">np_conv</span><span class="p">,</span>
+                <span class="s2">&quot;droop&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Droop_rate</span><span class="p">,</span>
+                <span class="s2">&quot;Pdcset&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">P_DC</span><span class="p">,</span>
+                <span class="s2">&quot;Vdcset&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">Node_DC</span><span class="o">.</span><span class="n">V</span><span class="p">,</span>
+                <span class="s2">&quot;dVdcset&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Pacmax&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">MVA_max</span><span class="p">,</span>
+                <span class="s2">&quot;Pacmin&quot;</span><span class="p">:</span> <span class="o">-</span><span class="n">conv</span><span class="o">.</span><span class="n">MVA_max</span><span class="p">,</span>
+                <span class="s2">&quot;Qacmax&quot;</span><span class="p">:</span> <span class="n">conv</span><span class="o">.</span><span class="n">MVA_max</span><span class="p">,</span>
+                <span class="s2">&quot;Qacmin&quot;</span><span class="p">:</span> <span class="o">-</span><span class="n">conv</span><span class="o">.</span><span class="n">MVA_max</span>
+            <span class="p">})</span>
+
+    <span class="n">gen_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">Generators</span><span class="p">:</span>
+        <span class="n">gen_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;bus&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Node_AC</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Pg&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Pset</span><span class="p">,</span>
+            <span class="s2">&quot;Qg&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Qset</span><span class="p">,</span>
+            <span class="s2">&quot;Qmax&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Max_pow_genR</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Qmin&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Min_pow_genR</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Vg&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Node_AC</span><span class="o">.</span><span class="n">V</span><span class="p">,</span>
+            <span class="s2">&quot;mBase&quot;</span><span class="p">:</span> <span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Pmax&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Max_pow_gen</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Pmin&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Min_pow_gen</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+            <span class="s2">&quot;Pc1&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;Pc2&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;Qc1min&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;Qc1max&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;Qc2min&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;Qc2max&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;ramp_agc&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;ramp_10&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;ramp_30&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;ramp_q&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;apf&quot;</span><span class="p">:</span> <span class="mi">0</span>
+        <span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">RenSources</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">RenSources</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">gen</span><span class="o">.</span><span class="n">connected</span> <span class="o">==</span> <span class="n">AcDcSide</span><span class="o">.</span><span class="n">DC</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">gen_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;bus&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Node</span><span class="o">.</span><span class="n">nodeNumber</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;Pg&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">PGi_ren</span><span class="p">,</span>
+                <span class="s2">&quot;Qg&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Qmax&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Qmax</span><span class="p">,</span>
+                <span class="s2">&quot;Qmin&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Qmin</span><span class="p">,</span>
+                <span class="s2">&quot;Vg&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">Node</span><span class="o">.</span><span class="n">V</span><span class="p">,</span>
+                <span class="s2">&quot;mBase&quot;</span><span class="p">:</span> <span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+                <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;Pmax&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">PGi_ren</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+                <span class="s2">&quot;Pmin&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">PGi_ren</span><span class="o">*</span><span class="n">gen</span><span class="o">.</span><span class="n">min_gamma</span><span class="o">*</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span><span class="p">,</span>
+                <span class="s2">&quot;Pc1&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Pc2&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Qc1min&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Qc1max&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Qc2min&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;Qc2max&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;ramp_agc&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;ramp_10&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;ramp_30&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;ramp_q&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;apf&quot;</span><span class="p">:</span> <span class="mi">0</span>
+            <span class="p">})</span>
+
+    <span class="n">gen_cost_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">Generators</span><span class="p">:</span>
+        <span class="n">gen_cost_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="s2">&quot;n&quot;</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span>
+            <span class="s2">&quot;startup&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;shutdown&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;c(n-1)&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">qf</span><span class="p">,</span>  <span class="c1"># Coefficient of the highest power term</span>
+            <span class="s2">&quot;c(n-2)&quot;</span><span class="p">:</span> <span class="n">gen</span><span class="o">.</span><span class="n">lf</span><span class="p">,</span>  <span class="c1"># Coefficient of the second highest power term</span>
+            <span class="s2">&quot;c0&quot;</span><span class="p">:</span> <span class="mi">0</span>         <span class="c1"># Constant cost term</span>
+        <span class="p">})</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">RenSources</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="n">grid</span><span class="o">.</span><span class="n">RenSources</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">gen</span><span class="o">.</span><span class="n">connected</span> <span class="o">==</span> <span class="n">AcDcSide</span><span class="o">.</span><span class="n">DC</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">gen_cost_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s2">&quot;n&quot;</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span>
+                <span class="s2">&quot;startup&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;shutdown&quot;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;c(n-1)&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>  <span class="c1"># Coefficient of the highest power term</span>
+                <span class="s2">&quot;c(n-2)&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>  <span class="c1"># Coefficient of the second highest power term</span>
+                <span class="s2">&quot;c0&quot;</span><span class="p">:</span> <span class="mi">0</span>         <span class="c1"># Constant cost term</span>
+            <span class="p">})</span>
+    <span class="n">base</span><span class="o">=</span><span class="n">grid</span><span class="o">.</span><span class="n">S_base</span>
+    <span class="n">grid_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">base</span><span class="p">,</span><span class="n">node_ac_data</span><span class="p">,</span><span class="n">line_ac_data</span><span class="p">,</span><span class="n">node_dc_data</span><span class="p">,</span><span class="n">line_dc_data</span><span class="p">,</span><span class="n">conv_data</span><span class="p">,</span><span class="n">gen_data</span><span class="p">,</span><span class="n">gen_cost_data</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">grid_data</span>
+
+
+<div class="viewcode-block" id="save_grid_to_matlab">
+<a class="viewcode-back" href="../../api/export_files.html#pyflow_acdc.save_grid_to_matlab">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_grid_to_matlab</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span><span class="n">file_name</span><span class="p">,</span><span class="n">folder_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">dcpol</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Export ``grid`` to a MATPOWER-style MATLAB ``.m`` case file.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dcpol : int, optional</span>
+<span class="sd">        DC polarity code written into the MATACDC export. Only one polarity can</span>
+<span class="sd">        be chosen for all DC grids in the file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base</span><span class="p">,</span><span class="n">node_ac_data</span><span class="p">,</span><span class="n">line_ac_data</span><span class="p">,</span><span class="n">node_dc_data</span><span class="p">,</span><span class="n">line_dc_data</span><span class="p">,</span><span class="n">conv_data</span><span class="p">,</span><span class="n">gen_data</span><span class="p">,</span><span class="n">gen_cost_data</span> <span class="o">=</span> <span class="n">gather_grid_data</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">folder_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Ensure the folder path exists</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">folder_name</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Create folder if it doesn&#39;t exist</span>
+
+        <span class="c1"># Save the file in the specified folder</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">folder_name</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s1">.m&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Save the file in the current directory</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s1">.m&#39;</span>
+
+    <span class="c1"># Write the main code to the file</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;function mpc = </span><span class="si">{</span><span class="n">file_name</span><span class="si">}</span><span class="s2">()</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># BaseMVA</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.version = &#39;2&#39;;</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+        <span class="c1"># BaseMVA</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;mpc.baseMVA = </span><span class="si">{</span><span class="n">base</span><span class="si">}</span><span class="s2">;</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Bus data</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> AC bus data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;%    bus_i    type    Pd    Qd    Gs    Bs    area    Vm    Va    baseKV    zone    Vmax    Vmin</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.bus = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">node_ac_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;bus_i&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Pd&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Qd&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Gs&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Bs&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;area&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Vm&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Va&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;baseKV&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;zone&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Vmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Vmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># For AC line data</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> AC branch data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%    f</span><span class="s2">bus    tbus    r    x    b    rateA    rateB    rateC    ratio    angle    status    angmin    angmax</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.branch = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">line_ac_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;fbus&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;tbus&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;r&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateA&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateB&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateC&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;ratio&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;angle&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;angmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;angmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> DC grid topology</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;mpc.dcpol = </span><span class="si">{</span><span class="n">dcpol</span><span class="si">}</span><span class="s2">;&quot;</span><span class="p">)</span>
+
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> DC bus data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%c</span><span class="s2">olumn_names%   busdc_i    grid    Pdc    Vdc    basekVdc    Vdcmax    Vdcmin    Cdc</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.busdc = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">node_dc_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;busdc_i&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;grid&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Pdc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Vdc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;basekVdc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Vdcmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Vdcmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;Cdc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+        <span class="c1"># For DC line data</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> DC branch data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%c</span><span class="s2">olumn_names</span><span class="si">%    f</span><span class="s2">busdc    tbusdc    r    l    c    rateA    rateB    rateC    status</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.branchdc = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">line_dc_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;fbusdc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;tbusdc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;r&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;l&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;c&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateA&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateB&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateC&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># For AC/DC converter data</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> AC/DC converter data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%c</span><span class="s2">olumn_names%    busdc_i    busac_i    type_dc    type_ac    P_g    Q_g    islcc    Vtar    rtf    xtf    transformer    tm    bf    filter    rc    xc    reactor    basekVac    Vmmax    Vmmin    Imax    status    LossA    LossB    LossCrec    LossCinv    droop    Pdcset    Vdcset    dVdcset    Pacmax    Pacmin    Qacmax    Qacmin</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.convdc = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">conv</span> <span class="ow">in</span> <span class="n">conv_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;busdc_i&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;busac_i&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;type_dc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;type_ac&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;P_g&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Q_g&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;islcc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Vtar&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;rtf&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;xtf&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;transformer&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;tm&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;bf&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;filter&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;rc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;xc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;reactor&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;basekVac&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Vmmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Vmmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Imax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;LossA&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;LossB&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;LossCrec&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;LossCinv&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;droop&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Pdcset&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Vdcset&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;dVdcset&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Pacmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Pacmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Qacmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">conv</span><span class="p">[</span><span class="s1">&#39;Qacmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># For generator data</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> Generator data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;%    bus    Pg    Qg    Qmax    Qmin    Vg    mBase    status    Pmax    Pmin    Pc1    Pc2    Qc1min    Qc1max    Qc2min    Qc2max    ramp_agc    ramp_10    ramp_30    ramp_q    apf</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.gen = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="n">gen_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;bus&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Pg&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qg&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Vg&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;mBase&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Pmax&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Pmin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Pc1&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Pc2&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qc1min&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qc1max&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qc2min&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;Qc2max&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;ramp_agc&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;ramp_10&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;ramp_30&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;ramp_q&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen</span><span class="p">[</span><span class="s1">&#39;apf&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># For generator cost data</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> Generator cost data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;%    2    startup    shutdown    n     c(n-1)    c(n-2)    c0</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.gencost = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">gen_cost</span> <span class="ow">in</span> <span class="n">gen_cost_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;startup&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;shutdown&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;n&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;c(n-1)&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;c(n-2)&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">     </span><span class="si">{</span><span class="n">gen_cost</span><span class="p">[</span><span class="s1">&#39;c0&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%%</span><span class="s2"> Adds current ratings to branch matrix</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%    c</span><span class="s2">_rating_a</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;mpc.branch_currents = [</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">line_ac_data</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">line</span><span class="p">[</span><span class="s1">&#39;rateA&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;];</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025-2026, Bernardo Castro Valerio
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=8a448e45"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

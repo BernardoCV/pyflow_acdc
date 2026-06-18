@@ -149,6 +149,60 @@ def plot_folium_network(
     add_marine_regions_wms=False,
     line_size_factor=1.0,
 ):
+    """Create an interactive map visualization using Folium.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to visualize.
+    text : str, optional
+        Hover text format (``'data'``, ``'inPu'``, or ``'abs'``).
+    name : str, optional
+        Output file name. Defaults to ``grid.name``.
+    tiles : str, optional
+        ``"OpenStreetMap"``, ``"CartoDB Positron"``, ``"Cartodb dark_matter"``, or ``None``.
+    polygon : shapely geometry or list, optional
+        Development-area polygon(s) to draw on the map.
+    linestrings : list, optional
+        Export-cable linestrings to draw on the map.
+    ant_path : str, optional
+        Animated power-flow paths: ``'All'`` (lines above 110 kV), ``'Reduced'`` (HVDC only),
+        or ``'None'``.
+    clustering : bool, optional
+        Enable marker clustering for generators.
+    coloring : str, optional
+        Line coloring mode (e.g. ``'loss'``, ``'loading'``, ``'ts_max_loading'``).
+    show : bool, optional
+        Open the map in a browser.
+    planar : bool, optional
+        Use planar coordinates instead of lon/lat.
+    scale_gen : bool, optional
+        Scale generator icons by rating.
+    base_icon_size : int, optional
+        Base marker size for generator icons.
+    plot_load : bool, optional
+        Plot load nodes on the map.
+    show_all : bool, optional
+        Show all components regardless of voltage filters.
+    add_marine_regions_wms : bool, optional
+        Add marine-regions WMS overlay.
+    line_size_factor : float, optional
+        Scale factor for line thickness.
+
+    Notes
+    -----
+    The map supports zoom/pan, voltage-level filtering, and component layers for MVAC lines
+    (<110 kV), HVAC lines (<300 kV), EHV lines (<500 kV), UHV lines, DC lines, converters,
+    transformers, and generators by type. Hover information is shown for components.
+    Optional animated power flows are controlled by ``ant_path``.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> grid, res = pyf.cases["NS_MTDC"]()
+    >>> pyf.optimal_pf(grid)
+    >>> pyf.plot_folium_network(grid, show=False)
+    """
     # "OpenStreetMap",     "CartoDB Positron"     "Cartodb dark_matter"
     if name is None:
         name = grid.name
@@ -1530,6 +1584,15 @@ def plot_folium(grid, mode='auto', **kwargs):
       ``Seq_MS_STEP_run`` is true; else static ``plot_folium_network``.
 
     Extra keyword arguments are forwarded to the selected function.
+
+    Examples
+    --------
+    Animated power flows on a solved grid::
+
+        >>> import pyflow_acdc as pyf
+        >>> grid, res = pyf.cases["NS_MTDC"]()
+        >>> pyf.optimal_pf(grid)
+        >>> pyf.plot_folium(grid, ant_path="All", show=False)
     """
     resolved = _resolve_folium_mode(grid, mode)
     if resolved == 'ts':

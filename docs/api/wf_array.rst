@@ -56,16 +56,10 @@ Sequential Cable Sizing (CSS)
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/wf_array/01_sequential_cable_sizing_css.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-
-      grid,res = pyf.barrow()
-      print('grid loaded')
-      pyf.sequential_CSS(grid,NPV=True,max_turbines_per_string=None,MIP_solver='gurobi',CSS_L_solver='gurobi',max_iter=None,time_limit=300,tee=True)
-          
-
-      res.all()
 
 
 MIP Path Selection (Array)
@@ -113,19 +107,10 @@ MIP Path Selection (Array)
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/wf_array/02_mip_path_selection_array.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-
-      grid,res = pyf.anholt()
-      
-      flag, high_flow,model_MIP,feasible_solutions_MIP = pyf.MIP_path_graph(grid, max_flow=10, 
-                                                                            solver_name='gurobi', 
-                                                                            crossings=True, tee=True,callback=True)
-      pyf.ACDC_TEP.plot_feasible_solutions(
-                      feasible_solutions_MIP,
-                      'MIP',
-                      show=True)
 
 Simplified CSS Workflow
 -----------------------

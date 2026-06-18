@@ -13,6 +13,8 @@ Running the OPF
 
 This function runs the AC/DC hybrid optimal power flow calculation. It creates the :ref:`model <model_creation>`, chooses an :ref:`objective function <obj_functions>`, and :ref:`solves <model_solving>` the model.
 
+For step-by-step examples (grid setup, generators, and calling ``optimal_pf``), see :ref:`Running an Optimal Power Flow <usage_opf>`.
+
 .. autofunction:: pyflow_acdc.optimal_pf
 
 .. _model_creation:
@@ -49,11 +51,6 @@ The model enforces constraints for:
 - :ref:`Price zone balancing <Price_zone_modelling>`
 
 For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
-
-.. code-block:: python
-
-   from pyflow_acdc.ACDC_OPF_NL_model import opf_create_nl_model_acdc
-   opf_create_nl_model_acdc(model, grid, PV_set=False, Price_Zones=False)
 
 .. _obj_functions:
 
@@ -131,24 +128,7 @@ The user can define the objective by setting the weight of each sub objective. T
     * - ``Gen_set_dev``
       - Generator setpoint deviation
       - :math:`\sum_{g \in G}  \left(P_g -P_{g,set}\right)^2`
-      
 
-  **Example**
-
-  .. code-block:: python
-
-      weights_def = {
-      'Ext_Gen': {'w': 0},
-      'Energy_cost': {'w': 0},
-      'Curtailment_Red': {'w': 0},
-      'AC_losses': {'w': 0},
-      'DC_losses': {'w': 0},
-      'Converter_Losses': {'w': 0},
-      'PZ_cost_of_generation': {'w': 0},
-      'Renewable_profit': {'w': 0},
-      'Gen_set_dev': {'w': 0}
-      }
-      
 .. _model_solving:
 
 Solvers
@@ -168,10 +148,6 @@ Tested with:
 - Bonmin
 
 .. autofunction:: pyflow_acdc.pyomo_model_solve
-
-.. code-block:: python
-
-   results, solver_stats = pyf.pyomo_model_solve(model, grid)
 
 Result Translation Helpers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

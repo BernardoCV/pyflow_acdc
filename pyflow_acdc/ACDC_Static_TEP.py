@@ -2558,7 +2558,27 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
 
 
 
-def export_TEP_multiScenario_results_to_excel(grid,export):
+def export_TEP_multiScenario_results_to_excel(grid, export):
+    """Export multi-scenario TEP results to an Excel workbook.
+
+    Writes expansion decisions, per-scenario operating results, and time-series
+    tables from ``grid.TEP_multiScenario_res`` (populated by
+    :func:`multi_scenario_TEP`).
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid with multi-scenario TEP results on ``grid.TEP_multiScenario_res``.
+    export : str
+        Output path. ``.xlsx`` is appended when missing.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> grid, res = pyf.cases["NS_MTDC"]()
+    >>> pyf.multi_scenario_TEP(grid)
+    >>> pyf.export_TEP_multiScenario_results_to_excel(grid, "results.xlsx")
+    """
 
     [clustering,n_clusters,flipped_data_PN,flipped_data_PZGEN ,flipped_data_SC, flipped_data_curt,flipped_data_curt_per, flipped_data_lines,
         flipped_data_conv, flipped_data_price,flipped_data_pgen,flipped_data_qgen] = grid.TEP_multiScenario_res

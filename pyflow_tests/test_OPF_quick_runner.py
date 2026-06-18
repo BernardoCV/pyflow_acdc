@@ -10,24 +10,7 @@ import importlib
 
 import pytest
 from pyflow_tests._quick_fake_solve import quick_fake_solve_context
-
-
-FULL_OPF_TEP_CASE_MODULES = [
-    # OPF
-    "pyflow_tests.DC_OPF",
-    "pyflow_tests.CigreB4_OPF",
-    "pyflow_tests.case39ac_OPF",
-    "pyflow_tests.case39acdc_OPF",
-    "pyflow_tests.case24_3zones_acdc_OPF",
-    "pyflow_tests.case24_OPF",
-    # LOPF
-    "pyflow_tests.case39ac_LOPF",
-    # TEP / related expansion
-    "pyflow_tests.case6_TEP_DC",
-    "pyflow_tests.case24_TEP",
-    "pyflow_tests.case24_REC",
-    "pyflow_tests.array_sizing",
-]
+from pyflow_tests.test_constants import FULL_OPF_TEP_CASE_MODULES
 
 
 @pytest.mark.parametrize("module_name", FULL_OPF_TEP_CASE_MODULES)

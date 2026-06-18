@@ -91,6 +91,7 @@ API Documentation
    :caption: Development:
 
    architecture
+   testing
    api/solver_utils
    api/windfarm_loader
 
@@ -101,18 +102,10 @@ Basic installation::
 
     pip install pyflow-acdc
 
-Basic usage::
+.. literalinclude:: ../pyflow_tests/doc_examples/index/basic_usage.py
+   :language: python
+   :lines: 2-
 
-   import pyflow_acdc as pyf
-
-   #Use pre saved grids to familiarize yourself with the package
-   [grid,res]=pyf.cases['PEI_grid']()
-
-   pyf.acdc_sequential(grid,QLimit=False)
-
-   
-   res.all()
-   
 Indices and tables
 ==================
 

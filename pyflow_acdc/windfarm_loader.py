@@ -137,6 +137,13 @@ def load_case_grid_and_geo(case_name, source_tag="gebco"):
     -------
     tuple
         ``(grid, res)`` from :func:`create_grid_from_pickle`.
+
+    Examples
+    --------
+    >>> import pyflow_acdc as pyf
+    >>> grid, res = pyf.windfarm_loader.load_case_grid_and_geo("Moray_East")
+    >>> # Geometry context is attached for folium / array plotting:
+    >>> # grid.dev_polygon, grid.export_cables, grid.exclusion_zones, ...
     """
     grid_pickle = _find_grid_pickle(case_name, source_tag=source_tag)
     grid, res = create_grid_from_pickle(str(grid_pickle), use_dill=True)

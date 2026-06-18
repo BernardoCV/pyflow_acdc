@@ -1,6 +1,7 @@
 import pyflow_acdc as pyf
 import pandas as pd
 from pyflow_acdc.Graph_Dash import create_dash_app
+from pyflow_tests.test_constants import NS_MTDC_MARKET_PRICES_URL, NS_MTDC_WIND_LOAD_URL
 
 def ts_dash():
     [grid,results] = pyf.cases['NS_MTDC']()
@@ -9,12 +10,10 @@ def ts_dash():
     end = 6000
     obj = {'Energy_cost': 1}
 
-    market_prices_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
-    TS_MK = pd.read_csv(market_prices_url)
+    TS_MK = pd.read_csv(NS_MTDC_MARKET_PRICES_URL)
     pyf.add_TimeSeries(grid,TS_MK)
 
-    wind_load_url = "https://raw.githubusercontent.com/BernardoCV/pyflow_acdc/main/examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
-    TS_wl = pd.read_csv(wind_load_url)
+    TS_wl = pd.read_csv(NS_MTDC_WIND_LOAD_URL)
     pyf.add_TimeSeries(grid,TS_wl)
 
     pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)

@@ -8,91 +8,17 @@ import warnings
 import re
 import time
 
+from pyflow_tests.test_constants import (
+    ALL_CASES,
+    DOCS_CASES,
+    IGNORED_WARNING_SNIPPETS,
+    OPF_CASES,
+    QUICK_CASES,
+    TEP_CASES,
+)
+
 # Configuration
 TEST_DIR = Path(__file__).parent
-IGNORED_WARNING_SNIPPETS = [
-    "PytestAssertRewriteWarning",
-    "Module already imported so cannot be rewritten; dash",
-]
-
-# List of test cases to run (in order)
-ALL_CASES = [
-    # Documentation tests
-    'test_docs_basic_grid_creation.py',
-    'test_docs_add_components.py',
-    'test_docs_power_flow.py',
-    'test_docs_opf_quick.py',
-    'test_docs_opf_detailed.py',
-    'test_example_grids_smoke.py',
-    'test_examples_folder_smoke.py',
-    'test_model_build_only.py',
-    
-    #Power Flow
-    'test_grid_creation.py',
-    'test_cigreb4_pf.py',
-
-
-    #OPF
-    'DC_OPF.py',
-    'CigreB4_OPF.py',
-    'case39ac_OPF.py',
-    'case39ac_LOPF.py',
-    'case39acdc_OPF.py',
-    'case24_3zones_acdc_OPF.py',
-   
-    #loading matlab files
-    'test_matlab_loader.py',
-    #folium
-    'folium_test.py',
-    #plot 
-    'test_plot.py',
-    #Transmission Expansion
-    'case24_OPF.py',
-    #DC
-    'case6_TEP_DC.py',
-    #AC
-    'case24_TEP.py',
-    #REC
-    'case24_REC.py',
-    #CT
-    'array_sizing.py',
-    #time series and dash
-    'ts_dash.py',
-    #wind farm array
-    'sequential_array.py',
-    'sequential_array_ortools.py'
-]
-
-# Solver-dependent OPF tests (opt-in, not in default/CI run)
-OPF_CASES = [
-    'DC_OPF.py',
-    'CigreB4_OPF.py',
-    'case39ac_OPF.py',
-    'case39acdc_OPF.py',
-    'case24_3zones_acdc_OPF.py',
-]
-
-# Quick tests (basic functionality only)
-QUICK_CASES = [
-    'test_docs_basic_grid_creation.py',
-    'test_docs_add_components.py',
-    'test_docs_power_flow.py',
-    'test_grid_creation.py',
-    'test_cigreb4_pf.py',
-    'test_matlab_loader.py',
-    'test_example_grids_smoke.py',
-    'test_model_build_only.py',
-    'test_plot.py',
-    'test_OPF_quick_runner.py',
-]
-
-TEP_CASES = [
-    'case24_OPF.py',
-    'case6_TEP_DC.py',
-    'case24_TEP.py',
-    'case24_REC.py',
-    'array_sizing.py',
-]
 
 def run_test_case(case: str, show_output: bool = False) -> Tuple[bool, str, List[str], float]:
     
@@ -161,11 +87,15 @@ def main():
     tep_mode = "--tep" in args
     opf_mode = "--opf" in args
     
+    docs_mode = "--docs" in args
+    
     # Choose which tests to run
     if quick_mode:
         CASES = QUICK_CASES
         print("Running quick tests (basic functionality only)")
-    
+    elif docs_mode:
+        CASES = DOCS_CASES
+        print("Running documentation example tests")
     elif tep_mode:
         CASES = TEP_CASES
         print("Running TEP tests")

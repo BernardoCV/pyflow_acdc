@@ -1,0 +1,24 @@
+/* Light mode: SCADA panel sidebar hover */
+[data-theme="light"] .sidebar-tree .reference.internal:hover {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        #2a4055 var(--sidebar-item-spacing-horizontal, 1rem),
+        #2a4055 100%
+    );
+}
+
+/* Center figures (including themed only-light / only-dark pairs) */
+figure.align-center {
+    text-align: center;
+}
+
+figure.align-center img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+figure.align-center .image-reference {
+    display: inline-block;
+}

@@ -26,9 +26,10 @@ Running one state transmission expansion planning
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/tep/01_running_one_state_transmission_expansion_planning.py
+   :language: python
+   :lines: 2-
 
-       model, results, timing, stats = pyf.transmission_expansion(grid)
 
 Running multiple scenario based transmission expansion planning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -94,9 +95,10 @@ Running multiple scenario based transmission expansion planning
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/tep/02_running_multiple_scenario_based_transmission_expansion_plann.py
+   :language: python
+   :lines: 2-
 
-       model, results, timing, stats, ts_results = pyf.multi_scenario_TEP(grid)
 
 Linear and Sensitivity Utilities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -200,12 +202,6 @@ Export Results
         - str
         - Export file path
         - Required
-
-   **Example**
-
-   .. code-block:: python
-
-       pyf.export_TEP_multiScenario_results_to_excel(grid, "results.xlsx")
 
 **References**
 

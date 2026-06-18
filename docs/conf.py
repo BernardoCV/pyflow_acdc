@@ -153,6 +153,7 @@ themed_figure_map = {
     "case24acdc_full": _themed_figure("case24acdc_full", _F_CASES),
     "case24acdc_neig": _themed_figure("case24acdc_neig", _F_CASES),
     "grid_network": _themed_figure("grid_network", _F_PLOTTING),
+    "3d_plot": _themed_figure("3d_plot", _F_PLOTTING),
     # UI screenshots
     "dash_example": _themed_figure("dash_example", _F_EXAMPLES),
     "north_sea_folium": _themed_figure("north_sea_folium", _F_EXAMPLES),
@@ -263,11 +264,13 @@ html_extra_path = ['_static']
 
 import importlib.util
 
-_gen_spec = importlib.util.spec_from_file_location(
-    "generate_cable_database_rst",
-    os.path.join(os.path.dirname(__file__), "generate_cable_database_rst.py"),
-)
-_gen_mod = importlib.util.module_from_spec(_gen_spec)
-_gen_spec.loader.exec_module(_gen_mod)
-_gen_mod.generate()
+def _run_doc_generator(script_name: str) -> None:
+    path = os.path.join(os.path.dirname(__file__), script_name)
+    spec = importlib.util.spec_from_file_location(script_name.replace(".py", ""), path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.generate()
+
+
+_run_doc_generator("generate_cable_database_rst.py")
 

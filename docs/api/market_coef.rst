@@ -134,12 +134,6 @@ Generates plots of market curves.
    - Integrated supply and demand
    - Price curves
 
-   **Example**
-
-   .. code-block:: python
-
-       pyf.plot_curves(market_data, hour=12, name='Belgium')
-
 ENTSO-E Data Cleaning
 ---------------------
 
