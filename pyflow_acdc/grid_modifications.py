@@ -1258,7 +1258,7 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
     return gen
 
 
-def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
+def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
     """Add an external-grid equivalent generator at an AC bus.
 
     Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
@@ -1293,7 +1293,8 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
     node = _look_up_node(grid, node, ac_or_dc="AC")
     if MWmax is None:
         MWmax=MVAmax
-
+    if MWmin is None:
+        MWmin=0
     if MVArmin is None:
         MVArmin=-MVAmax
     if MVArmax is None:
@@ -1304,7 +1305,7 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
 
     Max_pow_genR=MVArmax/grid.S_base
     Min_pow_genR=MVArmin/grid.S_base
-    Min_pow_gen=0
+    Min_pow_gen=MWmin/grid.S_base
     rating = MVAmax/ grid.S_base
     gen = Gen_AC(gen_name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,qf,lf,S_rated=rating)
     gen.is_ext_grid = True

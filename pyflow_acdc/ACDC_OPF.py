@@ -46,12 +46,22 @@ __all__ = [
     'opf_step_results',
     'fx_conv',
     'export_solver_progress_to_excel',
-    'reset_to_initialize'
+    'reset_to_initialize',
+    'get_gen_p_min_eff',
 ]
 
 def pack_variables(*args):
     return args
 
+
+def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
+    """Effective lower active-power bound (pu) for a generator at ``np_gen_value`` parallel units."""
+    if not getattr(gen, 'is_ext_grid', False):
+        return gen.Min_pow_gen * np_gen_value
+    if not getattr(gen, 'allow_sell', True):
+        return 0
+    p_load_eff = gen.p_load_eff if p_load_eff_value is None else p_load_eff_value
+    return -(gen.Max_pow_gen * np_gen_value - p_load_eff)
 
 
 def obj_w_rule(grid,ObjRule,OnlyGen):
@@ -1345,13 +1355,20 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     except (AttributeError, TypeError):
         has_loaded_solution = False
 
-    # Empty results.solution can be normal with IPOPT in some setups.
-    # Keep this warning for branch-and-bound/MINLP-style solvers where a
-    # missing payload is more suspicious.
+    # Empty results.solution is normal for some integrations (e.g. Gurobi
+    # persistent callback loads vars via load_vars() without populating
+    # results.solution). Warn only when the payload is missing and model
+    # variables were not loaded either.
+    has_model_values = has_loaded_solution
+    if not has_model_values:
+        has_model_values, _ = _quick_feasible_point_check(model, check_integrality=False)
+
     bnb_like_solvers = {"bonmin", "couenne", "scip", "cbc", "cplex", "gurobi"}
     should_warn_missing_payload = (
-        trusted_termination
+        not suppress_warnings
+        and trusted_termination
         and not has_loaded_solution
+        and not has_model_values
         and solver_name_lc in bnb_like_solvers
     )
     if should_warn_missing_payload:

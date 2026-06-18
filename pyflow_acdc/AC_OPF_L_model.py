@@ -62,6 +62,8 @@ def opf_create_l_model_ac(model,grid,TEP=False):
 
 
 def Generation_variables(model,grid,gen_info,TEP):
+    from .ACDC_OPF import get_gen_p_min_eff
+
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
     lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC = gen_DC_info
@@ -87,11 +89,11 @@ def Generation_variables(model,grid,gen_info,TEP):
 
     def P_Gen_bounds(model, g):
         gen = grid.Generators[g]
-        return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
+        return (get_gen_p_min_eff(gen, gen.np_gen), gen.Max_pow_gen * gen.np_gen)
 
     def P_gen_ini(model,ngen):
         gen = grid.Generators[ngen]
-        min_pow_gen = gen.Min_pow_gen * gen.np_gen
+        min_pow_gen = get_gen_p_min_eff(gen, gen.np_gen)
         ini=gen.Pset * gen.np_gen
         max_pow_gen = gen.Max_pow_gen * gen.np_gen
         if  min_pow_gen>ini:
@@ -104,6 +106,9 @@ def Generation_variables(model,grid,gen_info,TEP):
     model.gen_AC     = pyo.Set(initialize=lista_gen)
 
     if grid.GPR:
+        if TEP:
+            p_load_eff_ini = {gen.genNumber: gen.p_load_eff for gen in grid.Generators}
+            model.P_load_eff = pyo.Param(model.gen_AC, initialize=p_load_eff_ini, mutable=True)
         model.PGi_gen = pyo.Var(model.gen_AC, initialize=P_gen_ini)
 
     else:
@@ -596,6 +601,7 @@ def TEP_parameters(model,grid):
 def TEP_variables(model,grid):
 
     from .ACDC_Static_TEP import get_TEP_variables
+    from .ACDC_OPF import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 
@@ -625,7 +631,8 @@ def TEP_variables(model,grid):
 
         def P_gen_lower_bound_rule(model, gen):
             g = grid.Generators[gen]
-            return (g.Min_pow_gen * model.np_gen[gen] <= model.PGi_gen[gen])
+            p_load_eff = model.P_load_eff[gen] if hasattr(model, 'P_load_eff') else None
+            return (get_gen_p_min_eff(g, model.np_gen[gen], p_load_eff) <= model.PGi_gen[gen])
 
         def P_gen_upper_bound_rule(model, gen):
             g = grid.Generators[gen]
