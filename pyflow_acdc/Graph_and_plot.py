@@ -621,7 +621,7 @@ def calculate_positions(G, Grid):
     return pos
 
 
-def plot_neighbour_graph(grid, node=None, base_node_size=10, proximity=1):
+def plot_neighbour_graph(grid, node=None, base_node_size=10, proximity=1,show=True):
     """Plot the ego graph of a node and its neighbours.
 
     Builds a subgraph within ``proximity`` hops of ``node`` on ``grid.Graph_toPlot``
@@ -660,7 +660,7 @@ def plot_neighbour_graph(grid, node=None, base_node_size=10, proximity=1):
     if node not in G:
         raise ValueError(f"Node {node.name!r} is not in the plot graph.")
     Gn = nx.ego_graph(G, node, proximity)
-    plot_graph(grid, base_node_size=base_node_size, G=Gn)
+    plot_graph(grid, base_node_size=base_node_size, G=Gn,show=show)
 
 
 def plot_graph(Grid,text='inPu',base_node_size=10,G=None,show=True):
