@@ -143,3 +143,8 @@ select = ["E", "W", "F", "I", "N", "UP", "B"]
 # Class names intentionally keep underscores/mixed case (owner decision, Tier F WON'T DO).
 "pyflow_acdc/Classes.py" = ["N801"]   # class name should use CapWords
 "pyflow_acdc/__init__.py" = ["F401", "F403"]  # re-export surface + controlled star imports
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: large example-grid smoke tests (e.g. Texas7k)",
+]
