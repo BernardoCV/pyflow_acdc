@@ -121,6 +121,10 @@ packages = ["pyflow_acdc","pyflow_tests"]
     "example_grids/wind_farm_data/*.geojson"
 ]
 
+[tool.setuptools.data-files]
+"examples/NS_MP" = ["examples/NS_MP/*.csv", "examples/NS_MP/README.md"]
+"examples/Case24_MP" = ["examples/Case24_MP/*.csv", "examples/Case24_MP/README.md"]
+
 [project.scripts]
 pyflow-acdc-test = "pyflow_tests.run_tests:main"
 pyflow-acdc-check-solvers = "pyflow_acdc.solver_utils:cli_check_solvers"
