@@ -1,4 +1,4 @@
-"""Docs: api\modelling_dc.rst — DCDC converter"""
+"""Docs: api\\modelling_dc.rst — DCDC converter"""
 import pyflow_acdc as pyf
 # Create an AC node
 pyf.initialize_pyflowacdc()

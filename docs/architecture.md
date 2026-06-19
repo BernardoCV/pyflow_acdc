@@ -64,8 +64,7 @@ everything else builds on.
 - **`Array_OPT.py`** — Offshore-array inter-array cable sizing: MIP path
   graphs and the cable-string-sizing (CSS) loop, with `pyomo`/`ortools`
   backends.
-- **`AC_L_CSS_gurobi.py` / `AC_L_CSS_ortools.py`** — Solver-specific linear
-  cable-sizing implementations.
+- **`AC_L_CSS_ortools.py`** — Solver-specific linear cable-sizing implementation.
 - **`_tep_utils.py`** — Shared TEP economics (annuity/present-value factor).
 
 ## Time series

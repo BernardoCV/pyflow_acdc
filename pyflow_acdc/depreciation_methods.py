@@ -201,12 +201,6 @@ except ImportError:
 
 # --- Array cable-string sizing backends -----------------------------------
 try:
-    from .AC_L_CSS_gurobi import optimal_l_css_gurobi
-    _register(optimal_l_css_gurobi, 'Optimal_L_CSS_gurobi')
-except ImportError:
-    pass
-
-try:
     from .AC_L_CSS_ortools import optimal_l_css_ortools
     _register(optimal_l_css_ortools, 'Optimal_L_CSS_ortools')
 except ImportError:

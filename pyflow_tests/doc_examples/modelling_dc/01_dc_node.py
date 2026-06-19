@@ -1,4 +1,4 @@
-"""Docs: api\modelling_dc.rst — DC node"""
+"""Docs: api\\modelling_dc.rst — DC node"""
 import pyflow_acdc as pyf
 # Create an DC node
 pyf.initialize_pyflowacdc()

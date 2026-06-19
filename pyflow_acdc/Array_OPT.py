@@ -5,7 +5,7 @@ cable-string-sizing (CSS) loop, with ``pyomo`` and ``ortools`` backends.
 
 Owns: array-sizing optimization orchestration and backend dispatch.
 Does not own: solver-specific linear cable-sizing models (see
-``AC_L_CSS_gurobi`` / ``AC_L_CSS_ortools``).
+``AC_L_CSS_ortools``).
 """
 import time
 import os

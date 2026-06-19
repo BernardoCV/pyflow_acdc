@@ -1,4 +1,4 @@
-"""Docs: api\modelling_ac.rst — AC branch"""
+"""Docs: api\\modelling_ac.rst — AC branch"""
 import pyflow_acdc as pyf
 # Create an AC node
 pyf.initialize_pyflowacdc()

@@ -123,12 +123,8 @@ Simplified CSS Workflow
 
    Assigns cable types from an optimized model back into the grid.
 
-Linear CSS Solvers
-------------------
-
-.. autofunction:: pyflow_acdc.optimal_l_css_gurobi
-
-   Solves the linear CSS formulation with Gurobi.
+Linear CSS Solver
+-----------------
 
 .. autofunction:: pyflow_acdc.optimal_l_css_ortools
 

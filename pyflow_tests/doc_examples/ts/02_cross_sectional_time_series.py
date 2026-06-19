@@ -1,4 +1,4 @@
-"""Docs: api\ts.rst — Time series"""
+"""Docs: api\\ts.rst — Time series"""
 import pyflow_acdc as pyf
 import pandas as pd
 from pyflow_tests.test_constants import NS_MTDC_MARKET_PRICES_URL, NS_MTDC_WIND_LOAD_URL

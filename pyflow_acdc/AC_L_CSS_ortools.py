@@ -29,8 +29,7 @@ def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YE
                           discount_rate=DEFAULT_DISCOUNT_RATE, tee=False, time_limit=DEFAULT_TIME_LIMIT):
     """Main function to create and solve OR-Tools linear_solver model.
 
-    Equivalent to ``Optimal_L_CSS_gurobi`` but uses the open-source
-    ``ortools.linear_solver`` back-end (CBC by default).
+    Uses the open-source ``ortools.linear_solver`` back-end (CBC by default).
     Only CT lines are considered (no expansion / reconductoring).
     """
     if not ORTOOLS_LP_AVAILABLE:

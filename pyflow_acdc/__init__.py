@@ -209,13 +209,6 @@ except ImportError:
     HAS_DASH = False
 
 try:
-    from .AC_L_CSS_gurobi import *
-    __all__.extend(['optimal_l_css_gurobi'])
-    HAS_AC_L_CSS_GUROBI = True
-except ImportError:
-    HAS_AC_L_CSS_GUROBI = False
-
-try:
     from .AC_L_CSS_ortools import *
     __all__.extend(['optimal_l_css_ortools'])
     HAS_AC_L_CSS_ORTOOLS = True
