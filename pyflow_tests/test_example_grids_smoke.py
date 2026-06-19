@@ -108,11 +108,14 @@ def test_example_grid_factory_loads_grid_and_results(case_file):
 
 @pytest.mark.parametrize("case_file", CASE_FILES, ids=lambda p: p.stem)
 def test_example_grid_is_registered_in_pyf_cases(case_file):
-    """Primary factory should be the same object registered in pyf.cases."""
-    module = _load_module_from_path(case_file)
-    factory = _pick_factory(module, case_file.stem)
-    assert factory.__name__ in pyf.cases
-    assert pyf.cases[factory.__name__] is factory
+    """Primary factory should be registered in pyf.cases and load a grid."""
+    case_name = case_file.stem
+    assert case_name in pyf.cases
+    factory = pyf.cases[case_name]
+    assert callable(factory)
+    kwargs = CASE_KWARGS.get(case_name, {})
+    result = factory(**kwargs)
+    _assert_grid_result(case_name, result)
 
 
 @pytest.mark.slow
