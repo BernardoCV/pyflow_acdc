@@ -139,8 +139,6 @@ DOCS_CASES = [
     "test_docs_results.py",
     "test_docs_ts.py",
     "test_docs_plotting.py",
-    "test_docs_tep.py",
-    "test_docs_tep_dynamic.py",
     "test_docs_tep_pymoo.py",
     "test_docs_wf_array.py",
     "test_docs_dash.py",

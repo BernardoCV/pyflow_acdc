@@ -72,13 +72,6 @@ Multi-period Multi-scenario Dynamic TEP
    - Solver statistics dictionary
    - Dynamic TEP time-series results
 
-   **Example**
-
-.. literalinclude:: ../../pyflow_tests/doc_examples/tep_dynamic/01_multi_period_multi_scenario_dynamic_tep.py
-   :language: python
-   :lines: 2-
-
-
 Export Dynamic Investment Period Plots
 --------------------------------------
 

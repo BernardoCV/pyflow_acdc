@@ -24,13 +24,6 @@ Running one state transmission expansion planning
    - Timing information
    - Solver statistics
 
-   **Example**
-
-.. literalinclude:: ../../pyflow_tests/doc_examples/tep/01_running_one_state_transmission_expansion_planning.py
-   :language: python
-   :lines: 2-
-
-
 Running multiple scenario based transmission expansion planning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -92,13 +85,6 @@ Running multiple scenario based transmission expansion planning
    - Timing information
    - Solver statistics
    - TEP time series results
-
-   **Example**
-
-.. literalinclude:: ../../pyflow_tests/doc_examples/tep/02_running_multiple_scenario_based_transmission_expansion_plann.py
-   :language: python
-   :lines: 2-
-
 
 Linear and Sensitivity Utilities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
