@@ -21,8 +21,8 @@ spec = importlib.util.spec_from_file_location("case24_MP", case_path)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
-pyf.add_inv_series(grid, mod.resolve_example_path("case24_MP_TEP_inv_series_10.csv"))
-pyf.add_gen_mix_limits(grid, mod.resolve_example_path("case24_MP_TEP_gen_mix_limits.csv"))
+pyf.add_inv_series(grid, mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv"))
+pyf.add_gen_mix_limits(grid, mod._resolve_example_path("case24_MP_TEP_gen_mix_limits.csv"))
 ```
 
 Raw GitHub base path: `https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/Case24_MP/`

@@ -2,13 +2,14 @@
 """
 Smoke tests for example_grids factory functions (PF / OPF / TEP / Wind_Array).
 
-Each case module under ``pyflow_acdc/example_grids/`` is loaded and its primary
-factory is called once. This mirrors ``pyf.cases[...]`` without invoking helper
-functions that are also exported into that namespace (e.g. ``resolve_local_path``).
+Each case module under ``pyflow_acdc/example_grids/`` is loaded through the same
+module names as ``pyflow_acdc.__init__`` and its primary factory is called once.
+``pyf.cases`` should expose only those primary factories.
 """
 
 import importlib.util
 import inspect
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,9 +48,16 @@ CASE_FILES = _discover_case_files()
 CASE_FILES_DEFAULT = [f for f in CASE_FILES if f.stem not in SKIP_CASES]
 
 
-def _load_module_from_path(file_path):
-    module_name = f"_example_grid_{file_path.stem}"
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
+def _example_grid_module_name(case_file):
+    rel = case_file.relative_to(EXAMPLE_GRIDS_DIR).with_suffix("")
+    return "__".join(rel.parts)
+
+
+def _load_module_from_path(case_file):
+    module_name = _example_grid_module_name(case_file)
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(module_name, case_file)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -100,12 +108,11 @@ def test_example_grid_factory_loads_grid_and_results(case_file):
 
 @pytest.mark.parametrize("case_file", CASE_FILES, ids=lambda p: p.stem)
 def test_example_grid_is_registered_in_pyf_cases(case_file):
-    """Primary factory name should exist in pyf.cases when names match."""
-    case_name = case_file.stem
+    """Primary factory should be the same object registered in pyf.cases."""
     module = _load_module_from_path(case_file)
-    factory = _pick_factory(module, case_name)
-    if factory.__name__ in pyf.cases:
-        assert pyf.cases[factory.__name__] is factory
+    factory = _pick_factory(module, case_file.stem)
+    assert factory.__name__ in pyf.cases
+    assert pyf.cases[factory.__name__] is factory
 
 
 @pytest.mark.slow

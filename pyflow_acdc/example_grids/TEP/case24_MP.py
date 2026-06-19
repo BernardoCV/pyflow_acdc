@@ -35,7 +35,7 @@ def _case24_mp_data_dir():
     return data_dir
 
 
-def resolve_example_path(filename, *, online=False):
+def _resolve_example_path(filename, *, online=False):
     if _is_url(filename):
         return str(filename)
     if online:
@@ -46,7 +46,7 @@ def resolve_example_path(filename, *, online=False):
     return str(path)
 
 
-def example_data_url(filename):
+def _example_data_url(filename):
     """GitHub raw URL for a Case24_MP CSV filename."""
     return CASE24_MP_GITHUB_BASE + Path(filename).name
 
@@ -479,26 +479,26 @@ def case24_MP():
     return grid,res
 
 
-def resolve_local_path(base_file, maybe_relative_path):
+def _resolve_local_path(base_file, maybe_relative_path):
     del base_file
     if _is_url(maybe_relative_path) or os.path.isabs(maybe_relative_path):
         return maybe_relative_path
-    return resolve_example_path(maybe_relative_path)
+    return _resolve_example_path(maybe_relative_path)
 
 
-def read_inv_series_csv(csv_path):
+def _read_inv_series_csv(csv_path):
     df = pd.read_csv(csv_path, header=None)
     if df.shape[0] < 3:
         raise ValueError(f"Investment CSV '{csv_path}' has insufficient rows.")
     return df
 
 
-def get_column_indices_by_type(df, type_name):
+def _get_column_indices_by_type(df, type_name):
     return [idx for idx, t in enumerate(df.iloc[1, :].tolist()) if str(t).strip() == type_name]
 
 
-def get_last_load_multiplier(df):
-    data = df.iloc[2:, get_column_indices_by_type(df, "Load")].apply(pd.to_numeric, errors="coerce")
+def _get_last_load_multiplier(df):
+    data = df.iloc[2:, _get_column_indices_by_type(df, "Load")].apply(pd.to_numeric, errors="coerce")
     if data.empty:
         raise ValueError("No numeric load rows found in investment CSV.")
     last_row = data.iloc[-1].dropna()
@@ -507,7 +507,7 @@ def get_last_load_multiplier(df):
     return float(last_row.mean())
 
 
-def apply_uniform_load_multiplier(grid, load_multiplier):
+def _apply_uniform_load_multiplier(grid, load_multiplier):
     for node in grid.nodes_AC:
         node.PLi_factor = float(load_multiplier)
     for node in getattr(grid, "nodes_DC", []):

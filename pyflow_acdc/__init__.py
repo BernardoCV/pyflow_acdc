@@ -5,6 +5,7 @@ Provides grid simulation and power flow analysis functionality.
 """
 from pathlib import Path
 import importlib.util
+import inspect
 
 # Core imports - required modules
 from .Results_class import *
@@ -246,14 +247,28 @@ __all__.extend(depreciation_methods.__all__)
 # Dynamically load all .py files in the example_grids folders.
 _cases_root = Path(__file__).parent / "example_grids"
 _case_folders = [
-    _cases_root,
     _cases_root / "PF",
     _cases_root / "OPF",
     _cases_root / "TEP",
     _cases_root / "Wind_Array",
 ]
 
-# Namespace for all loaded cases
+
+def _pick_case_factory(module, stem):
+    candidates = [
+        fn
+        for _, fn in inspect.getmembers(module, inspect.isfunction)
+        if not fn.__name__.startswith("_") and fn.__module__ == module.__name__
+    ]
+    if not candidates:
+        return None
+    for fn in candidates:
+        if fn.__name__ == stem:
+            return fn
+    return candidates[0]
+
+
+# Namespace for primary example-grid factories only.
 cases = {}
 
 # Load each .py case module from configured folders
@@ -271,8 +286,9 @@ for folder in _case_folders:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)  # Trust boundary: only loads .py from bundled example_grids/
 
-        # Add all public functions from the module to the `cases` namespace
-        cases.update({name: obj for name, obj in vars(module).items() if not name.startswith("_")})
+        factory = _pick_case_factory(module, case_file.stem)
+        if factory is not None:
+            cases[factory.__name__] = factory
 
 
 

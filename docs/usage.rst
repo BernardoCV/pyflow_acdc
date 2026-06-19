@@ -102,7 +102,7 @@ Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
 * ``pyf.cases['case24_3zones_acdc']()``
 * ``pyf.cases['case39']()``
 * ``pyf.cases['case39_acdc']()``
-* ``pyf.cases['case_118_TEP_benchmark']()``
+* ``pyf.cases['case118_TEP_benchmark']()``
 * ``pyf.cases['case_ACTIVSg500']()``
 * ``pyf.cases['Texas7k_20210804']()``
 

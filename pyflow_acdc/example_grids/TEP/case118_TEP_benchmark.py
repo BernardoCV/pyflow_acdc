@@ -21,7 +21,7 @@ https://doi.org/10.1016/j.ijepes.2025.111459.
 """
 current_file = Path(__file__).resolve()
 path = str(current_file.parent)
-def case_118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=1,load_factor=1,export_capacity=15000,Gen_Pmin=True,DC=False,DC_exp=False):    
+def case118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=1,load_factor=1,export_capacity=15000,Gen_Pmin=True,DC=False,DC_exp=False):    
     exp_tf=False
     if exp_380 or exp_220:
         exp_tf =True

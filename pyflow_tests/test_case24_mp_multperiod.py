@@ -2,6 +2,7 @@
 """Fast multi-period TEP tests on the case24_MP example grid."""
 
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,10 @@ import pyflow_acdc as pyf
 
 def _load_case24_mp_module():
     case_path = Path(pyf.__file__).resolve().parent / "example_grids" / "TEP" / "case24_MP.py"
-    spec = importlib.util.spec_from_file_location("_case24_mp_test", case_path)
+    module_name = "TEP__case24_MP"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(module_name, case_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -19,8 +23,8 @@ def _load_case24_mp_module():
 def _case24_mp_grid_with_csvs():
     mod = _load_case24_mp_module()
     grid, res = mod.case24_MP()
-    inv_csv = mod.resolve_example_path("case24_MP_TEP_inv_series_10.csv")
-    mix_csv = mod.resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
+    inv_csv = mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv")
+    mix_csv = mod._resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
     pyf.add_inv_series(grid, inv_csv)
     pyf.add_gen_mix_limits(grid, mix_csv)
     return grid, res, mod
@@ -35,8 +39,8 @@ def test_case24_mp_case_is_registered():
 
 def test_case24_mp_investment_csvs_resolve():
     mod = _load_case24_mp_module()
-    inv_path = mod.resolve_example_path("case24_MP_TEP_inv_series_10.csv")
-    mix_path = mod.resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
+    inv_path = mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv")
+    mix_path = mod._resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
     assert Path(inv_path).is_file()
     assert Path(mix_path).is_file()
 
@@ -90,8 +94,8 @@ def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):
     monkeypatch.setattr("pyflow_acdc.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
 
     grid, _, mod = _case24_mp_grid_with_csvs()
-    inv_csv = mod.resolve_example_path("case24_MP_TEP_inv_series_10.csv")
-    mix_csv = mod.resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
+    inv_csv = mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv")
+    mix_csv = mod._resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
 
     run_results = pyf.sequential_STEP(
         grid=grid,
