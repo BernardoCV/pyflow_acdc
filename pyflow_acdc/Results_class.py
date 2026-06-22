@@ -801,7 +801,24 @@ class Results:
 
         return df_all
 
+    def _ensure_ac_line_currents(self):
+        """Derive line i_from/i_to from exported OPF voltages when export skipped them."""
+        grid = self.Grid
+        if not grid.nodes_AC or not getattr(grid, 'OPF_run', False):
+            return
+        if not any(not hasattr(line, 'i_from') for line in grid.lines_AC):
+            return
+        if not hasattr(grid, 'V_AC') or grid.V_AC is None or len(grid.V_AC) != grid.nn_AC:
+            raise AttributeError(
+                "Line currents (i_from) are missing after OPF/TEP export. "
+                "Ensure the model was solved and exported before calling res.all()."
+            )
+        grid.line_ac_calc()
+        if grid.lines_AC_exp or grid.lines_AC_rec or grid.lines_AC_ct:
+            grid.line_ac_calc_exp()
+
     def ac_lines_current(self, print_table=True):
+        self._ensure_ac_line_currents()
         rows = []
 
         for g in range(self.Grid.Num_Grids_AC):

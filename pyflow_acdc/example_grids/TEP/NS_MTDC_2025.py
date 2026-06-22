@@ -2,8 +2,8 @@
 """
 North Sea MTDC 2025 multi-period TEP example grid.
 
-Data files live in ``examples/NS_MP/`` (repo root). Load with
-``pyf.cases["NS_MTDC_2025"]()``.
+Data files live in ``examples/NS_MP/`` (or GitHub raw URLs under the same
+folder by default). Load with ``pyf.cases["NS_MTDC_2025"]()``.
 """
 
 from itertools import chain
@@ -12,6 +12,15 @@ from pathlib import Path
 import pandas as pd
 import pyflow_acdc as pyf
 from shapely.geometry import LineString, Point
+
+NS_MP_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MP/"
+)
+
+
+def _is_url(path):
+    text = str(path)
+    return text.startswith("http://") or text.startswith("https://")
 
 
 def _ns_mp_data_dir():
@@ -24,15 +33,35 @@ def _ns_mp_data_dir():
     return data_dir
 
 
-def NS_MTDC_2025(years_data='23,24', S_base=100, imp=1, export=1, per=1, AS=True, tee=False, expandable=True):
-    main = _ns_mp_data_dir().as_posix() + '/'
+def _resolve_example_path(filename, *, online=True):
+    if _is_url(filename):
+        return str(filename)
+    if online:
+        return NS_MP_GITHUB_BASE + Path(filename).name
+    path = _ns_mp_data_dir() / filename
+    if not path.exists():
+        raise FileNotFoundError(f"NS_MP example file not found: {path}")
+    return str(path)
+
+
+def NS_MTDC_2025(
+    years_data='23,24',
+    S_base=100,
+    imp=1,
+    export=1,
+    per=1,
+    AS=True,
+    tee=False,
+    expandable=True,
+    online=True,
+):
     selected_years = [year.strip() for year in years_data.split(',')]
 
-    AC_node_data = pd.read_csv(f'{main}NS_AC_node_data.csv')
-    AC_line_data = pd.read_csv(f'{main}NS_AC_line_data.csv')
-    DC_node_data = pd.read_csv(f'{main}NS_DC_node_data.csv')
-    DC_line_data = pd.read_csv(f'{main}NS_DC_line_data.csv')
-    Converter_ACDC_data = pd.read_csv(f'{main}NS_Converter_data.csv')
+    AC_node_data = pd.read_csv(_resolve_example_path("NS_AC_node_data.csv", online=online))
+    AC_line_data = pd.read_csv(_resolve_example_path("NS_AC_line_data.csv", online=online))
+    DC_node_data = pd.read_csv(_resolve_example_path("NS_DC_node_data.csv", online=online))
+    DC_line_data = pd.read_csv(_resolve_example_path("NS_DC_line_data.csv", online=online))
+    Converter_ACDC_data = pd.read_csv(_resolve_example_path("NS_Converter_data.csv", online=online))
 
     extgrid_loads_mw = {
         'BE4': 1300,
@@ -144,8 +173,12 @@ def NS_MTDC_2025(years_data='23,24', S_base=100, imp=1, export=1, per=1, AS=True
     TS_MK_list = []
     TS_wl_list = []
     for year in selected_years:
-        TS_MK_year = pd.read_csv(f'{main}NS_TS_marketPrices_data_sd20{year}.csv')
-        TS_wl_year = pd.read_csv(f'{main}NS_TS_WL_data20{year}.csv')
+        TS_MK_year = pd.read_csv(
+            _resolve_example_path(f"NS_TS_marketPrices_data_sd20{year}.csv", online=online)
+        )
+        TS_wl_year = pd.read_csv(
+            _resolve_example_path(f"NS_TS_WL_data20{year}.csv", online=online)
+        )
         len_MK = len(TS_MK_year)
         if len(TS_wl_year) != len_MK:
             TS_wl_year = TS_wl_year.iloc[:len_MK]
@@ -162,12 +195,20 @@ def NS_MTDC_2025(years_data='23,24', S_base=100, imp=1, export=1, per=1, AS=True
     pyf.add_TimeSeries(grid, TS_MK_all)
     pyf.add_TimeSeries(grid, TS_wl_all)
     if expandable:
-        exp_elements = pd.read_csv(f'{main}Expandable_elements.csv')
+        exp_elements = pd.read_csv(
+            _resolve_example_path("Expandable_elements.csv", online=online)
+        )
         pyf.expand_elements_from_pd(grid, exp_elements)
 
-        pyf.add_inv_series(grid, f'{main}NS_exp_MP_planned_intalled.csv')
-        pyf.add_inv_series(grid, f'{main}NS_exp_MP_max_intall_per_period.csv')
-        pyf.add_inv_series(grid, f'{main}NS_exp_MP_price_zones.csv')
+        pyf.add_inv_series(
+            grid, _resolve_example_path("NS_exp_MP_planned_intalled.csv", online=online)
+        )
+        pyf.add_inv_series(
+            grid, _resolve_example_path("NS_exp_MP_max_intall_per_period.csv", online=online)
+        )
+        pyf.add_inv_series(
+            grid, _resolve_example_path("NS_exp_MP_price_zones.csv", online=online)
+        )
 
         for line in  grid.lines_DC:
             line.investment_decisions['lambda_capex'] = [0,-0.03,-0.08]

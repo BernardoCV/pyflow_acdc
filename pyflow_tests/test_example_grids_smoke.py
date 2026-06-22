@@ -20,7 +20,7 @@ CASE_SUBDIRS = ("PF", "OPF", "TEP", "Wind_Array")
 
 # Lightweight kwargs for factories that accept TEP / expansion / TS options.
 CASE_KWARGS = {
-    "NS_MTDC_2025": {"years_data": "24", "expandable": False},
+    "NS_MTDC_2025": {"years_data": "24", "expandable": False, "online": True},
     "case39": {"TEP": False},
     "case39_acdc": {"TEP": False},
     "case24_3zones_acdc": {"TEP": False},

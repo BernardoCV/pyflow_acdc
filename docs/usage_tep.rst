@@ -42,17 +42,20 @@ Pick **one** of the following.
    :language: python
    :lines: 2-
 
+The static TEP example uses ``solver="ipopt"`` for fast doc tests. For production
+MINLP solves, prefer ``solver="bonmin"``.
+
 **MS TEP** — one expansion plan, several clustered operating scenarios.
 Attach time series with :func:`~pyflow_acdc.add_TimeSeries` (see :doc:`api/ts_mod`),
 set ``clustering_options`` (see :doc:`api/clustering`), then call
 :func:`~pyflow_acdc.multi_scenario_TEP`:
 
-.. literalinclude:: ../pyflow_tests/doc_examples/usage_tep/01_multi_scenario_tep.py
+.. literalinclude:: ../pyflow_tests/doc_examples/tep/02_multi_scenario_tep.py
    :language: python
    :lines: 2-
 
-The MS TEP example uses ``solver="ipopt"`` so doc tests finish quickly. For
-production solves with binary expansion decisions, prefer ``solver="bonmin"``.
+The MS TEP example also uses ``solver="ipopt"`` in doc tests; prefer ``solver="bonmin"``
+for production solves with binary expansion decisions.
 
 Example cases
 -------------

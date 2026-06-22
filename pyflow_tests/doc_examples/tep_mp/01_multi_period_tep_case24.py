@@ -23,3 +23,4 @@ model, model_results, timing_info, solver_stats = pyf.multi_period_transmission_
     tee=False,
     obj_scaling=1e9,
 )
+res.all()

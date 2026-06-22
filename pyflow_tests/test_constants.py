@@ -112,16 +112,13 @@ CABLE_TYPES_OFF66 = [
     "MOF_800",
 ]
 
-# --- NS_MTDC time-series fixtures (remote CSVs) ---
+# --- NS_MP example data (remote CSVs) ---
 
-NS_MTDC_MARKET_PRICES_URL = (
-    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/"
-    "examples/NS_MTDC_TS/NS_TS_marketPrices_data_sd2024.csv"
+NS_MP_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MP/"
 )
-NS_MTDC_WIND_LOAD_URL = (
-    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/"
-    "examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
-)
+NS_MTDC_MARKET_PRICES_URL = NS_MP_GITHUB_BASE + "NS_TS_marketPrices_data_sd2024.csv"
+NS_MTDC_WIND_LOAD_URL = NS_MP_GITHUB_BASE + "NS_TS_WL_data2024.csv"
 
 # --- Case24_MP planning CSVs (remote) ---
 
@@ -141,8 +138,8 @@ IGNORED_WARNING_SNIPPETS = [
 DOCS_CASES = [
     "test_docs_index.py",
     "test_docs_usage.py",
-    "test_docs_usage_tep.py",
-    "test_docs_usage_mp_tep.py",
+    "test_docs_tep.py",
+    "test_docs_tep_mp.py",
     "test_docs_csv_import.py",
     "test_docs_modelling_ac.py",
     "test_docs_modelling_dc.py",

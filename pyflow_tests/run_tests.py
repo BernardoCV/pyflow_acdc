@@ -67,7 +67,10 @@ def run_test_case(case: str, show_output: bool = False) -> Tuple[bool, str, List
                     captured_warnings.append(stripped)
             
             stdout_content = stdout_capture.getvalue()
-            if 'is not installed' in stdout_content or 'not available' in stdout_content:
+            doc_examples_passed = " doc examples passed" in stdout_content
+            if not doc_examples_passed and (
+                "is not installed" in stdout_content or "Skipped:" in stdout_content
+            ):
                 return False, "Dependency not available", captured_warnings, 0
 
         return True, "", captured_warnings, elapsed_time

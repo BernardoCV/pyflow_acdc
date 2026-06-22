@@ -87,7 +87,7 @@ Pick **one** of the following (same CSV setup from step 2 unless noted).
 
 **MP TEP** — one-shot multi-period MINLP, all periods in one model:
 
-.. literalinclude:: ../pyflow_tests/doc_examples/usage_mp_tep/01_multi_period_tep_case24.py
+.. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/01_multi_period_tep_case24.py
    :language: python
    :lines: 2-
 
@@ -141,6 +141,10 @@ reload a saved result with :func:`~pyflow_acdc.load_precomputed_clusters_to_grid
 
 Pass ``clustering_options`` to :func:`~pyflow_acdc.multi_period_MS_TEP` or
 :func:`~pyflow_acdc.sequential_MS_STEP`. See :doc:`api/clustering`.
+
+.. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/02_multi_period_multi_scenario_dynamic_tep.py
+   :language: python
+   :lines: 2-
 
 4. Results
 ^^^^^^^^^^

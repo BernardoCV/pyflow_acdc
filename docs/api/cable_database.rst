@@ -63,7 +63,7 @@ These cables are used for Moray East and West tests in [1]_ using cable data fro
 .. _cable_ref_abb-extrapolated:
 
 ABB\_extrapolated
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 **Source.** **ABB\_extrapolated**
 

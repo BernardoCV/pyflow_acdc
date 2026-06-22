@@ -176,12 +176,13 @@ def generate(output: Path | None = None) -> Path:
     for reference, cables in grouped.items():
         anchor = _section_anchor(reference)
         display = _reference_display_name(reference)
+        title = _rst_escape(display)
         lines.extend(
             [
                 ".. _cable_ref_{}:".format(anchor),
                 "",
-                _rst_escape(display),
-                "~" * len(display),
+                title,
+                "~" * len(title),
                 "",
                 *_reference_section_lines(reference),
                 f"**Cable types ({len(cables)}):**",

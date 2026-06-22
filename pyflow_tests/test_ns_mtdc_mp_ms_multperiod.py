@@ -28,13 +28,14 @@ def _ns_mtdc_mp_grid():
         years_data="24",
         tee=False,
         expandable=True,
+        online=True,
     )
     return grid, res
 
 
 def test_ns_mtdc_2025_case_is_registered():
     assert "NS_MTDC_2025" in pyf.cases
-    grid, res = pyf.cases["NS_MTDC_2025"](years_data="24", expandable=False)
+    grid, res = pyf.cases["NS_MTDC_2025"](years_data="24", expandable=False, online=True)
     assert len(grid.nodes_AC) > 0
     assert len(grid.nodes_DC) > 0
     assert res is not None

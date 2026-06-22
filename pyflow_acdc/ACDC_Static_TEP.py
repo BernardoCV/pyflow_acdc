@@ -1260,10 +1260,10 @@ def _initialize_MS_STEP_sets_model(model,grid):
     if grid.CT_AC:
         model.lines_AC_ct = pyo.Set(initialize=list(range(0,grid.nct_AC)))
         model.ct_set = pyo.Set(initialize=list(range(0,len(grid.Cable_options[0].cable_types))))
-    if grid.GPR:
-        model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
-    if grid.rs_GPR:
-        model.ren_sources = pyo.Set(initialize=list(range(0,grid.n_ren)))
+    if grid.ACmode and grid.n_gen > 0:
+        model.gen_AC = pyo.Set(initialize=list(range(0, grid.n_gen)))
+    if grid.n_ren > 0:
+        model.ren_sources = pyo.Set(initialize=list(range(0, grid.n_ren)))
 
 def alpha_pareto(grid,steps,ObjRule,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,solver='bonmin',time_limit=None,tee=False,save_name=None,obj_scaling=1.0):
     model, obj_TEP, obj_OPF,weights_def,PZ = _prepare_TEP_model(grid,NPV,n_years,Hy,discount_rate,ObjRule)
@@ -2450,6 +2450,10 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
         flipped_data_PZGEN = pd.DataFrame()
         flipped_data_SC = pd.DataFrame()
         flipped_data_price = pd.DataFrame()
+        flipped_data_pz_lb = pd.DataFrame()
+        flipped_data_pz_ub = pd.DataFrame()
+        flipped_data_a = pd.DataFrame()
+        flipped_data_b = pd.DataFrame()
         flipped_data_load = pd.DataFrame()
         data_load = pd.DataFrame()
 
@@ -2551,6 +2555,7 @@ def export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zon
 
     if mutate_grid:
         grid.line_ac_calc()
+        grid.line_ac_calc_exp()
         grid.create_Ybus_DC()
         grid.line_dc_calc()
 

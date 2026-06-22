@@ -19,10 +19,24 @@ Multi-period Multi-scenario Dynamic TEP
 
 .. autofunction:: pyflow_acdc.multi_period_transmission_expansion
 
+   Example on ``case24_MP`` (grid + planning CSVs, model build with **ipopt**; use
+   **bonmin** and omit ``build_only`` for a full MINLP solve):
+
+   .. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/01_multi_period_tep_case24.py
+      :language: python
+      :lines: 2-
+
 .. autofunction:: pyflow_acdc.multi_period_MS_TEP
 
    Solves dynamic transmission expansion planning across investment periods
    using clustered time frames/scenarios.
+
+   Example on ``NS_MTDC_2025`` (full solve with **ipopt**; use **bonmin** for
+   production MINLP with binary expansion):
+
+   .. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/02_multi_period_multi_scenario_dynamic_tep.py
+      :language: python
+      :lines: 2-
 
    .. list-table::
       :widths: 20 10 50 10

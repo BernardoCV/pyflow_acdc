@@ -1733,7 +1733,8 @@ class Node_AC:
         self.used = False
         self.stand_alone = True
 
-        self.P_INJ=Voltage_0
+        self.P_INJ = 0
+        self.Q_INJ = 0
 
         self.price = 0.0
         self.Num_conv_connected=0
