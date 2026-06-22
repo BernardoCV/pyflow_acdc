@@ -5,7 +5,7 @@ This package was designed to facilitate the management of node and branch data i
 
 Alternatively, you can also construct your grid directly in Python. Below is the fundamental approach to creating a grid.
 
-The Python blocks on this page are included from ``pyflow_tests/doc_examples/usage/`` and executed by ``test_docs_usage.py``.
+The Python blocks in **Creating a grid**, **Adding components**, and **Running a power flow** are included from ``pyflow_tests/doc_examples/usage/`` and executed by ``test_docs_usage.py``.
 
 Creating a Grid
 ---------------
@@ -39,35 +39,8 @@ Examples of running a power flow...
    :language: python
    :lines: 2-
 
-.. _usage_opf:
-
-Running an Optimal Power Flow
------------------------------
-To run this, you need to have the OPF optional installed. This includes the following packages:
-
-- pyomo
-- ipopt
-
-
-**Quick Example**
-
-.. literalinclude:: ../pyflow_tests/doc_examples/usage/opf_quick.py
-   :language: python
-   :lines: 2-
-
-It is important that for optimal power flow generators are added to the grid before running.
-
-
-**Detailed Example**
-
-Taking the Case 5 from the IEEE PES Power Grid Library [2]_.
-
-.. literalinclude:: ../pyflow_tests/doc_examples/usage/opf_detailed.py
-   :language: python
-   :lines: 2-
-
-Available test cases:
-^^^^^^^^^^^^^^^^^^^^^^
+Available test cases
+--------------------
 
 Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
 ``pyf.cases`` when you ``import pyflow_acdc as pyf``. Each factory returns a
@@ -97,6 +70,7 @@ Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
 
 **Transmission Expansion Planning** (``pyflow_acdc/example_grids/TEP/``):
 
+* ``pyf.cases['case24_MP']()``
 * ``pyf.cases['case118_TEP']()``
 * ``pyf.cases['case118_TEP_DC']()``
 * ``pyf.cases['case24_3zones_acdc']()``
@@ -105,23 +79,29 @@ Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
 * ``pyf.cases['case118_TEP_benchmark']()``
 * ``pyf.cases['case_ACTIVSg500']()``
 * ``pyf.cases['Texas7k_20210804']()``
+* ``pyf.cases['NS_MTDC_2025']()``
 
 **Wind Array** (``pyflow_acdc/example_grids/Wind_Array/``):
 
+* ``pyf.cases['alpha_ventus']()``
 * ``pyf.cases['anholt']()``
 * ``pyf.cases['barrow']()``
 * ``pyf.cases['Borssele_3_and_4']()``
+* ``pyf.cases['moray_east']()``
 * ``pyf.cases['nordsee_one']()``
+* ``pyf.cases['westermost_rough']()``
 
+Workflow guides
+---------------
 
+.. toctree::
+   :maxdepth: 1
 
-    
+   usage_opf
+   usage_tep
+   usage_mp_tep
+   usage_wf_array
 
 **References**
 
-
 .. [1] J. Beerten and R. Belmans, "MatACDC - an open source software tool for steady-state analysis and operation of HVDC grids," 11th IET International Conference on AC and DC Power Transmission, Birmingham, 2015, pp. 1-9, doi: 10.1049/cp.2015.0061. keywords: {Steady-state analysis;HVDC grids;AC/DC systems;power flow modelling},
-
-.. [2] https://github.com/power-grid-lib/pglib-opf
-
-

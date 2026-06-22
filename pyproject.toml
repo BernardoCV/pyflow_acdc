@@ -76,8 +76,7 @@ OPF = ["pyomo"]
 
 Dash = ["dash"]
 
-Array_OPT = ["ortools",
-             "pyomo"]
+ORTOOLS_ARRAY = ["ortools"]
 
 TEP_pymoo = ["pymoo",
              "pyomo"]

@@ -8,7 +8,9 @@ next period. This is an alternative to the multi-period formulations
 (:func:`multi_period_transmission_expansion`, :func:`multi_period_MS_TEP`) when
 you prefer a series of linked single-expansion solves over one large MP model.
 
-Requires OPF/pyomo (``pip install pyflow-acdc[opf]``).
+See :doc:`../usage_mp_tep` for workflow examples using ``pyf.cases['case24_MP']()``.
+
+Requires OPF/pyomo (``pip install pyflow-acdc[OPF]``).
 
 Functions are found in ``pyflow_acdc.ACDC_sequential_STEP``.
 

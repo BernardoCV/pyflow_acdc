@@ -3,6 +3,8 @@ Transmission Expansion Planning Module
 
 This module provides functions for transmission expansion planning (TEP) analysis of AC/DC hybrid power systems. [1]_
 
+See :doc:`../usage_tep` for static TEP and multi-scenario (MS) TEP workflows.
+
 Functions are found in pyflow_acdc.ACDC_Static_TEP
 
 Transmission Expansion Planning
@@ -29,7 +31,7 @@ Running multiple scenario based transmission expansion planning
 
 .. autofunction:: pyflow_acdc.multi_scenario_TEP
 
-   Performs a multiple scenario based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states.
+   Performs a multiple scenario based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states. See :doc:`clustering` and :doc:`../usage_tep`.
 
    .. list-table::
       :widths: 20 10 50 10
@@ -92,6 +94,8 @@ Linear and Sensitivity Utilities
 .. autofunction:: pyflow_acdc.linear_transmission_expansion
 
    Linearized TEP workflow suitable for faster studies and large sweeps.
+   This is also the Pyomo backend for :func:`~pyflow_acdc.simple_CSS` when
+   ``CSS_L_solver`` is a Pyomo LP/MIP solver (not ``'ortools'``).
 
 .. autofunction:: pyflow_acdc.alpha_pareto
 

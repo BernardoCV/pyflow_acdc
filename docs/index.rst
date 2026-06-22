@@ -63,6 +63,7 @@ API Documentation
    :caption: Time Series & Analysis:
 
    api/ts_mod
+   api/clustering
    api/ts
    api/market_coef
 
@@ -92,6 +93,7 @@ API Documentation
 
    architecture
    testing
+   api/constants
    api/solver_utils
    api/windfarm_loader
 

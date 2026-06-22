@@ -31,9 +31,10 @@ Requirements
         * pyomo
     * Dash:
         * dash
-    * Array optimization:
+    * Array optimization (OR-Tools route MIP + OR-Tools CSS):
         * ortools
-        * pyomo
+    * Array optimization (Pyomo CSS; route MIP with Pyomo backend):
+        * pyomo (``[OPF]`` extra)
     * TEP (pymoo wrapper):
         * pymoo
         * pyomo
@@ -93,11 +94,21 @@ Install with pip extras as defined in ``pyproject.toml``::
     pip install pyflow-acdc[mapping]
     pip install pyflow-acdc[OPF]
     pip install pyflow-acdc[Dash]
-    pip install pyflow-acdc[Array_OPT]
+    pip install pyflow-acdc[ORTOOLS_ARRAY]
+    pip install pyflow-acdc[Array_OPT]   # deprecated alias for ORTOOLS_ARRAY
     pip install pyflow-acdc[TEP_pymoo]
     pip install pyflow-acdc[Gurobi]
     pip install pyflow-acdc[plotting]
     pip install pyflow-acdc[All]
+
+Array sizing extras
+^^^^^^^^^^^^^^^^^^^
+
+- ``[OPF]`` — Pyomo-based CSS (and Pyomo route MIP when ``backend='pyomo'``).
+  Add ``[Gurobi]`` for faster MILP/LP solvers when licensed.
+- ``[ORTOOLS_ARRAY]`` — OR-Tools CP-SAT for the route MIP and OR-Tools
+  ``linear_solver`` for CSS (``CSS_L_solver='ortools'``).
+- ``[Array_OPT]`` — deprecated alias for ``[ORTOOLS_ARRAY]`` (``ortools`` only).
 
 Solver installation notes
 ^^^^^^^^^^^^^^^^^^^^^^^^^

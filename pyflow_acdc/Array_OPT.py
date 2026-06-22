@@ -1,11 +1,17 @@
 """Offshore-array inter-array cable sizing.
 
-Solves the inter-array cable layout/sizing problem via MIP path graphs and the
-cable-string-sizing (CSS) loop, with ``pyomo`` and ``ortools`` backends.
+Two coupled problems, usually run in sequence by ``sequential_CSS``:
 
-Owns: array-sizing optimization orchestration and backend dispatch.
-Does not own: solver-specific linear cable-sizing models (see
-``AC_L_CSS_ortools``).
+- **Route** — ``MIP_path_graph`` selects which candidate CT lines are built
+  (spanning tree, turbine-string flow, substation connection limits).
+  With ``enable_cable_types=True``, route and cable-type choice are solved
+  together in one MIP; otherwise routing only.
+- **CSS** — ``simple_CSS`` picks cable types on the fixed topology via
+  ``linear_transmission_expansion`` (Pyomo) or ``optimal_l_css_ortools``
+  (OR-Tools). Does not change which lines exist.
+
+Owns path-MIP orchestration and CSS dispatch. Solver-specific linear CSS
+implementation lives in ``AC_L_CSS_ortools``.
 """
 import time
 import os
@@ -68,7 +74,13 @@ class MIPConfig:
 def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
                    MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=DEFAULT_TIME_LIMIT,NL=False,tee=False,fs=False,save_path=None,
                    MIP_gap=0.01,backend=MIPBackend.PYOMO.value,min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
+    """Iteratively alternate path MIP and CSS on a shrinking cable-type set.
 
+    Each iteration: (1) ``MIP_path_graph`` fixes the inter-array route on
+    ``grid.lines_AC_ct``; (2) ``simple_CSS`` sizes cables on that topology
+    (no routing inside CSS). Stops when the largest usable cable type is
+    eliminated or ``max_iter`` is reached.
+    """
     if LCoE is not None:
         grid.LCoE = LCoE
     if NL == True:
@@ -197,7 +209,9 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
         # OPF uses NL solver; False and PF both use linear CSS
         css_NL = (NL == CssMode.OPF)
-        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,css_NL,tee,fs=fs)
+        model, model_results, timing_info_CSS, solver_stats = simple_CSS(
+            grid, NPV, n_years, Hy, discount_rate, ObjRule, CSS_L_solver,
+            CSS_NL_solver, time_limit, css_NL, tee, fs=fs)
         css_ok = solver_stats.get('solution_found', False) if solver_stats else False
         feasible_solutions_CSS = solver_stats.get('feasible_solutions', []) if solver_stats else []
         t4 = time.perf_counter()
@@ -587,16 +601,22 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                    flow_dir_tightening='auto',
                    solver_options_override: dict | None = None):
     """
-    Solve the master MIP problem and track feasible solutions over time.
+    Solve the inter-array path MIP (route selection).
 
-    Parameters:
-    -----------
+    Selects a minimum-cost spanning forest over candidate CT lines. Set
+    ``enable_cable_types=True`` to co-optimize cable types in the same MIP;
+    otherwise only routing is optimized and cable sizing is delegated to
+    ``simple_CSS``.
+
+    Parameters
+    ----------
     backend : str, optional
         Backend to use: 'pyomo' (default) or 'ortools'
         - 'pyomo': Uses Pyomo with external solver (GLPK, Gurobi, etc.)
         - 'ortools': Uses OR-Tools CP-SAT solver (built-in, faster)
     enable_cable_types : bool
-        If True, enable individual cable type selection per line
+        If True, solve route + cable size selection in one MIP; if False,
+        route only (cable sizing is done separately by ``simple_CSS``).
     t_MW : float
         Turbine MW rating (needed to calculate flow capacity from MVA ratings)
     cab_types_allowed : int, optional
@@ -761,7 +781,11 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         return False, None, None, feasible_solutions
 
 def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None, enable_cable_types=False, t_MW=None, cab_types_allowed=None, min_turbines_per_string=False, fixed_substation_connections=None,min_sub_connections=False,sub_k_max=None, flow_dir_tightening='auto'):
-    """Solve the master MIP problem using OR-Tools CP-SAT solver."""
+    """OR-Tools CP-SAT backend for ``MIP_path_graph``.
+
+    Same route / route+CSS semantics as the Pyomo path: ``enable_cable_types``
+    selects joint cable-type MIP vs route-only.
+    """
     if not ORTOOLS_AVAILABLE:
         raise ImportError(
             "OR-Tools is not installed. Please install it with: pip install ortools"
@@ -2130,6 +2154,15 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
 
 
 def simple_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=1200,NL=False,tee=False,export=True,fs=False):
+    """Run cable size selection (CSS) on a fixed inter-array topology.
+
+    Does not optimize routing. Expects ``grid.lines_AC_ct`` active/inactive
+    flags to reflect a route already chosen (e.g. by ``MIP_path_graph``).
+
+    Dispatches to ``transmission_expansion`` (``NL=True``),
+    ``optimal_l_css_ortools`` (``CSS_L_solver='ortools'``), or
+    ``linear_transmission_expansion`` (other linear Pyomo solvers).
+    """
 
     grid.Array_opf = False
     if NL:

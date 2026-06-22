@@ -13,6 +13,11 @@ Running the OPF
 
 This flow sets up and solves the AC 'dc linear' OPF. It creates the :ref:`model <L_model_creation>`, optionally adds TEP/REC/CT investment variables, and solves with a Pyomo solver. Results are then exported back to the `grid`.
 
+When ``TEP=True``, the Pyomo linear model may include TEP/CT network-flow and
+investment-linking constraints (see :func:`~pyflow_acdc.AC_OPF_L_model.TEP_variables`).
+That is the Pyomo path used by :func:`~pyflow_acdc.linear_transmission_expansion`
+and :func:`~pyflow_acdc.simple_CSS`.
+
 .. autofunction:: pyflow_acdc.optimal_l_pf
 
 .. _L_model_creation:

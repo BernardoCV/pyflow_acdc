@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Feb 12, 2026
+OR-Tools (linear_solver) linear AC OPF model for cable size selection (CSS).
 
-@author: BernardoCastro
-OR-Tools (linear_solver) version of AC OPF Linear Model for Cable Size Selection.
-Only considers CT lines (no expansion or reconductoring).
+Selects cable types on CT lines with a fixed inter-array topology
+(``line.active_config >= 0`` set beforehand, typically by ``MIP_path_graph``).
+Does not choose routes, spanning trees, or node connection counts — those
+belong to the path MIP in ``Array_OPT``.
+
+Uses CBC via ``ortools.linear_solver`` (no Pyomo/Gurobi license required).
 """
 
 import numpy as np
@@ -26,11 +29,34 @@ except ImportError:
 # ── Main entry point ────────────────────────────────────────────────────────
 
 def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YEAR,
-                          discount_rate=DEFAULT_DISCOUNT_RATE, tee=False, time_limit=DEFAULT_TIME_LIMIT):
-    """Main function to create and solve OR-Tools linear_solver model.
+                          discount_rate=DEFAULT_DISCOUNT_RATE, tee=False,
+                          time_limit=DEFAULT_TIME_LIMIT):
+    """Build and solve the linear CSS model with OR-Tools ``linear_solver``.
 
-    Uses the open-source ``ortools.linear_solver`` back-end (CBC by default).
-    Only CT lines are considered (no expansion / reconductoring).
+    Cable size selection only: one cable type per active CT line, with optional
+    discounted generator OPEX. The inter-array route must already be fixed on
+    ``grid`` (e.g. after ``MIP_path_graph``); this function does not optimize
+    topology.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with ``CT_AC`` and candidate cable options (mutated in place).
+    OPEX : bool, optional
+        Include discounted linear generator energy cost in the objective.
+    NPV : bool, optional
+        Discount OPEX with ``present_value_factor`` over ``n_years``.
+    n_years, Hy, discount_rate : optional
+        Planning horizon and economics for NPV OPEX.
+    tee : bool, optional
+        Stream solver log output.
+    time_limit : float, optional
+        Solver time limit in seconds.
+
+    Returns
+    -------
+    tuple
+        ``(solver, model_res, timing_info, solver_stats)``.
     """
     if not ORTOOLS_LP_AVAILABLE:
         raise ImportError(
@@ -258,17 +284,6 @@ def AC_variables_ortools(solver, grid, AC_info):
         ac_vars['PAC_to'][line] = solver.NumVar(-lim, lim, f'PAC_to_{line}')
         ac_vars['PAC_from'][line] = solver.NumVar(-lim, lim, f'PAC_from_{line}')
 
-    # ── Network flow (integer) for topology enforcement ──────────────────
-    max_flow = grid.max_turbines_per_string
-    ac_vars['network_flow'] = {}
-    ac_vars['node_net_flow'] = {}
-    for line in lista_lineas_AC_ct:
-        ac_vars['network_flow'][line] = solver.IntVar(-max_flow, max_flow,
-                                                       f'network_flow_{line}')
-    for node in lista_nodos_AC:
-        ac_vars['node_net_flow'][node] = solver.IntVar(
-            -len(lista_nodos_AC), 1, f'node_net_flow_{node}')
-
     # ── CT line power flows per cable type + McCormick helpers ───────────
     ac_vars['ct_PAC_to'] = {}
     ac_vars['ct_PAC_from'] = {}
@@ -299,20 +314,30 @@ def AC_constraints_ortools(solver, grid, AC_info, gen_info, gen_vars, ac_vars):
 
     gen_AC_info, _, gen_rs_info = gen_info
     P_renSource, np_rsgen, lista_rs = gen_rs_info
+    _, _, _, _, P_know, _, _ = AC_nodes_info
 
     max_cable_limits = {
         line: max(S_lineACct_lim[line, ct] for ct in cab_types_set)
         for line in lista_lineas_AC_ct}
 
-    # ── Nodal balance ────────────────────────────────────────────────────
+    Ybus = grid.Ybus_AC
+
+    # ── Slack reference bus ──────────────────────────────────────────────
+    for node in AC_slack:
+        solver.Add(ac_vars['theta_AC'][node] == 0, f'AC_theta_slack_{node}')
+
+    # ── Nodal balance (Ybus DC + known injections + CT aggregates) ───────
     for node in lista_nodos_AC:
         nAC = grid.nodes_AC[node]
 
-        # Power balance: Pto_CT + Pfrom_CT == PGi_ren + PGi_opt
-        solver.Add(
-            ac_vars['Pto_CT'][node] + ac_vars['Pfrom_CT'][node]
-            == ac_vars['PGi_ren'][node] + ac_vars['PGi_opt'][node],
-            f'power_balance_{node}')
+        p_sum = sum(
+            -np.imag(Ybus[node, k]) * (ac_vars['theta_AC'][node] - ac_vars['theta_AC'][k])
+            for k in lista_nodos_AC if Ybus[node, k] != 0)
+        p_rhs = (P_know[node]
+                 + ac_vars['PGi_ren'][node]
+                 + ac_vars['PGi_opt'][node])
+        p_rhs += ac_vars['Pto_CT'][node] + ac_vars['Pfrom_CT'][node]
+        solver.Add(p_sum == p_rhs, f'power_balance_{node}')
 
         # Generator power link
         gen_power = sum(gen_vars['PGi_gen'][g.genNumber]
@@ -378,23 +403,14 @@ def AC_constraints_ortools(solver, grid, AC_info, gen_info, gen_vars, ac_vars):
             <= sum(ac_vars['ct_branch'][line, ct] for line in lista_lineas_AC_ct),
             f'ct_types_lower_bound_{ct}')
 
-    # At most one cable type per line
+    # Exactly one cable type per active CT line (fixed topology from route MIP)
     for line in lista_lineas_AC_ct:
-        solver.Add(
-            sum(ac_vars['ct_branch'][line, ct] for ct in cab_types_set) <= 1,
-            f'ct_Array_cable_type_rule_{line}')
-
-    # Node connection limits
-    for node in lista_nodos_AC:
-        nAC = grid.nodes_AC[node]
-        if hasattr(nAC, 'ct_limit'):
-            connections = sum(
-                ac_vars['ct_branch'][line.lineNumber, ct]
-                for line in nAC.connected_toCTLine + nAC.connected_fromCTLine
-                for ct in cab_types_set)
-            solver.Add(connections >= 1, f'ct_node_min_rule_{node}')
-            solver.Add(connections <= nAC.ct_limit,
-                        f'ct_node_limit_rule_{node}')
+        ct_vars = sum(ac_vars['ct_branch'][line, ct] for ct in cab_types_set)
+        l = grid.lines_AC_ct[line]
+        if l.active_config >= 0:
+            solver.Add(ct_vars == 1, f'ct_cable_type_rule_{line}')
+        else:
+            solver.Add(ct_vars == 0, f'ct_cable_type_rule_{line}')
 
     # ── McCormick envelope + power-flow linking for CT lines ─────────────
     for line in lista_lineas_AC_ct:
@@ -469,77 +485,6 @@ def AC_constraints_ortools(solver, grid, AC_info, gen_info, gen_vars, ac_vars):
                 >= -S_lineACct_lim[line, ct] * ac_vars['ct_branch'][line, ct],
                 f'z_from_branch_lb_{line}_{ct}')
 
-    # ── Network flow constraints (topology enforcement) ──────────────────
-    _add_network_flow_constraints_ortools(solver, grid, ac_vars,
-                                          lista_nodos_AC,
-                                          lista_lineas_AC_ct,
-                                          cab_types_set)
-
-
-def _add_network_flow_constraints_ortools(solver, grid, ac_vars,
-                                           lista_nodos_AC,
-                                           lista_lineas_AC_ct,
-                                           cab_types_set):
-    """Network-flow constraints ensuring a connected spanning forest."""
-    max_flow = grid.max_turbines_per_string
-
-    source_nodes = [n for n in lista_nodos_AC
-                    if grid.nodes_AC[n].connected_RenSource]
-    sink_nodes = [n for n in lista_nodos_AC
-                  if grid.nodes_AC[n].connected_gen]
-
-    if not source_nodes:
-        raise ValueError("No renewable source nodes found!")
-    if not sink_nodes:
-        raise ValueError("No generator nodes found!")
-
-    # Spanning tree: exactly (N - sinks) connections
-    total_connections = sum(ac_vars['ct_branch'][line, ct]
-                            for line in lista_lineas_AC_ct
-                            for ct in cab_types_set)
-    solver.Add(total_connections == len(lista_nodos_AC) - len(sink_nodes),
-               'spanning_tree_connections')
-
-    # Flow conservation per node
-    for node in lista_nodos_AC:
-        net_flow = 0
-        for line in lista_lineas_AC_ct:
-            line_obj = grid.lines_AC_ct[line]
-            if line_obj.fromNode.nodeNumber == node:
-                net_flow += ac_vars['network_flow'][line]
-            elif line_obj.toNode.nodeNumber == node:
-                net_flow -= ac_vars['network_flow'][line]
-        solver.Add(ac_vars['node_net_flow'][node] == net_flow,
-                    f'flow_conservation_{node}')
-
-    # Source nodes: net flow out = 1
-    for node in source_nodes:
-        solver.Add(ac_vars['node_net_flow'][node] == 1,
-                    f'source_node_{node}')
-
-    # Sink nodes absorb all source flow
-    solver.Add(
-        sum(ac_vars['node_net_flow'][node] for node in sink_nodes)
-        == -len(source_nodes),
-        'total_sink_absorption')
-
-    # Intermediate nodes: conservation
-    for node in lista_nodos_AC:
-        if node not in source_nodes and node not in sink_nodes:
-            solver.Add(ac_vars['node_net_flow'][node] == 0,
-                        f'intermediate_node_{node}')
-
-    # Link flow to investment
-    for line in lista_lineas_AC_ct:
-        branch_sum = sum(ac_vars['ct_branch'][line, ct]
-                         for ct in cab_types_set)
-        solver.Add(
-            ac_vars['network_flow'][line] <= max_flow * branch_sum,
-            f'flow_investment_link_upper_{line}')
-        solver.Add(
-            ac_vars['network_flow'][line] >= -max_flow * branch_sum,
-            f'flow_investment_link_lower_{line}')
-
 
 # ── Objective ───────────────────────────────────────────────────────────────
 
@@ -569,8 +514,9 @@ def set_objective_ortools(solver, grid, gen_vars, ac_vars, OPEX=True,
 
         for g in range(grid.n_gen):
             gen = grid.Generators[g]
-            objective.SetCoefficient(gen_vars['PGi_gen'][g],
-                                     gen.lf * present_value)
+            objective.SetCoefficient(
+                gen_vars['PGi_gen'][g],
+                gen.lf * grid.S_base * present_value)
 
 
 # ── Export results back to grid ─────────────────────────────────────────────
@@ -638,8 +584,7 @@ def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
             line.toS = 0 + 1j * 0
         line.loss = 0
         line.P_loss = 0
-        line.network_flow = abs(
-            ac_vars['network_flow'][line.lineNumber].solution_value())
+        line.network_flow = 0.0
 
     # Standard AC lines
     Theta = grid.Theta_V_AC

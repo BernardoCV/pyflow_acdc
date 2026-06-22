@@ -61,10 +61,14 @@ everything else builds on.
 - **`ACDC_sequential_STEP.py`** — Sequential static TEP runs over time.
 - **`ACDC_TEP_pymoo.py`** — Population-based (pymoo) outer TEP with OPF
   subproblems.
-- **`Array_OPT.py`** — Offshore-array inter-array cable sizing: MIP path
-  graphs and the cable-string-sizing (CSS) loop, with `pyomo`/`ortools`
-  backends.
-- **`AC_L_CSS_ortools.py`** — Solver-specific linear cable-sizing implementation.
+- **`Array_OPT.py`** — Offshore inter-array sizing orchestration: **route**
+  MIP (``MIP_path_graph``, Pyomo or OR-Tools CP-SAT; optional joint cable types
+  via ``enable_cable_types``) and **CSS** dispatch (``simple_CSS``,
+  ``sequential_CSS``). Owns spanning-tree / flow / ``ct_limit`` constraints.
+  Install ``[OPF]`` for Pyomo CSS; ``[ORTOOLS_ARRAY]`` for OR-Tools MIP/CSS.
+- **`AC_L_CSS_ortools.py`** — OR-Tools ``linear_solver`` CSS only: cable type
+  per active CT line on a fixed topology; no routing. Used when
+  ``CSS_L_solver='ortools'``.
 - **`_tep_utils.py`** — Shared TEP economics (annuity/present-value factor).
 
 ## Time series

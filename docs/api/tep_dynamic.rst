@@ -9,6 +9,11 @@ with investment states applied over time.
 
 Functions are found in `pyflow_acdc.ACDC_MultiPeriod_TEP`.
 
+For workflow-oriented notes:
+
+- MS TEP (single investment snapshot): :doc:`../usage_tep`
+- MP TEP, sequential STEP, and MP+MS TEP: :doc:`../usage_mp_tep`
+
 Multi-period Multi-scenario Dynamic TEP
 ---------------------------------------
 

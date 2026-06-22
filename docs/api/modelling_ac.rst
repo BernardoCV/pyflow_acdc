@@ -144,6 +144,8 @@ In transmision expansion planning, each branch subject to modification is modele
 
 
 
+.. _AC_expandable_branch:
+
 AC expandable branch
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -206,6 +208,8 @@ Note:
 
 - The previous ``np_line_i`` attribute (used as a solver initialization / first guess) has been removed from the element classes.
 - Solver initial values are now computed in the modelling layer (see ``get_TEP_variables``) and passed to Pyomo variables via the ``*_model_first_guess`` data structures.
+
+.. _AC_reconducting_branch:
 
 AC reconducting branch
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -270,6 +274,8 @@ Inherits from :class:`Line_AC` with the following additional attributes:
    * - ``base_cost``
      - float
      - Base cost of the conductor
+
+.. _AC_conductor_size_selection:
 
 AC conductor size selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

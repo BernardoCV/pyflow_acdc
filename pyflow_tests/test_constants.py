@@ -123,6 +123,14 @@ NS_MTDC_WIND_LOAD_URL = (
     "examples/NS_MTDC_TS/NS_TS_WL_data2024.csv"
 )
 
+# --- Case24_MP planning CSVs (remote) ---
+
+CASE24_MP_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/Case24_MP/"
+)
+CASE24_MP_INV_SERIES_URL = CASE24_MP_GITHUB_BASE + "case24_MP_TEP_inv_series_10.csv"
+CASE24_MP_GEN_MIX_LIMITS_URL = CASE24_MP_GITHUB_BASE + "case24_MP_TEP_gen_mix_limits.csv"
+
 # --- run_tests.py case lists ---
 
 IGNORED_WARNING_SNIPPETS = [
@@ -133,6 +141,8 @@ IGNORED_WARNING_SNIPPETS = [
 DOCS_CASES = [
     "test_docs_index.py",
     "test_docs_usage.py",
+    "test_docs_usage_tep.py",
+    "test_docs_usage_mp_tep.py",
     "test_docs_csv_import.py",
     "test_docs_modelling_ac.py",
     "test_docs_modelling_dc.py",

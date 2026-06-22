@@ -6,7 +6,7 @@ Install the test extra from a local checkout::
     pip install -e ".[tests]"
 
 This adds ``pytest`` and ``pytest-cov``. Some cases also need optional extras
-(``OPF``, ``Array_OPT``, ``Dash``, and so on); missing dependencies are
+(``OPF``, ``ORTOOLS_ARRAY``, ``Dash``, and so on); missing dependencies are
 reported as **Skipped**, not failed.
 
 Test runner

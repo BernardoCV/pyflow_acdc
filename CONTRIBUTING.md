@@ -15,9 +15,9 @@ Requires **Python 3.10+**. Install the optional extras you need (see the
 README for the full list), e.g.:
 
 ```bash
-pip install -e ".[OPF]"        # pyomo for optimal power flow
-pip install -e ".[Array_OPT]"  # ortools + pyomo for array sizing
-pip install -e ".[tests]"      # pytest + pytest-cov
+pip install -e ".[OPF]"            # pyomo for optimal power flow
+pip install -e ".[ORTOOLS_ARRAY]"  # ortools for OR-Tools route MIP + CSS
+pip install -e ".[tests]"          # pytest + pytest-cov
 pip install -e ".[All]"        # everything except gurobipy (needs a license)
 ```
 

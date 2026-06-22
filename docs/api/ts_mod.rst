@@ -37,18 +37,8 @@ TimeSeries Object
 .. autoclass:: pyflow_acdc.TimeSeries
    :no-members:
 
-Time-Series Clustering
-----------------------
-
-Functions in :mod:`pyflow_acdc.Time_series_clustering`.
-
-.. autofunction:: pyflow_acdc.identify_correlations
-
-.. autofunction:: pyflow_acdc.cluster_TS
-
-.. autofunction:: pyflow_acdc.run_clustering_analysis_and_plot
-
-.. autofunction:: pyflow_acdc.cluster_analysis
+Representative-period clustering for TEP is documented in :doc:`clustering`.
+Workflow guides: :doc:`../usage_tep` (MS TEP), :doc:`../usage_mp_tep` (MP+MS TEP).
 
 References
 ----------
