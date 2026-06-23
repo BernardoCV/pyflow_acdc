@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Sequential CSS on westermost_rough using OR-Tools for MIP/CSS-L."""
+"""Sequential CSS on alpha_ventus using OR-Tools for MIP/CSS-L."""
 import time
 
 import pyflow_acdc as pyf
 import pyomo.environ as pyo
 import pytest
 
-from pyflow_acdc.windfarm_loader import load_case_grid_and_geo
 from pyflow_tests._test_solver_deps import (
     ortools_missing_for_run_test,
     pyomo_missing_for_run_test,
@@ -15,8 +14,7 @@ from pyflow_tests._test_solver_deps import (
     tep_solver,
 )
 
-CASES = {'westermost_rough'}
-
+ARRAY_CASE = "alpha_ventus"
 CT = 3
 MIP_SOLVER = 'ortools'
 TL = 300
@@ -28,11 +26,10 @@ FLH = 8760
 WACC = 0.02
 
 
-def run_case(case, mip_solver='ortools'):
+def run_case(mip_solver='ortools'):
     start_time = time.perf_counter()
 
-    grid, res = load_case_grid_and_geo(case)
-    grid.cab_types_allowed = CT
+    grid, res = pyf.cases[ARRAY_CASE](cab_types_allowed=CT)
 
     model, summary_results, timing_info, solver_stats, best_i = pyf.sequential_CSS(
         grid,
@@ -70,17 +67,15 @@ def run_case(case, mip_solver='ortools'):
     )
 
 
-@pytest.mark.slow
-def test_sequential_array_ortools_westermost_rough():
+def test_sequential_array_ortools_alpha_ventus():
     require_ortools()
     require_pyomo()
-    case = 'westermost_rough'
     (
         i, total_time, edges, substations, turbines, obj_value,
         path_time, css_time, summary_results, crossing, cable_length,
-    ) = run_case(case, MIP_SOLVER)
+    ) = run_case(MIP_SOLVER)
     print(
-        f'{case}- iterations {i}, total time {total_time}, edges {edges}, '
+        f'{ARRAY_CASE}- iterations {i}, total time {total_time}, edges {edges}, '
         f'subsations {substations}, turbines {turbines}, obj_value {obj_value}, '
         f'path_time {path_time}, css_time {css_time}, crossing {crossing}, '
         f'cable_length {cable_length}'
@@ -92,17 +87,16 @@ def run_test():
         return
     if pyomo_missing_for_run_test():
         return
-    for case in CASES:
-        (
-            i, total_time, edges, substations, turbines, obj_value,
-            path_time, css_time, summary_results, crossing, cable_length,
-        ) = run_case(case, MIP_SOLVER)
-        print(
-            f'{case}- iterations {i}, total time {total_time}, edges {edges}, '
-            f'subsations {substations}, turbines {turbines}, obj_value {obj_value}, '
-            f'path_time {path_time}, css_time {css_time}, crossing {crossing}, '
-            f'cable_length {cable_length}'
-        )
+    (
+        i, total_time, edges, substations, turbines, obj_value,
+        path_time, css_time, summary_results, crossing, cable_length,
+    ) = run_case(MIP_SOLVER)
+    print(
+        f'{ARRAY_CASE}- iterations {i}, total time {total_time}, edges {edges}, '
+        f'subsations {substations}, turbines {turbines}, obj_value {obj_value}, '
+        f'path_time {path_time}, css_time {css_time}, crossing {crossing}, '
+        f'cable_length {cable_length}'
+    )
 
 
 if __name__ == "__main__":
