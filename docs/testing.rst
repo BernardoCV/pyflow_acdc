@@ -55,6 +55,14 @@ Override with any installed Pyomo solver::
 
     PYFLOW_TEP_SOLVER=ipopt pytest pyflow_tests/ -q
 
+.. note::
+
+   Ipopt is NLP-only. Tests that run a real expansion solve with binary
+   investment variables (for example ``test_case24_TEP``) may behave differently or
+   fail without Bonmin. Use ``PYFLOW_TEP_SOLVER=bonmin`` when you want a proper
+   MINLP solve on a single test. Build-only tests (MP+MS,
+   ``test_model_build_only``, and similar) are unaffected.
+
 To run a single file::
 
     pytest pyflow_tests/test_plot.py -q
