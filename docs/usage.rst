@@ -79,10 +79,16 @@ after loading the grid (see :doc:`usage_tep`).
 * ``pyf.cases['pglib_opf_case5_pjm']()``
 * ``pyf.cases['pglib_opf_hvdc_case67']()``
 * ``pyf.cases['Stagg5MATACDC']()``
+* ``pyf.cases['case24_OPF']()`` — IEEE RTS-24 with expandable lines and
+  multi-unit generators (distinct from ``pglib_opf_case24_ieee_rts``)
+* ``pyf.cases['DC_OPF_simple']()`` — 3-bus DC OPF tutorial grid
 
 **Transmission Expansion Planning** (``pyflow_acdc/example_grids/TEP/``):
 
 * ``pyf.cases['case24_MP']()``
+* ``pyf.cases['case24_TEP']()`` — RTS-24 static TEP with expandable AC lines
+* ``pyf.cases['case24_REC']()`` — RTS-24 line repurposing (upgrades)
+* ``pyf.cases['case6_TEP_DC']()`` — 6-bus AC/DC TEP with expandable DC lines
 * ``pyf.cases['case118_TEP']()``
 * ``pyf.cases['case118_TEP_DC']()``
 * ``pyf.cases['case24_3zones_acdc']()``
@@ -104,6 +110,8 @@ after loading the grid (see :doc:`usage_tep`).
 * ``pyf.cases['moray_east']()``
 * ``pyf.cases['nordsee_one']()``
 * ``pyf.cases['westermost_rough']()``
+* ``pyf.cases['array_sizing_pei'](gamma_limit=0.9)`` — 8-turbine string array
+  with cable options for CSS/TEP array-sizing studies
 
 Workflow guides
 ---------------

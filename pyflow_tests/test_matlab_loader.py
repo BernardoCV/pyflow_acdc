@@ -4,6 +4,8 @@ import pyflow_acdc as pyf
 from pathlib import Path
 import tempfile
 
+from pyflow_tests._test_solver_deps import pyomo_missing_for_run_test, require_pyomo
+
 
 def matlab_loader(output_dir):
 
@@ -34,10 +36,7 @@ def matlab_loader(output_dir):
 
 def run_test(output_dir=None):
     """Test MATLAB file loading functionality."""
-    try:
-        import pyomo
-    except ImportError:
-        print("pyomo is not installed...")
+    if pyomo_missing_for_run_test():
         return
 
     if output_dir is None:
@@ -49,7 +48,8 @@ def run_test(output_dir=None):
 
 def test_matlab_loader(tmp_path):
     """Pytest entrypoint for MATLAB loader test."""
-    run_test(output_dir=tmp_path)
+    require_pyomo()
+    matlab_loader(tmp_path)
 
 
 if __name__ == "__main__":

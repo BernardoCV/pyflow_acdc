@@ -170,31 +170,42 @@ ALL_CASES = [
     "test_model_build_only.py",
     "test_grid_creation.py",
     "test_cigreb4_pf.py",
-    "DC_OPF.py",
-    "CigreB4_OPF.py",
-    "case39ac_OPF.py",
-    "case39ac_LOPF.py",
-    "case39acdc_OPF.py",
-    "case24_3zones_acdc_OPF.py",
+    "test_DC_OPF.py",
+    "test_CigreB4_OPF.py",
+    "test_case39ac_OPF.py",
+    "test_case39ac_LOPF.py",
+    "test_case39acdc_OPF.py",
+    "test_case24_3zones_acdc_OPF.py",
     "test_matlab_loader.py",
-    "folium_test.py",
+    "test_folium.py",
     "test_plot.py",
-    "case24_OPF.py",
-    "case6_TEP_DC.py",
-    "case24_TEP.py",
-    "case24_REC.py",
-    "array_sizing.py",
-    "ts_dash.py",
-    "sequential_array.py",
-    "sequential_array_ortools.py",
+    "test_case24_OPF.py",
+    "test_case6_TEP_DC.py",
+    "test_case24_TEP.py",
+    "test_case24_REC.py",
+    "test_array_sizing.py",
+    "test_ts_dash.py",
+    "test_sequential_array.py",
+    "test_sequential_array_ortools.py",
+]
+
+INTEGRATION_CASES = [
+    "test_folium.py",
+    "test_ts_dash.py",
+]
+
+ARRAY_CASES = [
+    "test_array_sizing.py",
+    "test_sequential_array.py",
+    "test_sequential_array_ortools.py",
 ]
 
 OPF_CASES = [
-    "DC_OPF.py",
-    "CigreB4_OPF.py",
-    "case39ac_OPF.py",
-    "case39acdc_OPF.py",
-    "case24_3zones_acdc_OPF.py",
+    "test_DC_OPF.py",
+    "test_CigreB4_OPF.py",
+    "test_case39ac_OPF.py",
+    "test_case39acdc_OPF.py",
+    "test_case24_3zones_acdc_OPF.py",
 ]
 
 QUICK_CASES = [
@@ -213,25 +224,25 @@ QUICK_CASES = [
 ]
 
 TEP_CASES = [
-    "case24_OPF.py",
-    "case6_TEP_DC.py",
-    "case24_TEP.py",
-    "case24_REC.py",
-    "array_sizing.py",
+    "test_case24_OPF.py",
+    "test_case6_TEP_DC.py",
+    "test_case24_TEP.py",
+    "test_case24_REC.py",
+    *ARRAY_CASES,
 ]
 
 # --- test_OPF_quick_runner.py ---
 
 FULL_OPF_TEP_CASE_MODULES = [
-    "pyflow_tests.DC_OPF",
-    "pyflow_tests.CigreB4_OPF",
-    "pyflow_tests.case39ac_OPF",
-    "pyflow_tests.case39acdc_OPF",
-    "pyflow_tests.case24_3zones_acdc_OPF",
-    "pyflow_tests.case24_OPF",
-    "pyflow_tests.case39ac_LOPF",
-    "pyflow_tests.case6_TEP_DC",
-    "pyflow_tests.case24_TEP",
-    "pyflow_tests.case24_REC",
-    "pyflow_tests.array_sizing",
+    "pyflow_tests.test_DC_OPF",
+    "pyflow_tests.test_CigreB4_OPF",
+    "pyflow_tests.test_case39ac_OPF",
+    "pyflow_tests.test_case39acdc_OPF",
+    "pyflow_tests.test_case24_3zones_acdc_OPF",
+    "pyflow_tests.test_case24_OPF",
+    "pyflow_tests.test_case39ac_LOPF",
+    "pyflow_tests.test_case6_TEP_DC",
+    "pyflow_tests.test_case24_TEP",
+    "pyflow_tests.test_case24_REC",
+    "pyflow_tests.test_array_sizing",
 ]

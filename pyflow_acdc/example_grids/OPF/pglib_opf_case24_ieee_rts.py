@@ -169,5 +169,3 @@ def pglib_opf_case24_ieee_rts():
     
     # Return the grid
     return grid,res
-
-pglib_opf_case24_ieee_rts()

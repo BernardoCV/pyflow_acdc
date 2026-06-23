@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 25 15:17:12 2025
+"""IEEE RTS-24 with expandable AC lines and multi-unit generators (MatACDC layout).
 
-@author: BernardoCastro
+Distinct from :func:`pglib_opf_case24_ieee_rts` (PGLib import topology/ratings).
+Load with ``pyf.cases["case24_OPF"]()``.
 """
 import pandas as pd
 import pyflow_acdc as pyf
-import time
-import sys
+
 
 def case24_OPF():
-
-    t1=time.perf_counter()
 
     S_base=100
 
@@ -180,35 +177,6 @@ def case24_OPF():
         
         
 
-    obj = {'Energy_cost': 1}
-
-
-    pyf.expand_elements_from_pd(grid,expandable_data)
-
-    model, model_res,timing_info,solver_stats= pyf.optimal_pf(grid,ObjRule=obj)
-
-
-
-    res.all()
-
-    print(model_res)
-    print(timing_info)
-    model.obj.display()
-    t2= time.perf_counter()
-    print(f'Total time :{t2-t1}')
-
-
-def run_test():
-    """Test case24 optimal power flow."""
-    try:
-        import pyomo
-    except ImportError:
-        print("pyomo is not installed...")
-        return  
-    
-    case24_OPF()
-
-if __name__ == "__main__":
-    run_test()
-
-       
+    pyf.expand_elements_from_pd(grid, expandable_data)
+    grid.name = 'case24_OPF'
+    return grid, res

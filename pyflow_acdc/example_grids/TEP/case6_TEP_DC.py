@@ -84,30 +84,6 @@ def case6_TEP_DC():
     # pyf.AC_PowerFlow(grid)
 
 
-    pyf.expand_elements_from_pd(grid,expandable_data)
-
-    model, model_results , timing_info, solver_stats= pyf.transmission_expansion(grid,NPV=True)
-
-
-    print(timing_info)
-
-def run_test():
-    """Test case6 DC transmission expansion planning."""
-    try:
-        import pyomo
-    except ImportError:
-        print("pyomo is not installed...")
-        return  
-    try:
-        import pyomo.environ as pyo
-        solver = pyo.SolverFactory('bonmin')
-        if not solver.available():
-            raise ImportError("Bonmin solver not available")
-    except (ImportError, Exception):
-        print("Bonmin solver is not available. To use TEP functions, please install Bonmin solver.")
-        return
-    
-    case6_TEP_DC()
-
-if __name__ == "__main__":
-    run_test()
+    pyf.expand_elements_from_pd(grid, expandable_data)
+    grid.name = 'case6_TEP_DC'
+    return grid, res

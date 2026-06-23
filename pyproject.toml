@@ -149,5 +149,6 @@ select = ["E", "W", "F", "I", "N", "UP", "B"]
 
 [tool.pytest.ini_options]
 markers = [
-    "slow: large example-grid smoke tests (e.g. Texas7k)",
+    "slow: solver-heavy or long-running tests (array sizing, sequential CSS, TS OPF, large grids)",
+    "integration: tests needing network access or heavy third-party stacks (folium, dash, remote CSVs)",
 ]

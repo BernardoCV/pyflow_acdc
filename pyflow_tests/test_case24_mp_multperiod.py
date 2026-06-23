@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 import pyflow_acdc as pyf
 
+from pyflow_tests._test_solver_deps import require_pyomo, tep_solver
+
 
 def _load_case24_mp_module():
     case_path = Path(pyf.__file__).resolve().parent / "example_grids" / "TEP" / "case24_MP.py"
@@ -53,7 +55,7 @@ def test_case24_mp_grid_ready_for_multperiod():
 
 
 def test_case24_multi_period_transmission_expansion_build_only():
-    pytest.importorskip("pyomo")
+    require_pyomo()
 
     grid, _, mod = _case24_mp_grid_with_csvs()
     model, model_results, timing_info, solver_stats = pyf.multi_period_transmission_expansion(
@@ -62,7 +64,7 @@ def test_case24_multi_period_transmission_expansion_build_only():
         Hy=8760,
         discount_rate=0.02,
         ObjRule=mod.DEFAULT_OBJ_RULE,
-        solver="bonmin",
+        solver=tep_solver(),
         tee=False,
         obj_scaling=1e9,
         build_only=True,
@@ -78,7 +80,7 @@ def test_case24_multi_period_transmission_expansion_build_only():
 
 
 def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):
-    pytest.importorskip("pyomo")
+    require_pyomo()
 
     solve_calls = []
 
@@ -105,7 +107,7 @@ def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):
         Hy=8760,
         discount_rate=0.02,
         ObjRule=mod.DEFAULT_OBJ_RULE,
-        solver="bonmin",
+        solver=tep_solver(),
         tee=False,
         obj_scaling=1e9,
         save_svgs=False,

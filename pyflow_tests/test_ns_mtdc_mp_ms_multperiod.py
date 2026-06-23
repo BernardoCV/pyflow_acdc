@@ -3,6 +3,7 @@
 
 import pytest
 import pyflow_acdc as pyf
+from pyflow_tests._test_solver_deps import require_pyomo, tep_solver
 from pyflow_tests.test_constants import north_sea_ms_clustering_options
 
 NS_MP_MS_OBJ_RULE = {
@@ -38,7 +39,7 @@ def test_ns_mtdc_mp_grid_has_investment_load_series():
 
 
 def test_ns_mtdc_multi_period_ms_tep_build_only():
-    pytest.importorskip("pyomo")
+    require_pyomo()
 
     grid, _ = _ns_mtdc_mp_grid()
     mp_load_series = list(grid.Price_Zones[0].investment_decisions.get("Load", []))
@@ -52,7 +53,7 @@ def test_ns_mtdc_multi_period_ms_tep_build_only():
         discount_rate=0.02,
         clustering_options=north_sea_ms_clustering_options(),
         ObjRule=NS_MP_MS_OBJ_RULE,
-        solver="bonmin",
+        solver=tep_solver(),
         tee=False,
         obj_scaling=1e10,
         save_period_svgs=False,
@@ -69,7 +70,7 @@ def test_ns_mtdc_multi_period_ms_tep_build_only():
 
 
 def test_ns_mtdc_sequential_ms_step_orchestration_fake_solve(monkeypatch):
-    pytest.importorskip("pyomo")
+    require_pyomo()
 
     solve_calls = []
 
@@ -92,7 +93,7 @@ def test_ns_mtdc_sequential_ms_step_orchestration_fake_solve(monkeypatch):
         discount_rate=0.02,
         clustering_options=north_sea_ms_clustering_options(),
         ObjRule=NS_MP_MS_OBJ_RULE,
-        solver="bonmin",
+        solver=tep_solver(),
         tee=False,
         obj_scaling=1e10,
         save_svgs=False,
