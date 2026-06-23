@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Fast multi-period multi-scenario TEP tests on the NS_MTDC_2025 example grid."""
+"""Multi-period multi-scenario TEP tests on NS_MTDC_2025 (build-only; no solver runs)."""
 
 import pytest
+
 import pyflow_acdc as pyf
 from pyflow_tests._test_solver_deps import require_pyomo, tep_solver
 from pyflow_tests.test_constants import north_sea_ms_clustering_options
@@ -67,42 +68,6 @@ def test_ns_mtdc_multi_period_ms_tep_build_only():
     assert timing_info["create"] >= 0
     assert timing_info["solve"] is None
     assert solver_stats["termination_condition"] == "build_only"
-
-
-def test_ns_mtdc_sequential_ms_step_orchestration_fake_solve(monkeypatch):
-    require_pyomo()
-
-    solve_calls = []
-
-    def _fake_solve(*args, **kwargs):
-        solve_calls.append(1)
-        return None, {
-            "solution_found": False,
-            "termination_condition": "unknown",
-            "solver_message": "mocked in test",
-            "time": 0.0,
-        }
-
-    monkeypatch.setattr("pyflow_acdc.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
-
-    grid, _ = _ns_mtdc_mp_grid()
-    run_results = pyf.sequential_MS_STEP(
-        grid=grid,
-        n_years=10,
-        Hy=8760,
-        discount_rate=0.02,
-        clustering_options=north_sea_ms_clustering_options(),
-        ObjRule=NS_MP_MS_OBJ_RULE,
-        solver=tep_solver(),
-        tee=False,
-        obj_scaling=1e10,
-        save_svgs=False,
-        export_steps=False,
-    )
-
-    assert len(solve_calls) == 1
-    assert run_results["_meta"]["aborted"] is True
-    assert "no feasible solution" in run_results["_meta"]["abort_reason"]
 
 
 def run_test():

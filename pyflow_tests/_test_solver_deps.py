@@ -1,5 +1,7 @@
 """Shared dependency and solver checks for script-style case tests."""
 
+import os
+
 import pytest
 
 import pyflow_acdc as pyf
@@ -73,6 +75,18 @@ def require_ortools():
 
 
 def tep_solver():
+    """TEP solver for tests.
+
+    Default is Ipopt (fast NLP). For full MINLP expansion solves, run with
+    ``PYFLOW_TEP_SOLVER=bonmin`` when Bonmin is installed.
+    """
+    forced = os.environ.get("PYFLOW_TEP_SOLVER", "").strip().lower()
+    if forced:
+        if pyf.is_pyomo_solver_available(forced):
+            return forced
+        return forced
+    if pyf.is_pyomo_solver_available("ipopt"):
+        return "ipopt"
     if pyf.is_pyomo_solver_available("bonmin"):
         return "bonmin"
     return "ipopt"

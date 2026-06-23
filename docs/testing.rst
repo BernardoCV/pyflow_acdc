@@ -42,6 +42,19 @@ From the repository root::
 
     pytest pyflow_tests/ -q
 
+Coverage::
+
+    pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing -q
+
+TEP tests use Ipopt by default (via ``tep_solver()``). For a full MINLP solve on
+one file, opt in to Bonmin::
+
+    PYFLOW_TEP_SOLVER=bonmin pytest pyflow_tests/test_case24_TEP.py -q
+
+Override with any installed Pyomo solver::
+
+    PYFLOW_TEP_SOLVER=ipopt pytest pyflow_tests/ -q
+
 To run a single file::
 
     pytest pyflow_tests/test_plot.py -q
