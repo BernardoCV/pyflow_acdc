@@ -101,5 +101,12 @@ packages = ["pyflow_acdc","pyflow_tests"]
     "example_grids/*.py"
 ]
 
+[tool.setuptools.data-files]
+"examples/North_Sea_grid_data" = [
+    "examples/North_Sea_grid_data/*.csv",
+    "examples/North_Sea_grid_data/*.json",
+    "examples/North_Sea_grid_data/README.md",
+]
+
 [project.scripts]
 pyflow-acdc-test = "pyflow_tests.run_tests:main"
