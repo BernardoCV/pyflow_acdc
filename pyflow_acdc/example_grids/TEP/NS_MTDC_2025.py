@@ -2,8 +2,12 @@
 """
 North Sea MTDC 2025 multi-period TEP example grid.
 
-Data files live in ``examples/NS_MP/`` (or GitHub raw URLs under the same
+Data files live in ``examples/North_Sea_grid_data/`` (or GitHub raw URLs under the same
 folder by default). Load with ``pyf.cases["NS_MTDC_2025"]()``.
+
+Set ``expandable="mp"`` (default) for multi-period planning with investment
+series CSVs, or ``expandable="step"`` for sequential / single-step MS TEP using
+``Expandable_elements_step.csv``.
 """
 
 from itertools import chain
@@ -13,8 +17,8 @@ import pandas as pd
 import pyflow_acdc as pyf
 from shapely.geometry import LineString, Point
 
-NS_MP_GITHUB_BASE = (
-    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MP/"
+NORTH_SEA_GRID_DATA_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/North_Sea_grid_data/"
 )
 
 
@@ -23,12 +27,12 @@ def _is_url(path):
     return text.startswith("http://") or text.startswith("https://")
 
 
-def _ns_mp_data_dir():
-    data_dir = Path(__file__).resolve().parents[3] / "examples" / "NS_MP"
+def _north_sea_data_dir():
+    data_dir = Path(__file__).resolve().parents[3] / "examples" / "North_Sea_grid_data"
     if not data_dir.is_dir():
         raise FileNotFoundError(
-            f"NS_MP example data directory not found: {data_dir}. "
-            "Expected examples/NS_MP/ at the pyflow_acdc repository root."
+            f"North Sea grid data directory not found: {data_dir}. "
+            "Expected examples/North_Sea_grid_data/ at the pyflow_acdc repository root."
         )
     return data_dir
 
@@ -37,10 +41,10 @@ def _resolve_example_path(filename, *, online=True):
     if _is_url(filename):
         return str(filename)
     if online:
-        return NS_MP_GITHUB_BASE + Path(filename).name
-    path = _ns_mp_data_dir() / filename
+        return NORTH_SEA_GRID_DATA_GITHUB_BASE + Path(filename).name
+    path = _north_sea_data_dir() / filename
     if not path.exists():
-        raise FileNotFoundError(f"NS_MP example file not found: {path}")
+        raise FileNotFoundError(f"North Sea grid data file not found: {path}")
     return str(path)
 
 
@@ -52,7 +56,7 @@ def NS_MTDC_2025(
     per=1,
     AS=True,
     tee=False,
-    expandable=True,
+    expandable="mp",
     online=True,
 ):
     selected_years = [year.strip() for year in years_data.split(',')]
@@ -195,27 +199,42 @@ def NS_MTDC_2025(
     pyf.add_TimeSeries(grid, TS_MK_all)
     pyf.add_TimeSeries(grid, TS_wl_all)
     if expandable:
-        exp_elements = pd.read_csv(
-            _resolve_example_path("Expandable_elements.csv", online=online)
-        )
-        pyf.expand_elements_from_pd(grid, exp_elements)
+        if expandable is True:
+            expansion_mode = "mp"
+        elif expandable in ("mp", "step"):
+            expansion_mode = expandable
+        else:
+            raise ValueError(
+                f"expandable must be False, True, 'mp', or 'step'; got {expandable!r}"
+            )
 
-        pyf.add_inv_series(
-            grid, _resolve_example_path("NS_exp_MP_planned_intalled.csv", online=online)
-        )
-        pyf.add_inv_series(
-            grid, _resolve_example_path("NS_exp_MP_max_intall_per_period.csv", online=online)
-        )
-        pyf.add_inv_series(
-            grid, _resolve_example_path("NS_exp_MP_price_zones.csv", online=online)
-        )
+        if expansion_mode == "step":
+            exp_elements = pd.read_csv(
+                _resolve_example_path("Expandable_elements_step.csv", online=online)
+            )
+            pyf.expand_elements_from_pd(grid, exp_elements)
+        else:
+            exp_elements = pd.read_csv(
+                _resolve_example_path("Expandable_elements.csv", online=online)
+            )
+            pyf.expand_elements_from_pd(grid, exp_elements)
 
-        for line in  grid.lines_DC:
-            line.investment_decisions['lambda_capex'] = [0,-0.03,-0.08]
-        for conv in grid.Converters_ACDC:
-            conv.investment_decisions['lambda_capex'] = [0,-0.06,-0.15]
-        for rs in grid.RenSources:
-            rs.investment_decisions['lambda_capex'] = [0,-0.10,-0.25]
+            pyf.add_inv_series(
+                grid, _resolve_example_path("NS_exp_MP_planned_intalled.csv", online=online)
+            )
+            pyf.add_inv_series(
+                grid, _resolve_example_path("NS_exp_MP_max_intall_per_period.csv", online=online)
+            )
+            pyf.add_inv_series(
+                grid, _resolve_example_path("NS_exp_MP_price_zones.csv", online=online)
+            )
+
+            for line in grid.lines_DC:
+                line.investment_decisions['lambda_capex'] = [0, -0.03, -0.08]
+            for conv in grid.Converters_ACDC:
+                conv.investment_decisions['lambda_capex'] = [0, -0.06, -0.15]
+            for rs in grid.RenSources:
+                rs.investment_decisions['lambda_capex'] = [0, -0.10, -0.25]
 
     return grid, res
 

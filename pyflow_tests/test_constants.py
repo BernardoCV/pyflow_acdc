@@ -112,13 +112,25 @@ CABLE_TYPES_OFF66 = [
     "MOF_800",
 ]
 
-# --- NS_MP example data (remote CSVs) ---
+# --- North Sea grid example data (remote CSVs) ---
 
-NS_MP_GITHUB_BASE = (
-    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/NS_MP/"
+from pathlib import Path
+
+NORTH_SEA_GRID_DATA_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/North_Sea_grid_data/"
 )
-NS_MTDC_MARKET_PRICES_URL = NS_MP_GITHUB_BASE + "NS_TS_marketPrices_data_sd2024.csv"
-NS_MTDC_WIND_LOAD_URL = NS_MP_GITHUB_BASE + "NS_TS_WL_data2024.csv"
+NORTH_SEA_GRID_DATA_DIR = Path(__file__).resolve().parents[1] / "examples" / "North_Sea_grid_data"
+NORTH_SEA_CLUSTERS_K4_JSON = NORTH_SEA_GRID_DATA_DIR / "clusters_kmeans_medoids_k4.json"
+NS_MTDC_MARKET_PRICES_URL = NORTH_SEA_GRID_DATA_GITHUB_BASE + "NS_TS_marketPrices_data_sd2024.csv"
+NS_MTDC_WIND_LOAD_URL = NORTH_SEA_GRID_DATA_GITHUB_BASE + "NS_TS_WL_data2024.csv"
+
+
+def north_sea_ms_clustering_options():
+    """Precomputed k=4 clusters for NS 2023+2024 MS TEP (local JSON)."""
+    return {
+        "n_clusters": 4,
+        "precomputed_clusters_path": str(NORTH_SEA_CLUSTERS_K4_JSON),
+    }
 
 # --- Case24_MP planning CSVs (remote) ---
 

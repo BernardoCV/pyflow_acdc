@@ -1,0 +1,61 @@
+﻿Expandable elements,n_b,planned_install,n_max,Life_time,per_unit_cost
+conv_Nautilus-BE,0,2,6,40,308000
+conv_Nautilus-PEI,0,2,6,40,512700
+conv_TritonLink-BE,0,0,6,40,308000
+conv_DE2,0,0,6,40,308000
+conv_DE3,0,2,6,40,308000
+conv_DE4,0,0,6,40,308000
+conv_DE6,0,0,6,40,308000
+conv_TritonLink-DK,0,2,8,40,308000
+conv_GB1,0,0,6,40,308000
+conv_LionLink-GB,0,2,6,40,308000
+conv_GB2,0,0,6,40,308000
+conv_Nautilus-GB,0,2,6,40,308000
+conv_GB27,0,0,6,40,308000
+conv_GB3,0,0,6,40,308000
+conv_GB6,0,0,6,40,308000
+conv_NL9,0,0,6,40,308000
+conv_NL10,0,0,6,40,308000
+conv_LionLink-NL,0,2,6,40,308000
+conv_NO3,0,0,6,40,308000
+conv_OFW_DEC,0,0,6,40,521700
+conv_OFW_DEC2,0,1,6,40,521700
+conv_OFW_DK,0,2,8,40,521700
+conv_OFW_GB1,0,0,6,40,521700
+conv_OFW_GB2,0,0,6,40,521700
+conv_OFW_GB3,0,2,6,40,521700
+conv_OFW_GB4,0,0,6,40,521700
+conv_OFW_GB5,0,0,6,40,521700
+conv_LionLink-EI,0,2,6,40,308000
+conv_OFW_NL2,0,0,6,40,521700
+conv_OFW_NL3,0,0,6,40,521700
+conv_OFW_NO,0,0,6,40,521700
+dc_Nautilus - BE,0,2,6,40,760
+dc_TritonLink - BE,0,0,6,40,760
+dc_BE2_OFW_NL,0,0,6,40,760
+dc_BE5_OFW_NO,0,0,6,40,760
+dc_DE6_OFW_NO,0,0,6,40,760
+dc_GB1_OFW_GB5,0,0,6,40,760
+dc_GB2_OFW_GB4,0,0,6,40,760
+dc_GB27_OFW_GB1,0,0,6,40,760
+dc_GriffinLink_GB,0,2,6,40,760
+dc_GB6_OFW_GB2,0,0,6,40,760
+dc_NL9_OFW_NL3,0,0,6,40,760
+dc_NL10_OFW_NL2,0,0,6,40,760
+dc_NO3_OFW_NO,0,0,6,40,760
+dc_OFW_DEC_DE2,0,0,6,40,760
+dc_GriffinLink_DE,0,2,6,40,760
+dc_TritonLink - DK,0,2,8,40,760
+dc_OFW_DK_DE4,0,0,6,40,760
+dc_OFW_DK_OFW_NO,0,0,6,40,760
+dc_OFW_GB1_BE5,0,0,6,40,760
+dc_OFW_GB2_OFW_NL3,0,0,6,40,760
+dc_GriffinLink,0,2,6,40,760
+dc_OFW_GB4_OFW_DK,0,0,6,40,760
+dc_OFW_GB5_DE3,0,0,6,40,760
+dc_OFW_GB5_OFW_NO,0,0,6,40,760
+dc_LionLink - NL,0,2,6,40,760
+dc_OFW_NL2_OFW_DEC,0,0,6,40,760
+dc_LionLink,0,2,6,40,760
+dc_Nautilus,0,2,6,40,760
+dc_TritonLink,0,2,6,40,760

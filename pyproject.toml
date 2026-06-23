@@ -121,7 +121,11 @@ packages = ["pyflow_acdc","pyflow_tests"]
 ]
 
 [tool.setuptools.data-files]
-"examples/NS_MP" = ["examples/NS_MP/*.csv", "examples/NS_MP/README.md"]
+"examples/North_Sea_grid_data" = [
+    "examples/North_Sea_grid_data/*.csv",
+    "examples/North_Sea_grid_data/*.json",
+    "examples/North_Sea_grid_data/README.md",
+]
 "examples/Case24_MP" = ["examples/Case24_MP/*.csv", "examples/Case24_MP/README.md"]
 
 [project.scripts]

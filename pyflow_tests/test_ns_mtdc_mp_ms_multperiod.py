@@ -3,6 +3,7 @@
 
 import pytest
 import pyflow_acdc as pyf
+from pyflow_tests.test_constants import north_sea_ms_clustering_options
 
 NS_MP_MS_OBJ_RULE = {
     "Energy_cost": 0,
@@ -11,31 +12,19 @@ NS_MP_MS_OBJ_RULE = {
 }
 
 
-def _clustering_options(n_clusters=2):
-    return {
-        "n_clusters": n_clusters,
-        "time_series": ["price", "Load", "WPP"],
-        "central_market": [],
-        "thresholds": [0, 0.8],
-        "print_details": False,
-        "correlation_decisions": [True, 3, True],
-        "cluster_algorithm": "kmedoids",
-    }
-
-
 def _ns_mtdc_mp_grid():
     grid, res = pyf.cases["NS_MTDC_2025"](
-        years_data="24",
+        years_data="23,24",
         tee=False,
-        expandable=True,
-        online=True,
+        expandable="mp",
+        online=False,
     )
     return grid, res
 
 
 def test_ns_mtdc_2025_case_is_registered():
     assert "NS_MTDC_2025" in pyf.cases
-    grid, res = pyf.cases["NS_MTDC_2025"](years_data="24", expandable=False, online=True)
+    grid, res = pyf.cases["NS_MTDC_2025"](years_data="24", expandable=False, online=False)
     assert len(grid.nodes_AC) > 0
     assert len(grid.nodes_DC) > 0
     assert res is not None
@@ -61,7 +50,7 @@ def test_ns_mtdc_multi_period_ms_tep_build_only():
         n_years=10,
         Hy=8760,
         discount_rate=0.02,
-        clustering_options=_clustering_options(),
+        clustering_options=north_sea_ms_clustering_options(),
         ObjRule=NS_MP_MS_OBJ_RULE,
         solver="bonmin",
         tee=False,
@@ -101,7 +90,7 @@ def test_ns_mtdc_sequential_ms_step_orchestration_fake_solve(monkeypatch):
         n_years=10,
         Hy=8760,
         discount_rate=0.02,
-        clustering_options=_clustering_options(),
+        clustering_options=north_sea_ms_clustering_options(),
         ObjRule=NS_MP_MS_OBJ_RULE,
         solver="bonmin",
         tee=False,
