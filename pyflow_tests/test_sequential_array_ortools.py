@@ -3,7 +3,6 @@
 import time
 
 import pyflow_acdc as pyf
-import pyomo.environ as pyo
 import pytest
 
 from pyflow_tests._test_solver_deps import (
@@ -15,7 +14,7 @@ from pyflow_tests._test_solver_deps import (
 ARRAY_CASE = "alpha_ventus"
 CT = 3
 MIP_SOLVER = 'ortools'
-TL = 300
+TL = 60
 NL = False
 TEE = True
 FS = False
@@ -47,7 +46,7 @@ def run_case(mip_solver='ortools'):
     )
 
     i = len(summary_results['iteration'])
-    obj_value = pyo.value(model[1].obj)
+    obj_value = model[1].Objective().Value()
     cable_length = summary_results['cable_length'][best_i]
     path_time = timing_info['Paths']
     css_time = timing_info['CSS']

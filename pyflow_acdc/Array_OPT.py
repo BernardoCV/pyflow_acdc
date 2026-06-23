@@ -234,7 +234,10 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_{CSS_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
 
         if css_ok:
-            obj_value = pyo.value(model.obj)
+            if CSS_L_solver == MIPBackend.ORTOOLS.value:
+                obj_value = model_results.get('objective_value') if model_results else None
+            else:
+                obj_value = pyo.value(model.obj)
         else:
             if tee:
                 print(f'Iteration {i} CSS solver status not ok and no feasible solution found, skipping to next cable combo')
@@ -245,12 +248,20 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
         # Analyze which cable types were used in the optimization
         if css_ok:
-            # Get the cable types that were actually used
-
-            for ct in model.ct_set:
-                if pyo.value(model.ct_types[ct]) > 0.5:  # Binary variable > 0.5 means it was selected
-                    used_cable_types.append(ct)
-                    used_cable_names.append(grid.Cable_options[0].cable_types[ct])
+            if CSS_L_solver == MIPBackend.ORTOOLS.value:
+                used_cable_types = sorted({
+                    line.active_config
+                    for line in grid.lines_AC_ct
+                    if line.active_config >= 0
+                })
+                used_cable_names = [
+                    grid.Cable_options[0].cable_types[ct] for ct in used_cable_types
+                ]
+            else:
+                for ct in model.ct_set:
+                    if pyo.value(model.ct_types[ct]) > 0.5:
+                        used_cable_types.append(ct)
+                        used_cable_names.append(grid.Cable_options[0].cable_types[ct])
 
             if used_cable_types:
                 # Find the largest cable type that was used
@@ -457,6 +468,11 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
     if NL == CssMode.OPF:
         export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ, TEP=True)
+    elif CSS_L_solver == MIPBackend.ORTOOLS.value:
+        from .AC_L_CSS_ortools import export_acdc_l_model_to_pyflow_acdc_ortools
+        export_acdc_l_model_to_pyflow_acdc_ortools(
+            model, grid, model_results['gen_vars'], model_results['ac_vars'],
+            tee=tee, time_limit=time_limit)
     else:
         export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=model_results, tee=tee)
 

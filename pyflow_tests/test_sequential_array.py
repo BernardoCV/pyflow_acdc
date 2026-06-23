@@ -17,9 +17,9 @@ from pyflow_tests._test_solver_deps import (
 
 ARRAY_CASE = "alpha_ventus"
 CT = 3
-TL = 300
+TL = 60
 NL = False
-TEE = False
+TEE = True
 FS = False
 OBJ = {'Energy_cost': 1}
 FLH = 8760

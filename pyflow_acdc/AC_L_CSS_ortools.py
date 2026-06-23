@@ -90,6 +90,9 @@ def optimal_l_css_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=HOURS_PER_YE
     model_res, solver_stats = solve_ortools_model(solver, grid, tee)
     t4 = time.perf_counter()
 
+    model_res['gen_vars'] = gen_vars
+    model_res['ac_vars'] = ac_vars
+
     # Export results to grid
     export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
                                             tee=tee, time_limit=time_limit)
@@ -141,16 +144,21 @@ def solve_ortools_model(solver, grid, tee=False):
         obj_val = solver.Objective().Value() if status in (
             pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE) else None
 
+        solution_found = status in (
+            pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE)
+
         model_res = {
             'status': status_str,
             'objective_value': obj_val,
             'solver_time': solve_time,
-            'Solver': [{'Status': 'ok' if status in (
-                pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE) else status_str}],
+            'solution_found': solution_found,
+            'Solver': [{'Status': 'ok' if solution_found else status_str}],
         }
         solver_stats = {
             'time': solve_time,
             'status': status_str,
+            'termination_condition': status_str,
+            'solution_found': solution_found,
             'iterations': solver.iterations(),
             'nodes': solver.nodes(),
             'feasible_solutions': [],
@@ -161,11 +169,14 @@ def solve_ortools_model(solver, grid, tee=False):
             'error_message': str(e),
             'objective_value': None,
             'solver_time': None,
+            'solution_found': False,
             'Solver': [{'Status': 'error'}],
         }
         solver_stats = {
             'time': None,
             'status': 'error',
+            'termination_condition': 'error',
+            'solution_found': False,
             'error_message': str(e),
             'feasible_solutions': [],
         }
