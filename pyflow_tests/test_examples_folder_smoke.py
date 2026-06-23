@@ -13,14 +13,13 @@ import pyflow_acdc as pyf
 
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
-EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("*.py"))
+EXAMPLE_SCRIPTS = sorted(
+    p for p in EXAMPLES_DIR.glob("*.py") if p.name != "__init__.py"
+)
 
 @pytest.mark.parametrize("script_file", EXAMPLE_SCRIPTS, ids=lambda p: p.stem)
 def test_examples_scripts_run(script_file, monkeypatch):
     """Run each examples/*.py script with minimal stubs for heavy optional steps."""
-    if script_file.name == "__init__.py":
-        pytest.skip("__init__ module is not a runnable example script")
-
     # Keep examples runnable without external solvers in CI.
     if script_file.name == "CrigeB4_OPF_Main.py":
         monkeypatch.setattr(
