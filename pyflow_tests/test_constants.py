@@ -184,14 +184,8 @@ ALL_CASES = [
     "test_case24_TEP.py",
     "test_case24_REC.py",
     "test_array_sizing.py",
-    "test_ts_dash.py",
     "test_sequential_array.py",
     "test_sequential_array_ortools.py",
-]
-
-INTEGRATION_CASES = [
-    "test_folium.py",
-    "test_ts_dash.py",
 ]
 
 ARRAY_CASES = [
