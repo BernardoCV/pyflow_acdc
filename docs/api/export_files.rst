@@ -53,7 +53,7 @@ Pickle Export
 .. autofunction:: pyflow_acdc.save_pickle
 
    Serializes a grid object to pickle/dill for later reload with
-   :py:func:`Create_grid_from_pickle`.
+   :py:func:`create_grid_from_pickle`.
 
 Solver Progress Export
 ----------------------

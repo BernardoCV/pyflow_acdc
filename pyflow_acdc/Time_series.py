@@ -127,7 +127,48 @@ def combine_TS(ts_list, rep_year=False):
 
     return combined_df
 
-def update_grid_data(grid,ts, idx,price_zone_restrictions=False,use_clusters=False,n_clusters=None):
+def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=False, n_clusters=None):
+    """Apply one time-series sample to mutable grid fields before PF/OPF/TEP.
+
+    Reads ``ts.data[idx]`` (or ``ts.data_clustered[n_clusters][idx]`` when
+    ``use_clusters=True``) and updates linked grid objects according to
+    ``ts.type`` (see :class:`~pyflow_acdc.constants.TSType`).
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid whose attached price zones, nodes, and renewable objects are
+        updated in place.
+    ts : TimeSeries
+        Series to apply. ``ts.element_name`` is matched against price-zone
+        names, AC/DC node names, renewable-source names, or renewable-zone
+        names depending on type.
+    idx : int
+        Index into ``ts.data`` or the clustered array for the current step.
+    price_zone_restrictions : bool, optional
+        When ``True``, also update price-zone restriction coefficients and
+        limits for types ``a_CG``, ``b_CG``, ``c_CG``, ``PGL_min``, and
+        ``PGL_max`` (in addition to the updates below).
+    use_clusters : bool, optional
+        Read from ``ts.data_clustered[n_clusters]`` instead of ``ts.data``.
+    n_clusters : int, optional
+        Cluster count key into ``ts.data_clustered``. Required when
+        ``use_clusters=True``.
+
+    Notes
+    -----
+    **``price``** — sets ``price`` on the matching price zone and on AC/DC
+    nodes named ``ts.element_name``.
+
+    **``Load``** — sets ``PLi_factor`` on the matching price zone and nodes.
+
+    **Renewable types** (``WPP``, ``SPP``, etc.) — sets ``PRGi_available`` on
+    the matching renewable zone and renewable source.
+
+    Used internally by :func:`~pyflow_acdc.ts_acdc_pf`, :func:`~pyflow_acdc.ts_acdc_opf`,
+    and TEP scenario-frame updates. Call directly when building custom
+    time-step loops.
+    """
     typ = ts.type
     if use_clusters:
         ts_data = ts.data_clustered[n_clusters]

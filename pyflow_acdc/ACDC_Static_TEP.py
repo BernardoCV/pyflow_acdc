@@ -2409,7 +2409,7 @@ def export_TEP_multiScenario_results_to_excel(grid, export):
     Examples
     --------
     >>> import pyflow_acdc as pyf
-    >>> grid, res = pyf.cases["NS_MTDC"]()
+    >>> grid, res = pyf.cases["NS_MTDC_2025"](years_data="23,24")
     >>> pyf.multi_scenario_TEP(grid)
     >>> pyf.export_TEP_multiScenario_results_to_excel(grid, "results.xlsx")
     """

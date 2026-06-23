@@ -29,7 +29,13 @@ Workflow
   modelled in :doc:`api/modelling_ac`.
 
 Bundled examples: ``pyf.cases["case118_TEP"]()`` (static TEP),
-``pyf.cases["NS_MTDC"]()`` (MS TEP with time series).
+``pyf.cases["NS_MTDC_2025"](expandable="step")`` (MS TEP with time series).
+Grid CSVs and precomputed clusters live under ``examples/North_Sea_grid_data/``
+(see that folder's README for ``expandable="mp"`` vs ``"step"``).
+
+For MS TEP on price-zone cases, set social cost in ``ObjRule`` with the key
+``"PZ_cost_of_generation"`` (not ``"Price_Zones"``). See :doc:`api/opf` for all
+objective component keys.
 
 2. Run
 ^^^^^^
@@ -54,8 +60,9 @@ set ``clustering_options`` (see :doc:`api/clustering`), then call
    :language: python
    :lines: 2-
 
-The MS TEP example also uses ``solver="ipopt"`` in doc tests; prefer ``solver="bonmin"``
-for production solves with binary expansion decisions.
+The MS TEP example also uses ``solver="ipopt"`` and ``build_only=True`` in doc
+tests; prefer ``solver="bonmin"`` for production solves with binary expansion
+decisions, and omit ``build_only`` for a full solve.
 
 Example cases
 -------------
@@ -63,7 +70,8 @@ Example cases
 * ``pyf.cases['case118_TEP']()``
 * ``pyf.cases['case39']()``
 * ``pyf.cases['case39_acdc']()``
-* ``pyf.cases['NS_MTDC']()`` (MS TEP with time series)
+* ``pyf.cases['NS_MTDC_2025'](years_data="23,24", expandable="step")`` (MS TEP;
+  data in ``examples/North_Sea_grid_data/``)
 
 See :doc:`usage` for the full catalogue.
 

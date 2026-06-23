@@ -4,7 +4,7 @@ Optimal Power Flow
 Requires ``pip install pyflow-acdc[OPF]`` plus Ipopt (see :doc:`installation`).
 
 Start from a grid with generators (:func:`~pyflow_acdc.add_gen`; see :doc:`api/grid_mod`). Set ``ObjRule`` if needed (see :ref:`obj_functions`),
-then call :func:`~pyflow_acdc.Optimal_PF`.
+then call :func:`~pyflow_acdc.optimal_pf`.
 
 .. _usage_opf:
 
@@ -36,7 +36,11 @@ Example cases
 -------------
 
 * ``pyf.cases['case118']()``
-* ``pyf.cases['NS_MTDC']()``
+* ``pyf.cases['NS_MTDC']()`` — alternate North Sea MTDC topology; attach
+  online TS from ``examples/North_Sea_grid_data/`` with
+  :func:`~pyflow_acdc.add_TimeSeries`
+* ``pyf.cases['NS_MTDC_2025'](years_data="23,24")`` — TEP-oriented North Sea
+  case with bundled time-series load from the same CSV folder
 * ``pyf.cases['pglib_opf_case5_pjm']()``
 * ``pyf.cases['Stagg5MATACDC']()``
 

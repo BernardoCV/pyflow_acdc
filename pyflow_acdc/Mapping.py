@@ -910,6 +910,12 @@ def plot_folium_ts_results(
     legend_position="topright",
     line_size_factor=1.0,
 ):
+    """Build an animated Folium map of line loading from TS-OPF results.
+
+    Requires ``grid.time_series_results['ac_loading']`` and/or
+    ``['dc_loading']`` (populated by :func:`ts_acdc_opf`). API under active
+    development.
+    """
     line_size_factor = float(line_size_factor)
     if line_size_factor <= 0:
         raise ValueError("line_size_factor must be > 0.")
@@ -1133,6 +1139,12 @@ def plot_folium_inv_results(
     inv_dropdown_period=False,
     line_size_factor=1.0,
 ):
+    """Build a Folium map of expansion/decommission decisions by investment period.
+
+    Reads ``grid.MP_TEP_results``, ``grid.Seq_STEP_results``, or
+    ``grid.Seq_MS_STEP_results`` depending on ``source``. API under active
+    development.
+    """
     line_size_factor = float(line_size_factor)
     if line_size_factor <= 0:
         raise ValueError("line_size_factor must be > 0.")

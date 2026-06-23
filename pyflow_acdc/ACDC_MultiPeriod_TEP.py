@@ -2125,15 +2125,40 @@ def run_ts_opf_for_investment_period(
     save_grid_pkl: bool = False,
     nominal_base=False,
 ):
-    """
-    Apply a dynamic investment state for a given MP period and run TS-OPF over [start, end].
+    """Apply one MP investment state and run time-series OPF.
 
-    This mirrors `run_opf_for_investment_period`, but calls `TS_ACDC_OPF`
-    to perform a time-series OPF for that investment period.
+    Mirrors :func:`run_opf_for_investment_period` but calls
+    :func:`ts_acdc_opf` over ``[start, end]`` with optional clustered frames.
 
-    If ``nominal_base=True``, ignore ``investment_period`` and apply
-    ``_set_grid_to_nominal_base`` (nominal ``np``, unity inv factors, neutral
-    ``current_generation_type_limits``).
+    Parameters
+    ----------
+    grid : Grid
+        Grid with MP TEP results and time series attached.
+    investment_period : int
+        Zero-based investment period index (ignored when ``nominal_base=True``).
+    start, end : int, optional
+        Time-step range passed to :func:`ts_acdc_opf`.
+    ObjRule : dict, optional
+        OPF objective weights.
+    price_zone_restrictions : bool
+        Update price-zone restriction coefficients each step.
+    use_clusters : bool
+        Read clustered representative periods when ``True``.
+    warm_start_mode : str
+        Passed to :func:`ts_acdc_opf` (for example ``'roll'``).
+    export_excel : bool
+        Write Excel via :func:`results_ts_opf` when ``True``.
+    export_location, file_name : str, optional
+        Output folder and base filename for exports.
+    plot_ts : bool
+        Save SVG time-series plots when ``True``.
+    nominal_base : bool
+        When ``True``, reset the grid to nominal ``np`` before TS-OPF.
+
+    Returns
+    -------
+    list
+        Per-step timing/info list from :func:`ts_acdc_opf`.
     """
     if nominal_base:
         period_tag = 'base'

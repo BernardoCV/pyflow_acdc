@@ -71,12 +71,20 @@ Running multiple scenario based transmission expansion planning
         - None
       * - ``ObjRule``
         - dict
-        - Objective function weights
+        - Objective component weights (see :doc:`opf`)
         - None
       * - ``solver``
         - str
         - Solver to use
         - 'bonmin'
+      * - ``obj_scaling``
+        - float
+        - Divide objective by this factor for numerical conditioning
+        - 1.0
+      * - ``build_only``
+        - bool
+        - Build model and return without solving or exporting
+        - False
 
    **Returns**
 
@@ -174,7 +182,8 @@ Export Results
 
 .. autofunction:: pyflow_acdc.export_TEP_multiScenario_results_to_excel
 
-   Exports time series TEP results to Excel file.
+   Exports multi-scenario TEP time-series tables from ``grid.TEP_multiScenario_res``
+   to an Excel workbook (expansion summary plus per-scenario operating tables).
 
    .. list-table::
       :widths: 20 10 50 10
@@ -192,6 +201,10 @@ Export Results
         - str
         - Export file path
         - Required
+
+.. function:: pyflow_acdc.export_TEP_TS_results_to_excel
+
+   **Deprecated alias** for :func:`export_TEP_multiScenario_results_to_excel`.
 
 **References**
 

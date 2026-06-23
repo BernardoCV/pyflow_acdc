@@ -1298,7 +1298,44 @@ def print_clustering_results(algorithm, n_clusters, specific_info):
     return CoV
 
 def run_clustering_analysis(grid, save_path='clustering_results',algorithms=None,n_clusters_list=None,time_series=None,print_details=False,ts_options=None,correlation_decisions=None,plotting=False, plotting_options=None,identifier=None):
+    """Sweep clustering algorithms and cluster counts for exploratory analysis.
 
+    Runs :func:`cluster_TS` for each ``(algorithm, n_clusters)`` pair, collects
+    quality metrics, optionally saves representative-period plots, and writes
+    ``clustering_summary_<identifier>.csv`` under ``save_path``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid with attached time series.
+    save_path : str
+        Output directory for CSV summaries and optional plots.
+    algorithms : list of str, optional
+        Clustering methods passed to :func:`cluster_TS` (default includes
+        ``kmeans``, ``kmedoids``, ``ward``, ``pam_hierarchical``).
+    n_clusters_list : list of int, optional
+        Cluster counts to test (defaults to ``DEFAULT_CLUSTER_NUMBERS``).
+    time_series : list, optional
+        TS types to include (empty list keeps grid defaults).
+    print_details : bool
+        Verbose clustering diagnostics from :func:`cluster_TS`.
+    ts_options : list, optional
+        ``[central_market, cv_threshold, correlation_threshold]`` for filtering.
+    correlation_decisions : list, optional
+        Passed through to :func:`identify_correlations`.
+    plotting : bool
+        When ``True``, save time-series plots per sweep step.
+    plotting_options : list, optional
+        ``[variable_name_or_None, file_extension]`` for plots.
+    identifier : str, optional
+        Suffix for output filenames.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per successful ``(algorithm, n_clusters)`` run with timing and
+        quality metrics.
+    """
     if algorithms is None:
         algorithms = ['kmeans', 'kmedoids', 'ward', 'pam_hierarchical']
     if n_clusters_list is None:

@@ -119,28 +119,31 @@ per period (grid state carried forward):
    )
 
 **MP+MS TEP** — multi-period planning with clustered operating scenarios
-(typically hybrid cases with time series, e.g. ``pyf.cases['NS_MTDC_2025']()``).
-Attach representative periods, then call :func:`~pyflow_acdc.multi_period_MS_TEP`
-or :func:`~pyflow_acdc.sequential_MS_STEP`:
+(cases with time series). For the North Sea bundled case use
+``pyf.cases["NS_MTDC_2025"](years_data="23,24", expandable="mp")`` — CSVs and
+precomputed clusters are under ``examples/North_Sea_grid_data/``. Use
+``expandable="step"`` for single-period MS TEP without MP investment series (see
+:doc:`usage_tep`). Then call :func:`~pyflow_acdc.multi_period_MS_TEP` or
+:func:`~pyflow_acdc.sequential_MS_STEP`:
 
 **Cluster time series** — run :func:`~pyflow_acdc.cluster_TS` (or
 :func:`~pyflow_acdc.run_clustering_analysis_and_plot` for exploratory work), or
-reload a saved result with :func:`~pyflow_acdc.load_precomputed_clusters_to_grid`:
+reload a saved result via ``precomputed_clusters_path`` in ``clustering_options``
+(see :func:`~pyflow_acdc.load_precomputed_clusters_to_grid`):
 
 .. code-block:: python
 
-   grid, _ = pyf.cases["NS_MTDC_2025"]()
+   from pyflow_tests.test_constants import north_sea_ms_clustering_options
 
-   clustering_options = {
-       "n_clusters": 6,
-       "time_series": ["price", "Load", "WPP"],
-       "cluster_algorithm": "kmedoids",
-       # optional: skip re-clustering when JSON already exists
-       # "precomputed_clusters_path": "/path/to/clusters.json",
-   }
+   grid, _ = pyf.cases["NS_MTDC_2025"](years_data="23,24", expandable="mp")
+
+   clustering_options = north_sea_ms_clustering_options()
+   # points to examples/North_Sea_grid_data/clusters_kmeans_medoids_k4.json
 
 Pass ``clustering_options`` to :func:`~pyflow_acdc.multi_period_MS_TEP` or
-:func:`~pyflow_acdc.sequential_MS_STEP`. See :doc:`api/clustering`.
+:func:`~pyflow_acdc.sequential_MS_STEP``. For price-zone OPEX use
+``ObjRule={"PZ_cost_of_generation": 1}`` (see :doc:`api/opf`). See
+:doc:`api/clustering`.
 
 .. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/02_multi_period_multi_scenario_dynamic_tep.py
    :language: python
@@ -167,7 +170,7 @@ generator counts, and decommission flags reflect the expansion plan.
 
    pyf.export_and_save_inv_period_svgs(grid, folder_name="case24_MP_TEP")
    res.pyomo_model_results(model, solver_stats=solver_stats, model_results=model_results)
-   res.All(export_type="excel", file_name="case24_MP_TEP", export_location="case24_MP_TEP")
+   res.all(export_type="excel", file_name="case24_MP_TEP", export_location="case24_MP_TEP")
 
    pyf.run_opf_for_all_investment_periods(
        grid,
@@ -180,6 +183,19 @@ generator counts, and decommission flags reflect the expansion plan.
 ``run_opf_for_all_investment_periods`` re-solves OPF for each investment period
 on the expanded grid and exports per-period operating results.
 
+For **time-series OPF** on one built-out period (clustered or hourly), use
+:func:`~pyflow_acdc.run_ts_opf_for_investment_period` — it applies the period
+state, calls :func:`~pyflow_acdc.ts_acdc_opf`, and writes Excel via
+:func:`~pyflow_acdc.results_ts_opf`.
+
+After MP+MS TEP, export scenario tables with
+:func:`~pyflow_acdc.export_TEP_multiScenario_results_to_excel` (deprecated alias
+``export_TEP_TS_results_to_excel``):
+
+.. code-block:: python
+
+   pyf.export_TEP_multiScenario_results_to_excel(grid, "NS_MP_MS_results.xlsx")
+
 **Sequential STEP** returns a ``run_results`` dict keyed by period. Set
 ``export_steps=True`` and ``export_dir=...`` for CSV summaries per step.
 
@@ -187,7 +203,8 @@ Example cases
 -------------
 
 * ``pyf.cases['case24_MP']()``
-* ``pyf.cases['NS_MTDC_2025']()`` (MP+MS with time series)
+* ``pyf.cases['NS_MTDC_2025'](years_data="23,24", expandable="mp")`` (MP+MS;
+  data in ``examples/North_Sea_grid_data/``)
 
 See :doc:`usage` for the full catalogue.
 
@@ -199,7 +216,9 @@ Related API pages
 - :doc:`api/tep_dynamic` — :func:`~pyflow_acdc.multi_period_transmission_expansion`,
   :func:`~pyflow_acdc.multi_period_MS_TEP`,
   :func:`~pyflow_acdc.export_and_save_inv_period_svgs`,
-  :func:`~pyflow_acdc.run_opf_for_all_investment_periods`
+  :func:`~pyflow_acdc.run_opf_for_all_investment_periods`,
+  :func:`~pyflow_acdc.run_ts_opf_for_investment_period`,
+  :func:`~pyflow_acdc.export_TEP_multiScenario_results_to_excel`
 - :doc:`api/sequential_step` — :func:`~pyflow_acdc.sequential_STEP`,
   :func:`~pyflow_acdc.sequential_MS_STEP`
 - :doc:`api/clustering` — :func:`~pyflow_acdc.cluster_TS`,

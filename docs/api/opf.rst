@@ -99,6 +99,9 @@ The user can define the objective by setting the weight of each sub objective. T
     * - ``General_Losses``
       - Generation minus demand
       - :math:`\left(\sum_{g \in \mathcal{G}} P_{g}+\sum_{rg \in \mathcal{RG}} P_{rg}*\gamma_{rg}- \sum_{l \in \mathcal{L}} P_{L} \right)`
+    * - ``Array_losses``
+      - Offshore array injection and slack extraction losses
+      - :math:`\left(\sum_{rg \in \mathcal{RG}} P_{rg}\, n_{rg} + \sum_{n \in \mathcal{N}_{slack}} P_{g,opt,n}\right) \cdot \mathrm{LCoE} \cdot S_{base}`
 
   The following table shows the pre-built objective functions as defined in [2]_:
 
@@ -113,6 +116,8 @@ The user can define the objective by setting the weight of each sub objective. T
       - Price zone generation cost
       - :math:`\sum_{m \in \mathcal{M}} CG(P_N)_m`
 
+  Pass these names exactly as ``ObjRule`` keys (e.g. ``{"PZ_cost_of_generation": 1}``).
+ 
   The following table shows the pre-built objective functions in development:
 
   .. list-table::

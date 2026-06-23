@@ -42,9 +42,19 @@ Examples of running a power flow...
 Available test cases
 --------------------
 
-Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
-``pyf.cases`` when you ``import pyflow_acdc as pyf``. Each factory returns a
-``(grid, results)`` tuple, for example ``grid, res = pyf.cases['PEI_grid']()``.
+Bundled example grids
+^^^^^^^^^^^^^^^^^^^^^
+
+Preloaded grids live under ``pyflow_acdc/example_grids/`` and are registered on
+``pyf.cases`` when you ``import pyflow_acdc as pyf``. Each factory returns
+``(grid, results)`` — for example ``grid, res = pyf.cases["PEI_grid"]()``.
+
+Factories are grouped by folder: ``PF/``, ``OPF/``, ``TEP/``, ``Wind_Array/``.
+Keyword arguments depend on the case. ``NS_MTDC_2025`` accepts ``years_data``
+(such as ``"23,24"``), ``expandable="mp"`` or ``"step"``, and ``online=True``
+for GitHub raw URLs under ``examples/North_Sea_grid_data/``. For ``NS_MTDC``,
+attach the same folder's time-series CSVs with :func:`~pyflow_acdc.add_TimeSeries`
+after loading the grid (see :doc:`usage_tep`).
 
 **Power Flow** (``pyflow_acdc/example_grids/PF/``):
 
@@ -57,7 +67,9 @@ Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
 * ``pyf.cases['case1888rte']()``
 * ``pyf.cases['case3120sp_acdc']()``
 * ``pyf.cases['case_ACTIVSg2000']()``
-* ``pyf.cases['NS_MTDC']()``
+* ``pyf.cases['NS_MTDC']()`` — North Sea MTDC with an alternate HVDC
+  configuration; use with online time-series CSVs from
+  ``examples/North_Sea_grid_data/`` (not bundled in the factory)
 * ``pyf.cases['NS_SI']()``
 * ``pyf.cases['NS_SII']()``
 * ``pyf.cases['pglib_opf_case14_ieee']()``
@@ -79,7 +91,9 @@ Preloaded grids live under ``pyflow_acdc/example_grids/`` and are exposed as
 * ``pyf.cases['case118_TEP_benchmark']()``
 * ``pyf.cases['case_ACTIVSg500']()``
 * ``pyf.cases['Texas7k_20210804']()``
-* ``pyf.cases['NS_MTDC_2025']()``
+* ``pyf.cases['NS_MTDC_2025']()`` — North Sea MTDC for TEP (different HVDC
+  layout, bundled TS load, expansion tables); CSVs in
+  ``examples/North_Sea_grid_data/`` (``expandable="mp"`` or ``"step"``)
 
 **Wind Array** (``pyflow_acdc/example_grids/Wind_Array/``):
 

@@ -1,7 +1,23 @@
 Results
 =======
 
-The Results class provides methods for analyzing and displaying power flow results. Results are printed in the terminal with the use of prettytable.
+The Results class provides methods for analyzing and displaying power flow,
+optimization, TEP, multi-period, clustering, and Pyomo solve summaries. Results
+are printed in the terminal with the use of prettytable.
+
+Construct a :class:`~pyflow_acdc.Results` instance with the solved grid, then
+call a printer on that instance — for example::
+
+   import pyflow_acdc as pyf
+
+   grid, _ = pyf.cases["PEI_grid"]()
+   pyf.power_flow(grid)
+   res = pyf.Results(grid)
+   res.all()
+
+Bundled case factories often return ``(grid, res)`` with ``res`` already bound
+to the grid. Use :meth:`~pyflow_acdc.Results.options` on ``res`` to list methods
+available for the current grid state.
 
 Class Reference
 ---------------
@@ -25,8 +41,9 @@ All
 
 .. automethod:: pyflow_acdc.Results.all
 
-   Displays all available results for both AC and DC grids including:
-   
+   On a :class:`~pyflow_acdc.Results` instance (``res = pyf.Results(grid)``),
+   prints every section that applies to ``res.Grid``. Includes:
+
    - :ref:`AC power flow <res_ac_powerflow>`
    - :ref:`AC voltages <res_ac_voltage>`
    - :ref:`AC line currents and power flows <res_ac_lines_current>`
@@ -36,17 +53,65 @@ All
    - :ref:`Slack bus information <res_slack_all>`
    - :ref:`Power losses <res_power_loss>`
 
-   If optimization module is used:
+   When ``res.Grid._last_pyomo_model_results_table`` is set (after a Pyomo solve),
+   ``res.all()`` prints the :ref:`Pyomo solve summary <res_pyomo_model_results>`
+   block first.
+
+   When ``res.Grid.Clustering_information`` is non-empty:
+
+   - :ref:`Clustering summary <res_clustering_results>`
+
+   When optimization has run (``res.Grid.OPF_run``):
 
    - :ref:`External generator data <res_ext_gen>`
    - :ref:`Renewable energy sources <res_ext_ren>`
-   - :ref:`Objective function <res_objective>`
+   - :ref:`Objective function <res_objective>` (skipped during TEP / MP TEP)
    - :ref:`Price zone optimization <res_price_zone>`
 
-   If transmission expansion module is used:
+   When expandable AC lines are present:
+
+   - :ref:`AC expansion line flows <res_ac_exp_lines_power>`
+
+   When DC/DC converters exist:
+
+   - :ref:`DC converter summary <res_dc_converter>`
+
+   When static TEP has run (``res.Grid.TEP_run``):
 
    - :ref:`Transmission expansion <res_TEP_N>`
-   - :ref:`Normalized transmission expansion <res_TEP_norm>`
+   - :ref:`Normalized transmission expansion <res_TEP_norm>` (single-state TEP), or
+     :ref:`Multi-scenario TEP tables <res_tep_multi_scenario_res>` and
+     :ref:`NPV-normalized MS objective <res_tep_ts_norm>` when
+     ``res.Grid.TEP_multiScenario_res`` is set
+
+   When multi-period TEP has run (``res.Grid.MP_TEP_run``):
+
+   - :ref:`MP expansion tables <res_mp_tep_results>`
+   - :ref:`MP objective by period <res_mp_tep_obj_res>`
+   - :ref:`MP fuel-type mix <res_mp_tep_fuel_type_distribution>`
+
+   When MP+MS TEP has run (``res.Grid.MP_MS_TEP_run``):
+
+   - :ref:`MP+MS expansion tables <res_mp_ms_tep_results>`
+   - :ref:`MP+MS objectives <res_mp_ms_tep_obj_res>` (plus the MP tables above)
+
+   When sequential STEP has run (``res.Grid.Seq_STEP_run``):
+
+   - :ref:`Sequential STEP results <res_seq_step_results>`
+   - :ref:`Sequential STEP objectives <res_seq_step_obj_res>`
+   - :ref:`Sequential STEP fuel-type mix <res_seq_step_fuel_type_distribution>`
+
+   When sequential MS STEP has run (``res.Grid.Seq_MS_STEP_run``):
+
+   - :ref:`Sequential MS STEP results <res_seq_ms_step_results>`
+   - :ref:`Sequential MS STEP objectives <res_seq_ms_step_obj_res>`
+   - :ref:`Sequential MS STEP fuel-type mix <res_seq_ms_step_fuel_type_distribution>`
+
+   For other clustering detail tables (:ref:`representatives <res_cluster_representatives>`,
+   :ref:`technique <res_clustering_technique>`,
+   :ref:`time-series statistics <res_clustering_time_series_statistics>`) or
+   sequential Pyomo summaries (:meth:`~pyflow_acdc.Results.pyomo_model_results_sequential`),
+   call the method on ``res`` directly or use :meth:`~pyflow_acdc.Results.options`.
 
 .. automethod:: pyflow_acdc.Results.all_ac
 
@@ -489,6 +554,130 @@ Treansmission expansion
 
 
 
+Pyomo solve summary
+^^^^^^^^^^^^^^^^^^^
+
+.. _res_pyomo_model_results:
+
+.. automethod:: pyflow_acdc.Results.pyomo_model_results
+
+   Solver status, timing, and objective breakdown after a single Pyomo solve
+   (for example MP TEP or static TEP). Call as ``res.pyomo_model_results(...)``
+   after ``res = pyf.Results(grid)``. ``res.all()`` prints the same table when
+   ``res.Grid._last_pyomo_model_results_table`` is populated.
+
+.. _res_pyomo_model_results_sequential:
+
+.. automethod:: pyflow_acdc.Results.pyomo_model_results_sequential
+
+   Per-period Pyomo summaries from :func:`~pyflow_acdc.sequential_STEP` or
+   :func:`~pyflow_acdc.sequential_MS_STEP` ``run_results``.
+
+Multi-scenario TEP results
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _res_tep_multi_scenario_res:
+
+.. automethod:: pyflow_acdc.Results.tep_multi_scenario_res
+
+   Per-scenario price-zone power, social cost, curtailment, line loading, and
+   converter loading from ``grid.TEP_multiScenario_res``.
+
+.. _res_tep_ts_norm:
+
+.. automethod:: pyflow_acdc.Results.tep_ts_norm
+
+   NPV-normalized objective components for multi-scenario TEP.
+
+Multi-period TEP results
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _res_mp_tep_results:
+
+.. automethod:: pyflow_acdc.Results.mp_tep_results
+
+   Installed, decommissioned, active, and cost tables from ``grid.MP_TEP_results``.
+
+.. _res_mp_tep_obj_res:
+
+.. automethod:: pyflow_acdc.Results.mp_tep_obj_res
+
+   Discounted operational objective by investment period (MP TEP).
+
+.. _res_mp_tep_fuel_type_distribution:
+
+.. automethod:: pyflow_acdc.Results.mp_tep_fuel_type_distribution
+
+   Generation-type mix versus limits across investment periods.
+
+.. _res_mp_ms_tep_results:
+
+.. automethod:: pyflow_acdc.Results.mp_ms_tep_results
+
+   Combined MP+MS expansion tables (``grid.MP_MS_TEP_results`` when present).
+
+.. _res_mp_ms_tep_obj_res:
+
+.. automethod:: pyflow_acdc.Results.mp_ms_tep_obj_res
+
+   MP+MS objective breakdown by period and scenario weight.
+
+Sequential STEP results
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _res_seq_step_results:
+
+.. automethod:: pyflow_acdc.Results.seq_step_results
+
+.. _res_seq_step_obj_res:
+
+.. automethod:: pyflow_acdc.Results.seq_step_obj_res
+
+.. _res_seq_step_fuel_type_distribution:
+
+.. automethod:: pyflow_acdc.Results.seq_step_fuel_type_distribution
+
+.. _res_seq_ms_step_results:
+
+.. automethod:: pyflow_acdc.Results.seq_ms_step_results
+
+.. _res_seq_ms_step_obj_res:
+
+.. automethod:: pyflow_acdc.Results.seq_ms_step_obj_res
+
+.. _res_seq_ms_step_fuel_type_distribution:
+
+.. automethod:: pyflow_acdc.Results.seq_ms_step_fuel_type_distribution
+
+Clustering results
+^^^^^^^^^^^^^^^^^^
+
+.. _res_clustering_results:
+
+.. automethod:: pyflow_acdc.Results.clustering_results
+
+.. _res_cluster_representatives:
+
+.. automethod:: pyflow_acdc.Results.cluster_representatives
+
+.. _res_clustering_technique:
+
+.. automethod:: pyflow_acdc.Results.clustering_technique
+
+.. _res_clustering_time_series_statistics:
+
+.. automethod:: pyflow_acdc.Results.clustering_time_series_statistics
+
+AC expansion line flows
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _res_ac_exp_lines_power:
+
+.. automethod:: pyflow_acdc.Results.ac_exp_lines_power
+
+   Power flows on expandable AC lines after TEP (non-zero ``np_line`` only).
+
+
 Other Results
 ^^^^^^^^^^^^^^^
 
@@ -520,6 +709,12 @@ Other Results
       |     2     |        PV       |      Slack      |   18.303  |      120       |
       |     3     |        PQ       |       PAC       |   30.159  |      120       |
       +-----------+-----------------+-----------------+-----------+----------------+
+
+.. _res_dc_converter:
+.. automethod:: pyflow_acdc.Results.dc_converter
+
+   DC-side converter summary when DC converters are present.
+
 
 .. _res_power_loss:
 .. automethod:: pyflow_acdc.Results.power_loss

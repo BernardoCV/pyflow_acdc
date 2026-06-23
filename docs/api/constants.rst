@@ -27,7 +27,7 @@ OPF objective components
 .. autoclass:: pyflow_acdc.constants.ObjComponent
    :members:
 
-   Keys for :func:`~pyflow_acdc.Optimal_PF` / TEP ``ObjRule`` weight dicts.
+   Keys for :func:`~pyflow_acdc.optimal_pf` / TEP ``ObjRule`` weight dicts.
 
 Economics and solver defaults
 -----------------------------

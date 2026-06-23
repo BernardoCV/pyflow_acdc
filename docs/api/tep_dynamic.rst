@@ -1,9 +1,6 @@
 Multi period Transmission Expansion Planning Module
 ====================================================
 
-This module is under development 
-
-
 This module provides functions for multi-period transmission expansion planning
 with investment states applied over time.
 
@@ -22,7 +19,7 @@ Multi-period Multi-scenario Dynamic TEP
    Example on ``case24_MP`` (grid + planning CSVs, model build with **ipopt**; use
    **bonmin** and omit ``build_only`` for a full MINLP solve):
 
-   .. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/01_multi_period_tep_case24.py
+   .. literalinclude:: ../../pyflow_tests/doc_examples/tep_mp/01_multi_period_tep_case24.py
       :language: python
       :lines: 2-
 
@@ -34,7 +31,7 @@ Multi-period Multi-scenario Dynamic TEP
    Example on ``NS_MTDC_2025`` (full solve with **ipopt**; use **bonmin** for
    production MINLP with binary expansion):
 
-   .. literalinclude:: ../pyflow_tests/doc_examples/tep_mp/02_multi_period_multi_scenario_dynamic_tep.py
+   .. literalinclude:: ../../pyflow_tests/doc_examples/tep_mp/02_multi_period_multi_scenario_dynamic_tep.py
       :language: python
       :lines: 2-
 
@@ -72,7 +69,7 @@ Multi-period Multi-scenario Dynamic TEP
         - None
       * - ``ObjRule``
         - dict
-        - OPF objective weights
+        - OPF objective weights (see :doc:`opf`)
         - None
       * - ``solver``
         - str
@@ -82,6 +79,10 @@ Multi-period Multi-scenario Dynamic TEP
         - float
         - Objective scaling factor
         - 1.0
+      * - ``build_only``
+        - bool
+        - Build model and return without solving or exporting
+        - False
 
    **Returns**
 
@@ -114,3 +115,28 @@ Run OPF on All Investment Periods
 
    Runs OPF for every dynamic investment period and exports one result file per
    period.
+
+Run TS-OPF on One Investment Period
+-----------------------------------
+
+.. autofunction:: pyflow_acdc.run_ts_opf_for_investment_period
+
+   Applies one MP investment-period state to the grid (or nominal base when
+   ``nominal_base=True``), runs :func:`~pyflow_acdc.ts_acdc_opf` over
+   ``[start, end]``, and optionally exports time-series OPF tables to Excel via
+   :func:`~pyflow_acdc.results_ts_opf`. Use after
+   :func:`~pyflow_acdc.multi_period_MS_TEP` or
+   :func:`~pyflow_acdc.multi_period_transmission_expansion` when you need
+   operating trajectories for a single built-out year.
+
+Export Multi-scenario TEP Time Series
+-------------------------------------
+
+.. autofunction:: pyflow_acdc.export_TEP_multiScenario_results_to_excel
+
+   Excel export for MS and MP+MS scenario tables on ``grid.TEP_multiScenario_res``.
+
+.. function:: pyflow_acdc.export_TEP_TS_results_to_excel
+
+   **Deprecated alias** for :func:`export_TEP_multiScenario_results_to_excel`.
+   Prefer the canonical name in new scripts.

@@ -120,6 +120,17 @@ Add Time Series
 
    CSV layout and supported series types are documented in :doc:`ts_mod`.
 
+Wire Time Series to Grid Elements
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.time_series_dict
+
+   Registers a :class:`~pyflow_acdc.Time_series.TimeSeries` on the matching
+   node, price zone, or renewable zone/source (sets ``TS_dict`` / availability
+   keys by ``ts.type``). Called automatically by :func:`~pyflow_acdc.add_TimeSeries`;
+   use directly when attaching custom :class:`~pyflow_acdc.Time_series.TimeSeries`
+   objects without going through CSV import.
+
 Add Investment Series
 ^^^^^^^^^^^^^^^^^^^^^
 

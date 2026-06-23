@@ -35,10 +35,20 @@ AC/DC
 Grid Data Update Helper
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: pyflow_acdc.Time_series.update_grid_data
+.. autofunction:: pyflow_acdc.update_grid_data
 
-   Internal helper that applies one time-step (or one clustered state) to grid
-   data before solving PF/OPF routines.
+   Applies one hourly (or clustered) time-series sample onto the ``Grid`` before
+   PF/OPF/TEP routines run. Matching is by ``TimeSeries.element_name`` and
+   ``TimeSeries.type``:
+
+   - ``price`` → node and price-zone ``price``
+   - ``Load`` → ``PLi_factor`` on nodes and price zones
+   - renewable types → ``PRGi_available`` on sources/zones
+   - with ``price_zone_restrictions=True`` → ``a_CG``, ``b_CG``, ``c_CG``,
+     ``PGL_min``, ``PGL_max`` on price zones
+
+   Set ``use_clusters=True`` and pass ``n_clusters`` when TEP/OPF should read
+   from ``ts.data_clustered`` instead of the full hourly ``ts.data``.
 
 Optimal Power Flow Time Series
 ------------------------------

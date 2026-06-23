@@ -23,6 +23,9 @@ TEP functions accept a ``clustering_options`` dict, normally processed by
        "precomputed_clusters_path": "examples/North_Sea_grid_data/clusters_kmeans_medoids_k4.json",
    }
 
+Use with ``years_data="23,24"`` on ``NS_MTDC_2025`` so time-series length matches the
+JSON payload.
+
 .. list-table::
    :widths: 28 52
    :header-rows: 1
@@ -98,5 +101,14 @@ Precomputed clusters
 
 Exploratory analysis
 --------------------
+
+.. autofunction:: pyflow_acdc.run_clustering_analysis
+
+   Sweeps clustering algorithms and cluster counts on the attached time series,
+   records quality metrics (coefficient of variation, inertia, Davies–Bouldin),
+   and writes ``clustering_summary_<identifier>.csv`` under ``save_path``. Set
+   ``plotting=True`` to save representative-period plots while sweeping. Use
+   this to tune ``clustering_options`` before calling TEP; production solves
+   normally use :func:`~pyflow_acdc.cluster_analysis` inside the TEP drivers.
 
 .. autofunction:: pyflow_acdc.run_clustering_analysis_and_plot
