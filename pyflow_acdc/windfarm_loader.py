@@ -16,13 +16,8 @@ from .grid_creator import create_grid_from_pickle
 __all__ = ['load_case_grid_and_geo']
 
 
-def _name_variants(case_name):
-    return [
-        case_name,
-        case_name.lower(),
-        case_name.upper(),
-        case_name.capitalize(),
-    ]
+def _file_stem(case_name):
+    return case_name.lower()
 
 
 def _candidate_dirs():
@@ -45,24 +40,24 @@ def _candidate_dirs():
 
 
 def _find_grid_pickle(case_name, source_tag="gebco"):
+    name = _file_stem(case_name)
+    tag = source_tag.lower()
     for base in _candidate_dirs():
-        for name in _name_variants(case_name):
-            candidates = [
-                base / f"{name}_{source_tag}.pkl.gz",
-                base / f"{name}.pkl.gz",
-            ]
-            for candidate in candidates:
-                if candidate.exists():
-                    return candidate
+        for candidate in (
+            base / f"{name}_{tag}.pkl.gz",
+            base / f"{name}.pkl.gz",
+        ):
+            if candidate.exists():
+                return candidate
     raise FileNotFoundError(f"Could not find grid pickle for case '{case_name}'.")
 
 
 def _find_geojson(case_name):
+    name = _file_stem(case_name)
     for base in _candidate_dirs():
-        for name in _name_variants(case_name):
-            candidate = base / f"{name}.geojson"
-            if candidate.exists():
-                return candidate
+        candidate = base / f"{name}.geojson"
+        if candidate.exists():
+            return candidate
     return None
 
 
@@ -121,15 +116,15 @@ def _parse_geojson_context(geojson_path):
 def load_case_grid_and_geo(case_name, source_tag="gebco"):
     """Load a bundled wind-farm grid and attach GeoJSON geographic context.
 
-    Locates ``{case_name}_{source_tag}.pkl.gz`` (or ``{case_name}.pkl.gz``) under
-    the packaged ``example_grids/wind_farm_data`` tree or ``PYFLOW_WINDFARM_DATA_DIR``.
-    Optionally loads ``{case_name}.geojson`` and attaches polygons/lines to ``grid``
+    Locates ``{case_name.lower()}_{source_tag}.pkl.gz`` (or ``{case_name.lower()}.pkl.gz``)
+    under the packaged ``example_grids/wind_farm_data`` tree or ``PYFLOW_WINDFARM_DATA_DIR``.
+    Optionally loads ``{case_name.lower()}.geojson`` and attaches polygons/lines to ``grid``
     (``dev_polygon``, ``export_cables``, ``exclusion_zones``, ``soft_exclusion_zones``).
 
     Parameters
     ----------
     case_name : str
-        Wind-farm case name (matched case-insensitively against bundled files).
+        Wind-farm case name (resolved to lowercase filenames under ``wind_farm_data/``).
     source_tag : str, optional
         Pickle filename tag (default ``"gebco"``).
 
@@ -141,7 +136,7 @@ def load_case_grid_and_geo(case_name, source_tag="gebco"):
     Examples
     --------
     >>> import pyflow_acdc as pyf
-    >>> grid, res = pyf.windfarm_loader.load_case_grid_and_geo("Moray_East")
+    >>> grid, res = pyf.windfarm_loader.load_case_grid_and_geo("moray_east")
     >>> # Geometry context is attached for folium / array plotting:
     >>> # grid.dev_polygon, grid.export_cables, grid.exclusion_zones, ...
     """

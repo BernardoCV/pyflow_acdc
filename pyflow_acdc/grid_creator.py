@@ -16,7 +16,7 @@ from shapely.wkt import loads
 
 from .Results_class import Results
 from .Classes import (
-    AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC,
+    AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC, Gen_DC,
     Grid, Line_AC, Line_DC, Node_AC, Node_DC, Price_Zone, Ren_Source,
     Ren_source_zone, Size_selection, TF_Line_AC, TimeSeries,
 )
@@ -72,6 +72,7 @@ def initialize_pyflowacdc():
     Price_Zone.reset_class()
 
     Gen_AC.reset_class()
+    Gen_DC.reset_class()
     Ren_Source.reset_class()
 
 

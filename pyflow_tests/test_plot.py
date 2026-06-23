@@ -44,7 +44,7 @@ def _assign_manual_cables(grid):
 
 
 def _load_moray_grid():
-    return load_case_grid_and_geo("Moray_East", source_tag="gebco")
+    return load_case_grid_and_geo("moray_east", source_tag="gebco")
 
 
 def test_moray_east_assign_and_plot_outputs(tmp_path):

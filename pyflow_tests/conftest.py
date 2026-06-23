@@ -11,7 +11,7 @@ import pyflow_acdc as pyf
 def reset_pyflow_state():
     """Reset all element class counters/registries before each test.
 
-    The element classes (``Node_AC``, ``Line_AC``, ``AC_DC_converter``,
+    The element classes (``Node_AC``, ``Line_AC``, ``Gen_DC``, ``AC_DC_converter``,
     ``Price_Zone``, ``TimeSeries``, ...) keep class-level numbering and name
     registries. Without a reset these leak between tests running in the same
     pytest process, so we restore a clean slate before every test.
