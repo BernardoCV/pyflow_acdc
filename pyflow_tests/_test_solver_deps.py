@@ -1,4 +1,13 @@
-"""Shared dependency and solver checks for script-style case tests."""
+"""Shared dependency and solver checks for script-style case tests.
+
+``require_*()`` — for pytest ``test_*()`` functions; calls :func:`pytest.skip`.
+``*_missing_for_run_test()`` — for ``run_test()`` script entrypoints used by
+``run_tests.py``; prints a skip line and returns ``True`` so the runner exits
+quietly without an exception.
+
+Each optional dependency uses a private ``_*_available()`` helper shared by both
+entry points.
+"""
 
 import os
 
@@ -7,71 +16,98 @@ import pytest
 import pyflow_acdc as pyf
 
 
-def _missing_for_run_test(import_fn, skip_message):
+def _missing_for_run_test(available_fn, skip_message):
+    if available_fn():
+        return False
+    print(skip_message)
+    return True
+
+
+def _require(available_fn, skip_message):
+    if not available_fn():
+        pytest.skip(skip_message)
+
+
+def _pyomo_available():
     try:
-        import_fn()
+        __import__("pyomo")
     except Exception:
-        print(skip_message)
-        return True
-    return False
+        return False
+    return True
 
 
 def pyomo_missing_for_run_test():
     """Return True when pyomo is absent (``run_test`` should return early)."""
-    return _missing_for_run_test(
-        lambda: __import__("pyomo"),
-        "Skipped: pyomo is not installed",
-    )
+    return _missing_for_run_test(_pyomo_available, "Skipped: pyomo is not installed")
 
 
 def require_pyomo():
-    pytest.importorskip("pyomo")
+    _require(_pyomo_available, "pyomo is not installed")
+
+
+def _folium_available():
+    try:
+        __import__("folium")
+    except Exception:
+        return False
+    return True
 
 
 def folium_missing_for_run_test():
-    return _missing_for_run_test(
-        lambda: __import__("folium"),
-        "Skipped: folium is not installed",
-    )
+    return _missing_for_run_test(_folium_available, "Skipped: folium is not installed")
 
 
 def require_folium():
-    pytest.importorskip("folium")
+    _require(_folium_available, "folium is not installed")
+
+
+def _dash_available():
+    try:
+        __import__("dash")
+    except Exception:
+        return False
+    return True
 
 
 def dash_missing_for_run_test():
-    return _missing_for_run_test(
-        lambda: __import__("dash"),
-        "Skipped: dash is not installed",
-    )
+    return _missing_for_run_test(_dash_available, "Skipped: dash is not installed")
 
 
 def require_dash():
-    pytest.importorskip("dash")
+    _require(_dash_available, "dash is not installed")
+
+
+def _dill_available():
+    try:
+        __import__("dill")
+    except Exception:
+        return False
+    return True
 
 
 def dill_missing_for_run_test():
-    return _missing_for_run_test(
-        lambda: __import__("dill"),
-        "Skipped: dill is not installed",
-    )
+    return _missing_for_run_test(_dill_available, "Skipped: dill is not installed")
 
 
 def require_dill():
-    pytest.importorskip("dill")
+    _require(_dill_available, "dill is not installed")
 
 
-def ortools_missing_for_run_test():
+def _ortools_available():
     try:
         from ortools.sat.python import cp_model  # noqa: F401
     except Exception:
-        print("Skipped: OR-Tools is not installed")
-        return True
-    return False
+        return False
+    return True
+
+
+def ortools_missing_for_run_test():
+    """Return True when OR-Tools CP-SAT is absent (``run_test`` should return early)."""
+    return _missing_for_run_test(_ortools_available, "Skipped: OR-Tools is not installed")
 
 
 def require_ortools():
-    pytest.importorskip("ortools")
+    _require(_ortools_available, "OR-Tools is not installed")
 
 
 def tep_solver():

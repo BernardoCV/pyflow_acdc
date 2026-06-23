@@ -8,9 +8,7 @@ import pytest
 
 from pyflow_tests._test_solver_deps import (
     ortools_missing_for_run_test,
-    pyomo_missing_for_run_test,
     require_ortools,
-    require_pyomo,
     tep_solver,
 )
 
@@ -69,7 +67,6 @@ def run_case(mip_solver='ortools'):
 
 def test_sequential_array_ortools_alpha_ventus():
     require_ortools()
-    require_pyomo()
     (
         i, total_time, edges, substations, turbines, obj_value,
         path_time, css_time, summary_results, crossing, cable_length,
@@ -84,8 +81,6 @@ def test_sequential_array_ortools_alpha_ventus():
 
 def run_test():
     if ortools_missing_for_run_test():
-        return
-    if pyomo_missing_for_run_test():
         return
     (
         i, total_time, edges, substations, turbines, obj_value,
