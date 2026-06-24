@@ -80,6 +80,46 @@ def require_folium():
     _require(_folium_available, "folium is not installed")
 
 
+def _mapping_available():
+    return _folium_available() and hasattr(pyf, "plot_folium")
+
+
+def mapping_missing_for_run_test():
+    return _missing_for_run_test(
+        _mapping_available,
+        "Skipped: mapping extra not installed (pip install pyflow-acdc[mapping])",
+    )
+
+
+def require_mapping():
+    if not _mapping_available():
+        pytest.skip(
+            "mapping extra not installed (pip install pyflow-acdc[mapping])"
+        )
+
+
+def _pymoo_tep_available():
+    try:
+        __import__("pymoo")
+    except Exception:
+        return False
+    return hasattr(pyf, "transmission_expansion_pymoo")
+
+
+def pymoo_tep_missing_for_run_test():
+    return _missing_for_run_test(
+        _pymoo_tep_available,
+        "Skipped: TEP_pymoo extra not installed (pip install pyflow-acdc[TEP_pymoo])",
+    )
+
+
+def require_tep_pymoo():
+    _require(
+        _pymoo_tep_available,
+        "TEP_pymoo extra not installed (pip install pyflow-acdc[TEP_pymoo])",
+    )
+
+
 def _dash_available():
     try:
         __import__("dash")

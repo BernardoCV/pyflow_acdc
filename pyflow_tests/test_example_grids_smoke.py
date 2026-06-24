@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 import pyflow_acdc as pyf
 
+from pyflow_tests._test_solver_deps import require_mapping
+
 EXAMPLE_GRIDS_DIR = Path(pyf.__file__).resolve().parent / "example_grids"
 CASE_SUBDIRS = ("PF", "OPF", "TEP", "Wind_Array")
 
@@ -31,7 +33,8 @@ CASE_KWARGS = {
 }
 
 # Very large grids: excluded from the default parametrized run (~1 min each).
-SKIP_CASES = {"Texas7k_20210804"}
+# case118_TEP_benchmark needs mapping (create_geometries_from_coords).
+SKIP_CASES = {"Texas7k_20210804", "case118_TEP_benchmark"}
 
 
 def _discover_case_files():
@@ -93,6 +96,8 @@ def _assert_grid_result(case_name, result):
 
 def _run_case_factory(case_file):
     case_name = case_file.stem
+    if case_name == "case118_TEP_benchmark":
+        require_mapping()
     module = _load_module_from_path(case_file)
     factory = _pick_factory(module, case_name)
     kwargs = CASE_KWARGS.get(case_name, {})
