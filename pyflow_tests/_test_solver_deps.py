@@ -14,6 +14,9 @@ import os
 import pytest
 
 import pyflow_acdc as pyf
+from pyflow_acdc.constants import ORTOOLS_LINEAR_SOLVERS
+
+PYOMO_MIP_CSS_SOLVERS = ("gurobi", "glpk")
 
 
 def _missing_for_run_test(available_fn, skip_message):
@@ -110,6 +113,67 @@ def require_ortools():
     _require(_ortools_available, "OR-Tools is not installed")
 
 
+def pyomo_mip_css_solver_available():
+    """Return True when a Pyomo MIP/CSS-L solver (Gurobi or GLPK) is available."""
+    if not _pyomo_available():
+        return False
+    return any(pyf.is_pyomo_solver_available(name) for name in PYOMO_MIP_CSS_SOLVERS)
+
+
+def require_pyomo_mip_css_solvers():
+    """Skip unless Pyomo and at least one MIP/CSS-L solver are available."""
+    require_pyomo()
+    if not pyomo_mip_css_solver_available():
+        pytest.skip(
+            "no Pyomo MIP/CSS-L solver available (need gurobi or glpk)"
+        )
+
+
+def pyomo_mip_css_solvers_missing_for_run_test():
+    """Return True when Pyomo MIP/CSS-L solvers are absent (for ``run_test``)."""
+    if not _pyomo_available():
+        return False
+    if pyomo_mip_css_solver_available():
+        return False
+    print("No Pyomo MIP/CSS-L solver available (need gurobi or glpk)")
+    return True
+
+
+def _ortools_lp_solver_available():
+    if not _ortools_available():
+        return False
+    try:
+        from ortools.linear_solver import pywraplp
+    except Exception:
+        return False
+    for name in ORTOOLS_LINEAR_SOLVERS:
+        if pywraplp.Solver.CreateSolver(name) is not None:
+            return True
+    return False
+
+
+def ortools_array_stack_available():
+    """Return True when OR-Tools CP-SAT (MIP) and a linear CSS-L solver are available."""
+    return _ortools_available() and _ortools_lp_solver_available()
+
+
+def require_ortools_array_stack():
+    """Skip unless the full OR-Tools array stack (MIP + CSS-L) can solve."""
+    require_ortools()
+    if not _ortools_lp_solver_available():
+        pytest.skip("no OR-Tools linear CSS-L solver available")
+
+
+def ortools_array_stack_missing_for_run_test():
+    """Return True when the OR-Tools array solve stack is absent (for ``run_test``)."""
+    if not _ortools_available():
+        return False
+    if ortools_array_stack_available():
+        return False
+    print("No OR-Tools linear CSS-L solver available")
+    return True
+
+
 def tep_solver():
     """TEP solver for tests.
 
@@ -132,8 +196,12 @@ def mip_solvers():
     """Return ``(MIP_solver, CSS_L_solver)`` for :func:`sequential_CSS`."""
     if pyf.is_pyomo_solver_available("gurobi"):
         return "gurobi", "gurobi"
-    print("Gurobi is not available; falling back to glpk for MIP and CSS.")
-    return "glpk", "glpk"
+    if pyf.is_pyomo_solver_available("glpk"):
+        print("Gurobi is not available; falling back to glpk for MIP and CSS.")
+        return "glpk", "glpk"
+    raise RuntimeError(
+        "no Pyomo MIP/CSS-L solver available (need gurobi or glpk)"
+    )
 
 
 def lopf_solver():

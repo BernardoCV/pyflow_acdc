@@ -39,7 +39,18 @@ from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,export_acdc
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, NodeType, CssMode, MIPBackend, ObjComponent
+from .constants import (
+    HOURS_PER_YEAR,
+    DEFAULT_DISCOUNT_RATE,
+    DEFAULT_TIME_LIMIT,
+    present_value_factor,
+    NodeType,
+    CssMode,
+    MIPBackend,
+    ObjComponent,
+    CT_SELECTION_THRESHOLD,
+    ORTOOLS_LINEAR_SOLVERS,
+)
 
 
 __all__ = [
@@ -258,11 +269,19 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
         # Analyze which cable types were used in the optimization
         if css_ok:
             if CSS_L_solver == MIPBackend.ORTOOLS.value:
-                used_cable_types = sorted({
-                    line.active_config
-                    for line in grid.lines_AC_ct
-                    if line.active_config >= 0
-                })
+                ac_vars = model_results.get('ac_vars') if model_results else None
+                if ac_vars and 'ct_types' in ac_vars:
+                    used_cable_types = sorted([
+                        ct for ct in ac_vars['ct_types']
+                        if ac_vars['ct_types'][ct].solution_value()
+                        >= CT_SELECTION_THRESHOLD
+                    ])
+                else:
+                    used_cable_types = sorted({
+                        line.active_config
+                        for line in grid.lines_AC_ct
+                        if line.active_config >= 0
+                    })
                 used_cable_names = [
                     grid.Cable_options[0].cable_types[ct] for ct in used_cable_types
                 ]
@@ -634,8 +653,10 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     ----------
     backend : str, optional
         Backend to use: 'pyomo' (default) or 'ortools'
-        - 'pyomo': Uses Pyomo with external solver (GLPK, Gurobi, etc.)
-        - 'ortools': Uses OR-Tools CP-SAT solver (built-in, faster)
+        - 'pyomo': Pyomo model solved by ``solver_name`` (Gurobi, GLPK, etc.)
+        - 'ortools': OR-Tools CP-SAT path MIP by default; if ``solver_name``
+          is one of :data:`~pyflow_acdc.constants.ORTOOLS_LINEAR_SOLVERS`
+          (GUROBI / SCIP / CBC), falls back to the Pyomo path with that solver
     enable_cable_types : bool
         If True, solve route + cable size selection in one MIP; if False,
         route only (cable sizing is done separately by ``wind_farm_CSS``).
@@ -674,6 +695,33 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
     # Route to appropriate backend
     if backend.lower() == MIPBackend.ORTOOLS.value:
+        linear_solver = (solver_name or '').upper()
+        if linear_solver in ORTOOLS_LINEAR_SOLVERS:
+            if tee:
+                print(
+                    f"Path MIP: OR-Tools linear solver '{solver_name}' requested; "
+                    f"using Pyomo path with solver '{solver_name.lower()}'."
+                )
+            return MIP_path_graph(
+                grid,
+                max_flow=max_flow,
+                solver_name=solver_name.lower(),
+                crossings=crossings,
+                tee=tee,
+                callback=callback,
+                MIP_gap=MIP_gap,
+                backend=MIPBackend.PYOMO.value,
+                enable_cable_types=enable_cable_types,
+                t_MW=t_MW,
+                cab_types_allowed=cab_types_allowed,
+                min_turbines_per_string=min_turbines_per_string,
+                fixed_substation_connections=fixed_substation_connections,
+                min_sub_connections=min_sub_connections,
+                sub_k_max=sub_k_max,
+                mip_cfg=mip_cfg,
+                flow_dir_tightening=flow_dir_tightening,
+                solver_options_override=solver_options_override,
+            )
         if not ORTOOLS_AVAILABLE:
             raise ImportError(
                 "OR-Tools is not installed. Please install it with: pip install ortools\n"
@@ -687,7 +735,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                       min_turbines_per_string=min_turbines_per_string,
                                       fixed_substation_connections=fixed_substation_connections,
                                       min_sub_connections=min_sub_connections,
-                                      sub_k_max=sub_k_max)
+                                      sub_k_max=sub_k_max,
+                                      flow_dir_tightening=flow_dir_tightening)
     elif backend.lower() != MIPBackend.PYOMO.value:
         raise ValueError(f"Unknown backend: {backend}. Must be '{MIPBackend.PYOMO.value}' or '{MIPBackend.ORTOOLS.value}'")
 
@@ -1558,7 +1607,9 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS = _prepare_capacity_and_min_turbines(
         grid, max_flow=max_flow, min_turbines_per_string=min_turbines_per_string,
         enable_cable_types=enable_cable_types, t_MW=t_MW, num_nodes=num_nodes,
-        fixed_substation_connections=fixed_substation_connections
+        fixed_substation_connections=fixed_substation_connections,
+        min_sub_connections=min_sub_connections,
+        sub_k_max=sub_k_max,
     )
 
     # Update max_flow for consistency (used later in the function)
@@ -1586,16 +1637,13 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     nT = num_nodes - len(sink_nodes)
     nS = len(sink_nodes)
 
-    # Minimum connections for sink nodes (same formula as Pyomo version)
-    # If fixed_substation_connections is set, use that; otherwise calculate based on capacity
+    # Minimum connections for sink nodes (match Pyomo connections_rule_lower)
     if fixed_substation_connections is not None:
         min_connections_per_sink = fixed_substation_connections
+    elif enable_cable_types:
+        min_connections_per_sink = math.ceil(nT / (nS * max_ct_flow))
     else:
-        # Calculate based on capacity - use max_ct_flow (already calculated above)
-        if nS > 0:
-            min_connections_per_sink = math.ceil(nT / (nS * max_ct_flow))
-        else:
-            raise ValueError("No substations found!")
+        min_connections_per_sink = math.ceil(nT / (nS * max_flow))
 
     # --------------------
     # Precompute line incidence and bounds
@@ -1623,8 +1671,8 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
         # Bounds depend on slack nodes (substations)
         # Note: substations are always toNode, so to_is_slack is true for substation-turbine edges
         # Bounds allow 0 (when line not used) and constraints enforce min_turbines_per_string when used
-        from_is_slack = getattr(from_node, "type", None) == "Slack"
-        to_is_slack = getattr(to_node, "type", None) == "Slack"
+        from_is_slack = getattr(from_node, "type", None) == NodeType.SLACK
+        to_is_slack = getattr(to_node, "type", None) == NodeType.SLACK
 
         if to_is_slack and not from_is_slack:
             lb, ub = 0, max_flow  # Allow 0 when line_used=0, constraint enforces min when used
@@ -1653,8 +1701,8 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
             line_obj = grid.lines_AC_ct[l]
             from_node = line_obj.fromNode
             to_node = line_obj.toNode
-            from_is_slack = getattr(from_node, "type", None) == "Slack"
-            to_is_slack = getattr(to_node, "type", None) == "Slack"
+            from_is_slack = getattr(from_node, "type", None) == NodeType.SLACK
+            to_is_slack = getattr(to_node, "type", None) == NodeType.SLACK
 
             if to_is_slack and not from_is_slack:
                 line_lb[l], line_ub[l] = 0, max_ct_flow
@@ -1784,6 +1832,16 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
             sum(node_flow_expr[n] for n in sink_nodes) == -len(source_nodes)
         )
 
+    # Per-substation absorption cap (pu turbines per connection), if configured
+    for n in sink_nodes:
+        pu_limit = grid.nodes_AC[n].pu_power_limit
+        if pu_limit is None:
+            continue
+        if isinstance(pu_limit, (int, float)) and (
+                math.isnan(pu_limit) or not math.isfinite(pu_limit)):
+            continue
+        model.Add(node_flow_expr[n] >= -pu_limit)
+
     # --------------------
     # Link flow to investment: |line_flow| <= capacity * line_used
     # If cable types enabled, use selected cable type capacity
@@ -1835,15 +1893,19 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
 
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
-            to_is_slack = getattr(line_obj.toNode, "type", None) == "Slack"
+            to_is_slack = getattr(line_obj.toNode, "type", None) == NodeType.SLACK
             min_flow = min_turbines_per_string if to_is_slack else 1
-            model.Add(line_flow[l] >= (min_flow - 2*M) + M*line_flow_dir[l] + M*line_used[l])
+            model.Add(
+                line_flow[l]
+                >= min_flow - M * (1 - line_used[l]) - M * (1 - line_flow_dir[l]))
 
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
-            from_is_slack = getattr(line_obj.fromNode, "type", None) == "Slack"
+            from_is_slack = getattr(line_obj.fromNode, "type", None) == NodeType.SLACK
             min_flow = min_turbines_per_string if from_is_slack else 1
-            model.Add(line_flow[l] <= (-min_flow + M) - M*line_used[l] + M*line_flow_dir[l])
+            model.Add(
+                line_flow[l]
+                <= -min_flow + M * (1 - line_used[l]) + M * line_flow_dir[l])
 
         for l in lines:
             model.Add(line_flow_dir[l] <= line_used[l])

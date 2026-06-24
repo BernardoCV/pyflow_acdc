@@ -103,6 +103,10 @@ class MIPBackend(str, Enum):
     ORTOOLS = 'ortools'
 
 
+# OR-Tools ``linear_solver`` backends (CSS MILP and optional Pyomo path-MIP fallback).
+ORTOOLS_LINEAR_SOLVERS = ('GUROBI', 'SCIP', 'CBC')
+
+
 class PricingStrategy(str, Enum):
     """How an `MTDCPrice_Zone` derives its price from linked price zones."""
     MIN = 'min'

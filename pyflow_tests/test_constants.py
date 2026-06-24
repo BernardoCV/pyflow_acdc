@@ -186,12 +186,16 @@ ALL_CASES = [
     "test_array_sizing.py",
     "test_sequential_array.py",
     "test_sequential_array_ortools.py",
+    "test_unified_array_pyomo.py",
+    "test_unified_array_ortools.py",
 ]
 
 ARRAY_CASES = [
     "test_array_sizing.py",
     "test_sequential_array.py",
     "test_sequential_array_ortools.py",
+    "test_unified_array_pyomo.py",
+    "test_unified_array_ortools.py",
 ]
 
 OPF_CASES = [

@@ -17,15 +17,21 @@ __all__ = ['optimal_l_css_ortools']
 
 from .ACDC_OPF import obj_w_rule, calculate_objective, get_gen_p_min_eff
 from .grid_analysis import analyse_grid
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, ObjComponent
+from .constants import (
+    HOURS_PER_YEAR,
+    DEFAULT_DISCOUNT_RATE,
+    DEFAULT_TIME_LIMIT,
+    present_value_factor,
+    ObjComponent,
+    CT_SELECTION_THRESHOLD,
+    ORTOOLS_LINEAR_SOLVERS,
+)
 
 try:
     from ortools.linear_solver import pywraplp
     ORTOOLS_LP_AVAILABLE = True
 except ImportError:
     ORTOOLS_LP_AVAILABLE = False
-
-ORTOOLS_CSS_SOLVERS = ('GUROBI', 'SCIP', 'CBC')
 
 
 # ── Main entry point ────────────────────────────────────────────────────────
@@ -56,7 +62,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
         Solver time limit in seconds.
     solver_name : str or None, optional
         OR-Tools MILP backend (e.g. ``'GUROBI'``, ``'SCIP'``, ``'CBC'``).
-        ``None`` tries :data:`ORTOOLS_CSS_SOLVERS` in order.
+        ``None`` tries :data:`~pyflow_acdc.constants.ORTOOLS_LINEAR_SOLVERS` in order.
 
     Returns
     -------
@@ -83,7 +89,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
     t_modelcreate = 0.0
     t3 = time.perf_counter()
 
-    for try_name in ((solver_name,) if solver_name else ORTOOLS_CSS_SOLVERS):
+    for try_name in ((solver_name,) if solver_name else ORTOOLS_LINEAR_SOLVERS):
         solver = pywraplp.Solver.CreateSolver(try_name)
         if solver is None:
             continue
@@ -106,7 +112,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
 
     t4 = time.perf_counter()
     if solver is None or model_res is None:
-        tried = (solver_name,) if solver_name else ORTOOLS_CSS_SOLVERS
+        tried = (solver_name,) if solver_name else ORTOOLS_LINEAR_SOLVERS
         raise RuntimeError(
             f"Could not create any OR-Tools MILP solver (tried: {', '.join(tried)})"
         )
@@ -612,7 +618,8 @@ def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
     # CT lines
     for line in grid.lines_AC_ct:
         ct_selected = [
-            ac_vars['ct_branch'][line.lineNumber, ct].solution_value() >= 0.9
+            ac_vars['ct_branch'][line.lineNumber, ct].solution_value()
+            >= CT_SELECTION_THRESHOLD
             for ct in cab_types_set]
         if any(ct_selected):
             sel_i = int(np.where(ct_selected)[0][0])
@@ -629,6 +636,11 @@ def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
         line.loss = 0
         line.P_loss = 0
         line.network_flow = 0.0
+
+    grid.Cable_options[0].active_config = {
+        ct: ac_vars['ct_types'][ct].solution_value()
+        for ct in ac_vars['ct_types']
+    }
 
     # Standard AC lines
     Theta = grid.Theta_V_AC
@@ -647,8 +659,9 @@ def export_acdc_l_model_to_pyflow_acdc_ortools(solver, grid, gen_vars, ac_vars,
         line.i_from = abs(P_ij)
         line.i_to = abs(P_ji)
 
-    # Fix oversizing if solver hit time limit
-    if time_limit is not None and solver.wall_time() >= time_limit * 0.99:
+    # Fix oversizing if solver hit time limit (wall_time is milliseconds)
+    if (time_limit is not None
+            and solver.wall_time() >= int(time_limit * 1000 * 0.99)):
         try:
             from .AC_OPF_L_model import (analyze_oversizing_issues_grid,
                                           apply_oversizing_fixes_grid)
