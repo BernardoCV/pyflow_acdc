@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import logging
 import itertools
-import base64
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import os

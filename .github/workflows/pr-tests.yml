@@ -31,9 +31,8 @@ jobs:
         run: pyflow-acdc-test --quick
 
   lint:
-    name: Ruff lint (non-blocking)
+    name: Ruff lint
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4

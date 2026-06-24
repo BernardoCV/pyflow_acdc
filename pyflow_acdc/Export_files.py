@@ -9,7 +9,6 @@ Does not own: the in-memory data model (see ``Classes``).
 """
 
 import numpy as np
-import pandas as pd
 import os
 from .Classes import MTDCPrice_Zone, OffshorePrice_Zone
 from .constants import (
@@ -21,7 +20,6 @@ from .constants import (
     PriceZoneCategory,
 )
 
-import os
 import pickle
 import gzip
 

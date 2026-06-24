@@ -5,7 +5,6 @@ Created on Thu Oct 24 09:06:32 2024
 @author: BernardoCastro
 """
 
-import sys
 import networkx as nx
 import pandas as pd
 import numpy as np
@@ -32,7 +31,7 @@ from .constants import (
     DEFAULT_RENEWABLE_TYPES,
     DEFAULT_GEN_TYPE,
 )
-from .grid_analysis import pol2cart, cart2pol, pol2cartz, cartz2pol
+from .grid_analysis import pol2cartz, cartz2pol
 
 __all__ = [
     'Grid',

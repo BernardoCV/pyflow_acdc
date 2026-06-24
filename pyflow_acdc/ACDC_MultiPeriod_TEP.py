@@ -3,12 +3,11 @@ import pyomo.environ as pyo
 import pandas as pd
 import time
 import math
-from concurrent.futures import ThreadPoolExecutor
 import os
 import copy
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables,export_acdc_nl_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective,calculate_objective_from_model,optimal_pf
+from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective_from_model,optimal_pf
 from .ACDC_Static_TEP import (
     get_TEP_variables,
     _initialize_MS_STEP_sets_model,

@@ -12,7 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from .grid_analysis import analyse_grid
-from .constants import HOURS_PER_YEAR, CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, TSType, TS_RENEWABLE_TYPES
+from .constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, TSType, TS_RENEWABLE_TYPES
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
 from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
@@ -1948,8 +1948,6 @@ def get_price_zone_data(t, model, grid,n_clusters,clustering):
         row_data_price[m.name] = np.round(np.float64(pyo.value(model.scenario_model[t].price_zone_price[nM])), decimals=2)
 
         from .Classes import Price_Zone
-        from .Classes import MTDCPrice_Zone
-        from .Classes import OffshorePrice_Zone
         gen=0
         for node in m.nodes_AC:
             nAC=node.nodeNumber

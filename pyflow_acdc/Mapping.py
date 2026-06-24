@@ -10,7 +10,6 @@ import networkx as nx
 import numpy as np
 import os
 from datetime import datetime, timedelta
-from pathlib import Path
 from importlib import resources
 import colorsys
 

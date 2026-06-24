@@ -4,7 +4,6 @@ AC/DC Power Flow calculations module.
 Provides functions for AC and AC/DC power flow analysis.
 """
 import numpy as np
-import sys
 import warnings
 import time
 from .grid_analysis import analyse_grid, pol2cartz, cartz2pol

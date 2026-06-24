@@ -1180,7 +1180,7 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
         #        min_turbines_per_string * min_s_conn <= nT
         #   2) Total capacity must be able to host all turbines:
         #        max_ct_flow * max_s_conn >= nT
-        max_s_conn = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
+        max_s_conn = sum(node.ct_limit for node in slack_nodes_with_limit)
         min_s_conn = math.ceil(nT / (nS * min_ct_flow))
 
         # Condition 1: lower bound from min_turbines_per_string

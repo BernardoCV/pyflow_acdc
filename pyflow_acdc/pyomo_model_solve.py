@@ -30,10 +30,8 @@ def log_infeasible_constraints_limited(model, max_per_type=5):
     """
     Custom function to check and display infeasible constraints with limited output.
     """
-    import logging
     from pyomo.core import Constraint
     from collections import defaultdict
-    import numpy as np
 
     print("=" * 80)
     print("INFEASIBLE CONSTRAINTS SUMMARY")
@@ -1163,7 +1161,6 @@ def export_solver_progress_to_excel(solver_stats, save_path):
     - is_feasible_all, inf_pr_all, inf_du_all (from all_solutions when available, e.g. IPOPT)
     - kkt_inf_du_feasible (inf_du only where is_feasible_all is True)
     """
-    import pandas as pd
     # all_solutions base format: [time_sec, objective, cumulative_iterations, nlp_call_num, is_feasible]
     # optional extra fields by solver:
     # - IPOPT: [time, objective, iter, iter, is_feasible, inf_pr, inf_du]

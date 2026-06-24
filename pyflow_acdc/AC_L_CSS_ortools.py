@@ -228,7 +228,6 @@ def opf_create_l_model_ac_ortools(solver, grid):
 
 def Generation_variables_ortools(solver, grid, gen_info):
     """Create generation decision variables."""
-    from .ACDC_OPF import get_gen_p_min_eff
 
     gen_AC_info, _, gen_rs_info = gen_info
     P_renSource, np_rsgen, lista_rs = gen_rs_info
