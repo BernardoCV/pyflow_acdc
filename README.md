@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/github/license/CITCEA-UPC/pyflow_acdc)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/LICENSE)
 [![PR tests](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml)
 [![Test coverage](https://img.shields.io/badge/coverage-67%25-yellow)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/TEST_COVERAGE.md)
+[![codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc/graph/badge.svg)](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
 [![Documentation Status](https://readthedocs.org/projects/pyflow-acdc/badge/?version=latest)](https://pyflow-acdc.readthedocs.io/en/latest/)
 
 A python-based tool for the design and analysis of hybrid AC/DC grids
@@ -254,8 +255,12 @@ pip install -e ".[tests]"
 pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
 ```
 
-See [`TEST_COVERAGE.md`](TEST_COVERAGE.md) for the current overall % and per-module gaps.
-Update that file and the coverage badge in this README when tests change materially.
+CI uploads coverage to [Codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc) on each
+push/PR to `main` (requires the `CODECOV_TOKEN` repository secret).
+
+See [`TEST_COVERAGE.md`](TEST_COVERAGE.md) for a maintained per-module snapshot and
+function-level gaps. Update that file and the **Test coverage** badge above when tests
+change materially (keep the badge % in sync with the snapshot header).
 ## Documentation
 Online documentation can be found at:
 

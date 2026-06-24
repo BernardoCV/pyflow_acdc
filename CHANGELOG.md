@@ -12,6 +12,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
+  ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets).
 - **`pyomo_model_solve.py`**: extracted generic Pyomo solve layer from
   `ACDC_OPF.py` (`pyomo_model_solve`, log parsers, feasibility checks,
   `reset_to_initialize`, `export_solver_progress_to_excel`). `ACDC_OPF` re-exports

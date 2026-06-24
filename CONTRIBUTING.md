@@ -50,7 +50,11 @@ the case module.
 
 ## Test coverage
 
-The package maintains a coverage snapshot in [`TEST_COVERAGE.md`](TEST_COVERAGE.md)
+CI uploads pytest coverage to [Codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
+on each push/PR to `main` (`.github/workflows/pr-tests.yml`, `coverage` job).
+The repository must have a `CODECOV_TOKEN` Actions secret.
+
+The package also maintains a coverage snapshot in [`TEST_COVERAGE.md`](TEST_COVERAGE.md)
 (overall %, per-module miss counts, missing lines, and public API functions
 without dedicated tests).
 
