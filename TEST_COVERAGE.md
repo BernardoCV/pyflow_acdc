@@ -39,7 +39,7 @@ Sorted by miss count (core package only; `example_grids/` omitted unless noted).
 | `AC_OPF_L_model.py` | 38% | 423 | Indirect (OPF / LOPF cases) |
 | `ACDC_MultiPeriod_TEP.py` | 69% | 436 | Partial (MP solve; MP+MS build-only) |
 | `Results_class.py` | 60% | 758 | Indirect (`res.all()` in case tests) |
-| `Graph_Dash.py` | 10% | 265 | Smoke (`test_docs_dash`) |
+| `Graph_Dash.py` | ~72% | 82 | **`test_graph_dash`** (synthetic TS; no server) + smoke (`test_docs_dash`) |
 | `Export_files.py` | 38% | 167 | Indirect (export flags rare in CI) |
 | `Market_Coeff.py` | 63% | 143 | Partial (`test_market_coeff`) |
 | `solver_utils.py` | 81% | 23 | `test_solver_utils` (mocked) |
@@ -57,7 +57,8 @@ when they account for large uncovered blocks.
 |--------|-------------|--------|-------------------|
 | `Market_Coeff` | `clean_entsoe_data` | **Not tested** | Needs ENTSO-E CSV tree on disk |
 | `Market_Coeff` | `compute_hour_of_year` | **Not tested** | Synthetic ENTSO-E-shaped DataFrame |
-| `Graph_Dash` | `run_ts_dash`, `run_mp_ts_dash`, `create_mp_ts_dash`, … | Smoke only | Dash UI; `test_docs_dash` scratches surface |
+| `Graph_Dash` | `run_ts_dash`, `run_mp_ts_dash` (server) | **Not tested** | `app.run()` blocks; use layout/callback unit tests |
+| `Graph_Dash` | `plot_TS_res_from_ts`, `create_dash_app`, `create_mp_ts_dash` | **Tested** | `test_graph_dash` (synthetic data, callbacks via `__wrapped__`) |
 | `Time_series_clustering` | `run_elbow_analysis`, `Time_series_cluster_relationship` | **Not tested** | Elbow / relationship workflows |
 | `Time_series_clustering` | `run_clustering_analysis_and_plot` | **Not tested** | Plotting + analysis wrapper |
 | `Time_series_clustering` | `cluster_Ward`, `cluster_PAM_Hierarchical` | **Not tested** | Doc example with `cluster_algorithm='ward'` |
@@ -216,7 +217,7 @@ OPF orchestration, objectives, and result helpers. Solver infrastructure moved t
 
 ### Other modules (missing lines only)
 
-**`Graph_Dash.py` 10%:** `47-87, 91, 105-201, 206, 360-362, 373-385, 396-416, 435-447, 453-454, 459-460, 476-503, 516-875, 879-880` — almost entire module; Dash callbacks **not tested**.
+**`Graph_Dash.py` ~72%:** remaining gaps — `run_ts_dash` / `run_mp_ts_dash` / `run_dash` auto-routing success paths (call `app.run`), `update_limits` callback, MP compare-mode subplot tail (821–873).
 
 **`Export_files.py` 38%:** `31-32, 51, 79-90, 102, 111, 134-138, 155-167, 250, 300-316, 330-332, 359-362, 422-444, 486-495, 517, 526-740, 752-845` — Excel export paths; partial via TEP/MP `export` flags.
 

@@ -21,7 +21,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   change tests must update it (see `CONTRIBUTING.md`).
 - **Tests**: `test_solver_utils.py` (mocked Pyomo/OR-Tools solver probes),
   `test_opf_result_helpers.py` (OPF result helpers after Ipopt solve),
-  `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`).
+  `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`),
+  `test_graph_dash.py` (synthetic TS + Dash callback unit tests).
 - **`ipopt_available` / `require_ipopt`** helpers in `pyflow_tests/_test_solver_deps.py`.
 
 ## [0.6.0] - 2026-06-16
