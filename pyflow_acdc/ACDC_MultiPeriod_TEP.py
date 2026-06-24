@@ -3,16 +3,23 @@ import pyomo.environ as pyo
 import pandas as pd
 import time
 import math
-from concurrent.futures import ThreadPoolExecutor
 import os
+import copy
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables,ExportACDC_NLmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,obj_w_rule,calculate_objective,calculate_objective_from_model,Optimal_PF
-from .ACDC_Static_TEP import get_TEP_variables,_initialize_MS_STEP_sets_model,create_scenarios
+from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables,export_acdc_nl_model_to_pyflow_acdc
+from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective_from_model,optimal_pf
+from .ACDC_Static_TEP import (
+    get_TEP_variables,
+    _initialize_MS_STEP_sets_model,
+    identify_standalone_rs_conv_pairs,
+    update_grid_scenario_frame,
+    export_acdc_tep_ms_to_pyflow_acdc,
+)
 from .grid_analysis import analyse_grid, current_fuel_type_distribution
-from .Time_series import _modify_parameters
-from .Graph_and_plot import save_network_svg, create_geometries
+from .Time_series import _modify_parameters, ts_acdc_opf, results_ts_opf
+from .Graph_and_plot import save_network_svg, create_geometries_from_layout
 from .Results_class import Results
+from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, PF_INNER_TOLERANCE, present_value_factor
 
 
 
@@ -22,11 +29,17 @@ __all__ = [
     'save_MP_TEP_period_svgs',
     'export_and_save_inv_period_svgs',
     'run_opf_for_investment_period',
+    'run_ts_opf_for_investment_period',
     'run_opf_for_all_investment_periods',
 ]
 
-def pack_variables(*args):
-    return args
+
+def _snapshot_ts_results(grid):
+    """Deep-copy TS DataFrames from grid after TS_ACDC_OPF (for Dash / comparisons)."""
+    return {
+        'time_series_results': copy.deepcopy(grid.time_series_results),
+        'S_base': float(getattr(grid, 'S_base', 100.0)),
+    }
 
 def _inv_decision(element, key):
     return element.investment_decisions[key]
@@ -40,7 +53,7 @@ def _fill_investment_decisions(grid):
     - Length-1 series are treated as defaults and broadcast to the target length.
     - Empty series are invalid and raise an error.
     """
-    
+
     def _iter_elements():
         for element in grid.Price_Zones:
             yield element
@@ -106,6 +119,17 @@ def _fill_investment_decisions(grid):
             )
         return values_list
 
+    def _dynamic_max_cap(element):
+        if hasattr(element, "np_gen_max"):
+            return float(element.np_gen_max)
+        if hasattr(element, "np_rsgen_max"):
+            return float(element.np_rsgen_max)
+        if hasattr(element, "np_line_max"):
+            return float(element.np_line_max)
+        if hasattr(element, "np_conv_max"):
+            return float(element.np_conv_max)
+        return None
+
     # Normalize object-owned investment decisions.
     for element in _iter_elements():
         for key, values in list(element.investment_decisions.items()):
@@ -113,15 +137,27 @@ def _fill_investment_decisions(grid):
                 values,
                 f"{element.name}:{key}"
             )
+
+        # Keep per-period investment caps consistent with static max stock.
+        cap = _dynamic_max_cap(element)
+        if cap is not None:
+            max_inv = [float(v) for v in element.investment_decisions["max_inv"]]
+            element.investment_decisions["max_inv"] = [min(v, cap) for v in max_inv]
     return target_len
 
 def _update_grid_investment_period(grid, i):
     idx = i
 
+    def _inv_at(inv, key, period_idx, fallback):
+        series = inv.get(key)
+        if isinstance(series, (list, tuple)) and period_idx < len(series):
+            return series[period_idx]
+        return fallback
+
     for price_zone in grid.Price_Zones:
         inv = price_zone.investment_decisions
         price_zone.PLi_inv_factor = inv['Load'][idx]
-        price_zone.elasticity = inv['elasticity'][idx]
+        price_zone.curvature_factor = inv['curvature_factor'][idx]
         price_zone.import_expand = inv['import_expand'][idx]
 
     for node in grid.nodes_AC:
@@ -136,6 +172,10 @@ def _update_grid_investment_period(grid, i):
         inv = node.investment_decisions
         node.PLi_inv_factor = inv['Load'][idx]
 
+    for element in grid.Generators + grid.RenSources + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC:
+        inv = element.investment_decisions
+        element.lambda_capex = _inv_at(inv, 'lambda_capex', idx, element.lambda_capex)
+
 
 def _MP_TEP_constraints(model,grid):
     if grid.rs_GPR:
@@ -145,12 +185,12 @@ def _MP_TEP_constraints(model,grid):
 
         def MP_rsgen_decomision(model,rs,i):
             ren_source = grid.RenSources[rs]
-            planned_decomision = _inv_decision(ren_source, 'planned_decomision')[i]
+            planned_decommission = _inv_decision(ren_source, 'planned_decommission')[i]
             decomision_period = ren_source.decomision_period
             if i < decomision_period:
-                return model.decomision_rsgen[rs,i] == planned_decomision
+                return model.decomision_rsgen[rs,i] == planned_decommission
             else:
-                return model.decomision_rsgen[rs,i] == planned_decomision + model.installed_rsgen[rs,i-decomision_period]
+                return model.decomision_rsgen[rs,i] == planned_decommission + model.installed_rsgen[rs,i-decomision_period]
         model.MP_rsgen_decomision_constraint = pyo.Constraint(model.ren_sources,model.inv_periods,rule=MP_rsgen_decomision)
 
         def MP_rsgen_installation(model,rs,i):
@@ -171,12 +211,12 @@ def _MP_TEP_constraints(model,grid):
 
         def MP_gen_decomision(model,g,i):
             gen = grid.Generators[g]
-            planned_decomision = _inv_decision(gen, 'planned_decomision')[i]
+            planned_decommission = _inv_decision(gen, 'planned_decommission')[i]
             decomision_period = gen.decomision_period
             if i < decomision_period:
-                return model.decomision_gen[g,i] == planned_decomision
+                return model.decomision_gen[g,i] == planned_decommission
             else:
-                return model.decomision_gen[g,i] == planned_decomision + model.installed_gen[g,i-decomision_period]
+                return model.decomision_gen[g,i] == planned_decommission + model.installed_gen[g,i-decomision_period]
         model.MP_gen_decomision_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_decomision)
 
         def MP_gen_installation(model,g,i):
@@ -188,7 +228,7 @@ def _MP_TEP_constraints(model,grid):
                 return model.np_gen[g,i] == model.installed_gen[g,i]+model.np_gen_base[g]
             else:
                 return model.np_gen[g,i] == model.installed_gen[g,i]+model.np_gen[g,i-1]-model.decomision_gen[g,i]
-            
+
         model.MP_gen_installed_constraint = pyo.Constraint(model.gen_AC,model.inv_periods,rule=MP_gen_installed)
 
     if grid.ACmode:
@@ -199,12 +239,12 @@ def _MP_TEP_constraints(model,grid):
 
             def MP_AC_line_decomision(model, l, i):
                 line = grid.lines_AC_exp[l]
-                planned_decomision = _inv_decision(line, 'planned_decomision')[i]
+                planned_decommission = _inv_decision(line, 'planned_decommission')[i]
                 decomision_period = line.decomision_period
                 if i < decomision_period:
-                    return model.decomision_ACline[l,i] == planned_decomision
+                    return model.decomision_ACline[l,i] == planned_decommission
                 else:
-                    return model.decomision_ACline[l,i] == planned_decomision + model.installed_ACline[l,i-decomision_period]
+                    return model.decomision_ACline[l,i] == planned_decommission + model.installed_ACline[l,i-decomision_period]
             model.MP_AC_line_decomision_constraint = pyo.Constraint(model.lines_AC_exp, model.inv_periods, rule=MP_AC_line_decomision)
 
             def MP_AC_line_installation(model, l, i):
@@ -225,12 +265,12 @@ def _MP_TEP_constraints(model,grid):
 
         def MP_DC_line_decomision(model, l, i):
             line = grid.lines_DC[l]
-            planned_decomision = _inv_decision(line, 'planned_decomision')[i]
+            planned_decommission = _inv_decision(line, 'planned_decommission')[i]
             decomision_period = line.decomision_period
             if i < decomision_period:
-                return model.decomision_DCline[l,i] == planned_decomision
+                return model.decomision_DCline[l,i] == planned_decommission
             else:
-                return model.decomision_DCline[l,i] == planned_decomision + model.installed_DCline[l,i-decomision_period]
+                return model.decomision_DCline[l,i] == planned_decommission + model.installed_DCline[l,i-decomision_period]
         model.MP_DC_line_decomision_constraint = pyo.Constraint(model.lines_DC, model.inv_periods, rule=MP_DC_line_decomision)
 
         def MP_DC_line_installation(model, l, i):
@@ -251,12 +291,12 @@ def _MP_TEP_constraints(model,grid):
 
         def MP_Conv_decomision(model, c, i):
             conv = grid.Converters_ACDC[c]
-            planned_decomision = _inv_decision(conv, 'planned_decomision')[i]
+            planned_decommission = _inv_decision(conv, 'planned_decommission')[i]
             decomision_period = conv.decomision_period
             if i < decomision_period:
-                return model.decomision_Conv[c,i] == planned_decomision
+                return model.decomision_Conv[c,i] == planned_decommission
             else:
-                return model.decomision_Conv[c,i] == planned_decomision + model.installed_Conv[c,i-decomision_period]
+                return model.decomision_Conv[c,i] == planned_decommission + model.installed_Conv[c,i-decomision_period]
         model.MP_Conv_decomision_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_decomision)
 
         def MP_Conv_installation(model, c, i):
@@ -269,6 +309,98 @@ def _MP_TEP_constraints(model,grid):
             else:
                 return model.ConvMP[c,i] == model.installed_Conv[c,i] + model.ConvMP[c,i-1] - model.decomision_Conv[c,i]
         model.MP_Conv_installed_constraint = pyo.Constraint(model.conv, model.inv_periods, rule=MP_Conv_installed)
+
+    if grid.enable_conv_wind_min_constraint and grid.rs_GPR and grid.ACmode and grid.DCmode:
+        ratio = float(grid.conv_wind_min_ratio)
+        if ratio < 0:
+            raise ValueError("conv_wind_min_ratio must be non-negative.")
+
+        def MP_standalone_conv_wind_min(model, rs, c, i):
+            ren_source = grid.RenSources[rs]
+            conv = grid.Converters_ACDC[c]
+            rs_capacity = ren_source.Max_S
+            conv_capacity = conv.MVA_max / grid.S_base
+            if rs_capacity <= 0:
+                raise ValueError(
+                    f"RenSource '{ren_source.name}' has non-positive Max_S={rs_capacity}"
+                )
+            if conv_capacity <= 0:
+                raise ValueError(
+                    f"Converter '{conv.name}' has non-positive MVA_max={conv_capacity}"
+                )
+            return model.ConvMP[c, i] * conv_capacity >= ratio * model.np_rsgen[rs, i] * rs_capacity
+
+        model.MP_standalone_conv_wind_min_constraint = pyo.Constraint(
+            model.standalone_rs_conv_pairs,
+            model.inv_periods,
+            rule=MP_standalone_conv_wind_min,
+        )
+
+    if grid.enable_conv_dcline_ratio_constraint and grid.ACmode and grid.DCmode:
+        conv_with_single_dc = []
+        conv_with_multi_dc = []
+        single_line_by_conv = {}
+        dc_lines_by_conv = {}
+        for c in model.conv:
+            conv = grid.Converters_ACDC[c]
+            connected = []
+            for l in model.lines_DC:
+                line = grid.lines_DC[l]
+                if line.fromNode == conv.Node_DC or line.toNode == conv.Node_DC:
+                    connected.append(l)
+            if len(connected) == 1:
+                conv_with_single_dc.append(c)
+                single_line_by_conv[c] = connected[0]
+            elif len(connected) > 1:
+                conv_with_multi_dc.append(c)
+                dc_lines_by_conv[c] = tuple(connected)
+
+        model.conv_with_single_dc_link = pyo.Set(initialize=conv_with_single_dc)
+        model.conv_with_multi_dc_links = pyo.Set(initialize=conv_with_multi_dc)
+
+        def _conv_capacity_pu(c):
+            conv = grid.Converters_ACDC[c]
+            conv_capacity = conv.MVA_max / grid.S_base
+            if conv_capacity <= 0:
+                raise ValueError(
+                    f"Converter '{conv.name}' has non-positive MVA_max={conv.MVA_max}"
+                )
+            return conv_capacity
+
+        def _line_capacity_pu(l):
+            line = grid.lines_DC[l]
+            line_capacity = line.MW_rating / grid.S_base
+            if line_capacity <= 0:
+                raise ValueError(
+                    f"DC line '{line.name}' has non-positive MW_rating={line.MW_rating}"
+                )
+            return line_capacity
+
+        # If only one DC line is connected at the converter node, line build
+        # should force converter build.
+        def MP_single_dcline_forces_conv(model, c, i):
+            l = single_line_by_conv[c]
+            return model.ConvMP[c, i] * _conv_capacity_pu(c) >= model.DCLinesMP[l, i] * _line_capacity_pu(l)
+
+        # If multiple DC lines are connected at the node, only converter ->
+        # lines is enforced (lines can still exist with no converter).
+        def MP_conv_forces_multi_dclines(model, c, i):
+            line_cap_sum = sum(
+                model.DCLinesMP[l, i] * _line_capacity_pu(l)
+                for l in dc_lines_by_conv[c]
+            )
+            return line_cap_sum >= model.ConvMP[c, i] * _conv_capacity_pu(c)
+
+        model.MP_single_dcline_forces_conv_constraint = pyo.Constraint(
+            model.conv_with_single_dc_link,
+            model.inv_periods,
+            rule=MP_single_dcline_forces_conv,
+        )
+        model.MP_conv_forces_multi_dclines_constraint = pyo.Constraint(
+            model.conv_with_multi_dc_links,
+            model.inv_periods,
+            rule=MP_conv_forces_multi_dclines,
+        )
 
 def _MP_GEN_balance_constraints(model, grid):
     # Same logic as static GEN balance, indexed by investment period.
@@ -307,7 +439,7 @@ def _MP_GEN_balance_constraints(model, grid):
             if normalize_type(gen.gen_type) != gen_type:
                 continue
             g = gen.genNumber
-            if grid.GPR:
+            if grid.GPR and g in model.gen_AC:
                 gen_capacity += gen.Max_pow_gen * model.np_gen[g, i]
             else:
                 gen_capacity += gen.Max_pow_gen * gen.np_gen
@@ -317,7 +449,7 @@ def _MP_GEN_balance_constraints(model, grid):
             if normalize_type(rs.rs_type) != gen_type:
                 continue
             r = rs.rsNumber
-            if grid.rs_GPR:
+            if grid.rs_GPR and r in model.ren_sources:
                 ren_capacity += rs.PGi_ren_base * model.np_rsgen[r, i]
             else:
                 ren_capacity += rs.PGi_ren_base * rs.np_rsgen
@@ -337,17 +469,42 @@ def _MP_GEN_balance_constraints(model, grid):
     model.gen_type_balance_constraint = pyo.Constraint(model.gen_types, model.inv_periods, rule=gen_type_balance_rule)
 
 
-def _MP_TEP_variables(model,grid):
-    
+def _MP_TEP_variables(model, grid, n_init_install=None):
+    if n_init_install not in (None, "max", "mean"):
+        raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
+
     tep_vars = get_TEP_variables(grid)
+    gen_set = list(model.gen_AC) if hasattr(model, "gen_AC") else []
+    rs_set = list(model.ren_sources) if hasattr(model, "ren_sources") else []
+    ac_line_set = list(model.lines_AC_exp) if hasattr(model, "lines_AC_exp") else []
+    dc_line_set = list(model.lines_DC) if hasattr(model, "lines_DC") else []
+    conv_set = list(model.conv) if hasattr(model, "conv") else []
+
     np_gen_max_install={}
-    for gen in grid.Generators:
-        max_inv = _inv_decision(gen, 'max_inv')
-        np_gen_max_install[gen.genNumber] = max(max_inv) if len(max_inv) > 0 else gen.np_gen_max
+    for g in gen_set:
+        vals = _inv_decision(grid.Generators[g], 'max_inv')
+        for i in model.inv_periods:
+            np_gen_max_install[(g, i)] = vals[i]
     np_rsgen_max_install={}
-    for rs in grid.RenSources:
-        max_inv = _inv_decision(rs, 'max_inv')
-        np_rsgen_max_install[rs.rsNumber] = max(max_inv) if len(max_inv) > 0 else rs.np_rsgen_max
+    for r in rs_set:
+        vals = _inv_decision(grid.RenSources[r], 'max_inv')
+        for i in model.inv_periods:
+            np_rsgen_max_install[(r, i)] = vals[i]
+    np_acline_max_install = {}
+    for l in ac_line_set:
+        vals = _inv_decision(grid.lines_AC_exp[l], 'max_inv')
+        for i in model.inv_periods:
+            np_acline_max_install[(l, i)] = vals[i]
+    np_dcline_max_install = {}
+    for l in dc_line_set:
+        vals = _inv_decision(grid.lines_DC[l], 'max_inv')
+        for i in model.inv_periods:
+            np_dcline_max_install[(l, i)] = vals[i]
+    np_conv_max_install = {}
+    for c in conv_set:
+        vals = _inv_decision(grid.Converters_ACDC[c], 'max_inv')
+        for i in model.inv_periods:
+            np_conv_max_install[(c, i)] = vals[i]
 
     def planned_installation_rsgen_init(model, rs, i):
         return _inv_decision(grid.RenSources[rs], 'planned_installation')[i]
@@ -360,56 +517,110 @@ def _MP_TEP_variables(model,grid):
     def planned_installation_Conv_init(model, c, i):
         return _inv_decision(grid.Converters_ACDC[c], 'planned_installation')[i]
 
+    def min_install_opt(element, planned, max_install):
+        allows_decrease = element.allow_planned_decrease
+        return -min(planned, max_install) if allows_decrease else 0
+
+    def min_install_lb(element, planned, max_install):
+        allows_decrease = element.allow_planned_decrease
+        return max(0.0, planned - max_install) if allows_decrease else planned
+
+    def init_from_bounds(bounds_fn, *idx):
+        lb, ub = bounds_fn(model, *idx)
+        if n_init_install == "max":
+            return ub
+        if n_init_install == "mean":
+            return int(round((lb + ub) / 2.0))
+        return None
+
     if grid.rs_GPR:
         np_rsgen = tep_vars['ren_sources']['np_rsgen']
         np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
 
         model.np_rsgen_base = pyo.Param(model.ren_sources,initialize=np_rsgen)
-        
+
         def np_rsgen_bounds(model,rs,i):
             return (0,np_rsgen_max[rs])
         def np_rsgen_bounds_install(model,rs,i):
-            return (0,np_rsgen_max_install[rs])
+            ren_source = grid.RenSources[rs]
+            planned = planned_installation_rsgen_init(model, rs, i)
+            max_install = np_rsgen_max_install[(rs, i)]
+            return (min_install_lb(ren_source, planned, max_install), planned + max_install)
         def np_rsgen_bounds_install_opt(model,rs,i):
             ren_source = grid.RenSources[rs]
             if ren_source.np_rsgen_opf:
-                return (-model.planned_installation_rsgen[rs, i], np_rsgen_max_install[rs])
+                planned = planned_installation_rsgen_init(model, rs, i)
+                max_install = np_rsgen_max_install[(rs, i)]
+                return (min_install_opt(ren_source, planned, max_install), max_install)
             else:
-                return (0,0)  
+                return (0,0)
         def np_rsgen_i(model, rs, i):
+            init_value = init_from_bounds(np_rsgen_bounds, rs, i)
+            if init_value is not None:
+                return init_value
             return np_rsgen[rs]
         model.np_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_rsgen_bounds,initialize=np_rsgen_i)
-        model.installed_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_rsgen_bounds_install)
+        model.installed_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=planned_installation_rsgen_init,bounds=np_rsgen_bounds_install)
         model.planned_installation_rsgen = pyo.Param(model.ren_sources,model.inv_periods,initialize=planned_installation_rsgen_init)
         model.opt_installation_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.Integers,initialize=0,bounds=np_rsgen_bounds_install_opt)
-        
-        model.decomision_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
-    
+        def decom_rs_bounds(model,rs,i):
+            ren_source = grid.RenSources[rs]
+            if ren_source.np_rsgen_opf:
+                planned_decommission = _inv_decision(ren_source, 'planned_decommission')[i]
+                decomision_period = ren_source.decomision_period
+                if i < decomision_period:
+                    return (0,planned_decommission)
+                else:
+                    planned_install = planned_installation_rsgen_init(model, rs, i-decomision_period)
+                    max_install = np_rsgen_max_install[(rs, i-decomision_period)]
+                    return (0,planned_install+max_install+planned_decommission)
+            else:
+                return (0,0)
+        model.decomision_rsgen = pyo.Var(model.ren_sources,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=decom_rs_bounds)
+
     if grid.GPR:
         np_gen = tep_vars['generators']['np_gen']
         np_gen_max = tep_vars['generators']['np_gen_max']
 
         model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
-        
+
         def np_gen_bounds(model,g,i):
             return (0,np_gen_max[g])
 
         def np_gen_bounds_install(model,g,i):
-            return (0,np_gen_max_install[g])
+            gen = grid.Generators[g]
+            planned = planned_installation_gen_init(model, g, i)
+            max_install = np_gen_max_install[(g, i)]
+            return (min_install_lb(gen, planned, max_install), planned + max_install)
         def np_gen_bounds_install_opt(model,g,i):
             gen = grid.Generators[g]
             if gen.np_gen_opf:
-                return (-model.planned_installation_gen[g, i], np_gen_max_install[g])
+                planned = planned_installation_gen_init(model, g, i)
+                max_install = np_gen_max_install[(g, i)]
+                return (min_install_opt(gen, planned, max_install), max_install)
             else:
                 return (0,0)
         def np_gen_i(model, g, i):
+            init_value = init_from_bounds(np_gen_bounds, g, i)
+            if init_value is not None:
+                return init_value
             return np_gen[g]
         model.np_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen_i)
-        model.installed_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=np_gen_bounds_install)
+        model.installed_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=planned_installation_gen_init,bounds=np_gen_bounds_install)
         model.planned_installation_gen = pyo.Param(model.gen_AC,model.inv_periods,initialize=planned_installation_gen_init)
         model.opt_installation_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.Integers,initialize=0,bounds=np_gen_bounds_install_opt)
-        
-        model.decomision_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
+        def decom_gen_bounds(model,g,i):
+            gen = grid.Generators[g]
+            if gen.np_gen_opf:
+                planned_decommission = _inv_decision(gen, 'planned_decommission')[i]
+                decomision_period = gen.decomision_period
+                if i < decomision_period:
+                    return (0,planned_decommission)
+                else:
+                    planned_install = planned_installation_gen_init(model, g, i-decomision_period)
+                    max_install = np_gen_max_install[(g, i-decomision_period)]
+                    return (0,planned_install+max_install+planned_decommission)
+        model.decomision_gen = pyo.Var(model.gen_AC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=decom_gen_bounds)
 
     if grid.ACmode:
         NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
@@ -419,42 +630,83 @@ def _MP_TEP_variables(model,grid):
             def MP_AC_line_bounds(model,l,i):
                 return (0,NP_lineAC_max[l])
             def MP_AC_line_bounds_install(model,l,i):
-                return (0,NP_lineAC_max[l])
+                line = grid.lines_AC_exp[l]
+                planned = planned_installation_ACline_init(model, l, i)
+                max_install = np_acline_max_install[(l, i)]
+                return (min_install_lb(line, planned, max_install), planned + max_install)
             def MP_AC_line_bounds_install_opt(model,l,i):
                 line = grid.lines_AC_exp[l]
                 if line.np_line_opf:
-                    return (-model.planned_installation_ACline[l, i], NP_lineAC_max[l])
+                    planned = planned_installation_ACline_init(model, l, i)
+                    max_install = np_acline_max_install[(l, i)]
+                    return (min_install_opt(line, planned, max_install), max_install)
                 else:
                     return (0,0)
             def NP_lineAC_i(model, l, i):
+                init_value = init_from_bounds(MP_AC_line_bounds, l, i)
+                if init_value is not None:
+                    return init_value
                 return NP_lineAC[l]
             model.ACLinesMP = pyo.Var(model.lines_AC_exp,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_AC_line_bounds,initialize=NP_lineAC_i)
-            model.installed_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_AC_line_bounds_install)
+            model.installed_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=planned_installation_ACline_init,bounds=MP_AC_line_bounds_install)
             model.planned_installation_ACline = pyo.Param(model.lines_AC_exp,model.inv_periods,initialize=planned_installation_ACline_init)
             model.opt_installation_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.Integers,initialize=0,bounds=MP_AC_line_bounds_install_opt)
-            model.decomision_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
+            def decom_ACline_bounds(model,l,i):
+                line = grid.lines_AC_exp[l]
+                if line.np_line_opf:
+                    planned_decommission = _inv_decision(line, 'planned_decommission')[i]
+                    decomision_period = line.decomision_period
+                    if i < decomision_period:
+                        return (0,planned_decommission)
+                    else:
+                        planned_install = planned_installation_ACline_init(model, l, i-decomision_period)
+                        max_install = np_acline_max_install[(l, i-decomision_period)]
+                        return (0,planned_install+max_install+planned_decommission)
+
+            model.decomision_ACline = pyo.Var(model.lines_AC_exp,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=decom_ACline_bounds)
     if grid.DCmode:
         NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
         NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
-        
+
         model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
         def MP_DC_line_bounds(model,l,i):
             return (0,NP_lineDC_max[l])
         def MP_DC_line_bounds_install(model,l,i):
-            return (0,NP_lineDC_max[l])
+            line = grid.lines_DC[l]
+            planned = planned_installation_DCline_init(model, l, i)
+            max_install = np_dcline_max_install[(l, i)]
+            return (min_install_lb(line, planned, max_install), planned + max_install)
         def MP_DC_line_bounds_install_opt(model,l,i):
             line = grid.lines_DC[l]
             if line.np_line_opf:
-                return (-model.planned_installation_DCline[l, i], NP_lineDC_max[l])
+                planned = planned_installation_DCline_init(model, l, i)
+                max_install = np_dcline_max_install[(l, i)]
+                return (min_install_opt(line, planned, max_install), max_install)
             else:
                 return (0,0)
         def NP_lineDC_i(model, l, i):
+            init_value = init_from_bounds(MP_DC_line_bounds, l, i)
+            if init_value is not None:
+                return init_value
             return NP_lineDC[l]
         model.DCLinesMP = pyo.Var(model.lines_DC,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_DC_line_bounds,initialize=NP_lineDC_i)
-        model.installed_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_DC_line_bounds_install)
+        model.installed_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=planned_installation_DCline_init,bounds=MP_DC_line_bounds_install)
         model.planned_installation_DCline = pyo.Param(model.lines_DC,model.inv_periods,initialize=planned_installation_DCline_init)
         model.opt_installation_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.Integers,initialize=0,bounds=MP_DC_line_bounds_install_opt)
-        model.decomision_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
+        def decom_DCline_bounds(model,l,i):
+            line = grid.lines_DC[l]
+            if line.np_line_opf:
+                planned_decommission = _inv_decision(line, 'planned_decommission')[i]
+                decomision_period = line.decomision_period
+                if i < decomision_period:
+                    return (0,planned_decommission)
+                else:
+                    planned_install = planned_installation_DCline_init(model, l, i-decomision_period)
+                    max_install = np_dcline_max_install[(l, i-decomision_period)]
+                    return (0,planned_install+max_install+planned_decommission)
+            else:
+                return (0,0)
+        model.decomision_DCline = pyo.Var(model.lines_DC,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=decom_DCline_bounds)
 
     if grid.ACmode and grid.DCmode:
         np_conv = tep_vars['converters']['np_conv']
@@ -463,28 +715,49 @@ def _MP_TEP_variables(model,grid):
         def MP_Conv_bounds(model,c,i):
             return (0,np_conv_max[c])
         def MP_Conv_bounds_install(model,c,i):
-            return (0,np_conv_max[c])
+            conv = grid.Converters_ACDC[c]
+            planned = planned_installation_Conv_init(model, c, i)
+            max_install = np_conv_max_install[(c, i)]
+            return (min_install_lb(conv, planned, max_install), planned + max_install)
         def MP_Conv_bounds_install_opt(model,c,i):
             conv = grid.Converters_ACDC[c]
             if conv.np_conv_opf:
-                return (-model.planned_installation_Conv[c, i], np_conv_max[c])
+                planned = planned_installation_Conv_init(model, c, i)
+                max_install = np_conv_max_install[(c, i)]
+                return (min_install_opt(conv, planned, max_install), max_install)
             else:
                 return (0,0)
         def np_conv_i(model, c, i):
+            init_value = init_from_bounds(MP_Conv_bounds, c, i)
+            if init_value is not None:
+                return init_value
             return np_conv[c]
         model.ConvMP = pyo.Var(model.conv,model.inv_periods, within=pyo.NonNegativeIntegers,bounds=MP_Conv_bounds,initialize=np_conv_i)
-        model.installed_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=MP_Conv_bounds_install)
+        model.installed_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=planned_installation_Conv_init,bounds=MP_Conv_bounds_install)
         model.planned_installation_Conv = pyo.Param(model.conv,model.inv_periods,initialize=planned_installation_Conv_init)
         model.opt_installation_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.Integers,initialize=0,bounds=MP_Conv_bounds_install_opt)
-        model.decomision_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0)
+        def decom_Conv_bounds(model,c,i):
+            conv = grid.Converters_ACDC[c]
+            if conv.np_conv_opf:
+                planned_decommission = _inv_decision(conv, 'planned_decommission')[i]
+                decomision_period = conv.decomision_period
+                if i < decomision_period:
+                    return (0,planned_decommission)
+                else:
+                    planned_install = planned_installation_Conv_init(model, c, i-decomision_period)
+                    max_install = np_conv_max_install[(c, i-decomision_period)]
+                    return (0,planned_install+max_install+planned_decommission)
+            else:
+                return (0,0)
+        model.decomision_Conv = pyo.Var(model.conv,model.inv_periods,within=pyo.NonNegativeIntegers,initialize=0,bounds=decom_Conv_bounds)
 def _validate_grid_for_MP_TEP(grid):
     """
     Fast pre-solve validation for MP TEP inputs.
 
     Current checks:
-    - planned_decomision[p] >= 0 for all periods
-    - sum(planned_decomision) <= pre-existing stock
-    - cumulative planned_decomision[t] <= stock[t] where
+    - planned_decommission[p] >= 0 for all periods
+    - sum(planned_decommission) <= pre-existing stock
+    - cumulative planned_decommission[t] <= stock[t] where
       stock[t] = pre-existing + cumulative planned_installation[t]
     """
     def _as_float_series(values, label, name, key):
@@ -493,10 +766,10 @@ def _validate_grid_for_MP_TEP(grid):
             raise ValueError(f"{label} '{name}' has empty {key} series")
         return series
 
-    def _validate_element_planned_decomision(element, base_count, label):
+    def _validate_element_planned_decommission(element, base_count, label):
         inv = element.investment_decisions
         name = element.name
-        required_keys = ('planned_installation', 'planned_decomision', 'max_inv', 'np_dynamic')
+        required_keys = ('planned_installation', 'planned_decommission', 'max_inv', 'np_dynamic')
         for key in required_keys:
             if key not in inv:
                 raise ValueError(f"{label} '{name}' is missing investment_decisions['{key}']")
@@ -510,11 +783,11 @@ def _validate_grid_for_MP_TEP(grid):
             raise ValueError(
                 f"{label} '{name}' has mismatched investment series lengths: "
                 f"planned_installation={series['planned_installation'].size}, "
-                f"planned_decomision={series['planned_decomision'].size}, "
+                f"planned_decommission={series['planned_decommission'].size}, "
                 f"max_inv={series['max_inv'].size}, np_dynamic={series['np_dynamic'].size}"
             )
         planned_installation = series['planned_installation']
-        planned_decomision = series['planned_decomision']
+        planned_decommission = series['planned_decommission']
 
         if np.any(planned_installation < 0):
             bad_idx = np.where(planned_installation < 0)[0][0]
@@ -523,11 +796,11 @@ def _validate_grid_for_MP_TEP(grid):
                 f"{label} '{name}' has negative planned_installation at period {int(bad_idx)}: {bad_val}"
             )
 
-        if np.any(planned_decomision < 0):
-            bad_idx = np.where(planned_decomision < 0)[0][0]
-            bad_val = float(planned_decomision[bad_idx])
+        if np.any(planned_decommission < 0):
+            bad_idx = np.where(planned_decommission < 0)[0][0]
+            bad_val = float(planned_decommission[bad_idx])
             raise ValueError(
-                f"{label} '{name}' has negative planned_decomision at period {int(bad_idx)}: {bad_val}"
+                f"{label} '{name}' has negative planned_decommission at period {int(bad_idx)}: {bad_val}"
             )
 
         if np.any(series['max_inv'] < 0):
@@ -547,14 +820,14 @@ def _validate_grid_for_MP_TEP(grid):
         base_count = float(base_count)
         if base_count < 0:
             raise ValueError(f"{label} '{name}' has negative base count: {base_count}")
-        total_decom = float(np.sum(planned_decomision))
+        total_decom = float(np.sum(planned_decommission))
         if total_decom > base_count + 1e-9:
             raise ValueError(
                 f"{label} '{name}' violates baseline decommission check: "
-                f"sum(planned_decomision)={total_decom} > base_count={base_count}"
+                f"sum(planned_decommission)={total_decom} > base_count={base_count}"
             )
 
-        cum_decom = np.cumsum(planned_decomision)
+        cum_decom = np.cumsum(planned_decommission)
         cum_install = np.cumsum(planned_installation)
         available_stock = base_count + cum_install
         bad = np.where(cum_decom > available_stock + 1e-9)[0]
@@ -597,14 +870,14 @@ def _validate_grid_for_MP_TEP(grid):
         for element in elements:
             if is_active(element):
                 _validate_static_parameters(element, base_count(element), max_count(element), label)
-                _validate_element_planned_decomision(element, base_count(element), label)
+                _validate_element_planned_decommission(element, base_count(element), label)
 
 def multi_period_transmission_expansion(
     grid,
-    inv_periods=[],
+    inv_periods=None,
     n_years=10,
-    Hy=8760,
-    discount_rate=0.02,
+    Hy=HOURS_PER_YEAR,
+    discount_rate=DEFAULT_DISCOUNT_RATE,
     ObjRule=None,
     solver='bonmin',
     time_limit=None,
@@ -612,16 +885,81 @@ def multi_period_transmission_expansion(
     callback=False,
     solver_options=None,
     obj_scaling=1.0,
+    alpha=None,
     capex_budget=None,
     nlp_warmstart=False,
+    build_only=False,
+    n_init_install=None,
+    initiate_max=None,
 ):
+    """Build and solve the multi-period (investment-horizon) TEP.
+
+    Optimises staged expansion decisions across several investment periods,
+    discounting per-period CAPEX and OPEX to present value over the horizon and
+    optionally enforcing a CAPEX budget. Exports the per-period expansion plan
+    and operating points back onto ``grid``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    inv_periods : sequence or None, optional
+        Investment-period definition; ``None`` uses the grid's configured
+        periods.
+    n_years : int, optional
+        Length of each investment period in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for present-value discounting.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo (MINLP/NLP) solver name.
+    time_limit : float or None, optional
+        Solver time limit in seconds.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    solver_options : dict or None, optional
+        Extra solver options.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    alpha : float or None, optional
+        Weighting between CAPEX (``alpha``) and OPEX (``1-alpha``).
+    capex_budget : float or None, optional
+        Optional cap on total investment cost.
+    nlp_warmstart : bool, optional
+        Warm-start the NLP from a relaxed/previous solution.
+    build_only : bool, optional
+        Build and return the model without solving.
+    n_init_install : {None, "max", "mean"}, optional
+        Pre-installation level used to initialise expandable elements.
+    initiate_max : bool or None, optional
+        Deprecated alias for ``n_init_install`` (``True`` maps to ``"max"``).
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats)``.
+    """
+    if initiate_max is not None:
+        if n_init_install is not None:
+            raise ValueError("Provide only one of 'n_init_install' or deprecated 'initiate_max'.")
+        if not isinstance(initiate_max, bool):
+            raise TypeError("Deprecated 'initiate_max' must be boolean when provided.")
+        n_init_install = "max" if initiate_max else None
+    if n_init_install not in (None, "max", "mean"):
+        raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
+
     grid.reset_run_flags()
     analyse_grid(grid)
     weights_def, PZ = obj_w_rule(grid,ObjRule,True)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
-    
+
     # If inv_periods is provided, set default load multipliers directly on objects.
     if inv_periods:
         load_factors = np.array(inv_periods, dtype=float)
@@ -631,20 +969,27 @@ def multi_period_transmission_expansion(
 
         for node in grid.nodes_DC:
             node.investment_decisions['Load'] = load_factors.copy().tolist()
-    
+
     n_periods = _fill_investment_decisions(grid)
-    
+
     _validate_grid_for_MP_TEP(grid)
 
-    grid.GPR = True if any(any(x != 0 for x in _inv_decision(gen, 'planned_installation')) for gen in grid.Generators) else grid.GPR
-    grid.rs_GPR = True if any(any(x != 0 for x in _inv_decision(ren_source, 'planned_installation')) for ren_source in grid.RenSources) else grid.rs_GPR
-    
+    grid.GPR = bool(grid.GPR) or any(
+        gen.np_gen_opf or any(x != 0 for x in _inv_decision(gen, 'planned_installation'))
+        for gen in grid.Generators
+    )
+    grid.rs_GPR = bool(grid.rs_GPR) or any(
+        rs.np_rsgen_opf or any(x != 0 for x in _inv_decision(rs, 'planned_installation'))
+        for rs in grid.RenSources
+    )
+
     for gen in grid.Generators:
         gen.np_gen_mp = gen.np_gen_opf or any(x != 0 for x in _inv_decision(gen, 'planned_installation'))
     for rs in grid.RenSources:
         rs.np_rsgen_mp = rs.np_rsgen_opf or any(x != 0 for x in _inv_decision(rs, 'planned_installation'))
-    
+
     t1=time.time()
+    _deactivate_non_pre_existing_loads(grid)
     pre_opt_fuel_type_distribution = current_fuel_type_distribution(grid, output='df')
 
     model = pyo.ConcreteModel()
@@ -655,12 +1000,19 @@ def multi_period_transmission_expansion(
     model.inv_model = pyo.Block(model.inv_periods)
 
     base_model = pyo.ConcreteModel()
-    OPF_create_NLModel_ACDC(base_model,grid,PV_set=False,Price_Zones=PZ,TEP=True)
+    opf_create_nl_model_acdc(
+        base_model,
+        grid,
+        PV_set=False,
+        Price_Zones=PZ,
+        TEP=True,
+        n_init_install=n_init_install,
+    )
 
-    for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC+grid.RenSources: 
+    for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC+grid.RenSources:
         _calculate_decomision_period(element,n_years)
-        
-    present_value_opf =   Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+
+    present_value_opf = present_value_factor(Hy, discount_rate, n_years)
     for i in model.inv_periods:
         base_model_copy = base_model.clone()
         model.inv_model[i].transfer_attributes_from(base_model_copy)
@@ -669,33 +1021,47 @@ def multi_period_transmission_expansion(
 
         _modify_parameters(grid,model.inv_model[i],PZ)
 
-        
-        obj_OPF = OPF_obj(model.inv_model[i],grid,weights_def,True)
-    
+
+        obj_OPF = opf_obj(model.inv_model[i],grid,weights_def,True)
+
         obj_OPF *=present_value_opf
-        
+
         model.inv_model[i].obj = pyo.Objective(rule=obj_OPF, sense=pyo.minimize)
 
-    _initialize_DTEP_sets_model(model,grid)
-    _MP_TEP_variables(model,grid)
+    _initialize_MPTEP_sets_model(model,grid)
+    _MP_TEP_variables(model, grid, n_init_install=n_init_install)
     _MP_TEP_constraints(model,grid)
     _MP_GEN_balance_constraints(model,grid)
     _MP_TEP_capex_budget_constraint(model,grid,capex_budget=capex_budget)
-    
 
-    net_cost = _MP_TEP_obj(model,grid,n_years,discount_rate)
+
+    net_cost = _MP_TEP_obj(model,grid,n_years,discount_rate,alpha=alpha)
     if obj_scaling != 1.0:
         net_cost = net_cost / obj_scaling
     model.obj = pyo.Objective(rule=net_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
-    
+
     t2 = time.time()
+
+    if build_only:
+        timing_info = {
+            "create": t2 - t1,
+            "solve": None,
+            "export": 0.0,
+        }
+        solver_stats = {
+            "solution_found": False,
+            "termination_condition": "build_only",
+            "solver_message": "build_only=True: model built and solve skipped.",
+            "time": None,
+        }
+        return model, None, timing_info, solver_stats
 
     model_results,solver_stats = pyomo_model_solve(
         model, grid, solver, time_limit=time_limit, tee=tee,
         callback=callback, solver_options=solver_options, nlp_warmstart=nlp_warmstart
     )
-    
+
     t3 = time.time()
 
     if not (solver_stats and solver_stats.get('solution_found', False)):
@@ -711,12 +1077,12 @@ def multi_period_transmission_expansion(
             "export": 0.0,
         }
         return model, model_results, timing_info, solver_stats
-    
+
     MINLP = False
     if solver != 'ipopt':
         MINLP = True
-    
-    export_MP_TEP_results_toPyflowACDC(
+
+    export_mp_tep_results_to_pyflow_acdc(
         model,
         grid,
         Price_Zones=PZ,
@@ -726,29 +1092,37 @@ def multi_period_transmission_expansion(
     _save_inv_models(model,grid)
     t4 = time.time()
 
-    inv_objs, inv_opf_objs = calculate_DTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False)
-    
+    inv_objs, inv_opf_objs = calculate_mptep_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False)
+
     # Build list of rows then create DataFrame once to avoid concat-on-empty FutureWarning
     obj_rows = []
     for i in model.inv_periods:
         present_value_tep = 1/(1+discount_rate)**(i*n_years)
-        
-        opf_obj = inv_opf_objs[i][0]  # Get first element from the list
-        npv_opf_obj = opf_obj*present_value_opf
-        inv_obj = inv_objs[i]
-        step_obj = inv_obj + npv_opf_obj
+
+        opf_obj_from_list = inv_opf_objs[i][0]  # Get first element from the list
+        npv_opf_obj = opf_obj_from_list*present_value_opf
+        inv_obj_from_list = inv_objs[i]
+        economic_step_obj = inv_obj_from_list + npv_opf_obj
+        if alpha is None:
+            step_obj = economic_step_obj
+        else:
+            step_obj = alpha * inv_obj_from_list + (1 - alpha) * npv_opf_obj
         npv_step_obj = step_obj*present_value_tep
+        npv_economic_step_obj = economic_step_obj*present_value_tep
         obj_rows.append({
             'Investment_Period': i+1,
-            'OPF_Objective': opf_obj,
+            'OPF_Objective': opf_obj_from_list,
             'NPV_OPF_Objective': npv_opf_obj,
-            'TEP_Objective': inv_obj,
+            'TEP_Objective': inv_obj_from_list,
             'STEP_Objective': step_obj,
-            'NPV_STEP_Objective': npv_step_obj
+            'NPV_STEP_Objective': npv_step_obj,
+            'STEP_Objective_Economic': economic_step_obj,
+            'NPV_STEP_Objective_Economic': npv_economic_step_obj
         })
     obj_res = pd.DataFrame(obj_rows, columns=['Investment_Period', 'OPF_Objective',
                                               'NPV_OPF_Objective','TEP_Objective',
-                                              'STEP_Objective','NPV_STEP_Objective'])
+                                              'STEP_Objective','NPV_STEP_Objective',
+                                              'STEP_Objective_Economic','NPV_STEP_Objective_Economic'])
     grid.MP_TEP_obj_res = obj_res
     timing_info = {
     "create": t2-t1,
@@ -756,22 +1130,42 @@ def multi_period_transmission_expansion(
     "export": t4-t3,
     }
 
-    
-    
+
+
     return model, model_results ,timing_info, solver_stats
-    
-def _initialize_DTEP_sets_model(model,grid):    
+
+def _initialize_MPTEP_sets_model(model,grid):
 
     if grid.DCmode:
-        model.lines_DC = pyo.Set(initialize=list(range(0, grid.nl_DC)))
+        model.lines_DC = pyo.Set(
+            initialize=[i for i, line in enumerate(grid.lines_DC) if line.np_line_opf]
+        )
     if grid.ACmode and grid.DCmode:
-        model.conv = pyo.Set(initialize=list(range(0, grid.nconv)))
+        model.conv = pyo.Set(
+            initialize=[i for i, conv in enumerate(grid.Converters_ACDC) if conv.np_conv_opf]
+        )
     if grid.TEP_AC:
-        model.lines_AC_exp = pyo.Set(initialize=list(range(0,grid.nle_AC)))
+        model.lines_AC_exp = pyo.Set(
+            initialize=[i for i, line in enumerate(grid.lines_AC_exp) if line.np_line_opf]
+        )
     if grid.GPR:
-        model.gen_AC = pyo.Set(initialize=list(range(0,grid.n_gen)))
+        model.gen_AC = pyo.Set(
+            initialize=[i for i, gen in enumerate(grid.Generators) if getattr(gen, "np_gen_mp", False)]
+        )
     if grid.rs_GPR:
-        model.ren_sources = pyo.Set(initialize=list(range(0,grid.n_ren)))
+        model.ren_sources = pyo.Set(
+            initialize=[i for i, rs in enumerate(grid.RenSources) if getattr(rs, "np_rsgen_mp", False)]
+        )
+        standalone_pairs = identify_standalone_rs_conv_pairs(
+            grid,
+            ren_source_ids=model.ren_sources,
+            conv_ids=model.conv if (grid.ACmode and grid.DCmode) else None,
+        )
+        model.standalone_rs_conv_pairs = pyo.Set(dimen=2, initialize=standalone_pairs)
+
+
+def _period_base_cost(element, i):
+    return float(element._base_cost) * (1.0 + element.investment_decisions['lambda_capex'][i])
 
 def _inv_model_obj(model,grid,i):
     inv_gen= 0
@@ -782,15 +1176,15 @@ def _inv_model_obj(model,grid,i):
     if grid.rs_GPR:
         for rs in model.ren_sources:
             ren_source = grid.RenSources[rs]
-            inv_rs+=model.installed_rsgen[rs,i]*ren_source.base_cost
+            inv_rs += model.installed_rsgen[rs, i] * _period_base_cost(ren_source, i)
     else:
         inv_rs=0
 
     if grid.GPR:
-        
+
         for g in model.gen_AC:
             gen = grid.Generators[g]
-            inv_gen+=model.installed_gen[g,i]*gen.base_cost
+            inv_gen += model.installed_gen[g, i] * _period_base_cost(gen, i)
     else:
         inv_gen=0
 
@@ -799,18 +1193,18 @@ def _inv_model_obj(model,grid,i):
         if grid.TEP_AC:
             for l in model.lines_AC_exp:
                 line = grid.lines_AC_exp[l]
-                AC_Inv_lines+=model.installed_ACline[l,i]*line.base_cost
-            
+                AC_Inv_lines += model.installed_ACline[l, i] * _period_base_cost(line, i)
+
     if grid.DCmode:
         for l in model.lines_DC:
             line = grid.lines_DC[l]
-            DC_Inv_lines+=model.installed_DCline[l,i]*line.base_cost
-        
+            DC_Inv_lines += model.installed_DCline[l, i] * _period_base_cost(line, i)
+
     if grid.ACmode and grid.DCmode:
         for c in model.conv:
             conv = grid.Converters_ACDC[c]
-            Conv_Inv+=model.installed_Conv[c,i]*conv.base_cost
-        
+            Conv_Inv += model.installed_Conv[c, i] * _period_base_cost(conv, i)
+
 
     inv_cost=inv_gen+AC_Inv_lines+DC_Inv_lines+Conv_Inv+inv_rs
     return inv_cost
@@ -848,13 +1242,24 @@ def _MP_TEP_capex_budget_constraint(model,grid,capex_budget=None):
 
     model.MP_CAPEX_budget_constraint = pyo.Constraint(model.inv_periods, rule=MP_CAPEX_budget_rule)
 
-def _MP_TEP_obj(model,grid,n_years,discount_rate):
-    
+def _MP_TEP_obj(model,grid,n_years,discount_rate,alpha=None):
+    if alpha is not None:
+        try:
+            alpha = float(alpha)
+        except (TypeError, ValueError):
+            raise ValueError("alpha must be None or a numeric value in [0, 1].") from None
+        if alpha < 0.0 or alpha > 1.0:
+            raise ValueError("alpha must be in [0, 1].")
+
     net_cost = 0
 
     for i in model.inv_periods:
         inv_cost = _inv_model_obj(model,grid,i)
-        instance_cost = model.inv_model[i].obj.expr + inv_cost
+        opf_cost = model.inv_model[i].obj.expr
+        if alpha is None:
+            instance_cost = opf_cost + inv_cost
+        else:
+            instance_cost = alpha * inv_cost + (1 - alpha) * opf_cost
         net_cost += instance_cost/(1+discount_rate)**(i*n_years)
         model.inv_model[i].obj.deactivate()
 
@@ -866,10 +1271,10 @@ def export_and_save_inv_period_svgs(grid,Price_Zones=False,folder_name=None):
     if hasattr(grid, 'inv_models'):
         grid_name = grid.name
         grid_name = grid_name.replace(" ", "_")
-        
+
         for i in grid.inv_models:
             save_path = f"{folder_name}/{grid_name}_inv_model_{i}" if folder_name else f'{grid_name}_inv_model_{i}'
-            ExportACDC_NLmodel_toPyflowACDC(grid.inv_models[i],grid,Price_Zones,TEP=True)
+            export_acdc_nl_model_to_pyflow_acdc(grid.inv_models[i],grid,Price_Zones,TEP=True)
             save_network_svg(
                 grid,
                 name=save_path,
@@ -885,15 +1290,25 @@ def _save_inv_models(model,grid):
     for i in model.inv_periods:
         grid.inv_models[i] = model.inv_model[i]
 
-def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False, *, pre_opt_fuel_type_distribution):
-    
+def export_mp_tep_results_to_pyflow_acdc(
+    model,
+    grid,
+    Price_Zones=False,
+    MINLP=False,
+    *,
+    pre_opt_fuel_type_distribution,
+    export_last_opf_state=True,
+    MS = False,
+):
 
-    grid.MP_TEP_run=True
-    
+
+    grid.MP_TEP_run = (not MS)
+    grid.MP_MS_TEP_run = MS
+
     n_periods = grid.TEP_n_periods
-    
+
     rows = []
-    
+
     if grid.GPR:
         if MINLP:
             gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i])) for (g, i) in model.np_gen}
@@ -903,7 +1318,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             gen_mp_values = {(g, i): round(pyo.value(model.np_gen[g, i]),2) for (g, i) in model.np_gen}
             gen_installed_values = {(g, i): round(pyo.value(model.installed_gen[g, i]),2) for (g, i) in model.installed_gen}
             gen_decomision_values = {(g, i): round(pyo.value(model.decomision_gen[g, i]),2) for (g, i) in model.decomision_gen}
-            
+
         for gen in grid.Generators:
             g = gen.genNumber
             gen.investment_decisions['np_dynamic'] = [gen_mp_values[g, i] for i in range(n_periods)]
@@ -913,10 +1328,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             total_cost = 0
             for i in range(n_periods):
                 n_val = gen_mp_values[g, i]
-                cost = gen_installed_values[g, i] * gen.base_cost
+                cost = gen_installed_values[g, i] * _period_base_cost(gen, i)
                 row[f"Decommissioned_{i+1}"] = gen_decomision_values[g, i]
-                row[f"Installed_{i+1}"] = gen_installed_values[g, i]    
-                row[f"Active_{i+1}"] = n_val                
+                row[f"Installed_{i+1}"] = gen_installed_values[g, i]
+                row[f"Active_{i+1}"] = n_val
                 row[f"Cost_{i+1}"] = cost
                 total_cost += cost
             row['Total_Cost'] = total_cost
@@ -927,10 +1342,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             rs_installed_values = {(rs, i): int(round(pyo.value(model.installed_rsgen[rs, i]))) for (rs, i) in model.installed_rsgen}
             rs_decomision_values = {(rs, i): int(round(pyo.value(model.decomision_rsgen[rs, i]))) for (rs, i) in model.decomision_rsgen}
         else:
-            rs_mp_values = {(rs, i): round(pyo.value(model.np_rsgen[rs, i]),2) for (rs, i) in model.np_rsgen}
+            rs_mp_values = {(rs, i): float(pyo.value(model.np_rsgen[rs, i])) for (rs, i) in model.np_rsgen}
             rs_installed_values = {(rs, i): round(pyo.value(model.installed_rsgen[rs, i]),2) for (rs, i) in model.installed_rsgen}
             rs_decomision_values = {(rs, i): round(pyo.value(model.decomision_rsgen[rs, i]),2) for (rs, i) in model.decomision_rsgen}
-            
+
         for ren_source in grid.RenSources:
             rs = ren_source.rsNumber
             ren_source.investment_decisions['np_dynamic'] = [rs_mp_values[rs, i] for i in range(n_periods)]
@@ -940,10 +1355,10 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             total_cost = 0
             for i in range(n_periods):
                 n_val = rs_mp_values[rs, i]
-                cost = rs_installed_values[rs, i] * ren_source.base_cost
+                cost = rs_installed_values[rs, i] * _period_base_cost(ren_source, i)
                 row[f"Decommissioned_{i+1}"] = rs_decomision_values[rs, i]
-                row[f"Installed_{i+1}"] = rs_installed_values[rs, i]    
-                row[f"Active_{i+1}"] = n_val                
+                row[f"Installed_{i+1}"] = rs_installed_values[rs, i]
+                row[f"Active_{i+1}"] = n_val
                 row[f"Cost_{i+1}"] = cost
                 total_cost += cost
             row['Total_Cost'] = total_cost
@@ -968,7 +1383,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
                 total_cost = 0
                 for i in range(n_periods):
                     n_val = ac_lines_mp_values[l, i]
-                    cost = ac_line_installed_values[l, i] * line.base_cost
+                    cost = ac_line_installed_values[l, i] * _period_base_cost(line, i)
                     row[f"Decommissioned_{i+1}"] = ac_line_decomision_values[l, i]
                     row[f"Installed_{i+1}"] = ac_line_installed_values[l, i]
                     row[f"Active_{i+1}"] = n_val
@@ -976,8 +1391,8 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
                     total_cost += cost
                 row['Total_Cost'] = total_cost
                 rows.append(row)
-        
-        
+
+
 
 
     if grid.DCmode:
@@ -986,11 +1401,11 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             dc_line_installed_values = {(l, i): int(round(pyo.value(model.installed_DCline[l, i]))) for (l, i) in model.installed_DCline}
             dc_line_decomision_values = {(l, i): int(round(pyo.value(model.decomision_DCline[l, i]))) for (l, i) in model.decomision_DCline}
         else:
-            dc_lines_mp_values = {(l, i): round(pyo.value(model.DCLinesMP[l, i]),2) for (l, i) in model.DCLinesMP}
+            dc_lines_mp_values = {(l, i): float(pyo.value(model.DCLinesMP[l, i])) for (l, i) in model.DCLinesMP}
             dc_line_installed_values = {(l, i): round(pyo.value(model.installed_DCline[l, i]),2) for (l, i) in model.installed_DCline}
             dc_line_decomision_values = {(l, i): round(pyo.value(model.decomision_DCline[l, i]),2) for (l, i) in model.decomision_DCline}
 
-        for line in grid.lines_DC:  
+        for line in grid.lines_DC:
             if line.np_line_opf:
                 l = line.lineNumber
                 line.investment_decisions['np_dynamic'] = [dc_lines_mp_values[l, i] for i in range(n_periods)]
@@ -1000,7 +1415,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
                 total_cost = 0
                 for i in range(n_periods):
                     n_val = dc_lines_mp_values[l, i]
-                    cost = dc_line_installed_values[l, i] * line.base_cost
+                    cost = dc_line_installed_values[l, i] * _period_base_cost(line, i)
                     row[f"Decommissioned_{i+1}"] = dc_line_decomision_values[l, i]
                     row[f"Installed_{i+1}"] = dc_line_installed_values[l, i]
                     row[f"Active_{i+1}"] = n_val
@@ -1015,7 +1430,7 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             conv_installed_values = {(c, i): int(round(pyo.value(model.installed_Conv[c, i]))) for (c, i) in model.installed_Conv}
             conv_decomision_values = {(c, i): int(round(pyo.value(model.decomision_Conv[c, i]))) for (c, i) in model.decomision_Conv}
         else:
-            acdc_conv_mp_values = {(c, i): round(pyo.value(model.ConvMP[c, i]),2) for (c, i) in model.ConvMP}
+            acdc_conv_mp_values = {(c, i): float(pyo.value(model.ConvMP[c, i])) for (c, i) in model.ConvMP}
             conv_installed_values = {(c, i): round(pyo.value(model.installed_Conv[c, i]),2) for (c, i) in model.installed_Conv}
             conv_decomision_values = {(c, i): round(pyo.value(model.decomision_Conv[c, i]),2) for (c, i) in model.decomision_Conv}
         for conv in grid.Converters_ACDC:
@@ -1026,15 +1441,15 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
             row['Pre Existing'] = pyo.value(model.np_conv_base[c])
             total_cost = 0
             for i in range(n_periods):
-                n_val = acdc_conv_mp_values[c, i]   
-                cost = conv_installed_values[c, i] * conv.base_cost
+                n_val = acdc_conv_mp_values[c, i]
+                cost = conv_installed_values[c, i] * _period_base_cost(conv, i)
                 row[f"Decommissioned_{i+1}"] = conv_decomision_values[c, i]
                 row[f"Installed_{i+1}"] = conv_installed_values[c, i]
                 row[f"Active_{i+1}"] = n_val
                 row[f"Cost_{i+1}"] = cost
                 total_cost += cost
             row['Total_Cost'] = total_cost
-            rows.append(row)    
+            rows.append(row)
 
     df = pd.DataFrame(rows)
     total_row = {}
@@ -1046,125 +1461,527 @@ def export_MP_TEP_results_toPyflowACDC(model,grid,Price_Zones=False,MINLP=False,
         else:
             total_row[col] = ""
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
-    
+
     # Capture fuel-type distribution for each investment period based on solved dynamic states.
     # Key 0 stores the state before optimization.
     fuel_type_dist_by_period = {0: pre_opt_fuel_type_distribution}
     for i in model.inv_periods:
         _set_grid_to_multiperiod_state(grid, i,Price_Zones)
-        
+
         fuel_type_dist_by_period[int(i) + 1] = current_fuel_type_distribution(grid, output='df')
 
     grid.MP_TEP_fuel_type_distribution = fuel_type_dist_by_period
 
-    last_i = max(model.inv_periods)
-    _set_grid_to_multiperiod_state(grid, last_i,Price_Zones)
-    
-    ExportACDC_NLmodel_toPyflowACDC(model.inv_model[last_i],grid,Price_Zones,TEP=True)
+    if export_last_opf_state:
+        last_i = max(model.inv_periods)
+        _set_grid_to_multiperiod_state(grid, last_i,Price_Zones)
+        export_acdc_nl_model_to_pyflow_acdc(model.inv_model[last_i],grid,Price_Zones,TEP=True)
 
-    grid.MP_TEP_results = df  
+    grid.MP_TEP_results = df
 
-def multi_period_MS_TEP(grid, NPV=True, n_years=10, Hy=8760, 
-                       discount_rate=0.02, clustering_options=None, ObjRule=None, 
-                       solver='bonmin', obj_scaling=1.0):
+
+def _resolve_mp_ms_clustering(grid, clustering_options, tee=False):
+    if clustering_options is None:
+        if not grid.Time_series:
+            raise ValueError("No time series available and clustering was not requested.")
+        n_clusters = len(grid.Time_series[0].data)
+        if n_clusters <= 0:
+            raise ValueError("Time series is empty; cannot build scenario frames.")
+        return n_clusters, False
+
+    from .Time_series_clustering import cluster_analysis
+    try:
+        n_clusters, clustering = cluster_analysis(grid, clustering_options)
+    except Exception as exc:
+        raise RuntimeError("Clustering was requested but failed.") from exc
+
+    if not clustering:
+        raise RuntimeError("Clustering was requested but did not produce clustered scenarios.")
+    if n_clusters <= 0:
+        raise ValueError("Clustering returned zero scenarios.")
+    if tee:
+        print(f"Clustering succeeded with {n_clusters} scenarios.")
+    return n_clusters, True
+
+
+def _scenario_weight_for_frame(grid, t, n_clusters, clustering):
+    if clustering:
+        return float(grid.Clusters[n_clusters]['Weight'][t-1])
+    if any(ts.element_name == 'TEP_w' for ts in grid.Time_series):
+        return float(next(ts.data[t-1] for ts in grid.Time_series if ts.element_name == 'TEP_w'))
+    return None
+
+
+def _validate_period_scenario_updates(grid, period_idx, frame_idx, n_clusters, clustering):
+    tol = PF_INNER_TOLERANCE
+    for pz in grid.Price_Zones:
+        expected_curvature = _inv_decision(pz, 'curvature_factor')[period_idx]
+        if abs(float(pz.curvature_factor) - float(expected_curvature)) > tol:
+            raise ValueError(
+                f"Price zone '{pz.name}' curvature_factor mismatch at period {period_idx}, frame {frame_idx}."
+            )
+
+    for pz in grid.Price_Zones:
+        expected_pli = float(pz._PLi_base) * float(pz.PLi_factor) * float(pz.PLi_inv_factor)
+        if abs(float(pz.PLi) - expected_pli) > 1e-6:
+            raise ValueError(
+                f"Price zone '{pz.name}' load consistency mismatch at period {period_idx}, frame {frame_idx}."
+            )
+
+    for node in grid.nodes_AC:
+        if node.PLi_linked:
+            continue
+        expected_pli = float(node._PLi_base) * float(node.PLi_factor) * float(node.PLi_inv_factor)
+        if abs(float(node.PLi) - expected_pli) > 1e-6:
+            raise ValueError(
+                f"AC node '{node.name}' load consistency mismatch at period {period_idx}, frame {frame_idx}."
+            )
+
+    for node in grid.nodes_DC:
+        if node.PLi_linked:
+            continue
+        expected_pli = float(node._PLi_base) * float(node.PLi_factor) * float(node.PLi_inv_factor)
+        if abs(float(node.PLi) - expected_pli) > 1e-6:
+            raise ValueError(
+                f"DC node '{node.name}' load consistency mismatch at period {period_idx}, frame {frame_idx}."
+            )
+
+
+def _add_period_ms_link_constraints(period_block, grid):
+    def NP_gen_link(m, gen, t):
+        element = grid.Generators[gen]
+        if element.np_gen_opf:
+            return m.np_gen[gen] == m.scenario_model[t].np_gen[gen]
+        return pyo.Constraint.Skip
+
+    def NP_rsgen_link(m, rs, t):
+        element = grid.RenSources[rs]
+        if element.np_rsgen_opf:
+            return m.np_rsgen[rs] == m.scenario_model[t].np_rsgen[rs]
+        return pyo.Constraint.Skip
+
+    def NP_ACline_link(m, line, t):
+        element = grid.lines_AC_exp[line]
+        if element.np_line_opf:
+            return m.NumLinesACP[line] == m.scenario_model[t].NumLinesACP[line]
+        return pyo.Constraint.Skip
+
+    def NP_line_link(m, line, t):
+        element = grid.lines_DC[line]
+        if element.np_line_opf:
+            return m.NumLinesDCP[line] == m.scenario_model[t].NumLinesDCP[line]
+        return pyo.Constraint.Skip
+
+    def NP_conv_link(m, conv, t):
+        element = grid.Converters_ACDC[conv]
+        if element.np_conv_opf:
+            return m.np_conv[conv] == m.scenario_model[t].np_conv[conv]
+        return pyo.Constraint.Skip
+
+    if grid.GPR:
+        period_block.NP_gen_link_constraint = pyo.Constraint(
+            period_block.gen_AC, period_block.scenario_frames, rule=NP_gen_link
+        )
+    if grid.rs_GPR:
+        period_block.NP_rsgen_link_constraint = pyo.Constraint(
+            period_block.ren_sources, period_block.scenario_frames, rule=NP_rsgen_link
+        )
+    if grid.TEP_AC:
+        period_block.NP_ACline_link_constraint = pyo.Constraint(
+            period_block.lines_AC_exp, period_block.scenario_frames, rule=NP_ACline_link
+        )
+    if grid.DCmode:
+        period_block.NP_line_link_constraint = pyo.Constraint(
+            period_block.lines_DC, period_block.scenario_frames, rule=NP_line_link
+        )
+    if grid.ACmode and grid.DCmode:
+        period_block.NP_conv_link_constraint = pyo.Constraint(
+            period_block.conv, period_block.scenario_frames, rule=NP_conv_link
+        )
+
+
+def _build_period_scenario_block(
+    model,
+    grid,
+    period_idx,
+    base_model,
+    Price_Zones,
+    weights_def,
+    n_clusters,
+    clustering,
+    n_years,
+    Hy,
+    discount_rate,
+    NPV,
+    n_init_install=None,
+):
+    period_block = model.inv_model[period_idx]
+    period_block.scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
+    period_block.scenario_model = pyo.Block(period_block.scenario_frames)
+    # Period block only carries shared TEP decisions; full OPF states live in scenario sub-blocks.
+    _initialize_MS_STEP_sets_model(period_block, grid)
+    TEP_variables(period_block, grid, n_init_install=n_init_install)
+
+    _update_grid_investment_period(grid, period_idx)
+
+    w = {}
+    for t in period_block.scenario_frames:
+        for ts in grid.Time_series:
+            update_grid_scenario_frame(grid, ts, t, n_clusters, clustering)
+
+        _validate_period_scenario_updates(grid, period_idx, t, n_clusters, clustering)
+
+        sc_block = period_block.scenario_model[t]
+        sc_block.transfer_attributes_from(base_model.clone())
+
+        _modify_parameters(grid, sc_block, Price_Zones)
+        sc_obj = opf_obj(sc_block, grid, weights_def, True)
+        sc_block.obj = pyo.Objective(rule=sc_obj, sense=pyo.minimize)
+
+        maybe_weight = _scenario_weight_for_frame(grid, t, n_clusters, clustering)
+        if maybe_weight is None:
+            maybe_weight = 1.0 / float(len(period_block.scenario_frames))
+        w[t] = float(maybe_weight)
+
+    period_block.weights = pyo.Param(period_block.scenario_frames, initialize=w)
+    _add_period_ms_link_constraints(period_block, grid)
+
+    expected_opf = sum(
+        period_block.weights[t] * period_block.scenario_model[t].obj.expr
+        for t in period_block.scenario_frames
+    )
+    for t in period_block.scenario_frames:
+        period_block.scenario_model[t].obj.deactivate()
+
+    scaling_factor = present_value_factor(Hy, discount_rate, n_years) if NPV else Hy
+    expected_opf *= scaling_factor
+    period_block.expected_opf = pyo.Expression(expr=expected_opf)
+    period_block.obj = pyo.Objective(expr=period_block.expected_opf, sense=pyo.minimize)
+
+
+
+
+def multi_period_MS_TEP(
+    grid,
+    inv_periods=None,
+    NPV=True,
+    n_years=10,
+    Hy=HOURS_PER_YEAR,
+    discount_rate=DEFAULT_DISCOUNT_RATE,
+    clustering_options=None,
+    ObjRule=None,
+    solver='bonmin',
+    time_limit=None,
+    tee=False,
+    callback=False,
+    alpha=None,
+    limit_flow_rate=True,
+    obj_scaling=1.0,
+    solver_options=None,
+    nlp_warmstart=False,
+    capex_budget=None,
+    save_period_svgs=True,
+    period_svg_prefix='grid_MP_MS_TEP',
+    period_svg_kwargs=None,
+    build_only=False,
+    n_init_install=None,
+):
+    """Build and solve the multi-period, multi-scenario (clustered) TEP.
+
+    Combines the staged investment horizon of
+    :func:`multi_period_transmission_expansion` with the representative-scenario
+    operating-cost evaluation of multi-scenario TEP, so each period's operating
+    cost is averaged over clustered scenarios. Exports the per-period plan and
+    results onto ``grid`` and optionally writes per-period SVG snapshots.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with candidate expandable elements (mutated in place).
+    inv_periods : sequence or None, optional
+        Investment-period definition; ``None`` uses the grid's configured
+        periods.
+    NPV : bool, optional
+        Discount OPEX to present value over the horizon.
+    n_years : int, optional
+        Length of each investment period in years.
+    Hy : float, optional
+        Operating hours per year used to annualise OPEX.
+    discount_rate : float, optional
+        Annual discount rate for present-value discounting.
+    clustering_options : dict or None, optional
+        Options passed to the representative-period clustering.
+    ObjRule : dict or None, optional
+        Objective-component weights; ``None`` uses the grid defaults.
+    solver : str, optional
+        Pyomo (MINLP/NLP) solver name.
+    time_limit : float or None, optional
+        Solver time limit in seconds.
+    tee : bool, optional
+        Stream raw solver output.
+    callback : bool, optional
+        Enable the solver-progress callback.
+    alpha : float or None, optional
+        Weighting between CAPEX (``alpha``) and OPEX (``1-alpha``).
+    limit_flow_rate : bool, optional
+        Enforce line flow-rate limits.
+    obj_scaling : float, optional
+        Divide the objective by this factor for numerical conditioning.
+    solver_options : dict or None, optional
+        Extra solver options.
+    nlp_warmstart : bool, optional
+        Warm-start the NLP from a relaxed/previous solution.
+    capex_budget : float or None, optional
+        Optional cap on total investment cost.
+    save_period_svgs : bool, optional
+        Write an SVG snapshot of the grid for each investment period.
+    period_svg_prefix : str, optional
+        Filename prefix for the per-period SVGs.
+    period_svg_kwargs : dict or None, optional
+        Extra keyword arguments for the SVG export.
+    build_only : bool, optional
+        Build and return the model without solving.
+    n_init_install : {None, "max", "mean"}, optional
+        Pre-installation level used to initialise expandable elements.
+
+    Returns
+    -------
+    tuple
+        ``(model, model_results, timing_info, solver_stats,
+        MP_MS_TEP_results)``.
     """
-    Multi-period Transmission Expansion Planning with time series clustering.
-    Hierarchical model structure:
-    - Level 1: Investment periods
-    - Level 2: Time frames/scenarios for each investment period
-    """
-    # 1. Initial analysis and setup
+    if n_init_install not in (None, "max", "mean"):
+        raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
+    grid.reset_run_flags()
     analyse_grid(grid)
-
     weights_def, Price_Zones = obj_w_rule(grid, ObjRule, True)
 
-    # 2. Set grid parameters
+    if alpha is not None:
+        try:
+            alpha = float(alpha)
+        except (TypeError, ValueError):
+            raise ValueError("alpha must be None or a numeric value in [0, 1].") from None
+        if alpha < 0.0 or alpha > 1.0:
+            raise ValueError("alpha must be in [0, 1].")
+
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate = discount_rate
+
+    if inv_periods:
+        load_factors = np.array(inv_periods, dtype=float)
+        for node in grid.nodes_AC:
+            node.investment_decisions['Load'] = load_factors.copy().tolist()
+        for node in grid.nodes_DC:
+            node.investment_decisions['Load'] = load_factors.copy().tolist()
+
     n_periods = _fill_investment_decisions(grid)
     _validate_grid_for_MP_TEP(grid)
 
-    # 3. Handle time series clustering
-    try:
-        from .Time_series_clustering import cluster_analysis
-        n_clusters,clustering = cluster_analysis(grid,clustering_options)
-    except:
-        n_clusters = len(grid.Time_series[0].data)
-        clustering = False
+    grid.GPR = bool(grid.GPR) or any(
+        gen.np_gen_opf or any(x != 0 for x in _inv_decision(gen, 'planned_installation'))
+        for gen in grid.Generators
+    )
+    grid.rs_GPR = bool(grid.rs_GPR) or any(
+        rs.np_rsgen_opf or any(x != 0 for x in _inv_decision(rs, 'planned_installation'))
+        for rs in grid.RenSources
+    )
+    for gen in grid.Generators:
+        gen.np_gen_mp = gen.np_gen_opf or any(x != 0 for x in _inv_decision(gen, 'planned_installation'))
+    for rs in grid.RenSources:
+        rs.np_rsgen_mp = rs.np_rsgen_opf or any(x != 0 for x in _inv_decision(rs, 'planned_installation'))
 
-    # 4. Create model sets
+    n_clusters, clustering = _resolve_mp_ms_clustering(grid, clustering_options, tee=tee)
+
     t1 = time.time()
     pre_opt_fuel_type_distribution = current_fuel_type_distribution(grid, output='df')
     model = pyo.ConcreteModel()
     model.name = "MP TEP MS MTDC AC/DC hybrid OPF"
-    
-    # Investment periods
     model.inv_periods = pyo.Set(initialize=list(range(0, n_periods)))
-    
-    # Create hierarchical model structure
-    model.inv_model = pyo.Block(model.inv_periods)  # Level 1: Investment periods
-    for i in model.inv_periods:
-        # Time frames for each investment period
-        model.inv_model[i].scenario_frames = pyo.Set(initialize=range(1, n_clusters + 1))
-        model.inv_model[i].scenario_model = pyo.Block(model.inv_model[i].scenario_frames)  # Level 2: Time frames
+    model.inv_model = pyo.Block(model.inv_periods)
+    #model.clustering = clustering
+    #model.n_clusters = n_clusters
+    grid.TEP_n_periods = n_periods
 
-    # 5. Create base model and clone for each period/time frame
     base_model = pyo.ConcreteModel()
-    OPF_create_NLModel_ACDC(base_model, grid, PV_set=False, Price_Zones=Price_Zones, TEP=True)
+    opf_create_nl_model_acdc(
+        base_model,
+        grid,
+        PV_set=False,
+        Price_Zones=Price_Zones,
+        TEP=True,
+        limit_flow_rate=limit_flow_rate,
+        n_init_install=n_init_install,
+    )
 
-    create_scenarios(model.inv_model[i],grid,Price_Zones,weights_def,n_clusters,clustering,NPV,n_years,discount_rate,Hy)
+    for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC + grid.RenSources:
+        _calculate_decomision_period(element, n_years)
 
-    _initialize_MS_STEP_sets_model(model,grid)
-    _MP_TEP_variables(model,grid)
-    _MP_GEN_balance_constraints(model,grid)
+    for i in model.inv_periods:
+        _build_period_scenario_block(
+            model,
+            grid,
+            i,
+            base_model,
+            Price_Zones,
+            weights_def,
+            n_clusters,
+            clustering,
+            n_years,
+            Hy,
+            discount_rate,
+            NPV,
+            n_init_install=n_init_install,
+        )
 
-    
-    net_cost = _MP_TEP_obj(model,grid,n_years,discount_rate)
+    _initialize_MPTEP_sets_model(model, grid)
+    _MP_TEP_variables(model, grid, n_init_install=n_init_install)
+    _MP_TEP_constraints(model, grid)
+    _MP_GEN_balance_constraints(model, grid)
+    _MP_TEP_capex_budget_constraint(model, grid, capex_budget=capex_budget)
+
+    net_cost = _MP_TEP_obj(model, grid, n_years, discount_rate, alpha=alpha)
     if obj_scaling != 1.0:
         net_cost = net_cost / obj_scaling
-    model.obj = pyo.Objective(rule=net_cost, sense=pyo.minimize)
+    model.obj = pyo.Objective(expr=net_cost, sense=pyo.minimize)
     model.obj_scaling = obj_scaling
 
+    if build_only:
+        timing_info = {
+            "create": time.time() - t1,
+            "solve": None,
+            "export": 0.0,
+        }
+        solver_stats = {
+            "solver": None,
+            "termination_condition": "build_only",
+            "solver_message": "build_only=True: model built and solve skipped.",
+            "solution_found": None,
+            "time": None,
+        }
+        return model, None, timing_info, solver_stats, {}
 
-    # 10. Solve the model
     t2 = time.time()
-    model_results, solver_stats = pyomo_model_solve(model, grid, solver)
+    model_results, solver_stats = pyomo_model_solve(
+        model, grid, solver, tee=tee, time_limit=time_limit, callback=callback,
+        solver_options=solver_options, nlp_warmstart=nlp_warmstart
+    )
     t3 = time.time()
 
-    # 11. Export results
-    MINLP = False
-    if solver != 'ipopt':
-        MINLP = True
-    TEP_TS_res = export_MP_TEP_results_toPyflowACDC(
+    if not (solver_stats and solver_stats.get('solution_found', False)):
+        termination = solver_stats.get('termination_condition', 'unknown') if solver_stats else 'unknown'
+        solver_message = solver_stats.get('solver_message', '') if solver_stats else ''
+        msg = f"MP-MS-TEP failed: no feasible solution found (termination: {termination})."
+        if solver_message:
+            msg = f"{msg} Solver message: {solver_message}"
+        raise RuntimeError(msg)
+
+    MINLP = solver != 'ipopt'
+    export_mp_tep_results_to_pyflow_acdc(
         model,
         grid,
-        Price_Zones,
-        MINLP,
+        Price_Zones=Price_Zones,
+        MINLP=MINLP,
         pre_opt_fuel_type_distribution=pre_opt_fuel_type_distribution,
+        export_last_opf_state=False,
+        MS=True,
     )
-    t4 = time.time()
+    _save_inv_models(model, grid)
 
-    timing_info = {
-        "create": t2-t1,
-        "solve": solver_stats['time'],
-        "export": t4-t3,
+    mp_ms_period_results = {}
+    period_scenario_grid_res = {}
+    obj_rows = []
+    last_period = max(model.inv_periods)
+    for i in model.inv_periods:
+        period_block = model.inv_model[i]
+        _set_grid_to_multiperiod_state(grid, i, Price_Zones)
+        period_result = export_acdc_tep_ms_to_pyflow_acdc(
+            period_block, grid, n_clusters, clustering, Price_Zones, mutate_grid=False, not_transposed=True
+        )
+        period_result['Investment_Period'] = int(i)
+        mp_ms_period_results[int(i)] = period_result
+
+        period_scenario_grid_res[int(i)] = {}
+        for t in period_block.scenario_frames:
+            period_scenario_grid_res[int(i)][int(t)] = {
+                'weight': float(pyo.value(period_block.weights[t])),
+                'opf_objective': float(calculate_objective_from_model(period_block.scenario_model[t], grid, weights_def, True)),
+            }
+
+        present_value_tep = 1 / (1 + discount_rate) ** (i * n_years)
+        inv_obj = pyo.value(_inv_model_obj(model, grid, i))
+        opex_obj = pyo.value(period_block.expected_opf)
+        economic_step_obj = inv_obj + opex_obj
+        if alpha is None:
+            step_obj = economic_step_obj
+        else:
+            step_obj = alpha * inv_obj + (1 - alpha) * opex_obj
+        obj_rows.append({
+            'Investment_Period': int(i) + 1,
+            'TEP_Objective': inv_obj,
+            'OPEX_Objective': opex_obj,
+            'STEP_Objective': step_obj,
+            'NPV_STEP_Objective': step_obj * present_value_tep,
+            'STEP_Objective_Economic': economic_step_obj,
+            'NPV_STEP_Objective_Economic': economic_step_obj * present_value_tep,
+        })
+
+    if save_period_svgs:
+        if period_svg_kwargs is None:
+            period_svg_kwargs = {}
+        save_MP_TEP_period_svgs(
+            grid,
+            name_prefix=period_svg_prefix,
+            journal=True,
+            legend=True,
+            Price_Zones=Price_Zones,
+            svg_kwargs=period_svg_kwargs,
+        )
+
+    _set_grid_to_multiperiod_state(grid, last_period, Price_Zones)
+    export_acdc_tep_ms_to_pyflow_acdc(
+        model.inv_model[last_period], grid, n_clusters, clustering, Price_Zones, mutate_grid=True
+    )
+
+    grid.MP_MS_TEP_obj_res = pd.DataFrame(obj_rows)
+    grid.MP_MS_TEP_results = {
+        'clustering': clustering,
+        'n_clusters': n_clusters,
+        'period_results': mp_ms_period_results,
+        'period_scenario_grid_res': period_scenario_grid_res,
+         'investment_summary': grid.MP_TEP_results,
+        'objective_summary': grid.MP_MS_TEP_obj_res,
     }
 
-    return model, model_results, timing_info, solver_stats, TEP_TS_res  
+    t4 = time.time()
+    timing_info = {
+        "create": t2 - t1,
+        "solve": solver_stats['time'],
+        "export": t4 - t3,
+    }
+    return model, model_results, timing_info, solver_stats, grid.MP_MS_TEP_results
 
 
-def save_MP_TEP_period_svgs(grid, name_prefix='grid_MP_TEP', journal=True, legend=True, square_ratio=False, poly=None, linestrings=None):
-    
+def save_MP_TEP_period_svgs(
+    grid,
+    name_prefix='grid_MP_TEP',
+    journal=True,
+    legend=True,
+    square_ratio=False,
+    poly=None,
+    linestrings=None,
+    Price_Zones=False,
+    svg_kwargs=None,
+):
+
     periods = grid.TEP_n_periods
-   
+
+    if svg_kwargs is None:
+        svg_kwargs = {}
+
     for i in range(periods):
             # From DataFrame by names
-        _set_grid_to_multiperiod_state(grid, i) 
-
-        try:
-            create_geometries(grid)
-        except Exception:
-            pass
+        _set_grid_to_multiperiod_state(grid, i, Price_Zones)
+        create_geometries_from_layout(grid)
 
         save_network_svg(
             grid,
@@ -1173,7 +1990,8 @@ def save_MP_TEP_period_svgs(grid, name_prefix='grid_MP_TEP', journal=True, legen
             legend=legend,
             square_ratio=square_ratio,
             poly=poly,
-            linestrings=linestrings
+            linestrings=linestrings,
+            **svg_kwargs,
         )
 
     return
@@ -1192,7 +2010,7 @@ def run_opf_for_investment_period(
     file_name=None,
     print_table=False,
     decimals=3,
-    plot_folium={}
+    save_grid_pkl: bool = False,
 ):
     """
     Apply a dynamic investment state, run OPF, and optionally export Results.All to Excel.
@@ -1208,10 +2026,10 @@ def run_opf_for_investment_period(
             f"investment_period={period_idx} out of range [0, {n_periods - 1}]"
         )
 
-    
+
     _, PZ = obj_w_rule(grid,ObjRule,True)
     _set_grid_to_multiperiod_state(grid, period_idx,PZ)
-    model, model_res, timing_info, solver_stats = Optimal_PF(
+    model, model_res, timing_info, solver_stats = optimal_pf(
         grid,
         ObjRule=ObjRule,
         solver=solver,
@@ -1229,44 +2047,189 @@ def run_opf_for_investment_period(
             'export_location': export_location,
         }
         res.pyomo_model_results(model, solver_stats=solver_stats, model_results=model_res, print_table=False)
-        res.All(**all_kwargs)
+        res.all(**all_kwargs)
 
-    if plot_folium:
-        try:
-            from .Mapping import plot_folium as plot_folium_fn
-            default_map_name = f"{grid.name}_period_{period_idx}"
-            default_map_name = os.path.join(export_location, default_map_name)
+    if save_grid_pkl:
+        from .Export_files import save_pickle
 
-            folium_kwargs = {
-                'planar': False,
-                'scale_gen': False,
-                'plot_load': True,
-                'name': default_map_name,
-            }
-            if isinstance(plot_folium, dict):
-                folium_kwargs.update(plot_folium)
+        base_name = file_name or f"{getattr(grid, 'name', 'grid')}_period_{period_idx}"
+        # Match Excel naming convention in Results.all():
+        #   excel_path = f"{base_name}_results.xlsx"
+        pkl_path = os.path.join(export_location, f"{base_name}_results.pkl")
+        save_pickle(grid, pkl_path, compress=True)
 
-            map_name = str(folium_kwargs.get('name', default_map_name))
-            export_norm = os.path.normpath(export_location)
-            map_norm = os.path.normpath(map_name)
-            # If relative and not already rooted under export_location, place it there.
-            already_under_export = (
-                map_norm == export_norm or
-                map_norm.startswith(export_norm + os.sep)
-            )
-            if not os.path.isabs(map_name) and not already_under_export:
-                map_name = os.path.join(export_location, map_name)
-            folium_kwargs['name'] = map_name
-
-            # Ensure output directory exists for custom map name paths.
-            map_parent = os.path.dirname(str(folium_kwargs.get('name', "")))
-            if map_parent:
-                os.makedirs(map_parent, exist_ok=True)
-
-            plot_folium_fn(grid, **folium_kwargs)
-        except Exception as exc:
-            print(f"Warning: folium plotting skipped ({exc})")
     return model, model_res, timing_info, solver_stats, res
+
+
+def _set_grid_inv_factors_unity(grid):
+    """Reset load / price-zone investment scaling to neutral (no MP growth on demand)."""
+    for price_zone in grid.Price_Zones:
+        price_zone.PLi_inv_factor = 1.0
+        price_zone.curvature_factor = 1.0
+        price_zone.import_expand = 0.0
+    for node in grid.nodes_AC:
+        if getattr(node, 'PLi_linked', False):
+            continue
+        node.PLi_inv_factor = 1.0
+    for node in grid.nodes_DC:
+        if getattr(node, 'PLi_linked', False):
+            continue
+        node.PLi_inv_factor = 1.0
+
+
+def _set_grid_to_nominal_base(grid):
+    """
+    Set expandable assets to nominal multiplicities (``np_line_b``, ``np_conv_b``,
+    ``np_gen_b``, ``np_rsgen_b``). Investment scaling on loads / price zones is
+    reset to unity (``_set_grid_inv_factors_unity``).
+
+    ``current_generation_type_limits`` is set to 1.0 for every ``generation_types``
+    entry. Those limits feed TEP / reporting (e.g. ``GEN_balance_constraints``),
+    not the standard TS-OPF model; keeping them neutral avoids pulling an
+    arbitrary MP-period slice for a run that is meant to be a nominal hardware base.
+    """
+    for line in grid.lines_AC_exp:
+        line.np_line = float(getattr(line, 'np_line_b', line.np_line))
+    for line in grid.lines_DC:
+        line.np_line = float(getattr(line, 'np_line_b', line.np_line))
+    for conv in grid.Converters_ACDC:
+        conv.np_conv = float(getattr(conv, 'np_conv_b', conv.np_conv))
+    for rs in grid.RenSources:
+        rs.np_rsgen = int(getattr(rs, 'np_rsgen_b', rs.np_rsgen))
+    for gen in grid.Generators:
+        gen.np_gen = int(getattr(gen, 'np_gen_b', gen.np_gen))
+    _set_grid_inv_factors_unity(grid)
+    for gen_type in grid.generation_types:
+        grid.current_generation_type_limits[gen_type] = 1.0
+
+
+def run_ts_opf_for_investment_period(
+    grid,
+    investment_period,
+    start=1,
+    end=None,
+    ObjRule=None,
+    price_zone_restrictions=False,
+    print_step=False,
+    limit_flow_rate=True,
+    use_clusters=True,
+    solver='ipopt',
+    obj_scaling=1.0,
+    warm_start_mode='roll',
+    export_to_grid=True,
+    export_excel=True,
+    export_location='MP_investment_periods_TS',
+    file_name=None,
+    plot_ts=False,
+    save_grid_pkl: bool = False,
+    nominal_base=False,
+):
+    """Apply one MP investment state and run time-series OPF.
+
+    Mirrors :func:`run_opf_for_investment_period` but calls
+    :func:`ts_acdc_opf` over ``[start, end]`` with optional clustered frames.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid with MP TEP results and time series attached.
+    investment_period : int
+        Zero-based investment period index (ignored when ``nominal_base=True``).
+    start, end : int, optional
+        Time-step range passed to :func:`ts_acdc_opf`.
+    ObjRule : dict, optional
+        OPF objective weights.
+    price_zone_restrictions : bool
+        Update price-zone restriction coefficients each step.
+    use_clusters : bool
+        Read clustered representative periods when ``True``.
+    warm_start_mode : str
+        Passed to :func:`ts_acdc_opf` (for example ``'roll'``).
+    export_excel : bool
+        Write Excel via :func:`results_ts_opf` when ``True``.
+    export_location, file_name : str, optional
+        Output folder and base filename for exports.
+    plot_ts : bool
+        Save SVG time-series plots when ``True``.
+    nominal_base : bool
+        When ``True``, reset the grid to nominal ``np`` before TS-OPF.
+
+    Returns
+    -------
+    list
+        Per-step timing/info list from :func:`ts_acdc_opf`.
+    """
+    if nominal_base:
+        period_tag = 'base'
+        if print_step:
+            print("[run_ts_opf_for_investment_period] applying state: nominal_base")
+        _set_grid_to_nominal_base(grid)
+    else:
+        period_idx = int(investment_period)
+        n_periods = int(getattr(grid, 'TEP_n_periods', 0) or 0)
+        if n_periods > 0 and (period_idx < 0 or period_idx >= n_periods):
+            raise ValueError(
+                f"investment_period={period_idx} out of range [0, {n_periods - 1}]"
+            )
+        period_tag = period_idx
+        if print_step:
+            print(f"[run_ts_opf_for_investment_period] applying state: investment_period={period_idx}")
+        _, PZ = obj_w_rule(grid, ObjRule, True)
+        _set_grid_to_multiperiod_state(grid, period_idx, PZ)
+
+    times = ts_acdc_opf(
+        grid,
+        start=start,
+        end=end,
+        ObjRule=ObjRule,
+        price_zone_restrictions=price_zone_restrictions,
+        expand=False,
+        print_step=print_step,
+        limit_flow_rate=limit_flow_rate,
+        use_clusters=use_clusters,
+        solver=solver,
+        obj_scaling=obj_scaling,
+        warm_start_mode=warm_start_mode,
+        export_to_grid=export_to_grid,
+    )
+
+    # Export TS results to Excel, following the same naming conventions used elsewhere.
+    export_location = export_location or 'MP_investment_periods_TS'
+    os.makedirs(export_location, exist_ok=True)
+    if nominal_base:
+        base_name = file_name or f"{getattr(grid, 'name', 'grid')}_TS_base"
+    else:
+        base_name = file_name or f"{getattr(grid, 'name', 'grid')}_TS_period_{period_tag}"
+    excel_path = os.path.join(export_location, base_name)
+
+    if export_excel:
+        results_ts_opf(grid, excel_file_path=excel_path, times=times)
+
+    if save_grid_pkl:
+        from .Export_files import save_pickle
+
+        pkl_path = os.path.join(export_location, f"{base_name}_results.pkl")
+        save_pickle(grid, pkl_path, compress=True)
+
+    if plot_ts:
+        try:
+            from .Graph_and_plot import plot_TS_res
+
+            ts_svg_dir = os.path.join(export_location, f"ts_svg_period_{period_tag}")
+            os.makedirs(ts_svg_dir, exist_ok=True)
+            plot_TS_res(
+                grid,
+                start=start,
+                end=end,
+                show=False,
+                path=ts_svg_dir,
+                save_format='svg',
+                skip_failed=True,
+            )
+        except Exception as exc:
+            print(f"Warning: TS plotting skipped ({exc})")
+
+    return times
 
 
 def run_opf_for_all_investment_periods(
@@ -1281,7 +2244,14 @@ def run_opf_for_all_investment_periods(
     file_name_prefix=None,
     print_table=False,
     decimals=3,
-    plot_folium=None,
+    plot:bool =False,
+    save_grid_pkl: bool = False,
+    MS: bool = False,
+    ts_start: int = 1,
+    ts_end: int = None,
+    ts_use_clusters: bool = True,
+    ts_include_base_case: bool = True,
+    ts_warm_start_mode: str = 'roll',
 ):
     """
     Run OPF for every dynamic investment period and export one Excel per period.
@@ -1290,52 +2260,149 @@ def run_opf_for_all_investment_periods(
     - `<grid.name>_res_invperiod_0_results.xlsx`
     - `<grid.name>_res_invperiod_1_results.xlsx`
     - ...
+
+    When ``MS=True``, each integer key ``i`` also has ``ts_results`` (snapshot of
+    ``grid.time_series_results`` and ``S_base``), and ``period_results['ts_inv']``
+    maps period index to that snapshot for ``create_mp_ts_dash`` / ``run_mp_ts_dash``.
+
+    If ``ts_include_base_case`` is True (default), run a **nominal-base** TS first
+    (see ``_set_grid_to_nominal_base``). Results go under ``period_results['base']``
+    and ``ts_inv['base']`` for Dash comparison.
+
+    ``ts_warm_start_mode`` is passed to ``TS_ACDC_OPF`` (``'roll'`` = continue from
+    the previous timestep solution; ``'hard'`` = reset decision variables to the
+    snapshot taken when the TS model was first built, before each timestep solve).
     """
     n_periods = grid.TEP_n_periods
 
 
     prefix = file_name_prefix or f"{grid.name}_res_invperiod"
     period_results = {}
+    ts_export_location = export_location or 'MP_investment_periods_TS'
 
-    for i in range(n_periods):
-        run_out = run_opf_for_investment_period(
+    if MS and ts_include_base_case:
+        ts_prefix = f"{prefix}_TS"
+        if tee:
+            print(
+                f"[run_opf_for_all_investment_periods] TS-OPF base case "
+                f"(use_clusters={ts_use_clusters}, start={ts_start}, end={ts_end})"
+            )
+        times = run_ts_opf_for_investment_period(
             grid,
-            investment_period=i,
+            investment_period=0,
+            start=ts_start,
+            end=ts_end,
             ObjRule=ObjRule,
+            print_step=tee,
+            use_clusters=ts_use_clusters,
             solver=solver,
-            tee=tee,
-            limit_flow_rate=limit_flow_rate,
             obj_scaling=obj_scaling,
+            warm_start_mode=ts_warm_start_mode,
             export_excel=export_excel,
-            export_location=export_location,
-            file_name=f"{prefix}_{i}",
-            print_table=print_table,
-            decimals=decimals,
-            plot_folium=plot_folium
+            export_location=ts_export_location,
+            file_name=f"{ts_prefix}_base",
+            plot_ts=bool(plot),
+            save_grid_pkl=save_grid_pkl,
+            nominal_base=True,
         )
-        period_results[i] = {
-            'model': run_out[0],
-            'model_res': run_out[1],
-            'timing_info': run_out[2],
-            'solver_stats': run_out[3],
-            'results_obj': run_out[4],
+        ts_snap = _snapshot_ts_results(grid)
+        ts_snap['times'] = times
+        period_results['base'] = {
+            'times': times,
+            'export_location': ts_export_location,
+            'ts_results': ts_snap,
         }
 
-    
+    for i in range(n_periods):
+        if not MS:
+            # Standard snapshot OPF for each investment period.
+            run_out = run_opf_for_investment_period(
+                grid,
+                investment_period=i,
+                ObjRule=ObjRule,
+                solver=solver,
+                tee=tee,
+                limit_flow_rate=limit_flow_rate,
+                obj_scaling=obj_scaling,
+                export_excel=export_excel,
+                export_location=export_location,
+                file_name=f"{prefix}_{i}",
+                print_table=print_table,
+                decimals=decimals,
+                save_grid_pkl=save_grid_pkl,
+            )
+            period_results[i] = {
+                'model': run_out[0],
+                'model_res': run_out[1],
+                'timing_info': run_out[2],
+                'solver_stats': run_out[3],
+                'results_obj': run_out[4],
+            }
+        else:
+            # MS=True: run a TS-OPF for each investment period instead of a single snapshot OPF.
+            # pyflow-acdc takes this as a time-series post-analysis on the MP solution.
+            ts_prefix = f"{prefix}_TS"
+            if tee:
+                print(
+                    f"[run_opf_for_all_investment_periods] TS-OPF investment_period={i} "
+                    f"(use_clusters={ts_use_clusters}, start={ts_start}, end={ts_end})"
+                )
+            times = run_ts_opf_for_investment_period(
+                grid,
+                investment_period=i,
+                start=ts_start,
+                end=ts_end,
+                ObjRule=ObjRule,
+                print_step=tee,
+                use_clusters=ts_use_clusters,
+                solver=solver,
+                obj_scaling=obj_scaling,
+                warm_start_mode=ts_warm_start_mode,
+                export_excel=export_excel,
+                export_location=ts_export_location,
+                file_name=f"{ts_prefix}_{i}",
+                plot_ts=bool(plot),
+                save_grid_pkl=save_grid_pkl,
+            )
+            ts_snap = _snapshot_ts_results(grid)
+            ts_snap['times'] = times
+            period_results[i] = {
+                'times': times,
+                'export_location': ts_export_location,
+                'ts_results': ts_snap,
+            }
+
+    if MS and period_results:
+        ts_inv = {}
+        if 'base' in period_results and 'ts_results' in period_results['base']:
+            ts_inv['base'] = period_results['base']['ts_results']
+        for k, v in period_results.items():
+            if isinstance(k, int) and 'ts_results' in v:
+                ts_inv[k] = v['ts_results']
+        period_results['ts_inv'] = ts_inv
+        grid.ts_inv = ts_inv
 
     return period_results
 
-def _set_grid_to_multiperiod_state(grid, investment_period,Price_Zones=False):    
+
+def _set_grid_to_multiperiod_state(grid, investment_period,Price_Zones=False):
+    def _np_dynamic_at(inv_dict, period, fallback):
+        """Return np_dynamic[period] if in range; otherwise fallback."""
+        series = inv_dict["np_dynamic"]
+        if period < len(series):
+            return series[period]
+        return fallback
+
     for line in grid.lines_AC_exp:
-        line.np_line = line.investment_decisions['np_dynamic'][investment_period]
+        line.np_line = _np_dynamic_at(line.investment_decisions, investment_period, line.np_line)
     for line in grid.lines_DC:
-        line.np_line = line.investment_decisions['np_dynamic'][investment_period]
+        line.np_line = _np_dynamic_at(line.investment_decisions, investment_period, line.np_line)
     for conv in grid.Converters_ACDC:
-        conv.np_conv = conv.investment_decisions['np_dynamic'][investment_period]
+        conv.np_conv = _np_dynamic_at(conv.investment_decisions, investment_period, conv.np_conv)
     for rs in grid.RenSources:
-        rs.np_rsgen = rs.investment_decisions['np_dynamic'][investment_period]
+        rs.np_rsgen = _np_dynamic_at(rs.investment_decisions, investment_period, rs.np_rsgen)
     for gen in grid.Generators:
-        gen.np_gen = gen.investment_decisions['np_dynamic'][investment_period]
+        gen.np_gen = _np_dynamic_at(gen.investment_decisions, investment_period, gen.np_gen)
     _update_grid_investment_period(grid, investment_period)
     # Keep active single-period limits aligned with selected period.
     series_map = grid.generation_type_limits
@@ -1349,20 +2416,41 @@ def _calculate_decomision_period(element,n_years):
 
     element.decomision_period = math.ceil(element.life_time/n_years)
 
-def calculate_DTEP_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False):
+def calculate_mptep_objective_from_model(model,grid,weights_def,n_years,discount_rate,multi_scenario=False):
     inv_objs = {}
     inv_opf_objs = {}
-    for i in model.inv_periods:    
+    for i in model.inv_periods:
         opf_objs = []
         if multi_scenario:
-            for t in model.scenario_frames:
-                opf_obj = calculate_objective_from_model(model.inv_model[i].scenario_model[t],grid,weights_def,True)
-                opf_objs.append(opf_obj)
+            period_block = model.inv_model[i]
+            if not hasattr(period_block, 'scenario_frames') or not hasattr(period_block, 'scenario_model'):
+                raise ValueError(f"Investment period {i} has no scenario blocks for multi-scenario objective extraction.")
+            for t in period_block.scenario_frames:
+                opf_obj_from_model = calculate_objective_from_model(period_block.scenario_model[t],grid,weights_def,True)
+                opf_objs.append(opf_obj_from_model)
         else:
             opf_objs = [calculate_objective_from_model(model.inv_model[i],grid,weights_def,True)]
 
-        tep_obj = _inv_model_obj(model,grid,i)  
+        tep_obj = _inv_model_obj(model,grid,i)
         tep_obj_value = pyo.value(tep_obj)
         inv_objs[i] = tep_obj_value
         inv_opf_objs[i] = opf_objs
     return inv_objs, inv_opf_objs
+
+def _deactivate_non_pre_existing_loads(grid):
+    for price_zone in grid.Price_Zones:
+        inv0_load = price_zone.investment_decisions["Load"][0]
+        if inv0_load == 0.0:
+            price_zone.PLi_inv_factor = 0.0
+    for node in grid.nodes_AC:
+        if node.PLi_linked:
+            continue
+        inv0_load = node.investment_decisions["Load"][0]
+        if inv0_load == 0.0:
+            node.PLi_inv_factor = 0.0
+    for node in grid.nodes_DC:
+        if node.PLi_linked:
+            continue
+        inv0_load = node.investment_decisions["Load"][0]
+        if inv0_load == 0.0:
+            node.PLi_inv_factor = 0.0

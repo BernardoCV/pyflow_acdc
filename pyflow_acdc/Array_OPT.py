@@ -1,3 +1,18 @@
+"""Offshore-array inter-array cable sizing.
+
+Two coupled problems, usually run in sequence by ``sequential_CSS``:
+
+- **Route** — ``MIP_path_graph`` selects which candidate CT lines are built
+  (spanning tree, turbine-string flow, substation connection limits).
+  With ``enable_cable_types=True``, route and cable-type choice are solved
+  together in one MIP; otherwise routing only.
+- **CSS** — ``wind_farm_CSS`` picks cable types on the fixed topology via
+  ``linear_transmission_expansion`` (Pyomo) or ``optimal_l_css_ortools``
+  (OR-Tools). Does not change which lines exist.
+
+Owns path-MIP orchestration and CSS dispatch. Solver-specific linear CSS
+implementation lives in ``AC_L_CSS_ortools``.
+"""
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -6,7 +21,6 @@ import numpy as np
 import math
 import pyomo.environ as pyo
 import pandas as pd
-import sys
 try:
     import gurobipy
     GUROBI_AVAILABLE = True
@@ -19,19 +33,31 @@ try:
 except ImportError:
     ORTOOLS_AVAILABLE = False
 
-from .ACDC_OPF_NL_model import OPF_create_NLModel_ACDC,TEP_variables
-from .AC_OPF_L_model import OPF_create_LModel_AC,ExportACDC_Lmodel_toPyflowACDC
-from .ACDC_OPF import pyomo_model_solve,OPF_obj,OPF_obj_L,obj_w_rule,ExportACDC_NLmodel_toPyflowACDC,calculate_objective,reset_to_initialize
+from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables
+from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
+from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
+from .constants import (
+    HOURS_PER_YEAR,
+    DEFAULT_DISCOUNT_RATE,
+    DEFAULT_TIME_LIMIT,
+    present_value_factor,
+    NodeType,
+    CssMode,
+    MIPBackend,
+    ObjComponent,
+    CT_SELECTION_THRESHOLD,
+    ORTOOLS_LINEAR_SOLVERS,
+)
 
 
 __all__ = [
     'sequential_CSS',
     'min_sub_connections',
     'MIP_path_graph',
-    'simple_CSS',
+    'wind_farm_CSS',
     'simple_assign_cable_types'
 ]
 
@@ -46,7 +72,7 @@ class MIPConfig:
     while keeping the public function signatures unchanged.
     """
     solver_name: str = 'glpk'
-    backend: str = 'pyomo'
+    backend: str = MIPBackend.PYOMO.value
     crossings: bool = False
     tee: bool = False
     callback: bool = False
@@ -56,12 +82,23 @@ class MIPConfig:
     t_MW: float | None = None
 
 
-def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
-                   MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=300,NL=False,tee=False,fs=False,save_path=None,
-                   MIP_gap=0.01,backend='pyomo',min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
-    
+def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,L_OPEX=True,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
+                   MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=DEFAULT_TIME_LIMIT,NL=False,tee=False,fs=False,save_path=None,
+                   MIP_gap=0.01,backend=MIPBackend.PYOMO.value,min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
+    """Iteratively alternate path MIP and CSS on a shrinking cable-type set.
+
+    Each iteration: (1) ``MIP_path_graph`` fixes the inter-array route on
+    ``grid.lines_AC_ct``; (2) ``wind_farm_CSS`` sizes cables on that topology
+    (no routing inside CSS). Stops when the largest usable cable type is
+    eliminated or ``max_iter`` is reached.
+
+    ``L_OPEX`` enables discounted array-loss OPEX on linear CSS passes.
+    Nonlinear CSS (``NL=CssMode.OPF``) always includes array-loss OPEX.
+    """
     if LCoE is not None:
         grid.LCoE = LCoE
+    if NL == True:
+        NL = CssMode.OPF.value
     # Determine save directory: create "sequential_CSS" folder
     if save_path is not None and os.path.isdir(save_path):
         # If save_path is provided and is a directory, create "sequential_CSS" inside it
@@ -69,31 +106,32 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
     else:
         # If save_path is None or not a directory, create "sequential_CSS" in current working directory
         save_dir = 'sequential_CSS'
-    if MIP_solver == 'ortools':
-        backend = 'ortools'
+    if MIP_solver == MIPBackend.ORTOOLS.value:
+        backend = MIPBackend.ORTOOLS.value
     # Create the directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
 
-    staring_cables = grid.Cable_options[0].cable_types
-    new_cables = staring_cables.copy()
-  
+
+    starting_cables = grid.Cable_options[0].cable_types
+    new_cables = starting_cables.copy()
+
     results = []
     tot_timing_info = {}
     i = 0
     seq_path_time = 0
     seq_css_time = 0
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(
+        grid,
+        {ObjComponent.ARRAY_LOSSES.value: 1} if L_OPEX else None,
+        True)
     t0 = time.perf_counter()
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
-    #print(f'DEBUG: t_MW {t_MW}')
-    #print(f'DEBUG: starting max flow {max_flow}')
 
     if max_iter is None:
         max_iter = len(grid.Cable_options[0].cable_types)
     og_cable_types = grid.Cable_options[0].cable_types.copy()
-    
+
     MIP_time = grid.MIP_time
     if max_turbines_per_string is not None:
         max_flow = max_turbines_per_string
@@ -121,7 +159,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
 
     while flag:
         timing_info = {}
-        
+
         t1 = time.perf_counter()
         if sub_min_connections:
             if tee and i==0:
@@ -137,21 +175,19 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
                 grid, max_flow, mip_cfg=mip_cfg,sub_k_max=max_ns
             )
             sub_iter = 1
-        
+
         t2 = time.perf_counter()
-        if tee:     
+        if tee:
             print(f'Iteration {i} MIP finished in {t2 - t1} seconds')
         timing_info['Paths'] = t2 - t1
         seq_path_time += t2 - t1
 
         if not flag:
             if i == 0:
-                # If MIP fails on first iteration, return None
                 if tee:
                     print(f'MIP failed on first iteration, returning None')
                 return None, None, None, None,i
             else:
-                # If MIP fails on later iterations, break the loop
                 if tee:
                     print(f'MIP failed on iteration {i}, breaking loop')
                 break
@@ -165,114 +201,129 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         else:
             raise AttributeError("model_MIP must have either 'objective' (Pyomo) or 'objective_value' (OR-Tools) attribute")
         if  high_flow < max_flow:
-            
-            max_power_per_string = t_MW*high_flow 
+
+            max_power_per_string = t_MW*high_flow
             first_index_to_comply = next((i for i, rating in enumerate(grid.Cable_options[0].MVA_ratings) if rating >= max_power_per_string), len(grid.Cable_options[0].MVA_ratings) - 1)
             for line in grid.lines_AC_ct:
                 if line.active_config > 0:
                     line.active_config = first_index_to_comply
 
             grid.Cable_options[0].cable_types = grid.Cable_options[0]._cable_types[:first_index_to_comply + 1]
-           
+
             grid.max_turbines_per_string = high_flow
         iter_cab_available= grid.Cable_options[0].cable_types.copy()
         if tee:
-            print(f'DEBUG: Iteration {i} iter_cab_available: {iter_cab_available}')
-        
+            print(f'Iteration {i} iter_cab_available: {iter_cab_available}')
+
         t3 = time.perf_counter()
-        #print(f'DEBUG: Iteration {i}')
-        if NL == 'OPF':
+        if NL == CssMode.OPF:
             from .Graph_and_plot import save_network_svg
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             os.makedirs(intermediate_dir, exist_ok=True)
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_preCSS', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
-        
+
         # OPF uses NL solver; False and PF both use linear CSS
-        css_NL = (NL == 'OPF')
-        model, model_results, timing_info_CSS, solver_stats = simple_CSS(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_L_solver,CSS_NL_solver,time_limit,css_NL,tee,fs=fs)
-        css_status_ok = model_results is not None and model_results['Solver'][0]['Status'] == 'ok'
-        css_solution_found = solver_stats.get('solution_found', False) if solver_stats else False
-        css_ok = css_status_ok or css_solution_found
+        css_NL = (NL == CssMode.OPF)
+        model, model_results, timing_info_CSS, solver_stats = wind_farm_CSS(
+            grid, NPV, n_years, Hy, discount_rate, L_OPEX=L_OPEX,
+            CSS_L_solver=CSS_L_solver, CSS_NL_solver=CSS_NL_solver,
+            time_limit=time_limit, NL=css_NL, tee=tee, fs=fs)
+        css_ok = solver_stats.get('solution_found', False) if solver_stats else False
         feasible_solutions_CSS = solver_stats.get('feasible_solutions', []) if solver_stats else []
         t4 = time.perf_counter()
         if tee:
             print(f'Iteration {i} CSS finished in {t4 - t3} seconds')
-            if not css_status_ok and css_solution_found:
+            if css_ok:
                 tc = solver_stats.get('termination_condition', 'unknown') if solver_stats else 'unknown'
-                print(f'  Warning: solver status not ok (termination: {tc}), but feasible solution found — using it')
+                print(f'  CSS feasible solution accepted (termination: {tc})')
         timing_info['CSS'] = t4 - t3
         seq_css_time += t4 - t3
         if svg is not None:
             if tee:
                 print(f'Iteration {i} saving SVG')
             from .Graph_and_plot import save_network_svg
-            CSS_solver = CSS_NL_solver if NL == 'OPF' else CSS_L_solver
+            CSS_solver = CSS_NL_solver if NL == CssMode.OPF else CSS_L_solver
             # Save SVG in the sequential_CSS folder
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             if not os.path.exists(intermediate_dir):
                 os.makedirs(intermediate_dir)
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_{CSS_solver}', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
-        
+
         if css_ok:
-            obj_value = pyo.value(model.obj)
+            if CSS_L_solver == MIPBackend.ORTOOLS.value:
+                obj_value = model_results.get('objective_value') if model_results else None
+            else:
+                obj_value = pyo.value(model.obj)
         else:
+            if NL != CssMode.OPF:
+                if tee:
+                    print(f'Iteration {i} linear CSS failed, stopping sequential_CSS')
+                return None, None, None, None, i
             if tee:
                 print(f'Iteration {i} CSS solver status not ok and no feasible solution found, skipping to next cable combo')
             obj_value = None
 
-        
-        
-        #print('DEBUG: Iteration',i)
-
         used_cable_types = []
         used_cable_names = []
-        
+
         # Analyze which cable types were used in the optimization
         if css_ok:
-            # Get the cable types that were actually used
-           
-            for ct in model.ct_set:
-                if pyo.value(model.ct_types[ct]) > 0.5:  # Binary variable > 0.5 means it was selected
-                    used_cable_types.append(ct)
-                    used_cable_names.append(grid.Cable_options[0].cable_types[ct])
-            #print(f'DEBUG: Used cable types: {used_cable_types}')
-            
+            if CSS_L_solver == MIPBackend.ORTOOLS.value:
+                ac_vars = model_results.get('ac_vars') if model_results else None
+                if ac_vars and 'ct_types' in ac_vars:
+                    used_cable_types = sorted([
+                        ct for ct in ac_vars['ct_types']
+                        if ac_vars['ct_types'][ct].solution_value()
+                        >= CT_SELECTION_THRESHOLD
+                    ])
+                else:
+                    used_cable_types = sorted({
+                        line.active_config
+                        for line in grid.lines_AC_ct
+                        if line.active_config >= 0
+                    })
+                used_cable_names = [
+                    grid.Cable_options[0].cable_types[ct] for ct in used_cable_types
+                ]
+            else:
+                for ct in model.ct_set:
+                    if pyo.value(model.ct_types[ct]) > 0.5:
+                        used_cable_types.append(ct)
+                        used_cable_names.append(grid.Cable_options[0].cable_types[ct])
+
             if used_cable_types:
                 # Find the largest cable type that was used
                 largest_used_index = max(used_cable_types)
-              
+
                 new_cables = new_cables[:largest_used_index]
-                
+
             else:
                 # No cable types were used, remove the largest one
                 new_cables.pop()
-               
+
         else:
-            # Optimization failed, remove the largest cable type
+            # Nonlinear OPF CSS failed: remove the largest cable type and continue
             new_cables.pop()
-           
-        
-       
-        
+
         # Check if it's Pyomo or OR-Tools MockModel
         if hasattr(model_MIP, 'line_used') and hasattr(model_MIP, 'lines'):
             # Pyomo model
             cable_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.lines))
-            weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.lines))
+            weighted_length = pyo.value(sum(model_MIP.line_used[line] * grid.lines_AC_ct[line].trench_length_km for line in model_MIP.lines))
         elif hasattr(model_MIP, 'line_used_vals'):
             # OR-Tools MockModel
             cable_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].Length_km for line in model_MIP.line_used_vals.keys())
-            weighted_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].trench_lenght_km for line in model_MIP.line_used_vals.keys())
+            weighted_length = sum(model_MIP.line_used_vals[line] * grid.lines_AC_ct[line].trench_length_km for line in model_MIP.line_used_vals.keys())
 
         else:
             raise AttributeError("model_MIP must have either Pyomo attributes ('line_used', 'lines') or OR-Tools attribute ('line_used_vals')")
-        
+
         t5 = time.perf_counter()
         timing_info['processing'] = (t5 - t1)-(timing_info['Paths']+timing_info['CSS'])
-        # Compute cable cost matching TEP_obj Array_investments()
-        
-               
-        present_value_factor = Hy * (1 - (1 + discount_rate) ** -n_years) / discount_rate
+        # Compute cable cost matching tep_obj Array_investments()
+
+
+        pv_factor = present_value_factor(Hy, discount_rate, n_years)
 
         if obj_value is None:
             cable_cost = None
@@ -281,21 +332,21 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             opt_obj = None
             total_cost = None
         else:
-            if NL == 'OPF':
+            if NL == CssMode.OPF:
                 # OPF: losses from NL solver export
                 loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
-                loss_cost = loss_MW * present_value_factor*grid.LCoE
+                loss_cost = loss_MW * pv_factor*grid.LCoE
                 cable_cost = 0
                 for line in grid.lines_AC_ct:
                     if line.active_config >= 0:
                         cable_cost += line.base_cost[line.active_config]
                 opt_obj = MIP_obj_value + cable_cost + loss_cost
-            elif NL == 'PF':
+            elif NL == CssMode.PF:
                 # PF: post-processing power flow for losses, not in opt_obj
-                from .ACDC_PF import Power_flow
-                Power_flow(grid)
+                from .ACDC_PF import power_flow
+                power_flow(grid)
                 loss_MW = sum(line.P_loss for line in grid.lines_AC_ct) * grid.S_base
-                loss_cost = loss_MW * present_value_factor*grid.LCoE
+                loss_cost = loss_MW * pv_factor*grid.LCoE
                 cable_cost = obj_value
                 opt_obj = cable_cost + MIP_obj_value
             else:
@@ -328,8 +379,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             'feasible_solutions_MIP': feasible_solutions_MIP,
             'feasible_solutions_CSS': feasible_solutions_CSS
         }
-        results.append(iteration_result)  # Add to the results list   
-        
+        results.append(iteration_result)  # Add to the results list
+
         if i > 0 and opt_obj is not None and results[i-1]['opt_obj'] is not None:
             if opt_obj > results[i-1]['opt_obj']:
                 if tee:
@@ -343,7 +394,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         # Update grid with new cable set
         if len(new_cables) > 0:
             grid.Cable_options[0].cable_types = new_cables
-            
+
             # Recalculate max_flow based on current cable set
             max_cable_capacity = max(grid.Cable_options[0].MVA_ratings)
             max_flow = int(max_cable_capacity / t_MW)
@@ -385,7 +436,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
         best_result = valid_results[0]
     else:
         best_result = results[0]  # All failed, return first
-    
+
 
     if fs:
         feasible_solutions_MIP = [result['feasible_solutions_MIP'] for result in results]
@@ -415,8 +466,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             save_path=feasible_sol_excel_path
         )
 
-    
-    
+
+
 
     model = best_result['CSS_model']
     model_MIP = best_result['MIP_model']
@@ -440,13 +491,18 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
             used_types.add(line.active_config)
     grid.Cable_options[0].active_config = [1 if k in used_types else 0 for k in range(len(og_cable_types))]
 
-    if NL == 'OPF':
-        ExportACDC_NLmodel_toPyflowACDC(model, grid, PZ, TEP=True)
+    if NL == CssMode.OPF:
+        export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ, TEP=True)
+    elif CSS_L_solver == MIPBackend.ORTOOLS.value:
+        from .AC_L_CSS_ortools import export_acdc_l_model_to_pyflow_acdc_ortools
+        export_acdc_l_model_to_pyflow_acdc_ortools(
+            model, grid, model_results['gen_vars'], model_results['ac_vars'],
+            tee=tee, time_limit=time_limit)
     else:
-        ExportACDC_Lmodel_toPyflowACDC(model, grid, solver_results=model_results, tee=tee)
+        export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=model_results, tee=tee)
 
 
-    present_value = Hy*(1 - (1 + discount_rate) ** -n_years) / discount_rate
+    present_value = present_value_factor(Hy, discount_rate, n_years)
     for obj in weights_def:
         weights_def[obj]['v']=calculate_objective(grid,obj,True)
         weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
@@ -460,11 +516,11 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=8760,discount_rate=0.02
 
     models = (model_MIP,model)
     return models, summary_results , tot_timing_info, solver_stats,best_i
-    
+
 
 
 def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True, tee=False, max_ns=None,
-                        callback=False, MIP_gap=None, backend='pyomo',
+                        callback=False, MIP_gap=None, backend=MIPBackend.PYOMO.value,
                         min_turbines_per_string=False, mip_cfg: MIPConfig | None = None,t_MW=None):
     # If a MIPConfig is provided, let it override the individual flags.
     if mip_cfg is not None:
@@ -485,7 +541,7 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
     sn = grid.nn_AC - grid.n_ren
 
     ns = math.ceil(tn/(sn* max_flow))
-    
+
     # If the minimum required ns already exceeds max_ns, the problem is infeasible
     if max_ns is not None and ns > max_ns:
         if tee:
@@ -501,13 +557,13 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
         if tee:
             print(f'Iteration sub-{i} starting min sub connections')
             if min_turbines_per_string:
-                min_t_s = math.floor(tn / (sn * ns))   
+                min_t_s = math.floor(tn / (sn * ns))
             else:
                 min_t_s = min_turbines_per_string
-            print(f'Connecting {tn} turbines to {sn} substations')    
+            print(f'Connecting {tn} turbines to {sn} substations')
             print(f'max connection to substations: {ns}, max turbines per connection: {max_flow}, min turbines per string: {min_t_s}')
         for node in grid.nodes_AC:
-            if node.type == 'Slack':
+            if node.type == NodeType.SLACK:
                 node.ct_limit = ns
 
         t0 = time.perf_counter()
@@ -537,7 +593,7 @@ def min_sub_connections(grid, max_flow=None, solver_name='glpk', crossings=True,
                         print(f'Iteration sub-{i} ns increased to {ns} (max_ns reached), breaking loop')
                     break
                 ns+=1
-                
+
             if tee:
                 print(f'Iteration sub-{i} ns increased to {ns}')
 
@@ -578,7 +634,7 @@ def simple_assign_cable_types(grid, model, t_MW=None):
 
 
 def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False,
-                   callback=False, MIP_gap=None, backend='pyomo',
+                   callback=False, MIP_gap=None, backend=MIPBackend.PYOMO.value,
                    enable_cable_types=False, t_MW=None, cab_types_allowed=None,
                    min_turbines_per_string=False, fixed_substation_connections=None,
                    min_sub_connections=False, sub_k_max=None,
@@ -586,23 +642,31 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                    flow_dir_tightening='auto',
                    solver_options_override: dict | None = None):
     """
-    Solve the master MIP problem and track feasible solutions over time.
-    
-    Parameters:
-    -----------
+    Solve the inter-array path MIP (route selection).
+
+    Selects a minimum-cost spanning forest over candidate CT lines. Set
+    ``enable_cable_types=True`` to co-optimize cable types in the same MIP;
+    otherwise only routing is optimized and cable sizing is delegated to
+    ``wind_farm_CSS``.
+
+    Parameters
+    ----------
     backend : str, optional
-        Backend to use: 'pyomo' (default) or 'ortools'
-        - 'pyomo': Uses Pyomo with external solver (GLPK, Gurobi, etc.)
-        - 'ortools': Uses OR-Tools CP-SAT solver (built-in, faster)
+        ``'pyomo'`` (default) or ``'ortools'``. Pyomo uses ``solver_name``
+        (Gurobi, GLPK, etc.). OR-Tools uses CP-SAT by default; if
+        ``solver_name`` is in
+        :data:`~pyflow_acdc.constants.ORTOOLS_LINEAR_SOLVERS` (GUROBI / SCIP /
+        CBC), the Pyomo path is used with that solver instead.
     enable_cable_types : bool
-        If True, enable individual cable type selection per line
+        If True, solve route + cable size selection in one MIP; if False,
+        route only (cable sizing is done separately by ``wind_farm_CSS``).
     t_MW : float
         Turbine MW rating (needed to calculate flow capacity from MVA ratings)
     cab_types_allowed : int, optional
         Maximum number of cable types that can be used (linking constraint)
-    
-    Returns:
-    --------
+
+    Returns
+    -------
     success : bool
         True if solution found, False otherwise
     high_flow : float or None
@@ -630,13 +694,40 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     if t_MW is None:
         t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
     # Route to appropriate backend
-    if backend.lower() == 'ortools':
+    if backend.lower() == MIPBackend.ORTOOLS.value:
+        linear_solver = (solver_name or '').upper()
+        if linear_solver in ORTOOLS_LINEAR_SOLVERS:
+            if tee:
+                print(
+                    f"Path MIP: OR-Tools linear solver '{solver_name}' requested; "
+                    f"using Pyomo path with solver '{solver_name.lower()}'."
+                )
+            return MIP_path_graph(
+                grid,
+                max_flow=max_flow,
+                solver_name=solver_name.lower(),
+                crossings=crossings,
+                tee=tee,
+                callback=callback,
+                MIP_gap=MIP_gap,
+                backend=MIPBackend.PYOMO.value,
+                enable_cable_types=enable_cable_types,
+                t_MW=t_MW,
+                cab_types_allowed=cab_types_allowed,
+                min_turbines_per_string=min_turbines_per_string,
+                fixed_substation_connections=fixed_substation_connections,
+                min_sub_connections=min_sub_connections,
+                sub_k_max=sub_k_max,
+                mip_cfg=mip_cfg,
+                flow_dir_tightening=flow_dir_tightening,
+                solver_options_override=solver_options_override,
+            )
         if not ORTOOLS_AVAILABLE:
             raise ImportError(
                 "OR-Tools is not installed. Please install it with: pip install ortools\n"
                 "Alternatively, use backend='pyomo' (default) which uses Pyomo with external solvers."
             )
-        return MIP_path_graph_ortools(grid, max_flow=max_flow, crossings=crossings, 
+        return MIP_path_graph_ortools(grid, max_flow=max_flow, crossings=crossings,
                                       tee=tee, callback=callback, MIP_gap=MIP_gap,
                                       enable_cable_types=enable_cable_types,
                                       t_MW=t_MW,
@@ -644,12 +735,13 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                       min_turbines_per_string=min_turbines_per_string,
                                       fixed_substation_connections=fixed_substation_connections,
                                       min_sub_connections=min_sub_connections,
-                                      sub_k_max=sub_k_max)
-    elif backend.lower() != 'pyomo':
-        raise ValueError(f"Unknown backend: {backend}. Must be 'pyomo' or 'ortools'")
-    
+                                      sub_k_max=sub_k_max,
+                                      flow_dir_tightening=flow_dir_tightening)
+    elif backend.lower() != MIPBackend.PYOMO.value:
+        raise ValueError(f"Unknown backend: {backend}. Must be '{MIPBackend.PYOMO.value}' or '{MIPBackend.ORTOOLS.value}'")
+
     # Original Pyomo implementation
-    model = _create_master_problem_pyomo(grid, crossings, max_flow, 
+    model = _create_master_problem_pyomo(grid, crossings, max_flow,
                                          enable_cable_types=enable_cable_types,
                                          t_MW=t_MW,
                                          cab_types_allowed=cab_types_allowed,
@@ -661,7 +753,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     # Build solver options based on solver and grid attributes
     solver_options = {}
     time_limit = getattr(grid, "MIP_time", None)
-    
+
     if solver_name == 'gurobi':
         mip_focus = getattr(grid, "MIP_focus", 2)
         solver_options = {
@@ -678,10 +770,10 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     elif solver_name == 'highs':
         if MIP_gap is not None:
             solver_options['mip_rel_gap'] = MIP_gap
-    
+
     if solver_options_override is not None:
         solver_options.update(solver_options_override)
-    
+
     # Use pyomo_model_solve to handle all solver logic
     results, solver_stats = pyomo_model_solve(
         model,
@@ -694,7 +786,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         objective_name='objective',  # MIP model uses 'objective'
         suppress_warnings=True  # Suppress warnings for MIP failures
     )
-    
+
     # Extract results
     feasible_solutions = solver_stats['feasible_solutions'] if solver_stats else []
     feasible_solution_found = solver_stats['solution_found'] if solver_stats else False
@@ -704,12 +796,12 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     if feasible_solution_found:
         flows = [abs(pyo.value(model.line_flow[line])) for line in model.lines]
         high_flow = max(flows) if flows else 0
-        
+
         # Assign cable types to lines
         for line in model.lines:
             ct_line = grid.lines_AC_ct[line]
             line_used = pyo.value(model.line_used[line]) > 0.5
-            
+
             if not line_used:
                 ct_line.active_config = -1
             elif enable_cable_types and hasattr(model, 'ct_branch'):
@@ -731,7 +823,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                     # Calculate MW flow for this line: flow in turbines * MW per turbine
                     flow_turbines = abs(pyo.value(model.line_flow[line]))
                     mw_flow = flow_turbines * t_MW
-                    
+
                     # Find minimum cable type that can handle this MW flow
                     cable_options = grid.Cable_options[0]
                     selected_ct = None
@@ -741,11 +833,11 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                         if mva_rating >= mw_flow:
                             selected_ct = ct_idx
                             break
-                    
+
                     # If no cable type can handle the flow, use the largest one
                     if selected_ct is None:
                         selected_ct = len(cable_options._cable_types) - 1
-                    
+
                     ct_line.active_config = selected_ct
                 else:
                     # Fallback: use last cable type as default
@@ -760,38 +852,42 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         return False, None, None, feasible_solutions
 
 def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, callback=False, MIP_gap=None, enable_cable_types=False, t_MW=None, cab_types_allowed=None, min_turbines_per_string=False, fixed_substation_connections=None,min_sub_connections=False,sub_k_max=None, flow_dir_tightening='auto'):
-    """Solve the master MIP problem using OR-Tools CP-SAT solver."""
+    """OR-Tools CP-SAT backend for ``MIP_path_graph``.
+
+    Same route / route+CSS semantics as the Pyomo path: ``enable_cable_types``
+    selects joint cable-type MIP vs route-only.
+    """
     if not ORTOOLS_AVAILABLE:
         raise ImportError(
             "OR-Tools is not installed. Please install it with: pip install ortools"
         )
     length_scale = 1000
     from ortools.sat.python import cp_model
-    
+
     # Create model (calculation will be done inside _create_master_problem_ortools)
-    model, vars_dict = _create_master_problem_ortools(grid, crossings, max_flow, min_turbines_per_string, length_scale, 
+    model, vars_dict = _create_master_problem_ortools(grid, crossings, max_flow, min_turbines_per_string, length_scale,
                                                        enable_cable_types, t_MW, cab_types_allowed, fixed_substation_connections,min_sub_connections,sub_k_max,
                                                        flow_dir_tightening=flow_dir_tightening)
-    
+
     feasible_solutions = []
     feasible_solution_found = False
     high_flow = None
-    
+
     # Create solver
     solver = cp_model.CpSolver()
-    
+
     # Set solver parameters
     if tee:
         solver.parameters.log_search_progress = True
-    
+
     # Set time limit if specified
     if hasattr(grid, "MIP_time") and grid.MIP_time is not None:
         solver.parameters.max_time_in_seconds = grid.MIP_time
-    
+
     # Set MIP gap if specified (CP-SAT uses relative gap)
     if MIP_gap is not None:
         solver.parameters.relative_gap_limit = MIP_gap
-    
+
     # Callback for tracking feasible solutions (if requested)
     if callback:
         class SolutionCallback(cp_model.CpSolverSolutionCallback):
@@ -800,31 +896,31 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
                 self.vars_dict = vars_dict
                 self.feasible_solutions = feasible_solutions
                 self.solution_count = 0
-            
+
             def on_solution_callback(self):
                 self.solution_count += 1
                 runtime = self.WallTime()
                 objective = self.ObjectiveValue()
-                
+
                 # Try to get bound if available (CP-SAT may not provide in callback)
                 try:
                     bound = self.BestObjectiveBound()
-                except:
+                except Exception:
                     bound = None
-                
+
                 # Calculate relative gap
                 relgap = None
                 if bound is not None and objective is not None and abs(objective) > 1e-10:
                     relgap = 1.0 - bound / objective
-                
+
                 # Store as tuple for compatibility: (time, objective, gap)
                 self.feasible_solutions.append((runtime, objective, relgap))
-        
+
         callback_obj = SolutionCallback(vars_dict, feasible_solutions)
         status = solver.Solve(model, callback_obj)
     else:
         status = solver.Solve(model)
-    
+
     # Check solution status
     if status == cp_model.OPTIMAL:
         feasible_solution_found = True
@@ -841,23 +937,23 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
             obj_val = solver.ObjectiveValue()
             # If objective is reasonable (not infinity), we have a solution
             feasible_solution_found = obj_val < 1e20
-        except:
+        except Exception:
             feasible_solution_found = False
-    
+
     # Post-solve handling
     if feasible_solution_found:
         # Extract solution values
         line_used_vals = {}
         line_flow_vals = {}
-        
+
         for l in vars_dict["line_used"]:
             line_used_vals[l] = solver.Value(vars_dict["line_used"][l])
             line_flow_vals[l] = solver.Value(vars_dict["line_flow"][l])
-        
+
         # Calculate high flow
         flows = [abs(line_flow_vals[l]) for l in line_flow_vals]
         high_flow = max(flows) if flows else 0
-        
+
         # Update grid with solution
         for l in line_used_vals:
             ct_line = grid.lines_AC_ct[l]
@@ -878,52 +974,52 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
                 else:
                     # Calculate MW flow for this line
                     flow_turbines = abs(line_flow_vals[l])
-                    
+
                     if t_MW is not None:
                         # Calculate MW flow: flow in turbines * MW per turbine
                         mw_flow = flow_turbines * t_MW
-                        
+
                         # Find minimum cable type that can handle this MW flow
                         cable_options = grid.Cable_options[0]
                         selected_ct = None
-                        
+
                         # Cable types are sorted by capacity (smallest to largest)
                         for ct_idx in range(len(cable_options._cable_types)):
                             mva_rating = cable_options.MVA_ratings[ct_idx]
                             if mva_rating >= mw_flow:
                                 selected_ct = ct_idx
                                 break
-                        
+
                         # If no cable type can handle the flow, use the largest one
                         if selected_ct is None:
                             selected_ct = len(cable_options._cable_types) - 1
-                        
+
                         ct_line.active_config = selected_ct
-                    
+
                     else:
                         # Fallback: use last cable type if t_MW not available
                         last_cable_type_index = len(grid.Cable_options[0]._cable_types) - 1 if grid.Cable_options and len(grid.Cable_options) > 0 else -1
                         ct_line.active_config = last_cable_type_index
             else:
                 ct_line.active_config = -1
-        
+
         # Create SolutionInfo for final solution
         objective = solver.ObjectiveValue()
         runtime = solver.WallTime()
-        
+
         # Get bound if available
         try:
             bound = solver.BestObjectiveBound()
-        except:
+        except Exception:
             bound = None
-        
+
         # Calculate relative gap
         relgap = None
         if bound is not None and objective is not None and abs(objective) > 1e-10:
             relgap = 1.0 - bound / objective
         elif status == cp_model.OPTIMAL:
             relgap = 0.0  # Optimal means gap is 0
-        
+
         # Get termination status name
         termination_map = {
             cp_model.OPTIMAL: 'OPTIMAL',
@@ -933,12 +1029,12 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
             cp_model.UNKNOWN: 'UNKNOWN'
         }
         termination = termination_map.get(status, 'UNKNOWN')
-    
+
         # Add final solution to feasible_solutions if callback was used
         if callback:
             # Store as tuple for compatibility: (time, objective, gap)
             feasible_solutions.append((runtime, objective, relgap))
-        
+
         # Create a mock model-like object for compatibility with Pyomo version
         class MockModel:
             def __init__(self, vars_dict, line_used_vals, line_flow_vals, objective_value, length_scale):
@@ -947,10 +1043,10 @@ def MIP_path_graph_ortools(grid, max_flow=None, crossings=False, tee=False, call
                 self.line_flow_vals = line_flow_vals
                 self.objective_value = objective_value / length_scale
                 self.length_scale = length_scale
-             
-        
+
+
         mock_model = MockModel(vars_dict, line_used_vals, line_flow_vals, objective, length_scale)
-        
+
         return True, high_flow, mock_model, feasible_solutions
     else:
         print("✗ MIP model failed (OR-Tools)")
@@ -962,14 +1058,14 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
                                        fixed_substation_connections=None,min_sub_connections=False,sub_k_max=None):
     """
     Helper function to prepare capacity calculations and min_turbines_per_string.
-    
+
     This function extracts common logic for:
     - Calculating cable type flow capacities
     - Determining max_ct_flow (max cable capacity or max_flow)
     - Calculating min_turbines_per_string based on grid topology
     - Performing feasibility checks
     - Handling fixed_substation_connections
-    
+
     Parameters:
     -----------
     grid : Grid object
@@ -989,7 +1085,7 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
         Number of nodes in the grid. If None, uses len(grid.nodes_AC)
     fixed_substation_connections : int, optional
         If provided, sets ct_limit for all slack nodes and performs feasibility check
-    
+
     Returns:
     --------
     min_turbines_per_string : int
@@ -1010,14 +1106,14 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
             raise ValueError("enable_cable_types=True but no Cable_options found in grid")
         if t_MW is None:
             raise ValueError("t_MW must be provided when enable_cable_types=True")
-        
+
         # Calculate flow capacity for each cable type (in turbine units)
         # Flow capacity = int(MVA_rating / t_MW)
         ct_set_temp = list(range(len(grid.Cable_options[0]._cable_types)))
         for ct in ct_set_temp:
             mva_rating = grid.Cable_options[0].MVA_ratings[ct]
             ct_flow_capacity[ct] = int(mva_rating / t_MW)
-    
+
     if enable_cable_types and ct_flow_capacity:
         max_ct_flow = max(ct_flow_capacity.values())
         min_ct_flow = min(ct_flow_capacity.values())
@@ -1028,22 +1124,22 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
     if min_turbines_per_string is True:
         if max_ct_flow is None:
             raise ValueError("max_flow must be provided when min_turbines_per_string=True")
-    
+
     # Set default max_flow
     if num_nodes is None:
         num_nodes = len(grid.nodes_AC)
     if max_flow is None:
         max_flow = num_nodes - 1
-    
+
     # Initialize cable type capacities (if enabled) - needed for capacity calculation
-    
-    
-    
-    
+
+
+
+
     # Calculate nT and nS
     nT = len([n for n in grid.nodes_AC if n not in grid.slack_nodes])
     nS = len(grid.slack_nodes)
-    
+
     # Handle min_turbines_per_string: can be bool or int, default is False
     if min_turbines_per_string is False:
         min_turbines_per_string = 1
@@ -1054,7 +1150,7 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
             min_turbines_per_string = math.floor(nT / (nS * min_s_connections))
         else:
             max_s_connections = sub_k_max
-            min_turbines_per_string = math.floor(nT / (nS * max_s_connections))   
+            min_turbines_per_string = math.floor(nT / (nS * max_s_connections))
     # If it's an int, validate and correct if needed
     elif isinstance(min_turbines_per_string, int):
         # If provided value is greater than capacity, recalculate
@@ -1062,19 +1158,19 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
             print(f"min_turbines_per_string {min_turbines_per_string} must be less than capacity {max_ct_flow}")
             min_s_connections = math.ceil(nT / (nS * max_ct_flow))
             min_turbines_per_string = math.floor(nT / (nS * min_s_connections))
-    
+
     # Get slack nodes (handle both direct access and getattr for compatibility)
     if hasattr(grid, 'slack_nodes'):
         slack_nodes = grid.slack_nodes
     else:
         slack_nodes = [n for n in grid.nodes_AC if getattr(n, "type", None) == "Slack"]
-    
+
     # Feasibility check: only valid if ALL substations have ct_limit defined
     # If any substation has ct_limit = None, it has unlimited connections, so check is invalid
-    slack_nodes_with_limit = [node for node in slack_nodes 
+    slack_nodes_with_limit = [node for node in slack_nodes
                               if getattr(node, "ct_limit", None) is not None]
     all_slack_have_limit = len(slack_nodes_with_limit) == len(slack_nodes) if slack_nodes else False
-    
+
     if all_slack_have_limit and len(slack_nodes_with_limit) > 0:
         # All substations have an explicit connection limit -> we can perform
         # a meaningful global feasibility check.
@@ -1084,7 +1180,7 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
         #        min_turbines_per_string * min_s_conn <= nT
         #   2) Total capacity must be able to host all turbines:
         #        max_ct_flow * max_s_conn >= nT
-        max_s_conn = sum(getattr(node, "ct_limit") for node in slack_nodes_with_limit)
+        max_s_conn = sum(node.ct_limit for node in slack_nodes_with_limit)
         min_s_conn = math.ceil(nT / (nS * min_ct_flow))
 
         # Condition 1: lower bound from min_turbines_per_string
@@ -1108,16 +1204,16 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
                 f"Total capacity: {max_total_capacity} < {nT} turbines. "
                 f"Increase connections or cable capacity."
             )
-    
+
     # Handle fixed_substation_connections
     if fixed_substation_connections is not None:
         # Recalculate min_turbines_per_string based on fixed connections
         min_turbines_per_string = math.floor(nT / (nS * fixed_substation_connections))
-        
+
         # Set ct_limit for all slack nodes
         for node in slack_nodes:
             node.ct_limit = fixed_substation_connections
-        
+
         # Feasibility check: total maximum capacity must be >= number of turbines
         # Each substation has fixed_substation_connections connections
         total_max_capacity = max_ct_flow * fixed_substation_connections * nS
@@ -1128,12 +1224,12 @@ def _prepare_capacity_and_min_turbines(grid, max_flow=None, min_turbines_per_str
                 f"and max flow of {max_ct_flow} per connection. "
                 f"Total capacity: {total_max_capacity} < {nT} turbines"
             )
-    
+
     return min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS
 
 
-def _create_master_problem_pyomo(grid,crossings=True, max_flow=None, 
-                                  enable_cable_types=False, 
+def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
+                                  enable_cable_types=False,
                                   t_MW=None,
                                   cab_types_allowed=None,
                                   min_turbines_per_string=False,
@@ -1142,7 +1238,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                                   sub_k_max=None,
                                   flow_dir_tightening='auto'):
         """Create master problem using Pyomo
-        
+
         Parameters:
         -----------
         enable_cable_types : bool
@@ -1167,15 +1263,15 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
         min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS = _prepare_capacity_and_min_turbines(
             grid, max_flow=max_flow, min_turbines_per_string=min_turbines_per_string,
             enable_cable_types=enable_cable_types, t_MW=t_MW, num_nodes=len(grid.nodes_AC),
-            fixed_substation_connections=fixed_substation_connections, 
+            fixed_substation_connections=fixed_substation_connections,
             min_sub_connections=min_sub_connections,
             sub_k_max=sub_k_max
         )
-        
+
         model = pyo.ConcreteModel()
         model.lines = pyo.Set(initialize=range(len(grid.lines_AC_ct)))
         model.nodes = pyo.Set(initialize=range(len(grid.nodes_AC)))
-        
+
         sink_nodes = []
         source_nodes = []
         for node in model.nodes:
@@ -1184,23 +1280,23 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 sink_nodes.append(node)
             if nAC.connected_RenSource:
                 source_nodes.append(node)
-        
+
         if not sink_nodes:
             raise ValueError("No generator nodes found!")
-        
+
         model.source_nodes = pyo.Set(initialize=source_nodes)
         model.sink_nodes = pyo.Set(initialize=sink_nodes)
-        
+
         model.line_used = pyo.Var(model.lines, domain=pyo.Binary)
         if enable_cable_types:
             if grid.Cable_options is None or len(grid.Cable_options) == 0:
                 raise ValueError("enable_cable_types=True but no Cable_options found in grid")
             if t_MW is None:
                 raise ValueError("t_MW must be provided when enable_cable_types=True")
-            
+
             # Cable type set
             model.ct_set = pyo.Set(initialize=range(len(grid.Cable_options[0]._cable_types)))
-            
+
             # Calculate flow capacity for each cable type (in turbine units)
             # Flow capacity = int(MVA_rating / t_MW)
             ct_flow_capacity = {}
@@ -1208,17 +1304,17 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 mva_rating = grid.Cable_options[0].MVA_ratings[ct]
                 ct_flow_capacity[ct] = int(mva_rating / t_MW)
             model.ct_flow_capacity = pyo.Param(model.ct_set, initialize=ct_flow_capacity)
-            
+
             model.ct_branch = pyo.Var(model.lines, model.ct_set, domain=pyo.Binary)
             model.ct_types = pyo.Var(model.ct_set, domain=pyo.Binary)
-        
+
         def line_flow_bounds(model, line):
             line_obj = grid.lines_AC_ct[line]
             from_node = line_obj.fromNode
             to_node = line_obj.toNode
-            from_is_slack = from_node.type == 'Slack'
-            to_is_slack = to_node.type == 'Slack'
-            
+            from_is_slack = from_node.type == NodeType.SLACK
+            to_is_slack = to_node.type == NodeType.SLACK
+
             if enable_cable_types:
                 if to_is_slack and not from_is_slack:
                     return (0, max_ct_flow)
@@ -1234,7 +1330,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 else:
                     # If line connects PQ-PQ (turbine-turbine) or both slack: use reduced capacity
                     return (-(max_flow - 1), max_flow - 1)
-        
+
         # Flow variables (integer - can carry flow in either direction)
         model.line_flow = pyo.Var(model.lines, domain=pyo.Integers, bounds=line_flow_bounds)
 
@@ -1261,46 +1357,46 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 return installation_cost + cable_type_cost
             else:
                 return installation_cost
-        
+
         model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
-        
+
         # Spanning tree constraint: exactly numNodes-1 connections
         def spanning_tree_rule(model):
             return sum(model.line_used[line] for line in model.lines) == len(model.nodes) - len(model.sink_nodes)
-     
-        
+
+
         model.spanning_tree = pyo.Constraint(rule=spanning_tree_rule)
-        
-        # Constrain connections 
+
+        # Constrain connections
         def connections_rule(model, node):
             if  grid.nodes_AC[node].ct_limit is None:
                     return pyo.Constraint.Skip
             else:
-                node_connections = sum(model.line_used[line] 
+                node_connections = sum(model.line_used[line]
                                      for line in model.lines
-                                     if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or 
+                                     if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or
                                          grid.lines_AC_ct[line].toNode.nodeNumber == node))
                 return node_connections <= grid.nodes_AC[node].ct_limit
-                
+
         nT= len(model.nodes) - len(model.sink_nodes)
         nS = len(model.sink_nodes)
 
         def connections_rule_lower(model, node):
-            node_connections = sum(model.line_used[line] 
+            node_connections = sum(model.line_used[line]
                             for line in model.lines
-                            if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or 
+                            if (grid.lines_AC_ct[line].fromNode.nodeNumber == node or
                                 grid.lines_AC_ct[line].toNode.nodeNumber == node))
-        
+
             # If node is a sink (substation), calculate minimum connections needed
             if node in model.sink_nodes:
                 # Calculate minimum connections per sink based on capacity
                 # Formula: ceil((non_sink_nodes) / (total_sink_capacity))
                 if fixed_substation_connections is not None:
                     min_connections = fixed_substation_connections
-                
+
                 elif enable_cable_types:
                     min_connections = math.ceil(nT/(nS*max_ct_flow))
-                    
+
                 else:
                     min_connections = math.ceil(nT/(nS*max_flow))
                 return node_connections >= min_connections
@@ -1316,14 +1412,14 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
 
         def source_node_rule(model, node):
             return model.node_flow[node] == 1
-            
+
         model.source_node = pyo.Constraint(model.source_nodes, rule=source_node_rule)
 
-     
+
         def sink_absorption_rule(model):
             return sum(model.node_flow[n] for n in model.sink_nodes) == -len(model.source_nodes)
         model.total_sink_absorption = pyo.Constraint(rule=sink_absorption_rule)
-        
+
         def sink_power_limit_rule(model, node):
             pu_limit = grid.nodes_AC[node].pu_power_limit
             # Check for None, NaN, or non-finite values
@@ -1333,7 +1429,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             if isinstance(pu_limit, (int, float)) and (math.isnan(pu_limit) or not math.isfinite(pu_limit)):
                 return pyo.Constraint.Skip
             return model.node_flow[node] >= -pu_limit
-        
+
         # Only create constraint if at least one node has a valid (non-None, finite) pu_power_limit
         def is_valid_pu_limit(node):
             pu_limit = grid.nodes_AC[node].pu_power_limit
@@ -1342,7 +1438,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             if isinstance(pu_limit, (int, float)):
                 return not (math.isnan(pu_limit) or not math.isfinite(pu_limit))
             return True
-        
+
         if any(is_valid_pu_limit(node) for node in model.sink_nodes):
             model.sink_power_limit = pyo.Constraint(model.sink_nodes, rule=sink_power_limit_rule)
 
@@ -1352,22 +1448,22 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
                 return model.node_flow[node] == 0
             else:
                 return pyo.Constraint.Skip
-        
+
         model.intermediate_node = pyo.Constraint(model.nodes, rule=intermediate_node_rule)
-        
+
         # Link flow to investment: can only use lines we invest in
         if enable_cable_types:
             # Flow capacity linked to selected cable type
             def flow_capacity_upper_rule(model, line):
                 # Flow <= sum(flow_capacity[ct] * ct_branch[line, ct])
-                return model.line_flow[line] <= sum(model.ct_flow_capacity[ct] * model.ct_branch[line, ct] 
+                return model.line_flow[line] <= sum(model.ct_flow_capacity[ct] * model.ct_branch[line, ct]
                                                    for ct in model.ct_set)
-            
+
             def flow_capacity_lower_rule(model, line):
                 # Flow >= -sum(flow_capacity[line, ct] * ct_branch[line, ct])
-                return model.line_flow[line] >= -sum(model.ct_flow_capacity[ct] * model.ct_branch[line, ct] 
+                return model.line_flow[line] >= -sum(model.ct_flow_capacity[ct] * model.ct_branch[line, ct]
                                                     for ct in model.ct_set)
-            
+
             # Cable type selection: each used line must have exactly one cable type
             # CONSTRAINT LINKING line_used and ct_branch:
             # sum(ct_branch[line, ct]) == line_used[line]
@@ -1375,11 +1471,11 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             # - If line_used[line] = 0: all ct_branch[line, ct] = 0 (no cable type selected)
             def cable_type_selection_rule(model, line):
                 return sum(model.ct_branch[line, ct] for ct in model.ct_set) == model.line_used[line]
-            
+
             model.flow_capacity_upper = pyo.Constraint(model.lines, rule=flow_capacity_upper_rule)
             model.flow_capacity_lower = pyo.Constraint(model.lines, rule=flow_capacity_lower_rule)
             model.cable_type_selection = pyo.Constraint(model.lines, rule=cable_type_selection_rule)
-            
+
             # Link ct_types to ct_branch using homogeneity constraint from image formulation
             # Constraint: sum(ct_branch[line, ct]) - (NN-1) * ct_types[ct] <= 0
             # Which is: sum(ct_branch[line, ct]) <= (NN-1) * ct_types[ct]
@@ -1390,13 +1486,13 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
             #   (because if ct_types[ct] = 0, we'd have sum(ct_branch) <= 0, contradiction)
             # So the lower bound constraint is NOT needed - homogeneity constraint is sufficient!
             NN_minus_1 = len(model.nodes) - len(model.sink_nodes)  # Number of lines in spanning tree
-            
+
             def ct_types_homogeneity_rule(model, ct):
                 # Image formulation: sum X_i,j,k - (NN-1) * Z_k <= 0
                 return sum(model.ct_branch[line, ct] for line in model.lines) - NN_minus_1 * model.ct_types[ct] <= 0
-            
+
             model.ct_types_homogeneity = pyo.Constraint(model.ct_set, rule=ct_types_homogeneity_rule)
-            
+
             # Optional: Limit total cable types used (linking constraint)
             if cab_types_allowed is not None:
                 def ct_limit_rule(model):
@@ -1409,7 +1505,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
 
             def flow_investment_rule_2(model, line):
                 return model.line_flow[line] >= -max_flow * model.line_used[line]
-            
+
             model.flow_investment_link = pyo.Constraint(model.lines, rule=flow_investment_rule)
             model.flow_investment_link_2 = pyo.Constraint(model.lines, rule=flow_investment_rule_2)
 
@@ -1422,7 +1518,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
 
             def flow_nonzero_positive(model, line):
                 line_obj = grid.lines_AC_ct[line]
-                to_is_slack = line_obj.toNode.type == 'Slack'
+                to_is_slack = line_obj.toNode.type == NodeType.SLACK
                 min_flow = min_turbines_per_string if to_is_slack else 1
                 if enable_cable_types:
                     M = max_ct_flow + 1
@@ -1432,7 +1528,7 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
 
             def flow_nonzero_negative(model, line):
                 line_obj = grid.lines_AC_ct[line]
-                from_is_slack = line_obj.fromNode.type == 'Slack'
+                from_is_slack = line_obj.fromNode.type == NodeType.SLACK
                 min_flow = min_turbines_per_string if from_is_slack else 1
                 if enable_cable_types:
                     M = max_ct_flow + 1
@@ -1453,18 +1549,18 @@ def _create_master_problem_pyomo(grid,crossings=True, max_flow=None,
         if crossings and hasattr(grid, 'crossing_groups') and grid.crossing_groups:
             # Create a set for crossing groups
             model.crossing_groups = pyo.Set(initialize=range(len(grid.crossing_groups)))
-            
+
             # Constraint: for each crossing group, only one line can be active
             def crossing_constraint_rule(model, group_idx):
                 group = grid.crossing_groups[group_idx]
                 # Sum of all line_used variables in this crossing group must be <= 1
-                return sum(model.line_used[line] for line in model.lines 
+                return sum(model.line_used[line] for line in model.lines
                           if grid.lines_AC_ct[line].lineNumber in group) <= 1
-            
+
             model.crossing_constraints = pyo.Constraint(model.crossing_groups, rule=crossing_constraint_rule)
-            
+
         return model
-    
+
 
 
 
@@ -1488,7 +1584,7 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
         raise ImportError(
             "OR-Tools is not installed. Please install it with: pip install ortools"
         )
-    
+
     if flow_dir_tightening == 'auto':
         n_crossings = len(grid.crossing_groups) if hasattr(grid, 'crossing_groups') and grid.crossing_groups else 0
         flow_dir_tightening = n_crossings >= 3000
@@ -1511,9 +1607,11 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     min_turbines_per_string, max_ct_flow, ct_flow_capacity, nT, nS = _prepare_capacity_and_min_turbines(
         grid, max_flow=max_flow, min_turbines_per_string=min_turbines_per_string,
         enable_cable_types=enable_cable_types, t_MW=t_MW, num_nodes=num_nodes,
-        fixed_substation_connections=fixed_substation_connections
+        fixed_substation_connections=fixed_substation_connections,
+        min_sub_connections=min_sub_connections,
+        sub_k_max=sub_k_max,
     )
-    
+
     # Update max_flow for consistency (used later in the function)
     if max_flow is None:
         max_flow = num_nodes - 1
@@ -1539,16 +1637,13 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     nT = num_nodes - len(sink_nodes)
     nS = len(sink_nodes)
 
-    # Minimum connections for sink nodes (same formula as Pyomo version)
-    # If fixed_substation_connections is set, use that; otherwise calculate based on capacity
+    # Minimum connections for sink nodes (match Pyomo connections_rule_lower)
     if fixed_substation_connections is not None:
         min_connections_per_sink = fixed_substation_connections
+    elif enable_cable_types:
+        min_connections_per_sink = math.ceil(nT / (nS * max_ct_flow))
     else:
-        # Calculate based on capacity - use max_ct_flow (already calculated above)
-        if nS > 0:
-            min_connections_per_sink = math.ceil(nT / (nS * max_ct_flow))
-        else:
-            raise ValueError("No substations found!")
+        min_connections_per_sink = math.ceil(nT / (nS * max_flow))
 
     # --------------------
     # Precompute line incidence and bounds
@@ -1576,8 +1671,8 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
         # Bounds depend on slack nodes (substations)
         # Note: substations are always toNode, so to_is_slack is true for substation-turbine edges
         # Bounds allow 0 (when line not used) and constraints enforce min_turbines_per_string when used
-        from_is_slack = getattr(from_node, "type", None) == "Slack"
-        to_is_slack = getattr(to_node, "type", None) == "Slack"
+        from_is_slack = getattr(from_node, "type", None) == NodeType.SLACK
+        to_is_slack = getattr(to_node, "type", None) == NodeType.SLACK
 
         if to_is_slack and not from_is_slack:
             lb, ub = 0, max_flow  # Allow 0 when line_used=0, constraint enforces min when used
@@ -1596,26 +1691,26 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     ct_set = []
     ct_branch = {}
     ct_types = {}
-    
+
     if enable_cable_types:
         # Cable type set (capacities already calculated above)
         ct_set = list(range(len(grid.Cable_options[0]._cable_types)))
-        
+
         # Update bounds to use max_ct_flow (already calculated, same as max cable type capacity)
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
             from_node = line_obj.fromNode
             to_node = line_obj.toNode
-            from_is_slack = getattr(from_node, "type", None) == "Slack"
-            to_is_slack = getattr(to_node, "type", None) == "Slack"
-            
+            from_is_slack = getattr(from_node, "type", None) == NodeType.SLACK
+            to_is_slack = getattr(to_node, "type", None) == NodeType.SLACK
+
             if to_is_slack and not from_is_slack:
                 line_lb[l], line_ub[l] = 0, max_ct_flow
             elif from_is_slack and not to_is_slack:
                 line_lb[l], line_ub[l] = -max_ct_flow, 0
             else:
                 line_lb[l], line_ub[l] = -(max_ct_flow - 1), (max_ct_flow - 1)
-    
+
     # --------------------
     # Variables
     # --------------------
@@ -1637,14 +1732,14 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
         l: model.NewIntVar(line_lb[l], line_ub[l], f"line_flow[{l}]")
         for l in lines
     }
-    
+
     # Cable type selection variables (if enabled)
     if enable_cable_types:
         # ct_branch[line, ct] = 1 if cable type ct selected for line
         for l in lines:
             for ct in ct_set:
                 ct_branch[(l, ct)] = model.NewBoolVar(f"ct_branch[{l},{ct}]")
-        
+
         # Global cable type indicator: ct_types[ct] = 1 if cable type ct is used anywhere
         for ct in ct_set:
             ct_types[ct] = model.NewBoolVar(f"ct_types[{ct}]")
@@ -1683,9 +1778,9 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
                 base_cost = line_obj.base_cost[ct] if hasattr(line_obj, 'base_cost') and ct < len(line_obj.base_cost) else 0
                 cost_coeff = math.ceil(base_cost * length_scale)
                 cable_type_cost_terms.append(cost_coeff * ct_branch[(l, ct)])
-        
+
         model.Minimize(
-            sum(coeffs[l] * line_used[l] for l in lines) + 
+            sum(coeffs[l] * line_used[l] for l in lines) +
             sum(cable_type_cost_terms)
         )
     else:
@@ -1737,6 +1832,16 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
             sum(node_flow_expr[n] for n in sink_nodes) == -len(source_nodes)
         )
 
+    # Per-substation absorption cap (pu turbines per connection), if configured
+    for n in sink_nodes:
+        pu_limit = grid.nodes_AC[n].pu_power_limit
+        if pu_limit is None:
+            continue
+        if isinstance(pu_limit, (int, float)) and (
+                math.isnan(pu_limit) or not math.isfinite(pu_limit)):
+            continue
+        model.Add(node_flow_expr[n] >= -pu_limit)
+
     # --------------------
     # Link flow to investment: |line_flow| <= capacity * line_used
     # If cable types enabled, use selected cable type capacity
@@ -1752,14 +1857,14 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
             model.Add(
                 line_flow[l] >= -sum(ct_flow_capacity[ct] * ct_branch[(l, ct)] for ct in ct_set)
             )
-        
+
         # Cable type selection: each used line must have exactly one cable type
         # sum(ct_branch[line, ct]) == line_used[line]
         for l in lines:
             model.Add(
                 sum(ct_branch[(l, ct)] for ct in ct_set) == line_used[l]
             )
-        
+
         # Homogeneity constraint: link ct_types to ct_branch
         # sum(ct_branch[line, ct]) <= (NN-1) * ct_types[ct]
         NN_minus_1 = num_nodes - len(sink_nodes)
@@ -1767,7 +1872,7 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
             model.Add(
                 sum(ct_branch[(l, ct)] for l in lines) <= NN_minus_1 * ct_types[ct]
             )
-        
+
         # Optional: Limit total cable types used
         if cab_types_allowed is not None:
             model.Add(
@@ -1788,15 +1893,19 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
 
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
-            to_is_slack = getattr(line_obj.toNode, "type", None) == "Slack"
+            to_is_slack = getattr(line_obj.toNode, "type", None) == NodeType.SLACK
             min_flow = min_turbines_per_string if to_is_slack else 1
-            model.Add(line_flow[l] >= (min_flow - 2*M) + M*line_flow_dir[l] + M*line_used[l])
+            model.Add(
+                line_flow[l]
+                >= min_flow - M * (1 - line_used[l]) - M * (1 - line_flow_dir[l]))
 
         for l in lines:
             line_obj = grid.lines_AC_ct[l]
-            from_is_slack = getattr(line_obj.fromNode, "type", None) == "Slack"
+            from_is_slack = getattr(line_obj.fromNode, "type", None) == NodeType.SLACK
             min_flow = min_turbines_per_string if from_is_slack else 1
-            model.Add(line_flow[l] <= (-min_flow + M) - M*line_used[l] + M*line_flow_dir[l])
+            model.Add(
+                line_flow[l]
+                <= -min_flow + M * (1 - line_used[l]) + M * line_flow_dir[l])
 
         for l in lines:
             model.Add(line_flow_dir[l] <= line_used[l])
@@ -1834,7 +1943,7 @@ def _create_master_problem_ortools(grid, crossings=True, max_flow=None, min_turb
     }
     if flow_dir_tightening:
         vars_dict["line_flow_dir"] = line_flow_dir
-    
+
     if enable_cable_types:
         vars_dict["ct_branch"] = ct_branch
         vars_dict["ct_types"] = ct_types
@@ -1849,14 +1958,14 @@ def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=
     # local import to ensure availability regardless of module-level imports
     import os
     FS = 10
-    
+
     # Determine which column to extract based on type parameter
     # Tuples are always (time, solution, gap)
     if type == 'gap':
         col_idx = 2  # Third column (gap)
     else:  # type == 'solution'
         col_idx = 1  # Second column (solution)
-    
+
     # Normalize input: accept a single feasible_solutions list, a list of those,
     # a dict with key 'feasible_solutions_MIP', or a list of such dicts
     def _is_pair_list(seq):
@@ -1864,7 +1973,7 @@ def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=
             return isinstance(seq, (list, tuple)) and len(seq) > 0 and isinstance(seq[0], (list, tuple)) and len(seq[0]) >= 2
         except Exception:
             return False
-    
+
     if results is None:
         normalized_results = []
     elif isinstance(results, dict) and 'feasible_solutions_MIP' in results:
@@ -1881,13 +1990,13 @@ def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=
     else:
         # Fallback: treat as empty
         normalized_results = []
-    
+
     if width_mm is not None:
         fig_w_in = width_mm / 25.4
-        fig_h_in = fig_w_in 
+        fig_h_in = fig_w_in
     else:
         fig_w_in = 6.0
-        fig_h_in = fig_w_in 
+        fig_h_in = fig_w_in
 
     fig, ax = plt.subplots(1, 1, figsize=(fig_w_in, fig_h_in), sharex=False, sharey=False, constrained_layout=True)
 
@@ -1898,7 +2007,7 @@ def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=
     else:
         ptype = 'MIP'
         y_axis_label = 'Cable length [km]'
-    
+
     # Update y-axis label based on type
     if type == 'gap':
         y_axis_label = 'Gap'
@@ -1928,10 +2037,10 @@ def _plot_feasible_solutions(results,type='solution', plot_type='MIP', suptitle=
                     continue
                 times.append(t)
                 values.append(v)
-            
+
             if not times:  # Skip if no valid data points
                 continue
-            
+
             if ptype == 'CSS' and col_idx == 1:
                 values = [v / 1e6 for v in values]
             ax.plot(times, values, 'o-', label=f'i={i} (s={len(values)})', markersize=5, linewidth=2)
@@ -1968,13 +2077,13 @@ def _export_feasible_solutions_to_excel(results_mip, results_css, save_path):
     """
     Export feasible solutions to separate CSV files (one for MIP, one for CSS) or Excel.
     Format: 0_t, 0_obj, 0_gap, 1_t, 1_obj, 1_gap, ...
-    
+
     Args:
         results_mip: List of feasible solutions for MIP (each is list of (time, obj, gap) tuples)
         results_css: List of feasible solutions for CSS (each is list of (time, obj, gap) tuples)
         save_path: Base path (will create _MIP.csv and _CSS.csv, or single .xlsx file)
     """
-    
+
     # Determine format from extension
     base_path = save_path
     if save_path.lower().endswith('.csv'):
@@ -1985,15 +2094,15 @@ def _export_feasible_solutions_to_excel(results_mip, results_css, save_path):
     else:
         # Default to CSV
         file_format = 'csv'
-    
+
     def _export_single(results, suffix, max_solutions):
         """Export a single set of results (MIP or CSS)"""
         if not results:
             return None
-        
+
         data = {}
         max_iter = len(results)
-        
+
         for i in range(max_iter):
             if results[i]:
                 feas_sorted = sorted(results[i], key=lambda x: x[0])  # Sort by time
@@ -2001,16 +2110,16 @@ def _export_feasible_solutions_to_excel(results_mip, results_css, save_path):
                 times = [t for t, _, _ in feas_sorted] + [np.nan] * (max_solutions - len(feas_sorted))
                 objs = [o for _, o, _ in feas_sorted] + [np.nan] * (max_solutions - len(feas_sorted))
                 gaps = [g for _, _, g in feas_sorted] + [np.nan] * (max_solutions - len(feas_sorted))
-                
+
                 data[f'{i}_t'] = times[:max_solutions]
                 data[f'{i}_obj'] = objs[:max_solutions]
                 data[f'{i}_gap'] = gaps[:max_solutions]
-        
+
         if not data:
             return None
-        
+
         df = pd.DataFrame(data)
-        
+
         if file_format == 'csv':
             csv_path = f"{base_path}_{suffix}.csv"
             df.to_csv(csv_path, index=False)
@@ -2019,15 +2128,15 @@ def _export_feasible_solutions_to_excel(results_mip, results_css, save_path):
         else:
             # For Excel, return DataFrame to write to sheet
             return df
-    
+
     # Find maximum number of feasible solutions for each type
     max_mip_solutions = max((len(feas) for feas in results_mip if feas), default=0)
     max_css_solutions = max((len(feas) for feas in results_css if feas), default=0)
-    
+
     if max_mip_solutions == 0 and max_css_solutions == 0:
         print("Warning: No feasible solutions to export")
         return
-    
+
     if file_format == 'csv':
         # Save separate CSV files
         if max_mip_solutions > 0:
@@ -2095,14 +2204,14 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
             ax.legend(prop={'size': FS}, loc='upper right', frameon=False)
         ax.tick_params(labelsize=FS)
         ax.grid(True, alpha=0.3)
-    
+
     if type == 'gap':
         _plot(axes[0], results_mip, 'MIP', 'Gap [%]',type)
         _plot(axes[1], results_css, 'CSS', 'Gap [%]',type)
     else:
         _plot(axes[0], results_mip, 'MIP', 'Cable length [km]',type)
         _plot(axes[1], results_css, 'CSS', 'Objective [M€]',type)
-   
+
 
     if suptitle is not None:
         fig.suptitle(suptitle, fontsize=FS*1.3)
@@ -2115,7 +2224,7 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
         root, ext = os.path.splitext(base)
         base = (root + ext.lower()).lower()  # lowercase name + extension
         save_path = os.path.join(dir_, base)
-        
+
         if save_path.endswith('.svg'):
             fig.savefig(save_path, format='svg', bbox_inches='tight')
         else:
@@ -2128,18 +2237,47 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
 
 
 
-def simple_CSS(grid,NPV=True,n_years=25,Hy=8760,discount_rate=0.02,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=1200,NL=False,tee=False,export=True,fs=False):
+def wind_farm_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,L_OPEX=True,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=1200,NL=False,tee=False,export=True,fs=False):
+    """Run cable size selection (CSS) on a fixed inter-array topology.
+
+    Does not optimize routing. Expects ``grid.lines_AC_ct`` active/inactive
+    flags to reflect a route already chosen (e.g. by ``MIP_path_graph``).
+
+    Dispatches to ``transmission_expansion`` (``NL=True``),
+    ``optimal_l_css_ortools`` (``CSS_L_solver='ortools'``), or
+    ``linear_transmission_expansion`` (other linear Pyomo solvers).
+
+    ``L_OPEX=True`` adds discounted array-loss OPEX on linear CSS; ``L_OPEX=False`` is
+    investment-only (``min_gamma`` set to 1 so ``gamma`` cannot curtail). Nonlinear
+    CSS always includes array-loss OPEX.
+    """
+    array_losses_obj = {ObjComponent.ARRAY_LOSSES.value: 1}
+    css_obj = array_losses_obj if L_OPEX else None
 
     grid.Array_opf = False
     if NL:
-        model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export,PV_set=True,callback=fs)
-    elif CSS_L_solver == 'ortools':
-        from .AC_L_CSS_ortools import Optimal_L_CSS_ortools
-        OPEX = ObjRule is not None and ObjRule.get('Energy_cost', 0) != 0
-        model, model_results, timing_info, solver_stats = Optimal_L_CSS_ortools(
-            grid, OPEX=OPEX, NPV=NPV, n_years=n_years, Hy=Hy,
-            discount_rate=discount_rate, tee=tee, time_limit=time_limit)
+        model, model_results , timing_info, solver_stats= transmission_expansion(
+            grid, NPV, n_years, Hy, discount_rate, array_losses_obj, CSS_NL_solver,
+            time_limit, tee, export, PV_set=True, callback=fs)
     else:
-        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export,fs)
+        saved_min_gamma = None
+        if not L_OPEX:
+            saved_min_gamma = {rs.rsNumber: rs.min_gamma for rs in grid.RenSources}
+            for rs in grid.RenSources:
+                rs.min_gamma = 1.0
+        try:
+            if CSS_L_solver == MIPBackend.ORTOOLS.value:
+                from .AC_L_CSS_ortools import optimal_l_css_ortools
+                model, model_results, timing_info, solver_stats = optimal_l_css_ortools(
+                    grid, ObjRule=css_obj, NPV=NPV, n_years=n_years, Hy=Hy,
+                    discount_rate=discount_rate, tee=tee, time_limit=time_limit)
+            else:
+                model, model_results , timing_info, solver_stats= linear_transmission_expansion(
+                    grid, NPV, n_years, Hy, discount_rate, css_obj, CSS_L_solver,
+                    time_limit, tee, export, fs)
+        finally:
+            if saved_min_gamma is not None:
+                for rs in grid.RenSources:
+                    rs.min_gamma = saved_min_gamma[rs.rsNumber]
 
     return model, model_results , timing_info, solver_stats

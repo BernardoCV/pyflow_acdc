@@ -1,17 +1,112 @@
 Wind Farm Array Sizing Module
 =============================
 
-This module provides functions for wind farm array sizing based on [1]_.
+This module provides functions for wind farm array sizing based on [1]_ and
+[2]_.
 
+See :doc:`../usage_wf_array` for a sequential cable-sizing workflow.
 
+Inter-array optimisation splits into two problems:
 
+- **Route** — ``MIP_path_graph`` selects which candidate CT lines are built
+  (spanning tree, string flow, substation limits). With
+  ``enable_cable_types=True``, cable types are chosen in the same MIP.
+- **CSS** — ``wind_farm_CSS`` / ``optimal_l_css_ortools`` pick cable types on a
+  fixed topology (no routing). ``sequential_CSS`` alternates route MIP then CSS
+  each iteration.
+
+Recommended workflow
+--------------------
+
+For most studies, use **sequential** sizing: ``sequential_CSS`` with
+``enable_cable_types=False`` on the route MIP (the default inside
+``sequential_CSS``). Each iteration fixes the route, then runs CSS on that
+topology, shrinking the cable catalogue until convergence.
+
+Setting ``enable_cable_types=True`` on ``MIP_path_graph`` solves route and cable
+types in one joint MIP. That can be useful for comparison, but the sequential
+methodology is recommended for production workflows — see [2]_.
+
+Solver and install matrix
+-------------------------
+
+.. list-table::
+   :widths: 28 36 36
+   :header-rows: 1
+
+   * - Task
+     - Recommended install
+     - Solver / backend
+   * - Route MIP (Pyomo)
+     - ``pip install pyflow-acdc[OPF]`` (+ optional ``[Gurobi]``)
+     - ``backend='pyomo'`` with ``gurobi`` or ``glpk`` (see :doc:`solver_utils`)
+   * - Route MIP (OR-Tools)
+     - ``pip install pyflow-acdc[ORTOOLS_ARRAY]``
+     - ``backend='ortools'`` (CP-SAT)
+   * - CSS (Pyomo linear)
+     - ``pip install pyflow-acdc[OPF]`` (+ optional ``[Gurobi]``)
+     - ``CSS_L_solver='gurobi'`` or other Pyomo LP/MIP solver →
+       :func:`~pyflow_acdc.linear_transmission_expansion`
+   * - CSS (OR-Tools)
+     - ``pip install pyflow-acdc[ORTOOLS_ARRAY]``
+     - ``CSS_L_solver='ortools'`` → :func:`~pyflow_acdc.optimal_l_css_ortools`
+   * - CSS (nonlinear OPF)
+     - ``pip install pyflow-acdc[OPF]`` + Bonmin/Ipopt
+     - ``NL='OPF'`` → :func:`~pyflow_acdc.transmission_expansion`
+
+**Recommended defaults** (probe availability with
+:func:`~pyflow_acdc.is_pyomo_solver_available`):
+
+- ``MIP_path_graph`` ``backend``: ``'pyomo'`` if Gurobi is available, else
+  ``'ortools'``
+- ``CSS_L_solver``: ``'gurobi'`` if available, else ``'ortools'``
+- ``NL``: :attr:`~pyflow_acdc.constants.CssMode.PF` (linear CSS + post-solve
+  power flow for losses), not ``CssMode.OPF``
+- ``enable_cable_types``: ``False``; set ``True`` only for the unified route+CSS
+  MIP
+
+See :doc:`../installation` for ``[OPF]``, ``[ORTOOLS_ARRAY]``, and the
+deprecated ``[Array_OPT]`` alias.
+
+CssMode.PF vs CssMode.OPF
+---------------------------
+
+When ``NL`` is not ``False``, ``sequential_CSS`` normalises it to a
+:class:`~pyflow_acdc.constants.CssMode` value:
+
+- **``CssMode.PF``** — linear CSS (Pyomo or OR-Tools), then
+  :func:`~pyflow_acdc.power_flow` on the sized array to evaluate AC losses for
+  the iteration objective.
+- **``CssMode.OPF``** — nonlinear OPF inside CSS; losses come from the NL solver
+  export directly.
+
+``CssMode.PF`` is the recommended default: faster and sufficient for comparing
+cable options once the route is fixed.
+
+Internal helpers
+----------------
+
+``min_sub_connections`` and ``MIPConfig`` are used inside
+:func:`~pyflow_acdc.sequential_CSS` and :func:`~pyflow_acdc.MIP_path_graph` to
+enforce substation connection limits. They are not part of the public API.
 
 Sequential Cable Sizing (CSS)
 -----------------------------
 
-.. function:: sequential_CSS(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, max_turbines_per_string=None, limit_crossings=True, MIP_solver='glpk', CSS_L_solver='gurobi', CSS_NL_solver='bonmin', svg=None, max_iter=None, time_limit=300, NL=False, tee=False, fs=False)
+.. autofunction:: pyflow_acdc.sequential_CSS
 
-   Iteratively alternates between a path selection MIP and a linear/nonlinear OPF-based cable type selection to converge to an efficient array layout. Returns models, a summary of iterations, timing info, solver stats, and the best iteration index.
+   Outer loop for array sizing: each iteration runs ``MIP_path_graph`` (route)
+   then ``wind_farm_CSS`` (cable types on that route), shrinking the allowed cable
+   catalogue until convergence or ``max_iter``. Returns models, iteration
+   summary, timing info, solver stats, and the best iteration index.
+
+   Key parameters beyond the table below:
+
+   - ``backend`` — route MIP backend (``MIPBackend.PYOMO`` or
+     ``MIPBackend.ORTOOLS``); prefer ``pyomo`` when Gurobi is available
+   - ``NL`` — ``False`` (linear), ``CssMode.PF``, or ``CssMode.OPF``; prefer
+     ``CssMode.PF``
+   - ``sub_min_connections`` — internal; passed through to the route MIP
 
    .. list-table::
       :widths: 22 10 48 10
@@ -39,41 +134,44 @@ Sequential Cable Sizing (CSS)
         - 'glpk'
       * - ``CSS_L_solver``
         - str
-        - Solver for linear OPF step
-        - 'gurobi'
+        - Solver for linear CSS step
+        - 'glpk'
       * - ``CSS_NL_solver``
         - str
-        - Solver for nonlinear OPF step (if ``NL=True``)
+        - Solver for nonlinear OPF step (if ``NL='OPF'``)
         - 'bonmin'
       * - ``time_limit``
         - int
         - Solver time limit in seconds
         - 300
       * - ``NL``
-        - bool
-        - Use nonlinear OPF instead of linear in CSS
+        - bool/str
+        - ``False``, ``CssMode.PF``, or ``CssMode.OPF``
         - False
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/wf_array/01_sequential_cable_sizing_css.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-
-      grid,res = pyf.barrow()
-      print('grid loaded')
-      pyf.sequential_CSS(grid,NPV=True,max_turbines_per_string=None,MIP_solver='gurobi',CSS_L_solver='gurobi',max_iter=None,time_limit=300,tee=True)
-          
-
-      res.All()
 
 
 MIP Path Selection (Array)
 --------------------------
 
-.. function:: MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee=False, callback=False)
+.. autofunction:: pyflow_acdc.MIP_path_graph
 
-   Solves a master MIP to select array connection paths minimizing total cable length, with optional crossing constraints and Gurobi callback to record feasible solutions over time. Activates cable types on candidate lines upon success.
+   Solves the inter-array **route** MIP: minimum cable-length spanning forest
+   over candidate CT lines, with optional crossing constraints and feasible-
+   solution callbacks. Does not run OPF.
+
+   - ``enable_cable_types=False`` (default): route only; marks lines active/
+     inactive and may assign a rating via ``simple_assign_cable_types``.
+   - ``enable_cable_types=True``: joint route + cable-type MIP (no separate
+     CSS step required for sizing).
+
+   Backends: ``pyomo`` (default, external MILP solver) or ``ortools`` (CP-SAT).
 
    .. list-table::
       :widths: 22 10 48 10
@@ -91,17 +189,25 @@ MIP Path Selection (Array)
         - int
         - Per-line absolute flow bound (≈ turbines per string)
         - ``|nodes|-1``
+      * - ``enable_cable_types``
+        - bool
+        - Joint route + cable-type MIP vs route only
+        - False
       * - ``solver_name``
         - str
-        - 'glpk' or 'gurobi' (callback supported with Gurobi)
+        - Pyomo MILP solver (e.g. ``glpk``, ``gurobi``)
         - 'glpk'
+      * - ``backend``
+        - str
+        - ``pyomo`` or ``ortools`` for the path MIP
+        - 'pyomo'
       * - ``crossings``
         - bool
         - Enforce one-active-per-crossing-group
         - False
       * - ``callback``
         - bool
-        - Enable Gurobi MIPSOL callback to track (time, objective)
+        - Record feasible solutions over time (solver-dependent)
         - False
 
    **Returns**
@@ -113,44 +219,45 @@ MIP Path Selection (Array)
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/wf_array/02_mip_path_selection_array.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
 
-      grid,res = pyf.anholt()
-      
-      flag, high_flow,model_MIP,feasible_solutions_MIP = pyf.MIP_path_graph(grid, max_flow=10, 
-                                                                            solver_name='gurobi', 
-                                                                            crossings=True, tee=True,callback=True)
-      pyf.ACDC_TEP.plot_feasible_solutions(
-                      feasible_solutions_MIP,
-                      'MIP',
-                      show=True)
+Cable Size Selection (CSS)
+--------------------------
 
-Simplified CSS Workflow
------------------------
+.. autofunction:: pyflow_acdc.wind_farm_CSS
 
-.. py:function:: simple_CSS(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, CSS_L_solver='gurobi', CSS_NL_solver='bonmin', time_limit=1200, NL=False, tee=False, export=True, fs=False)
+   Cable size selection on a **fixed** inter-array topology (``line.active_config``
+   set beforehand, typically by ``MIP_path_graph``). Does not optimise routing.
 
-   Runs a simplified sequential cable sizing workflow with reduced setup.
+   Dispatches to ``transmission_expansion`` (nonlinear, ``NL='OPF'``),
+   ``optimal_l_css_ortools`` (``CSS_L_solver='ortools'``), or
+   ``linear_transmission_expansion`` (other linear Pyomo solvers).
 
-.. py:function:: simple_assign_cable_types(grid, model, t_MW=None)
+.. autofunction:: pyflow_acdc.simple_assign_cable_types
 
-   Assigns cable types from an optimized model back into the grid.
+   Post-process a route MIP solution: assign the smallest sufficient cable rating
+   per active line from turbine-string flow (used when ``enable_cable_types=False``).
 
-Linear CSS Solvers
-------------------
+Linear CSS Solver (OR-Tools)
+----------------------------
 
-.. py:function:: Optimal_L_CSS_gurobi(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, tee=False, time_limit=300)
+.. autofunction:: pyflow_acdc.optimal_l_css_ortools
 
-   Solves the linear CSS formulation with Gurobi.
-
-.. py:function:: Optimal_L_CSS_ortools(grid, OPEX=True, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, tee=False, time_limit=300)
-
-   Solves the linear CSS formulation with OR-Tools.
+   OR-Tools ``linear_solver`` backend for CSS: one cable type per active CT line,
+   Ybus DC balance, optional discounted generator OPEX. Called by ``wind_farm_CSS``
+   when ``CSS_L_solver='ortools'``. Route selection is not part of this model.
+   See also :doc:`L_opf` for the Pyomo linear model (which may include TEP/CT
+   network-flow when ``TEP=True``).
 
 **References**
 ^^^^^^^^^^^^^^
 
 .. [1] B.C. Valerio, P. Gebraad, M. Cheah-Mane, V. A. Lacerda and O. Gomis-Bellmunt,
        "Strategies for wind park inter array optimisation through Mixed Integer Linear Programming"
+
+.. [2] B.C. Valerio, P. Gebraad, M. Cheah-Mane, V. A. Lacerda and O. Gomis-Bellmunt,
+       "Strategies for wind park inter array optimisation through Mixed Integer Linear Programming,"
+       Wind Energy Science, 2026 (preprint). https://doi.org/10.5194/wes-2026-53

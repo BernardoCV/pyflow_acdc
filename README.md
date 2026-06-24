@@ -1,10 +1,19 @@
-<img src="docs/images/logo_dark.svg" align="right" width="200px">
+<img src="docs/images/logos/logo_dark.svg" align="right" width="200px">
 
-# PyFlow ACDC
+# pyflow-acdc
+
+[![PyPI version](https://img.shields.io/pypi/v/pyflow-acdc)](https://pypi.org/project/pyflow-acdc/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pyflow-acdc)](https://pypi.org/project/pyflow-acdc/)
+[![License](https://img.shields.io/github/license/CITCEA-UPC/pyflow_acdc)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/LICENSE)
+[![PR tests](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml)
+[![Test coverage](https://img.shields.io/badge/coverage-67%25-yellow)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/TEST_COVERAGE.md)
+[![codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc/graph/badge.svg)](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
+[![Documentation Status](https://readthedocs.org/projects/pyflow-acdc/badge/?version=latest)](https://pyflow-acdc.readthedocs.io/en/latest/)
+
 A python-based tool for the design and analysis of hybrid AC/DC grids
 
 
-PyFlow ACDC is a program worked on by ADOreD Project 
+pyflow-acdc is a program worked on by ADOreD Project by CITCEA-UPC in collaboration with Youwind
 
 This project has received funding from the European Union’s  Horizon Europe 
 Research and Innovation programme under the Marie Skłodowska-Curie grant 
@@ -46,10 +55,7 @@ https://www.sciencedirect.com/science/article/pii/S0142061525010075
 
 **For array optimization:**
 ```
-B. C. Valerio, P. M. Gebraad, M. Cheah-Mane, V. Lacerda, and O. Gomis-
-Bellmunt, “Strategies for wind park inter-array optimisation through mixed in-
-teger linear programming,” in Proceedings of the TORQUE 2026 Conference,
-2026, to be published in Journal of Physics: Conference Series [under review].
+Castro Valerio, B., Gebraad, P. M. O., Cheah-Mane, M., A. Lacerda, V., and Gomis-Bellmunt, O.: A multi-stage methodology for wind park inter-array cabling: graph preparation, layout, and sizing, Wind Energ. Sci. Discuss. [preprint], https://doi.org/10.5194/wes-2026-53, in review, 2026.
 
 ```
 
@@ -129,14 +135,15 @@ affecting the production PyPI package.
 You can install pyflow_acdc with optional dependencies using pip:
 
 ```bash
-# Install with all optional dependencies
+# Install with all optional dependencies (excludes gurobipy, which requires a license)
 pip install pyflow-acdc[All]
 
 # Or install specific optional dependency groups:
 pip install pyflow-acdc[mapping]      # For mapping features (folium, branca)
 pip install pyflow-acdc[OPF]          # For optimal power flow (pyomo)
 pip install pyflow-acdc[Dash]         # For Dash web applications
-pip install pyflow-acdc[Array_OPT]    # For array optimization (ortools, pyomo)
+pip install pyflow-acdc[ORTOOLS_ARRAY]  # For OR-Tools route MIP + OR-Tools CSS (ortools)
+pip install pyflow-acdc[Array_OPT]    # Deprecated alias for ORTOOLS_ARRAY (ortools only)
 pip install pyflow-acdc[TEP_pymoo]    # For TEP with pymoo (pymoo, pyomo)
 pip install pyflow-acdc[Gurobi]       # For Gurobi solver (requires license)
 pip install pyflow-acdc[plotting]     # For static image export (kaleido)
@@ -155,10 +162,17 @@ pip install pyomo
 conda install -c conda-forge ipopt
 ```
 
-**For Array Optimization:**
+**For Array Optimization (OR-Tools path):**
 ```bash
-pip install ortools pyomo
-pip install highs  # Optional: for HiGHS solver
+pip install ortools
+pip install highspy  # Optional: for HiGHS solver
+```
+
+**For Array Optimization (Pyomo CSS path):**
+```bash
+pip install pyomo
+# Optional: Gurobi for faster MIP/CSS
+pip install gurobipy
 ```
 
 **For TEP with pymoo:** (still in development)
@@ -180,7 +194,7 @@ ipopt
 conda install -c conda-forge ipopt
 
 highs
-pip install highs
+pip install highspy
 
 gurobi (requires external licensing)
 pip install gurobipy
@@ -219,16 +233,34 @@ pip install dash
 ## Test
 
 Run the test suite:
+
 ```bash
 pyflow-acdc-test
 ```
 
-**Test Flags:**
+**Test flags** (see also `docs/testing.rst` and `CONTRIBUTING.md`):
+
 ```bash
---quick         # Quick tests only
+--quick         # Fast subset (run before opening a PR)
+--docs          # Documentation literalinclude examples
 --tep           # TEP tests only
---show-output    # All tests with output
+--opf           # OPF tests only
+--show-output   # Stream each case's output
 ```
+
+**Coverage** (maintained snapshot for contributors):
+
+```bash
+pip install -e ".[tests]"
+pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
+```
+
+CI uploads coverage to [Codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc) on each
+push/PR to `main` (requires the `CODECOV_TOKEN` repository secret).
+
+See [`TEST_COVERAGE.md`](TEST_COVERAGE.md) for a maintained per-module snapshot and
+function-level gaps. Update that file and the **Test coverage** badge above when tests
+change materially (keep the badge % in sync with the snapshot header).
 ## Documentation
 Online documentation can be found at:
 

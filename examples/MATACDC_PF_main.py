@@ -22,20 +22,20 @@ Converter_data = pd.read_csv(f'Stagg5MATACDC/MATACDC_Converter_data_{ext}.csv')
 
 
 
-[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data,DC_node_data, DC_line_data, Converter_data,data_in = ext)
+[grid,res]=pyf.create_grid_from_data(S_base, AC_node_data, AC_line_data,DC_node_data, DC_line_data, Converter_data,data_in = ext)
 
 """
 # Sequential algorithm 
 
 # """
 
-pf_time,tol,ps_iterations = pyf.ACDC_sequential(grid,QLimit=False)
+pf_time,tol,ps_iterations = pyf.acdc_sequential(grid,QLimit=False)
 
 
 
 
 end_time = time.perf_counter()
 elapsed_time = end_time - start_time
-res.All()
+res.all()
 print ('------')
 print(f'Time elapsed : {elapsed_time}')

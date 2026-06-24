@@ -13,7 +13,7 @@ their Pareto trade-off using a Pyomo-based optimization model [2]_.
 Transmission Expansion (pymoo)
 -------------------------------
 
-.. function:: transmission_expansion_pymoo(grid, NPV=True, n_years=25, Hy=8760, discount_rate=0.02, ObjRule=None, solver='GA', time_limit=300, tee=False, n_gen=10)
+.. autofunction:: pyflow_acdc.transmission_expansion_pymoo
 
    Runs a pymoo-based outer optimization for TEP. For single-objective, minimizes
    present value of total cost (CAPEX + NPV·OPEX). For multi-objective (``solver='NSGA2'``),
@@ -90,30 +90,10 @@ Transmission Expansion (pymoo)
 
    **Example**
 
-   .. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/tep_pymoo/01_transmission_expansion_pymoo.py
+   :language: python
+   :lines: 2-
 
-      import pyflow_acdc as pyf
-
-      grid,res = pyf.case39_acdc(TEP=True,exp='All',N_b_dc=0,N_b_ac=0,N_i=0,N_max=5,Increase=1.5)
-
-      obj = {'Energy_cost': 1}
-
-
-
-      model, model_results , timing_info, solver_stats= pyf.transmission_expansion_pymoo(grid,NPV=True,ObjRule=obj,solver='GA',n_gen=300,tee=True)
-
-
-   
-
-   **Notes**
-
-   - The OPF model is built once (nonlinear ACDC OPF) and re-evaluated across candidate
-     solutions by updating Pyomo Params; this avoids model rebuild overhead.
-   - Decision variable bounds mirror the grid's candidate objects and their
-     ``*_max`` attributes. Ensure these are set appropriately before running.
-   - For Pareto runs (``solver='NSGA2'``), the function returns Pareto information and
-     exports the balanced solution by default. Alternative selections can be chosen via
-     ``pareto_result`` inside the returned information.
 
 **References**
 ^^^^^^^^^^^^^^

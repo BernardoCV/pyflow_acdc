@@ -29,7 +29,7 @@ DC_line_data   = pd.read_csv(f"{path}/CigreB4/CigreB4_DC_line_data.csv")
 Converter_ACDC_data = pd.read_csv(f"{path}/CigreB4/CigreB4_Converter_data.csv")
 DCDC_data = pd.read_csv(f"{path}/CigreB4/CigreB4_DCDC_conv.csv")
 
-[grid,res]=pyf.Create_grid_from_data(S_base, AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_ACDC_data)
+[grid,res]=pyf.create_grid_from_data(S_base, AC_node_data, AC_line_data, DC_node_data, DC_line_data, Converter_ACDC_data)
 for conv in grid.Converters_ACDC:
     conv.a_conv=0
     conv.b_conv=0
@@ -47,9 +47,9 @@ for conv in DCDC_data.itertuples():
 
 
 #pyf.ACDC_sequential(grid)
-model, model_res , timing_info, solver_stats=pyf.Optimal_PF(grid)
+model, model_res , timing_info, solver_stats=pyf.optimal_pf(grid)
 
-res.All()
+res.all()
 end_time = time.perf_counter()
 elapsed_time = end_time - start_time
 

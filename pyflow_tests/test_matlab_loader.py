@@ -2,18 +2,21 @@
 
 import pyflow_acdc as pyf
 from pathlib import Path
+import tempfile
+
+from pyflow_tests._test_solver_deps import pyomo_missing_for_run_test, require_pyomo
 
 
-def matlab_loader():
+def matlab_loader(output_dir):
 
     current_file = Path(__file__).resolve()
     path = str(current_file.parent)
 
     data = f'{path}/case39_acdc_var.mat'
 
-    [grid,res]=pyf.Create_grid_from_mat(data)
+    [grid,res]=pyf.create_grid_from_mat(data)
 
-    pyf.save_grid_to_file(grid, 'case39',folder_name='example_grids')
+    pyf.save_grid_to_file(grid, "case39", folder_name=str(output_dir))
 
 
     obj = {'Energy_cost'  : 1}
@@ -22,29 +25,31 @@ def matlab_loader():
     print(nac)
 
         
-    model, model_res,timing_info, solver_stats = pyf.Optimal_PF(grid,ObjRule=obj)
+    model, model_res,timing_info, solver_stats = pyf.optimal_pf(grid,ObjRule=obj)
 
-    res.All()
+    res.all()
 
     print(timing_info)
     print(model_res)
     model.obj.display()
 
 
-def run_test():
+def run_test(output_dir=None):
     """Test MATLAB file loading functionality."""
-    try:
-        import pyomo
-    except ImportError:
-        print("pyomo is not installed...")
+    if pyomo_missing_for_run_test():
         return
 
-    matlab_loader()
+    if output_dir is None:
+        with tempfile.TemporaryDirectory(prefix="pyflow_matlab_loader_") as tmpdir:
+            matlab_loader(tmpdir)
+    else:
+        matlab_loader(output_dir)
 
 
-def test_matlab_loader():
+def test_matlab_loader(tmp_path):
     """Pytest entrypoint for MATLAB loader test."""
-    run_test()
+    require_pyomo()
+    matlab_loader(tmp_path)
 
 
 if __name__ == "__main__":

@@ -5,18 +5,14 @@ CSV files for importing data
 
 In this page the column names for importing data from CSV files are described. It is important to note that column names are case sensitive. The CSV can then be used for the following functions:
 
-.. py:function:: Create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
+.. autofunction:: pyflow_acdc.create_grid_from_data
    :noindex:
 
-   Creates a new grid from pandas/geopandas DataFrames or csv file strings containing component data.
-
-.. py:function:: Extend_grid_from_data(grid, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in='Real')
+.. autofunction:: pyflow_acdc.extend_grid_from_data
    :noindex:
 
-   Extends an existing grid with new components from pandas/geopandas DataFrames or csv file strings.
 
-
-.. figure:: ../images/Stagg5MATACDC.svg
+.. themed-figure:: stagg5
    :alt: Case 5 Stagg
    :align: center
 
@@ -289,79 +285,35 @@ Here are example CSV files from a 5-bus test system in per unit:
 
 **AC Node Data (AC_node_data.csv)**
 
-.. code-block:: text
-
-    Node_id, type  , Voltage_0, theta_0, Power_Gained, Reactive_Gained, Power_load, Reactive_load, kV_base
-    1     , Slack , 1.06     , 0      , 0           , 0              , 0         , 0            , 345
-    2     , PV    , 1        , 0.1    , 0.4         , 0              , 0.2       , 0.1          , 345  
-    3     , PQ    , 1        , 0.1    , 0           , 0              , 0.45      , 0.15         , 345
-    4     , PQ    , 1        , 0.1    , 0           , 0              , 0.4       , 0.05         , 345
-    5     , PQ    , 1        , 0.1    , 0           , 0              , 0.6       , 0.1          , 345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/AC_node_data.csv
+   :language: text
 
 **AC Line Data (AC_line_data.csv)**
 
-.. code-block:: text
-
-    Line_id, fromNode, toNode,r    , x    , g, b   ,MVA_rating, kV_base
-    1      , 1       , 2     , 0.02, 0.06 , 0, 0.06, 150      , 345
-    2      , 1       , 3     , 0.08, 0.24 , 0, 0.05, 100      , 345  
-    3      , 2       , 3     , 0.06, 0.18 , 0, 0.04, 100      , 345
-    4      , 2       , 4     , 0.06, 0.18 , 0, 0.04, 100      , 345
-    5      , 2       , 5     , 0.04, 0.12 , 0, 0.03, 100      , 345
-    6      , 3       , 4     , 0.01, 0.03 , 0, 0.02, 100      , 345
-    7      , 4       , 5     , 0.08, 0.24 , 0, 0.05, 100      , 345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/AC_line_data.csv
+   :language: text
 
 **DC Node Data (DC_node_data.csv)**
 
-.. code-block:: text
-
-    Node_id,type ,Voltage_0,Power_Gained,Power_load,kV_base
-       1   , P   ,     1   ,     0      ,     0    , 345
-       2   ,Slack,     1   ,     0      ,     0    , 345
-       3   , P   ,     1   ,     0      ,     0    , 345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/DC_node_data.csv
+   :language: text
 
 **DC Line Data (DC_line_data.csv)**
 
-.. code-block:: text
-
-    Line_id, fromNode, toNode, r    , MW_rating, kV_base, Mono_Bi_polar
-    1      , 1       , 2     , 0.052, 100     , 345    , sm
-    2      , 2       , 3     , 0.052, 100     , 345    , sm
-    3      , 1       , 3     , 0.073, 100     , 345    , sm
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/DC_line_data.csv
+   :language: text
 
 **Converter Data (Converter_data.csv)**
 
-.. code-block:: text
-
-    Conv_id, AC_type, DC_type, AC_node, DC_node, P_AC  , Q_AC , P_DC, T_r   , T_x  , PR_r  , PR_x   , Filter_b, Droop, AC_kV_base, MVA_rating, Ucmin, Ucmax
-    1      , PQ     , PAC    , 2      , 1      , -0.6  , -0.4 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
-    2      , PV     , Slack  , 3      , 2      , 0     , 0    , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
-    3      , PQ     , PAC    , 5      , 3      , 0.35  , 0.05 , 0   , 0.0015, 0.121, 0.0001, 0.16428, 0.0887, 0    , 345       , 120       , 0.9  , 1.2
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/Converter_data.csv
+   :language: text
 
 **Example Code**
 
-.. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/01_data_in_per_unit_pu.py
+   :language: python
+   :lines: 2-
 
-    import pandas as pd
-    import pyflow_acdc as pyf
-
-    # Read CSV files
-    ac_nodes = pd.read_csv('AC_node_data.csv')
-    ac_lines = pd.read_csv('AC_line_data.csv')
-    dc_nodes = pd.read_csv('DC_node_data.csv')
-    dc_lines = pd.read_csv('DC_line_data.csv')
-    converters = pd.read_csv('Converter_data.csv')
-
-    # Create grid
-    grid, results = pyf.Create_grid_from_data(
-        S_base=100,
-        AC_node_data=ac_nodes,
-        AC_line_data=ac_lines,
-        DC_node_data=dc_nodes,
-        DC_line_data=dc_lines,
-        Converter_data=converters,
-        data_in='pu'  # Data is in per unit
-    )
 
 .. raw:: html
 
@@ -638,83 +590,39 @@ Here are example CSV files from a 5-bus test system using the data in Ohm values
 
 **AC Node Data (AC_node_data_Ohm.csv)**
 
-.. code-block:: text
-
-    Node_id,type,Voltage_0,theta_0,Power_Gained,Reactive_Gained,Power_load,Reactive_load,kV_base
-    1,Slack,1.06,0,0,0,0,0,345
-    2,PV,1,0.1,40,0,20,10,345
-    3,PQ,1,0.1,0,0,45,15,345
-    4,PQ,1,0.1,0,0,40,5,345
-    5,PQ,1,0.1,0,0,60,10,345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/AC_node_data_Ohm.csv
+   :language: text
 
 
 **AC Line Data (AC_line_data_Ohm.csv)**
 
-.. code-block:: text
-
-    Line_id,fromNode,toNode,R,X,G,B,MVA_rating,kV_base
-    1,1,2,23.810,71.420,0,0.0000504,150,345
-    2,1,3,95.220,285.660,0,0.0000420,100,345
-    3,2,3,71.420,214.250,0,0.0000336,100,345
-    4,2,4,71.420,214.250,0,0.0000336,100,345
-    5,2,5,47.610,142.830,0,0.0000252,100,345
-    6,3,4,11.900,35.710,0,0.0000168,100,345
-    7,4,5,95.220,285.660,0,0.0000420,100,345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/AC_line_data_Ohm.csv
+   :language: text
 
 
 **DC Node Data (DC_node_data_Ohm.csv)**
 
-.. code-block:: text
-
-    Node_id,type,Voltage_0,Power_Gained,Power_load,kV_base
-    1,P,1,0,0,345
-    2,Slack,1,0,0,345
-    3,P,1,0,0,345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/DC_node_data_Ohm.csv
+   :language: text
 
 
 **DC Line Data (DC_line_data_Ohm.csv)**
 
-.. code-block:: text
-
-    Line_id,fromNode,toNode,R,MW_rating,kV_base,Mono_Bi_polar
-    1,1,2,61.89,100,345,sm
-    2,2,3,61.89,100,345,sm
-    3,1,3,86.89,100,345,sm
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/DC_line_data_Ohm.csv
+   :language: text
 
 
 **Converter Data (Converter_data_Ohm.csv)**
 
-.. code-block:: text
-
-    Conv_id,AC_type,DC_type,AC_node,DC_node,P_MW_AC,Q_MVA_AC,P_MW_DC,T_R,T_X,PR_R,PR_X,Filter,Droop,AC_kV_base,MVA_rating,Ucmin,Ucmax
-    1,PQ,PAC,2,1,-60,-40,0,1.785,144.02,0.119,195.534,7.45E-05,0,345,120,0.9,1.2
-    2,PV,Slack,3,2,0,0,0,1.785,144.02,0.119,195.534,7.45E-05,0,345,120,0.9,1.2
-    3,PQ,PAC,5,3,35,5,0,1.785,144.02,0.119,195.534,7.45E-05,0,345,120,0.9,1.2
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/Converter_data_Ohm.csv
+   :language: text
 
 **Example Code**
 
-.. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/02_data_in_ohms.py
+   :language: python
+   :lines: 2-
 
-    import pandas as pd
-    import pyflow_acdc as pyf
-
-    # Read CSV files
-    ac_nodes = pd.read_csv('AC_node_data_Ohm.csv')
-    ac_lines = pd.read_csv('AC_line_data_Ohm.csv')
-    dc_nodes = pd.read_csv('DC_node_data_Ohm.csv')
-    dc_lines = pd.read_csv('DC_line_data_Ohm.csv')
-    converters = pd.read_csv('Converter_data_Ohm.csv')
-
-    # Create grid
-    grid, results = pyf.Create_grid_from_data(
-        S_base=100,
-        AC_node_data=ac_nodes,
-        AC_line_data=ac_lines,
-        DC_node_data=dc_nodes,
-        DC_line_data=dc_lines,
-        Converter_data=converters,
-        data_in='Ohm'  # Data is in Ohm values
-    )
 
 .. raw:: html
 
@@ -983,80 +891,36 @@ Here are example CSV files from a 5-bus test system using the data in Real value
 
 **AC Node Data (AC_node_data_Real.csv)**
 
-.. code-block:: text
-
-    Node_id,type,Voltage_0,theta_0,Power_Gained,Reactive_Gained,Power_load,Reactive_load,kV_base
-    1,Slack,1.06,0,0,0,0,0,345
-    2,PV,1,0.1,40,0,20,10,345
-    3,PQ,1,0.1,0,0,45,15,345
-    4,PQ,1,0.1,0,0,40,5,345
-    5,PQ,1,0.1,0,0,60,10,345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/AC_node_data_Real.csv
+   :language: text
 
 **AC Line Data (AC_line_data_Real.csv)**
 
-.. code-block:: text
-
-    Line_id,fromNode,toNode,R_Ohm_km,L_mH_km,G_uS_km,C_uF_km,A_rating,kV_base
-    1,1,2,23.81,227.3369207,0,0.160428183,251.0218562,345
-    2,1,3,95.22,909.2840209,0,0.133690152,167.3479041,345
-    3,2,3,71.42,681.9789311,0,0.106952122,167.3479041,345
-    4,2,4,71.42,681.9789311,0,0.106952122,167.3479041,345
-    5,2,5,47.61,454.6420104,0,0.080214091,167.3479041,345
-    6,3,4,11.9,113.6684604,0,0.053476061,167.3479041,345
-    7,4,5,95.22,909.2840209,0,0.133690152,167.3479041,345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/AC_line_data_Real.csv
+   :language: text
 
 **DC Node Data (DC_node_data_Real.csv)**
 
-.. code-block:: text
-
-    Node_id,type,Voltage_0,Power_Gained,Power_load,kV_base
-    1,P,1,0,0,345
-    2,Slack,1,0,0,345
-    3,P,1,0,0,345
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/DC_node_data_Real.csv
+   :language: text
 
 
 **DC Line Data (DC_line_data_Real.csv)**
 
-.. code-block:: text
-
-    Line_id,fromNode,toNode,R_Ohm_km,A_rating,kV_base,Mono_Bi_polar
-    1,1,2,61.89,290,345,sm
-    2,2,3,61.89,290,345,sm
-    3,1,3,86.89,290,345,sm
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/DC_line_data_Real.csv
+   :language: text
 
 **Converter Data (Converter_data_Real.csv)**
 
-.. code-block:: text
-
-    Conv_id,AC_type,DC_type,AC_node,DC_node,P_MW_AC,Q_MVA_AC,P_MW_DC,T_R_Ohm,T_X_mH,PR_R_Ohm,PR_X_mH,Filter_uF,Droop,AC_kV_base,MVA_rating,Ucmin,Ucmax
-    1,PQ,PAC,2,1,-60,-40,0,1.785,458.4298981,0.119,622.4040529,0.237140865,0,345,120,0.9,1.2
-    2,PV,Slack,3,2,0,0,0,1.785,458.4298981,0.119,622.4040529,0.237140865,0,345,120,0.9,1.2
-    3,PQ,PAC,5,3,35,5,0,1.785,458.4298981,0.119,622.4040529,0.237140865,0,345,120,0.9,1.2
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/data/Converter_data_Real.csv
+   :language: text
 
 **Example Code**
 
-.. code-block:: python
+.. literalinclude:: ../../pyflow_tests/doc_examples/csv_import/03_data_in_real_values.py
+   :language: python
+   :lines: 2-
 
-    import pandas as pd
-    import pyflow_acdc as pyf
-
-    # Read CSV files
-    ac_nodes = pd.read_csv('AC_node_data_Real.csv')
-    ac_lines = pd.read_csv('AC_line_data_Real.csv')
-    dc_nodes = pd.read_csv('DC_node_data_Real.csv')
-    dc_lines = pd.read_csv('DC_line_data_Real.csv')
-    converters = pd.read_csv('Converter_data_Real.csv')
-
-    # Create grid
-    grid, results = pyf.Create_grid_from_data(
-        S_base=100,
-        AC_node_data=ac_nodes,
-        AC_line_data=ac_lines,
-        DC_node_data=dc_nodes,
-        DC_line_data=dc_lines,
-        Converter_data=converters,
-        data_in='Real'  # Data is in Real values
-    )
 
 .. raw:: html
 

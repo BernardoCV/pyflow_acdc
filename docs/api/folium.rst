@@ -1,97 +1,38 @@
 Mapping
 =======
 
-
-
-For this module, you need to have the optional dependendency pyflow_acdc[mapping] installed.
+For this module, you need to have the optional dependency ``pyflow-acdc[mapping]`` installed.
 
 Interactive map
 ---------------
 
-.. py:function:: plot_folium(grid, text='inPu', name='grid_map',tiles="CartoDB Positron",polygon=None,ant_path='None',clustering=True,coloring=None)
+.. autofunction:: pyflow_acdc.plot_folium
+
+Network map (static topology)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.plot_folium_network
+
+.. themed-figure:: north_sea_folium
+   :alt: Example of the Folium map.
+   :align: center
+   :width: 80%
    
-   Creates an interactive map visualization using Folium.
+Time-series and investment maps (under development)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
+These helpers read solved results already stored on the ``Grid`` and build
+animated Folium maps. The API may change in future releases.
 
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to visualize
-        - Required
-      * - ``text``
-        - str
-        - Hover text format ('data','inPu' or 'abs')
-        - 'inPu'
-      * - ``name``
-        - str
-        - Output file name
-        - 'grid_map'
-      * - ``tiles``
-        - str
-        - "OpenStreetMap","CartoDB Positron","Cartodb dark_matter" or None
-        - "CartoDB Positron"
-      * - ``ant_path``
-        - str
-        - Animated paths
-        - 'ALl', 'Reduced' or 'None'
-      * - ``clustering``
-        - bool
-        - Enable marker clustering
-        - True
+.. autofunction:: pyflow_acdc.plot_folium_ts_results
 
-   **Features**:
+   Line-loading animation from ``grid.time_series_results`` (after
+   :func:`~pyflow_acdc.ts_acdc_opf` or :func:`~pyflow_acdc.run_ts_opf_for_investment_period`).
 
-   - Interactive map with zoom/pan
-   - Voltage level filtering
-   - Component type layers:
+.. autofunction:: pyflow_acdc.plot_folium_inv_results
 
-     - MVAC Lines (<110kV)
-     - HVAC Lines (<300kV)
-     - EHVAC Lines (<500kV)
-     - UHVAC Lines
-     - DC Lines
-     - Converters
-     - Transformers
-     - Generators by type
-   - Marker clustering for generators
-   - Hover information for components
-   - Optional animated power flows:
+   Expansion/decommission overlay from ``grid.MP_TEP_results``,
+   ``grid.Seq_STEP_results``, or ``grid.Seq_MS_STEP_results`` (``source="auto"``
+   picks the first non-empty table).
 
-     - 'All', all lines higher than 110kV
-     - 'Reduced', only HVDC lines
-     - 'None', no animated power flows
 
-   **Example**
-
-   .. code-block:: python
-
-       import pyflow_acdc as pyf
-
-       grid,res = pyf.NS_MTDC()
-
-       pyf.Optimal_PF(grid)
-
-       pyf.plot_folium(grid)
-
-   .. figure:: ../images/north_sea_folium.svg
-      :alt: Example of the Folium map.
-      :align: center
-      :width: 80%
-
-   **Example with animated power flows**
-
-   .. code-block:: python
-
-       import pyflow_acdc as pyf
-
-       grid,res = pyf.NS_MTDC()
-
-       pyf.Optimal_PF(grid)
-
-       pyf.plot_folium(grid,ant_path='All')

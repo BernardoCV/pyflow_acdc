@@ -1,24 +1,29 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Dec  2 18:23:52 2024
+"""Grid export and loader code generation.
 
-@author: BernardoCastro
+Exports a :class:`~pyflow_acdc.Classes.Grid` to runnable Python, MATLAB, or
+pickle, including generation of loader code that reconstructs the grid.
+
+Owns: serialization/export and code generation.
+Does not own: the in-memory data model (see ``Classes``).
 """
 
 import numpy as np
-import pandas as pd
 import os
 from .Classes import MTDCPrice_Zone, OffshorePrice_Zone
+from .constants import (
+    NodeType,
+    ConverterDCType,
+    AcDcSide,
+    Polarity,
+    DataInput,
+    PriceZoneCategory,
+)
 
-import os
 import pickle
 import gzip
 
-try:
-    import dill  # optional fallback
-    _dill = dill
-except Exception:
-    _dill = None
+import dill
 
 __all__ = [
     'save_grid_to_file',
@@ -30,58 +35,58 @@ __all__ = [
 def generate_dataframe_code_from_dict(data_list, var_name):
     """
     Generate Python code to recreate a DataFrame from an input dictionary.
-    
+
     :param data_dict: Dictionary with column names as keys and lists as values.
     :param var_name: The desired variable name for the DataFrame.
     :return: Python code to recreate the DataFrame.
     """
-    
+
     if not data_list:
         return f"{var_name} = None\n"
-    
+
     data_repr = f"{var_name}_data = [\n"
     for i, data in enumerate(data_list):
         data_repr += f"        {data},\n" if i < len(data_list) - 1 else f"        {data}\n"
     data_repr += "    ]\n"
-    
+
     # Create DataFrame from list of dictionaries
     df_creation_code = f"    {var_name} = pd.DataFrame({var_name}_data)\n"
-    
+
     # Return the complete code
     return data_repr + df_creation_code
-    
+
 def generate_add_price_zone_code(price_zone_data):
     """
     Generates Python code with a for loop to call `add_price_zone` for each set of arguments
     in the list `price_zone_data`.
-    
+
     :param price_zone_data: List of dictionaries with arguments for add_price_zone.
     :return: Python code as a string to call add_price_zone for each set of arguments.
     """
-    
+
     code = ""
-    
+
     if not price_zone_data:
         return code
-  
+
     # Loop through each entry in the data list and generate the corresponding function call
     for zone in price_zone_data:
-        if zone["type"]=="main":        
+        if zone["type"] == PriceZoneCategory.MAIN:
             code += f"    pyf.add_price_zone(grid,'{zone['name']}',{zone['price']},import_pu_L={zone['import_pu_L']},export_pu_G={zone['export_pu_G']},a={zone['a']},b={zone['b']},c={zone['c']},import_expand_pu={zone['import_expand_pu']})\n"
     for zone in price_zone_data:
-        if zone["type"]== "offshore":
+        if zone["type"] == PriceZoneCategory.OFFSHORE:
             code += f"    pyf.add_offshore_price_zone(grid,'{zone['main_price_zone']}','{zone['name']}')\n"
     for zone in price_zone_data:
-        if zone["type"]== "MTDC":
-            code += f"    pyf.add_MTDC_price_zone(grid, '{zone['name']}',linked_price_zones={zone['linked_price_zones']},pricing_strategy={zone['pricing_strategy']})\n"        
-    
-   
+        if zone["type"] == PriceZoneCategory.MTDC:
+            code += f"    pyf.add_MTDC_price_zone(grid, '{zone['name']}',linked_price_zones={zone['linked_price_zones']},pricing_strategy='{zone['pricing_strategy']}')\n"
+
+
     return code
 
 def generate_add_gen_code(gens,S_base):
     """
     Generate Python code with a for loop to call `add_gen` for each generator in the list `gens`.
-    
+
     :param gens: List of dictionaries, where each dictionary contains the arguments for add_gen.
     :return: Python code as a string to call add_gen for each generator.
     """
@@ -89,12 +94,12 @@ def generate_add_gen_code(gens,S_base):
     code = ""
     if not gens:
         return code
-    
+
     # Loop through each generator in the list and generate the corresponding function call
     for gen in gens:
         # Start building the add_gen function call
         code += f"    pyf.add_gen(grid, '{gen['node']}', '{gen['name']}', "
-        
+
         # Dynamically handle parameters
         if gen['price_zone_link'] != False:
             code += f"price_zone_link={gen['price_zone_link']}, "
@@ -104,7 +109,7 @@ def generate_add_gen_code(gens,S_base):
         code += f"MVArmax={gen['Max_pow_genR']*S_base}, MVArmin={gen['Min_pow_genR']*S_base}, "
         code += f"PsetMW={gen['Pset']*S_base}, QsetMVA={gen['Qset']*S_base})\n"
 
-    
+
     return code
 
 def generate_add_ren_source_zone_code(ren_source_zones):
@@ -114,16 +119,16 @@ def generate_add_ren_source_zone_code(ren_source_zones):
     :param ren_source_zones: List of dictionaries, where each dictionary contains the arguments for add_RenSource_zone.
     :return: Python code as a string to call add_RenSource_zone for each renewable source zone.
     """
-    
+
     code = ""
-    
+
     if not ren_source_zones:
         return code
-    
+
     for zone in ren_source_zones:
         # Start building the add_RenSource_zone function call
         code += f"    pyf.add_RenSource_zone(grid,'{zone['name']}')\n"
-    
+
     return code
 
 def generate_add_ren_source_code(ren_sources,S_base):
@@ -133,18 +138,18 @@ def generate_add_ren_source_code(ren_sources,S_base):
     :param ren_sources: List of dictionaries, where each dictionary contains the arguments for add_RenSource.
     :return: Python code as a string to call add_RenSource for each renewable source.
     """
-    
-    
-    
+
+
+
     code = ""
-    
+
     if not ren_sources:
         return code
-    
+
     for ren_source in ren_sources:
         # Start building the add_RenSource function call
         code += f"    pyf.add_RenSource(grid, '{ren_source['node_name']}', {ren_source['base']*S_base}, "
-        
+
         # Dynamically handle optional parameters
         code += f"ren_source_name='{ren_source['ren_source_name']}', " if ren_source['ren_source_name'] else ""
         code += f"available={ren_source['available']}, "
@@ -152,7 +157,7 @@ def generate_add_ren_source_code(ren_sources,S_base):
         code += f"price_zone='{ren_source['price_zone']}', " if ren_source['price_zone'] else ""
         code += f"Offshore={ren_source['Offshore']}, "
         code += f"MTDC={ren_source['MTDC']})\n"
-    
+
     return code
 
 def create_dictionaries(grid):
@@ -168,7 +173,7 @@ def create_dictionaries(grid):
         "Generators": [],
         "RenSources": [],
     }
-    
+
     # AC Nodes
     if grid.nodes_AC:
         for node in getattr(grid, "nodes_AC", []):
@@ -201,10 +206,10 @@ def create_dictionaries(grid):
                     "Line_id": line.name,
                     "fromNode": line.fromNode.name,
                     "toNode": line.toNode.name,
-                    "r": float(line.R),
-                    "x": float(line.X),
-                    "g": float(line.G),
-                    "b": float(line.B),
+                    "r": float(line.r),
+                    "x": float(line.x),
+                    "g": float(line.g),
+                    "b": float(line.b),
                     "MVA_rating": float(line.MVA_rating),
                     "m": float(line.m),
                     "shift": float(line.shift),
@@ -236,19 +241,19 @@ def create_dictionaries(grid):
         for line in getattr(grid, "lines_DC", []):
             if line:
                 if line.pol   == 1:
-                    pol = 'm'
+                    pol = Polarity.MONOPOLAR
                 else:
-                    pol = 'b'
-            
+                    pol = Polarity.BIPOLAR
+
                 data["lines_DC"].append({
                     "fromNode":   line.fromNode.name,
                     "toNode":     line.toNode.name,
-                    "r": float(line.R),
+                    "r": float(line.r),
                     "MW_rating":  float(line.MW_rating),
                     "kV_base":    float(line.kV_base),
                     "Length_km":         float(line.Length_km),
                     "Mono_Bi_polar":   pol,
-                    "Line_id":       line.name,     
+                    "Line_id":       line.name,
                     "geometry": line.geometry.wkt if line.geometry is not None else None
                 })
 
@@ -264,11 +269,11 @@ def create_dictionaries(grid):
                     "P_AC": float(conv.P_AC),
                     "Q_AC": float(conv.Q_AC),
                     "P_DC": float(conv.P_DC),
-                    "T_r": float(conv.R_t * conv.cn_pol),
-                    "T_x": float(conv.X_t * conv.cn_pol),
-                    "PR_r": float(conv.PR_R * conv.cn_pol),
-                    "PR_x": float(conv.PR_X * conv.cn_pol),
-                    "Filter": float(conv.Bf / conv.cn_pol),
+                    "T_r": float(conv.r_t * conv.cn_pol),
+                    "T_x": float(conv.x_t * conv.cn_pol),
+                    "PR_r": float(conv.pr_r * conv.cn_pol),
+                    "PR_x": float(conv.pr_x * conv.cn_pol),
+                    "Filter": float(conv.bf / conv.cn_pol),
                     "Droop": float(conv.Droop_rate),
                     "AC_kV_base": float(conv.AC_kV_base),
                     "MVA_rating": float(conv.MVA_max / conv.cn_pol),
@@ -281,9 +286,9 @@ def create_dictionaries(grid):
                     "losscinv": float(conv.c_inver_og * conv.cn_pol),
                     "Ucmin": float(conv.Ucmin),
                     "Ucmax": float(conv.Ucmax),
-                    "geometry": conv.geometry.wkt if conv.geometry is not None else None        
+                    "geometry": conv.geometry.wkt if conv.geometry is not None else None
                 })
-    
+
     # Step 1: Define sets for the MTDC price_zones and linked price_zones
     if grid.Price_Zones:
         for price_zone in getattr(grid, "Price_Zones", []):
@@ -293,13 +298,13 @@ def create_dictionaries(grid):
                         "name": price_zone.name,
                         "linked_price_zones": price_zone.linked_price_zones,
                         "pricing_strategy": price_zone.pricing_strategy,
-                        "type":'MTDC',
+                        "type": PriceZoneCategory.MTDC.value,
                     })
                 elif isinstance(price_zone, OffshorePrice_Zone):
                     data["Price_Zone"].append({
                         "main_price_zone": price_zone.main_price_zone.name,
                         "name": price_zone.name,
-                        "type":'offshore', 
+                        "type": PriceZoneCategory.OFFSHORE.value,
                     })
                 else:
                     data["Price_Zone"].append({
@@ -311,7 +316,7 @@ def create_dictionaries(grid):
                         "b":           price_zone.b,
                         "c":           price_zone.c,
                         "import_expand_pu": price_zone.import_expand,
-                        "type":'main',
+                        "type": PriceZoneCategory.MAIN.value,
                     })
 
     # RenSource Zones
@@ -347,7 +352,7 @@ def create_dictionaries(grid):
     if grid.RenSources:
         for ren_source in getattr(grid, "RenSources", []):
             if ren_source:
-                        
+
                 data["RenSources"].append({
                     "ren_source_name" : ren_source.name,
                     "node_name": ren_source.Node,
@@ -367,7 +372,7 @@ def create_dictionaries(grid):
 
 
 def generate_loading_code(grid,file_name):
-    
+
     data_dict=create_dictionaries(grid)
     # Generate the code
     nodes_AC_code = generate_dataframe_code_from_dict(data_dict["nodes_AC"], "nodes_AC")
@@ -375,94 +380,105 @@ def generate_loading_code(grid,file_name):
     nodes_DC_code = generate_dataframe_code_from_dict(data_dict["nodes_DC"], "nodes_DC")
     lines_DC_code = generate_dataframe_code_from_dict(data_dict["lines_DC"], "lines_DC")
     Converters_ACDC_code = generate_dataframe_code_from_dict(data_dict["Converters_ACDC"], "Converters_ACDC")
-    
-    
+
+
     pz_code = generate_add_price_zone_code(data_dict["Price_Zone"])
     gen_code = generate_add_gen_code(data_dict["Generators"],data_dict['S_base'])
-    
-    
+
+
     rz_code = generate_add_ren_source_zone_code(data_dict["RenSource_zone"])
     rens_code = generate_add_ren_source_code(data_dict["RenSources"],data_dict['S_base'])
-    
-    
+
+
     main_code = f"""
 
 import pyflow_acdc as pyf
 import pandas as pd
 
 
-def {file_name}():    
-    
+def {file_name}():
+
     S_base={data_dict['S_base']}
-    
+
     # DataFrame Code:
     {nodes_AC_code}
     {lines_AC_code}
     {nodes_DC_code}
     {lines_DC_code}
     {Converters_ACDC_code}
-    
+
     # Create the grid
-    [grid, res] = pyf.Create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='pu')
+    [grid, res] = pyf.create_grid_from_data(S_base, nodes_AC, lines_AC, nodes_DC, lines_DC, Converters_ACDC, data_in='{DataInput.PU.value}')
     grid.name = '{file_name}'
     """
-    
+
     if pz_code:
-        main_code += f"""    
-    
+        main_code += f"""
+
     # Add Price Zones:
 {pz_code}
-    
+
 
     """
-    
+
     # If nodes_AC code exists, add the code for assigning price zones to nodes_AC
         if data_dict["nodes_AC"]:
             main_code += f"""
-        # Assign Price Zones to Nodes
-        for index, row in nodes_AC.iterrows():
-            node_name = nodes_AC.at[index, 'Node_id']
-            price_zone = nodes_AC.at[index, 'PZ']
-            ACDC = 'AC'
-            if price_zone is not None:
-                pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
-        """
-    
+    # Assign Price Zones to Nodes
+    for index, row in nodes_AC.iterrows():
+        node_name = nodes_AC.at[index, 'Node_id']
+        price_zone = nodes_AC.at[index, 'PZ']
+        ACDC = '{AcDcSide.AC.value}'
+        if price_zone is not None:
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
+    """
+
     # If nodes_DC code exists, add the code for assigning price zones to nodes_DC
         if data_dict["nodes_DC"]:
             main_code += f"""
-        for index, row in nodes_DC.iterrows():
-            node_name = nodes_DC.at[index, 'Node_id']
-            price_zone = nodes_DC.at[index, 'PZ']
-            ACDC = 'DC'
-            if price_zone is not None:
-                pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
-        """
-    
-    
+    for index, row in nodes_DC.iterrows():
+        node_name = nodes_DC.at[index, 'Node_id']
+        price_zone = nodes_DC.at[index, 'PZ']
+        ACDC = '{AcDcSide.DC.value}'
+        if price_zone is not None:
+            pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
+    """
+
+
     main_code+=f"""
     # Add Generators
-{gen_code}    
-    
+{gen_code}
+
     # Add Renewable Source Zones
 {rz_code}
-    
+
     # Add Renewable Sources
 {rens_code}
-    
+
     # Return the grid
     return grid,res
 """
 
-   
+
     return main_code
-    
-    
+
+
 
 
 def save_pickle(grid, path, compress=True, use_dill=False):
+    """Serialize ``grid`` to a pickle (or dill) file for reload via :func:`create_grid_from_pickle`.
+
+    Parameters
+    ----------
+    path : str
+        Output file path (parent directories are created if needed).
+    compress : bool, optional
+        Write gzip-compressed pickle when ``True``.
+    use_dill : bool, optional
+        Use ``dill`` instead of ``pickle`` when ``True``.
+    """
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    lib = _dill if (use_dill and _dill is not None) else pickle
+    lib = dill if use_dill else pickle
     protocol = pickle.HIGHEST_PROTOCOL
 
     if compress:
@@ -475,25 +491,25 @@ def save_pickle(grid, path, compress=True, use_dill=False):
 
 
 def save_grid_to_file(grid, file_name,folder_name=None):
-    """
-    Save the generated main code to a .py file.
+    """Export ``grid`` to a runnable Python loader file.
 
-    :param main_code: The code to save to the file.
-    :param file_name: The name of the file where the code will be saved.
+    Generates Python code that reconstructs the grid (same pattern as the bundled
+    ``example_grids`` cases) and writes it to ``file_name`` (optionally under
+    ``folder_name``).
     """
-    
+
     main_code= generate_loading_code(grid,file_name)
-   
+
     if folder_name is not None:
         # Ensure the folder path exists
         os.makedirs(folder_name, exist_ok=True)  # Create folder if it doesn't exist
-        
+
         # Save the file in the specified folder
         file_path = os.path.join(folder_name, f'{file_name}.py')
     else:
         # Save the file in the current directory
         file_path = f'{file_name}.py'
-    
+
     # Write the main code to the file
     with open(file_path, 'w') as file:
         file.write(main_code)
@@ -504,9 +520,9 @@ def gather_grid_data(grid):
     node_ac_data = []
 
     for node in grid.nodes_AC:
-        if node.type == 'PQ':
+        if node.type == NodeType.PQ:
             tp=1
-        elif node.type =='PV':
+        elif node.type == NodeType.PV:
             tp=2
         else:
             tp=3
@@ -524,17 +540,17 @@ def gather_grid_data(grid):
             "zone": grid.Graph_node_to_Grid_index_AC[node.nodeNumber]+1,
             "Vmax": node.Umax,
             "Vmin": node.Umin
-        })  
-        
+        })
+
     line_ac_data = []
 
     for line in grid.lines_AC:
         line_ac_data.append({
             "fbus": line.fromNode.nodeNumber+1,
             "tbus": line.toNode.nodeNumber+1,
-            "r": line.R,
-            "x": line.X,
-            "b": line.B,
+            "r": line.r,
+            "x": line.x,
+            "b": line.b,
             "rateA": np.round(line.MVA_rating,0),
             "rateB": np.round(line.MVA_rating,0),
             "rateC": np.round(line.MVA_rating,0),
@@ -544,10 +560,10 @@ def gather_grid_data(grid):
             "angmin": -360,
             "angmax": 360
         })
-    
+
     node_dc_data = []
-    
-    if grid.nodes_DC is not None:    
+
+    if grid.nodes_DC is not None:
         for node in grid.nodes_DC:
             node_dc_data.append({
                 "busdc_i": node.nodeNumber+1,
@@ -559,17 +575,17 @@ def gather_grid_data(grid):
                 "Vdcmin": node.Umin,
                 "Cdc": 0
             })
-        
-        
+
+
     line_dc_data = []
-    if grid.lines_DC is not None:   
+    if grid.lines_DC is not None:
         for line in grid.lines_DC:
             pol = line.pol
-            
+
             line_dc_data.append({
                 "fbusdc": line.fromNode.nodeNumber+1,
                 "tbusdc": line.toNode.nodeNumber+1,
-                "r": line.R,
+                "r": line.r,
                 "l": 0,
                 "c": 0,
                 "rateA": np.round(line.MW_rating,0),
@@ -577,25 +593,25 @@ def gather_grid_data(grid):
                 "rateC": np.round(line.MW_rating,0),
                 "status": 1
             })
-    
+
     conv_data = []
-    if grid.Converters_ACDC is not None:   
+    if grid.Converters_ACDC is not None:
         for conv in grid.Converters_ACDC:
-            if conv.AC_type == 'PQ':
+            if conv.AC_type == NodeType.PQ:
                 tpac=1
-            elif conv.AC_type =='PV':
+            elif conv.AC_type == NodeType.PV:
                 tpac=2
             else:
                 tpac=1
-            
-            if conv.type == 'P' or conv.type == 'PAC':
+
+            if conv.type == ConverterDCType.P or conv.type == ConverterDCType.PAC:
                 tpdc=1
-            elif conv.type =='Slack':
+            elif conv.type == ConverterDCType.SLACK:
                 tpdc=2
-            else: 
+            else:
                 tpdc=3
-            
-            
+
+
             conv_data.append({
                 "busdc_i": conv.Node_DC.nodeNumber+1,
                 "busac_i": conv.Node_AC.nodeNumber+1,
@@ -603,16 +619,16 @@ def gather_grid_data(grid):
                 "type_ac": tpac,
                 "P_g": conv.P_AC,
                 "Q_g": conv.P_DC,
-                "islcc": 0, 
+                "islcc": 0,
                 "Vtar": 1,
-                "rtf": conv.R_t/conv.np_conv,
-                "xtf": conv.X_t/conv.np_conv,
-                "transformer": 1 if conv.R_t != 0 else 0,
+                "rtf": conv.r_t/conv.np_conv,
+                "xtf": conv.x_t/conv.np_conv,
+                "transformer": 1 if conv.r_t != 0 else 0,
                 "tm": 1,
-                "bf": conv.Bf*conv.np_conv,
-                "filter": 1 if conv.Bf != 0 else 0,
-                "rc": conv.PR_R/conv.np_conv,
-                "xc": conv.PR_X/conv.np_conv,
+                "bf": conv.bf*conv.np_conv,
+                "filter": 1 if conv.bf != 0 else 0,
+                "rc": conv.pr_r/conv.np_conv,
+                "xc": conv.pr_x/conv.np_conv,
                 "reactor": 0,
                 "basekVac": conv.AC_kV_base,
                 "Vmmax": conv.Ucmax,
@@ -632,7 +648,7 @@ def gather_grid_data(grid):
                 "Qacmax": conv.MVA_max,
                 "Qacmin": -conv.MVA_max
             })
-        
+
     gen_data = []
 
     for gen in grid.Generators:
@@ -658,11 +674,11 @@ def gather_grid_data(grid):
             "ramp_30": 0,
             "ramp_q": 0,
             "apf": 0
-        }) 
-    
-    if grid.RenSources is not None:    
+        })
+
+    if grid.RenSources is not None:
         for gen in grid.RenSources:
-            if gen.connected =='DC':
+            if gen.connected == AcDcSide.DC:
                 continue
             gen_data.append({
                 "bus": gen.Node.nodeNumber+1,
@@ -687,7 +703,7 @@ def gather_grid_data(grid):
                 "ramp_q": 0,
                 "apf": 0
             })
-        
+
     gen_cost_data = []
 
     for gen in grid.Generators:
@@ -699,10 +715,10 @@ def gather_grid_data(grid):
             "c(n-1)": gen.qf,  # Coefficient of the highest power term
             "c(n-2)": gen.lf,  # Coefficient of the second highest power term
             "c0": 0         # Constant cost term
-        }) 
-    if grid.RenSources is not None:        
+        })
+    if grid.RenSources is not None:
         for gen in grid.RenSources:
-            if gen.connected =='DC':
+            if gen.connected == AcDcSide.DC:
                 continue
             gen_cost_data.append({
                 "type": 2,
@@ -712,34 +728,41 @@ def gather_grid_data(grid):
                 "c(n-1)": 0,  # Coefficient of the highest power term
                 "c(n-2)": 0,  # Coefficient of the second highest power term
                 "c0": 0         # Constant cost term
-            })  
+            })
     base=grid.S_base
-    grid_data = [base,node_ac_data,line_ac_data,node_dc_data,line_dc_data,conv_data,gen_data,gen_cost_data]    
+    grid_data = [base,node_ac_data,line_ac_data,node_dc_data,line_dc_data,conv_data,gen_data,gen_cost_data]
     return grid_data
-        
-        
+
+
 def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
-    
+    """Export ``grid`` to a MATPOWER-style MATLAB ``.m`` case file.
+
+    Parameters
+    ----------
+    dcpol : int, optional
+        DC polarity code written into the MATACDC export. Only one polarity can
+        be chosen for all DC grids in the file.
+    """
     base,node_ac_data,line_ac_data,node_dc_data,line_dc_data,conv_data,gen_data,gen_cost_data = gather_grid_data(grid)
-    
+
     if folder_name is not None:
         # Ensure the folder path exists
         os.makedirs(folder_name, exist_ok=True)  # Create folder if it doesn't exist
-        
+
         # Save the file in the specified folder
         file_path = os.path.join(folder_name, f'{file_name}.m')
     else:
         # Save the file in the current directory
         file_path = f'{file_name}.m'
-    
+
     # Write the main code to the file
     with open(file_path, 'w') as f:
         f.write(f"function mpc = {file_name}()\n\n")
-        
+
         # BaseMVA
         f.write("mpc.version = '2';\n\n")
-        
-        
+
+
         # BaseMVA
         f.write(f"mpc.baseMVA = {base};\n\n")
 
@@ -758,19 +781,19 @@ def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
         for line in line_ac_data:
             f.write(f"    {line['fbus']}     {line['tbus']}     {line['r']}     {line['x']}     {line['b']}     {line['rateA']}     {line['rateB']}     {line['rateC']}     {line['ratio']}     {line['angle']}     {line['status']}     {line['angmin']}     {line['angmax']};\n")
         f.write("];\n\n")
-        
+
         f.write("%% DC grid topology\n")
         f.write(f"mpc.dcpol = {dcpol};")
-       
-        
+
+
         f.write("%% DC bus data\n")
         f.write("%column_names%   busdc_i    grid    Pdc    Vdc    basekVdc    Vdcmax    Vdcmin    Cdc\n")
         f.write("mpc.busdc = [\n")
         for node in node_dc_data:
             f.write(f"    {node['busdc_i']}     {node['grid']}     {node['Pdc']}     {node['Vdc']}     {node['basekVdc']}     {node['Vdcmax']}     {node['Vdcmin']}     {node['Cdc']};\n")
         f.write("];\n\n")
-        
-        
+
+
         # For DC line data
         f.write("%% DC branch data\n")
         f.write("%column_names%    fbusdc    tbusdc    r    l    c    rateA    rateB    rateC    status\n")
@@ -779,7 +802,7 @@ def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
         for line in line_dc_data:
             f.write(f"    {line['fbusdc']}     {line['tbusdc']}     {line['r']}     {line['l']}     {line['c']}     {line['rateA']}     {line['rateB']}     {line['rateC']}     {line['status']};\n")
         f.write("];\n\n")
-        
+
         # For AC/DC converter data
         f.write("%% AC/DC converter data\n")
         f.write("%column_names%    busdc_i    busac_i    type_dc    type_ac    P_g    Q_g    islcc    Vtar    rtf    xtf    transformer    tm    bf    filter    rc    xc    reactor    basekVac    Vmmax    Vmmin    Imax    status    LossA    LossB    LossCrec    LossCinv    droop    Pdcset    Vdcset    dVdcset    Pacmax    Pacmin    Qacmax    Qacmin\n")
@@ -788,7 +811,7 @@ def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
         for conv in conv_data:
             f.write(f"    {conv['busdc_i']}     {conv['busac_i']}     {conv['type_dc']}     {conv['type_ac']}     {conv['P_g']}     {conv['Q_g']}     {conv['islcc']}     {conv['Vtar']}     {conv['rtf']}     {conv['xtf']}     {conv['transformer']}     {conv['tm']}     {conv['bf']}     {conv['filter']}     {conv['rc']}     {conv['xc']}     {conv['reactor']}     {conv['basekVac']}     {conv['Vmmax']}     {conv['Vmmin']}     {conv['Imax']}     {conv['status']}     {conv['LossA']}     {conv['LossB']}     {conv['LossCrec']}     {conv['LossCinv']}     {conv['droop']}     {conv['Pdcset']}     {conv['Vdcset']}     {conv['dVdcset']}     {conv['Pacmax']}     {conv['Pacmin']}     {conv['Qacmax']}     {conv['Qacmin']};\n")
         f.write("];\n\n")
-        
+
         # For generator data
         f.write("%% Generator data\n")
         f.write("%    bus    Pg    Qg    Qmax    Qmin    Vg    mBase    status    Pmax    Pmin    Pc1    Pc2    Qc1min    Qc1max    Qc2min    Qc2max    ramp_agc    ramp_10    ramp_30    ramp_q    apf\n")
@@ -797,7 +820,7 @@ def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
         for gen in gen_data:
             f.write(f"    {gen['bus']}     {gen['Pg']}     {gen['Qg']}     {gen['Qmax']}     {gen['Qmin']}     {gen['Vg']}     {gen['mBase']}     {gen['status']}     {gen['Pmax']}     {gen['Pmin']}     {gen['Pc1']}     {gen['Pc2']}     {gen['Qc1min']}     {gen['Qc1max']}     {gen['Qc2min']}     {gen['Qc2max']}     {gen['ramp_agc']}     {gen['ramp_10']}     {gen['ramp_30']}     {gen['ramp_q']}     {gen['apf']};\n")
         f.write("];\n\n")
-        
+
         # For generator cost data
         f.write("%% Generator cost data\n")
         f.write("%    2    startup    shutdown    n     c(n-1)    c(n-2)    c0\n")
@@ -805,14 +828,14 @@ def save_grid_to_matlab(grid,file_name,folder_name=None,dcpol=2):
         for gen_cost in gen_cost_data:
             f.write(f"    {gen_cost['type']}     {gen_cost['startup']}     {gen_cost['shutdown']}     {gen_cost['n']}     {gen_cost['c(n-1)']}     {gen_cost['c(n-2)']}     {gen_cost['c0']};\n")
         f.write("];\n\n")
-        
+
         f.write("%% Adds current ratings to branch matrix\n")
         f.write("%    c_rating_a\n")
         f.write("mpc.branch_currents = [\n")
-        
+
         for line in line_ac_data:
             f.write(f"{line['rateA']};\n")
-        
+
         f.write("];\n")
-        
- 
+
+

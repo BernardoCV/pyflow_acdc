@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.5.1"
+version = "0.6.0"
 license = {file = "LICENSE"}
 requires-python = ">= 3.10"
 
@@ -22,16 +22,25 @@ description = "A python-based tool for the design and analysis of hybrid AC/DC g
 
 readme = "README.md"
 
+keywords = [
+    "power systems",
+    "AC/DC",
+    "HVDC",
+    "optimal power flow",
+    "power flow",
+    "transmission expansion planning",
+    "offshore wind",
+    "energy systems",
+]
+
 classifiers = [
     'Development Status :: 3 - Alpha',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: BSD License',
-    'Programming Language :: C',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
-    'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: Implementation :: CPython',
     'Topic :: Scientific/Engineering',
 ]
@@ -66,8 +75,7 @@ OPF = ["pyomo"]
 
 Dash = ["dash"]
 
-Array_OPT = ["ortools",
-             "pyomo"]
+ORTOOLS_ARRAY = ["ortools"]
 
 TEP_pymoo = ["pymoo",
              "pyomo"]
@@ -76,18 +84,20 @@ Gurobi = ["gurobipy"]
 
 plotting = ["kaleido"]
 
-tests = ["pytest"]
+tests = ["pytest",
+         "pytest-cov"]
 
 All = ["folium",
        "branca",
        "pyomo",
        "dash",
        "ortools",
-       "highs",
+       "highspy",
        "pymoo",
        "kaleido"]
 
 [project.urls]
+Homepage       = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Repository     = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
@@ -98,7 +108,15 @@ packages = ["pyflow_acdc","pyflow_tests"]
 "pyflow_acdc" = [
     "folium_images/*.png",
     "Cable_database/*.yaml",
-    "example_grids/*.py"
+    "example_grids/*.py",
+    "example_grids/PF/*.py",
+    "example_grids/OPF/*.py",
+    "example_grids/TEP/*.py",
+    "example_grids/TEP/*.csv",
+    "example_grids/Wind_Array/*.py",
+    "example_grids/wind_farm_data/*.py",
+    "example_grids/wind_farm_data/*.pkl.gz",
+    "example_grids/wind_farm_data/*.geojson"
 ]
 
 [tool.setuptools.data-files]
@@ -107,6 +125,50 @@ packages = ["pyflow_acdc","pyflow_tests"]
     "examples/North_Sea_grid_data/*.json",
     "examples/North_Sea_grid_data/README.md",
 ]
+"examples/Case24_MP" = ["examples/Case24_MP/*.csv", "examples/Case24_MP/README.md"]
 
 [project.scripts]
 pyflow-acdc-test = "pyflow_tests.run_tests:main"
+pyflow-acdc-check-solvers = "pyflow_acdc.solver_utils:cli_check_solvers"
+
+[tool.ruff]
+line-length = 100          # dense numerical/Pyomo expressions; relax from default 88
+# Bundled example/case grids are generated data tables (long literal node/line
+# rows); linting them is noise, so they are excluded from style checks.
+extend-exclude = ["pyflow_acdc/example_grids"]
+
+[tool.ruff.lint]
+# F/E/W/I/B only — legacy mixed-case API and power-system symbols (P, Q, V) are
+# intentional; pep8-naming (N) and pyupgrade (UP) are deferred to a rename pass.
+select = ["E", "W", "F", "I", "B"]
+ignore = [
+    "E402",   # lazy / optional imports in large modules
+    "E501",   # long Pyomo expressions and grid literals (line-length = 100)
+    "E701",
+    "E702",   # legacy one-line if/for
+    "E711",
+    "E712",   # legacy True/False/None comparisons
+    "E741",   # I, O, l in power-system math
+    "F405",   # star re-exports (__init__.py)
+    "F841",   # assigned-but-unused in solver/debug paths
+    "B007",   # unused loop control variable
+    "B010",   # setattr on dynamic grid elements
+    "B028",   # warnings without explicit stacklevel
+    "B905",   # zip() without strict=
+    "F541",   # f-string without placeholders
+    "I001",   # import sort — enable after a dedicated cleanup pass
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Class names intentionally keep underscores/mixed case (owner decision, Tier F WON'T DO).
+"pyflow_acdc/Classes.py" = ["N801"]   # class name should use CapWords
+"pyflow_acdc/__init__.py" = ["F401", "F403", "F405"]  # re-export surface + controlled star imports
+# try/import availability probes (import tests presence, not the symbol)
+"pyflow_acdc/Array_OPT.py" = ["F401"]
+"pyflow_acdc/Results_class.py" = ["F401"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: solver-heavy or long-running tests (array sizing, sequential CSS, TS OPF, large grids)",
+    "integration: tests needing network access or heavy third-party stacks (folium, dash, remote CSVs)",
+]

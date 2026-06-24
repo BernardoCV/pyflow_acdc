@@ -5,14 +5,16 @@ Analysis and utility helpers for pyflow_acdc grids.
 import numpy as np
 import pandas as pd
 
+from .constants import SQRT_3
+
 
 __all__ = [
     "pol2cart",
     "pol2cartz",
     "cart2pol",
     "cartz2pol",
-    "Converter_parameters",
-    "Cable_parameters",
+    "converter_parameters",
+    "cable_parameters",
     "grid_state",
     "analyse_grid",
     "current_fuel_type_distribution",
@@ -20,12 +22,40 @@ __all__ = [
 
 
 def pol2cart(r, theta):
+    """Convert polar coordinates to Cartesian.
+
+    Parameters
+    ----------
+    r : float
+        Radius.
+    theta : float
+        Angle in radians.
+
+    Returns
+    -------
+    tuple
+        ``(x, y)``.
+    """
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     return x, y
 
 
 def pol2cartz(r, theta):
+    """Convert polar coordinates to a complex number.
+
+    Parameters
+    ----------
+    r : float
+        Radius.
+    theta : float
+        Angle in radians.
+
+    Returns
+    -------
+    complex
+        ``x + j y``.
+    """
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     z = x + 1j * y
@@ -33,18 +63,64 @@ def pol2cartz(r, theta):
 
 
 def cart2pol(x, y):
+    """Convert Cartesian coordinates to polar.
+
+    Parameters
+    ----------
+    x, y : float
+        Cartesian components.
+
+    Returns
+    -------
+    tuple
+        ``(rho, theta)`` with ``theta`` in radians.
+    """
     rho = np.sqrt(x**2 + y**2)
     theta = np.arctan2(y, x)
     return rho, theta
 
 
 def cartz2pol(z):
+    """Convert a complex number to polar coordinates.
+
+    Parameters
+    ----------
+    z : complex
+        Complex value ``x + j y``.
+
+    Returns
+    -------
+    tuple
+        ``(r, theta)`` with ``theta`` in radians.
+    """
     r = np.abs(z)
     theta = np.angle(z)
     return r, theta
 
 
-def Converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Filter_uF, f=50):
+def converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Filter_uF, f=50):
+    """Convert converter transformer/reactor/filter data to per-unit values.
+
+    Parameters
+    ----------
+    S_base : float
+        System power base in MVA.
+    kV_base : float
+        Voltage base in kV.
+    T_R_Ohm, T_X_mH : float
+        Transformer resistance (ohm) and inductance (mH).
+    PR_R_Ohm, PR_X_mH : float
+        Phase-reactor resistance (ohm) and inductance (mH).
+    Filter_uF : float
+        Filter capacitance in microfarad.
+    f : float, optional
+        System frequency in Hz (default 50).
+
+    Returns
+    -------
+    list
+        ``[T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu]`` in per unit.
+    """
     Z_base = kV_base**2 / S_base  # kv^2/MVA
     Y_base = 1 / Z_base
 
@@ -65,7 +141,37 @@ def Converter_parameters(S_base, kV_base, T_R_Ohm, T_X_mH, PR_R_Ohm, PR_X_mH, Fi
     return [T_R_pu, T_X_pu, PR_R_pu, PR_X_pu, Filter_pu]
 
 
-def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1, f=50):
+def cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cables=1, f=50):
+    """Convert cable data to per-unit equivalent parameters and rating.
+
+    For DC cables (``L_mH == 0``) ``N_cables`` is forced to 1 and a 2-conductor
+    MVA rating is used; otherwise a 3-phase (``sqrt(3)``) rating is used.
+
+    Parameters
+    ----------
+    S_base : float
+        System power base in MVA.
+    R : float
+        Series resistance per km (ohm/km).
+    L_mH, C_uF, G_uS : float
+        Per-km inductance (mH), capacitance (microF), and shunt conductance
+        (microS).
+    A_rating : float
+        Current rating in A.
+    kV_base : float
+        Voltage base in kV.
+    km : float
+        Cable length in km.
+    N_cables : int, optional
+        Number of parallel cables (default 1).
+    f : float, optional
+        System frequency in Hz (default 50).
+
+    Returns
+    -------
+    list
+        ``[Rpu, Xpu, Gpu, Bpu, MVA_rating]`` (per-unit parameters + MVA rating).
+    """
     Z_base = kV_base**2 / S_base  # kv^2/MVA
     Y_base = 1 / Z_base
 
@@ -74,7 +180,7 @@ def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
         MVA_rating = N_cables * A_rating * kV_base / (1000)
         # IN DC N cables is always 1 as the varible is used directly in the formulation
     else:
-        MVA_rating = N_cables * A_rating * kV_base * np.sqrt(3) / (1000)
+        MVA_rating = N_cables * A_rating * kV_base * SQRT_3 / (1000)
 
     C = C_uF * (10 ** (-6))
     L = L_mH / 1000
@@ -110,6 +216,18 @@ def Cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
 
 
 def grid_state(grid):
+    """Return aggregate load and generation bounds for the current grid.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network to summarise.
+
+    Returns
+    -------
+    tuple
+        ``(total_load, min_generation, max_generation)`` in per unit.
+    """
     Total_load = 0
     min_generation = 0
     max_generation = 0
@@ -118,7 +236,14 @@ def grid_state(grid):
     for node in grid.nodes_DC:
         Total_load += node.PLi
     for gen in grid.Generators:
-        min_generation += gen.Min_pow_gen * gen.np_gen if not gen.activate_gen_opf else 0
+        if getattr(gen, 'is_ext_grid', False):
+            if getattr(gen, 'allow_sell', True):
+                min_eff = -(gen.Max_pow_gen * gen.np_gen - gen.p_load_eff)
+            else:
+                min_eff = 0
+        else:
+            min_eff = gen.Min_pow_gen * gen.np_gen
+        min_generation += min_eff if not gen.activate_gen_opf else 0
         max_generation += gen.Max_pow_gen * gen.np_gen
 
     for ren in grid.RenSources:
@@ -128,6 +253,33 @@ def grid_state(grid):
 
 
 def analyse_grid(grid):
+    """Detect enabled grid features and store boolean flags on ``grid``.
+
+    Sets ``ACmode``, ``DCmode``, ``TEP_AC``, ``REC_AC``, ``TAP_tf``, ``CT_AC``,
+    ``CFC``, ``CDC``, ``GPR``, ``rs_GPR``, and ``act_gen``. Called at the start
+    of power-flow, OPF, and TEP entry points.
+
+    Parameters
+    ----------
+    grid : Grid
+        Network to analyse (mutated in place).
+
+    Returns
+    -------
+    tuple
+        ``(ACmode, DCmode, [TEP_AC, TAP_tf, REC_AC, CT_AC], [CFC, CDC], GPR)``.
+    """
+    def _has_positive_planned_install(element):
+        planned = getattr(element, "planned_installation", 0)
+        if isinstance(planned, np.ndarray):
+            return bool(np.any(planned > 0))
+        if isinstance(planned, (list, tuple)):
+            return any(float(v) > 0 for v in planned)
+        try:
+            return float(planned) > 0
+        except (TypeError, ValueError):
+            return False
+
     # Perform the analysis and store directly on grid
     grid.ACmode = grid.nn_AC != 0  # AC nodes present
     grid.DCmode = grid.nn_DC != 0  # DC nodes present
@@ -137,19 +289,33 @@ def analyse_grid(grid):
     grid.CT_AC = grid.nct_AC != 0  # AC conductor size selection lines present
     grid.CFC = grid.ncfc_DC != 0  # DC variable voltage converter lines present
     grid.CDC = grid.ncdc_DC != 0  # DC-DC converter lines present
-    grid.GPR = any(gen.np_gen_opf for gen in grid.Generators)
-    grid.rs_GPR = any(rs.np_rsgen_opf for rs in grid.RenSources)
+    grid.GPR = any(
+        gen.np_gen_opf or _has_positive_planned_install(gen)
+        for gen in grid.Generators
+    )
+    grid.rs_GPR = any(
+        rs.np_rsgen_opf or _has_positive_planned_install(rs)
+        for rs in grid.RenSources
+    )
     grid.act_gen = any(gen.activate_gen_opf for gen in grid.Generators)
 
     return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
 
 
 def current_fuel_type_distribution(grid, output="df"):
-    """
-    Build current generation-type distribution summary.
+    """Summarise installed capacity by generation type (Static TEP style).
 
-    The summary follows Static TEP style normalization (lowercase types) and
-    includes both conventional generators and renewable sources.
+    Parameters
+    ----------
+    grid : Grid
+        Network whose generators and renewable sources are counted.
+    output : str, optional
+        ``'df'`` for a :class:`pandas.DataFrame`, ``'dict'`` for a nested dict.
+
+    Returns
+    -------
+    pandas.DataFrame or dict
+        Rows per fuel/technology plus ``'All'`` and system-load summary.
     """
 
     def _norm(t):
@@ -181,7 +347,10 @@ def current_fuel_type_distribution(grid, output="df"):
     total_units = sum(type_units.values())
     load_nodes_count = sum(1 for node in grid.nodes_AC if node.PLi != 0.0) + sum(1 for node in grid.nodes_DC if node.PLi != 0.0)
 
-    total_system_load = sum(node.PLi for node in grid.nodes_AC) + sum(node.PLi for node in grid.nodes_DC)
+    total_system_load = (
+        sum((node.PLi_base + node._PLi_extgrid) * node.PLi_inv_factor for node in grid.nodes_AC)
+        + sum(node.PLi_base * node.PLi_inv_factor for node in grid.nodes_DC)
+    )
     load_pct_of_total_cap = round((total_system_load / total_cap) * 100.0, 2) if total_cap > 0 else 0.0
 
     rows = []

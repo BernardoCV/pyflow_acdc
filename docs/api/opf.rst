@@ -3,7 +3,8 @@ Optimal Power Flow Module
 
 This module provides functions for AC/DC hybrid optimal power flow analysis [1]_.
 
-functions are found in pyflow_acdc.ACDC_OPF and pyflow_acdc.ACDC_OPF_NL_model
+functions are found in ``pyflow_acdc.ACDC_OPF``, ``pyflow_acdc.pyomo_model_solve``,
+and ``pyflow_acdc.ACDC_OPF_NL_model``
 
 AC/DC Hybrid Optimal Power Flow
 -------------------------------
@@ -13,44 +14,9 @@ Running the OPF
 
 This function runs the AC/DC hybrid optimal power flow calculation. It creates the :ref:`model <model_creation>`, chooses an :ref:`objective function <obj_functions>`, and :ref:`solves <model_solving>` the model.
 
-.. py:function::  Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+For step-by-step examples (grid setup, generators, and calling ``optimal_pf``), see :ref:`Running an Optimal Power Flow <usage_opf>`.
 
-   Performs AC/DC hybrid optimal power flow calculation.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``grid``
-        - Grid
-        - Grid to optimize
-        - Required
-      * - ``ObjRule``
-        - dict
-        - Objective function weights
-        - None
-      * - ``PV_set``
-        - bool
-        - Sets PV and Slack voltage as fixed variables
-        - False
-      * - ``OnlyGen``
-        - bool
-        - Only generators are considered in the cost function
-        - True
-      * - ``Price_Zones``
-        - bool
-        - Enable price zone constraints
-        - False
-  
-   **Example**
-
-   .. code-block:: python
-
-      model, model_res , timing_info, solver_stats =pyf.Optimal_PF(grid, ObjRule=None, PV_set=False, OnlyGen=True, Price_Zones=False)
+.. autofunction:: pyflow_acdc.optimal_pf
 
 .. _model_creation:
 
@@ -58,71 +24,34 @@ Creating the OPF model
 ^^^^^^^^^^^^^^^^^^^^^^
 
 
-.. function:: OPF_create_NLModel_ACDC(model, grid, PV_set, Price_Zones, TEP=False, limit_flow_rate=True)
+.. autofunction:: pyflow_acdc.ACDC_OPF_NL_model.opf_create_nl_model_acdc
 
-   Creates the OPF model.
+**Variables**
 
-   .. list-table::
-      :widths: 20 10 50 
-      :header-rows: 1
+The optimization model includes variables for:
 
-      * - Parameter
-        - Type
-        - Description
-      * - ``model``
-        - Model
-        - Model to create
-      * - ``grid``
-        - Grid
-        - Grid to optimize    
-      * - ``PV_set``
-        - bool
-        - Sets PV and Slack voltage as fixed variables
-      * - ``Price_Zones``
-        - bool
-        - Enable price zone constraints
-      * - ``TEP``
-        - bool
-        - Enable TEP investment variables (lines/generators)
-      * - ``limit_flow_rate``
-        - bool
-        - Enable flow rate limits
+- AC node voltages and angles
+- DC node voltages
+- Generator active/reactive power
+- Renewable generation and curtailment
+- Line flows
+- Converter power flows
+- Price zone variables
 
-   **Variables**
+**Constraints**
 
+The model enforces constraints for:
 
-   The optimization model includes variables for:
+- :ref:`AC power flow equations <AC_node_modelling>`
+- :ref:`DC power flow equations <DC_node_modelling>`
+- :ref:`Generator limits <Generator_modelling>`
+- :ref:`AC branch thermal limits <AC_branch_modelling>`
+- :ref:`DC branch thermal limits <DC_line_modelling>`
+- Voltage and angle limits
+- :ref:`Converter operation limits <ACDC_converter_modelling>`
+- :ref:`Price zone balancing <Price_zone_modelling>`
 
-   - AC node voltages and angles
-   - DC node voltages 
-   - Generator active/reactive power
-   - Renewable generation and curtailment
-   - Line flows
-   - Converter power flows
-   - Price zone variables
-
-   **Constraints**
-
-
-   The model enforces constraints for:
-
-   - :ref:`AC power flow equations <AC_node_modelling>`
-   - :ref:`DC power flow equations <DC_node_modelling>`
-   - :ref:`Generator limits <Generator_modelling>`
-   - :ref:`AC branch thermal limits <AC_branch_modelling>`
-   - :ref:`DC branch thermal limits <DC_line_modelling>`
-   - Voltage and angle limits
-   - :ref:`Converter operation limits <ACDC_converter_modelling>`
-   - :ref:`Price zone balancing <Price_zone_modelling>`
-
-   For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
-
-   **Example**
-
-   .. code-block:: python
-
-      from pyflow_acdc.ACDC_OPF_NL_model import OPF_create_NLModel_ACDC
-      model = OPF_create_NLModel_ACDC(model, grid, PV_set=False, Price_Zones=False)
+For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
 
 .. _obj_functions:
 
@@ -131,7 +60,7 @@ Objective Functions
 
 The user can define the objective by setting the weight of each sub objective. The objective function is defined as:
 
-.. function:: OPF_obj(model,grid,ObjRule,OnlyGen,OnlyAC=False)
+.. autofunction:: pyflow_acdc.opf_obj
 
   This function creates a weighted sum of the different sub objectives.
 
@@ -171,6 +100,9 @@ The user can define the objective by setting the weight of each sub objective. T
     * - ``General_Losses``
       - Generation minus demand
       - :math:`\left(\sum_{g \in \mathcal{G}} P_{g}+\sum_{rg \in \mathcal{RG}} P_{rg}*\gamma_{rg}- \sum_{l \in \mathcal{L}} P_{L} \right)`
+    * - ``Array_losses``
+      - Offshore array injection and slack extraction losses
+      - :math:`\left(\sum_{rg \in \mathcal{RG}} P_{rg}\, n_{rg} + \sum_{n \in \mathcal{N}_{slack}} P_{g,opt,n}\right) \cdot \mathrm{LCoE} \cdot S_{base}`
 
   The following table shows the pre-built objective functions as defined in [2]_:
 
@@ -185,6 +117,8 @@ The user can define the objective by setting the weight of each sub objective. T
       - Price zone generation cost
       - :math:`\sum_{m \in \mathcal{M}} CG(P_N)_m`
 
+  Pass these names exactly as ``ObjRule`` keys (e.g. ``{"PZ_cost_of_generation": 1}``).
+ 
   The following table shows the pre-built objective functions in development:
 
   .. list-table::
@@ -200,24 +134,7 @@ The user can define the objective by setting the weight of each sub objective. T
     * - ``Gen_set_dev``
       - Generator setpoint deviation
       - :math:`\sum_{g \in G}  \left(P_g -P_{g,set}\right)^2`
-      
 
-  **Example**
-
-  .. code-block:: python
-
-      weights_def = {
-      'Ext_Gen': {'w': 0},
-      'Energy_cost': {'w': 0},
-      'Curtailment_Red': {'w': 0},
-      'AC_losses': {'w': 0},
-      'DC_losses': {'w': 0},
-      'Converter_Losses': {'w': 0},
-      'PZ_cost_of_generation': {'w': 0},
-      'Renewable_profit': {'w': 0},
-      'Gen_set_dev': {'w': 0}
-      }
-      
 .. _model_solving:
 
 Solvers
@@ -236,34 +153,16 @@ Tested with:
 - IPOPT
 - Bonmin
 
-.. function::  pyomo_model_solve(model,grid,solver = 'ipopt')
-
-   Solves the OPF model using the specified solver.
-
-   :param model: The optimization model
-   :param grid: The grid to optimize
-   :param solver: The solver to use
-
-   **Example**
-
-   .. code-block:: python
-
-        results, solver_stats =pyf.pyomo_model_solve(model,grid)
+.. autofunction:: pyflow_acdc.pyomo_model_solve
 
 Result Translation Helpers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: OPF_line_res(model, grid)
+.. autofunction:: pyflow_acdc.opf_line_res
 
-   Extracts AC/DC line OPF results from a solved model into pandas-friendly structures.
+.. autofunction:: pyflow_acdc.opf_price_price_zone
 
-.. py:function:: OPF_price_priceZone(model, grid)
-
-   Extracts price-zone results from a solved OPF model.
-
-.. py:function:: Translate_pyf_OPF(grid, Price_Zones=False)
-
-   Translates solved OPF variables into `grid` result containers for plotting/export.
+.. autofunction:: pyflow_acdc.translate_pyf_opf
 
 
 **References**

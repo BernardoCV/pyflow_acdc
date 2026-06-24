@@ -9,41 +9,73 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
+from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy
+
 
 __all__ = [
-    'OPF_create_NLModel_ACDC',
-    'ExportACDC_NLmodel_toPyflowACDC'
+    'opf_create_nl_model_acdc',
+    'export_acdc_nl_model_to_pyflow_acdc'
 ]
 
 
-    
+def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
+    """Populate ``model`` with the non-linear AC/DC OPF formulation.
 
-def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True):
-    from .ACDC_OPF import Translate_pyf_OPF 
-    
+    Adds the variables and constraints for the full non-linear AC/DC OPF (bus
+    voltages/angles, generation, converters, DC network, and optionally price
+    zones and TEP investment variables) onto the given Pyomo model, using data
+    translated from ``grid``. Mutates ``model`` in place; does not add the
+    objective or solve.
+
+    Parameters
+    ----------
+    model : pyomo.ConcreteModel
+        Empty model to populate (mutated in place).
+    grid : Grid
+        Source of network data.
+    PV_set : bool
+        Fix PV-bus setpoints instead of optimising them.
+    Price_Zones : bool
+        Include price-zone pricing variables/constraints.
+    TEP : bool, optional
+        Add transmission-expansion investment variables.
+    limit_flow_rate : bool or float, optional
+        Enforce line flow-rate limits (``True`` is treated as a factor of 1).
+    n_init_install : optional
+        Number of pre-installed parallel circuits for TEP, when applicable.
+
+    Examples
+    --------
+    >>> import pyomo.environ as pyo
+    >>> from pyflow_acdc.ACDC_OPF_NL_model import opf_create_nl_model_acdc
+    >>> model = pyo.ConcreteModel()
+    >>> opf_create_nl_model_acdc(model, grid, PV_set=False, Price_Zones=False)
+    """
+    from .ACDC_OPF import translate_pyf_opf
+
     if limit_flow_rate is True:
         limit_flow_rate = 1
-    
-    opf_data = Translate_pyf_OPF(grid,Price_Zones=Price_Zones)
+
+    opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
     AC_info = opf_data['AC_info']
     DC_info = opf_data['DC_info']
     Conv_info = opf_data['Conv_info']
     Price_Zone_info = opf_data['Price_Zone_info']
     gen_info = opf_data['gen_info']
-   
+
     Generation_variables(model,grid,gen_info,TEP)
 
     if grid.ACmode:
-        AC_variables(model,grid,AC_info,PV_set,limit_flow_rate)
+        AC_variables(model,grid,AC_info,PV_set,limit_flow_rate,TEP)
 
     if grid.DCmode:
         DC_variables(model,grid,DC_info,TEP,limit_flow_rate)
-    
+
     if grid.DCmode and grid.ACmode:
-        Converter_variables(model,grid,Conv_info)
+        Converter_variables(model,grid,Conv_info,TEP)
 
     if TEP:
-        TEP_variables(model,grid)
+        TEP_variables(model,grid,n_init_install=n_init_install)
     else:
         TEP_parameters(model,grid,AC_info,DC_info,Conv_info)
 
@@ -54,25 +86,27 @@ def OPF_create_NLModel_ACDC(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_r
         price_zone_parameters(model,grid,AC_info,DC_info,gen_info)
 
     if grid.ACmode:
-        AC_constraints(model,grid,AC_info,limit_flow_rate)
+        AC_constraints(model,grid,AC_info,limit_flow_rate,TEP)
 
     if grid.DCmode:
-        DC_constraints(model,grid)
-        
-    if grid.DCmode and grid.ACmode:
-        Converter_constraints(model,grid,Conv_info)
+        DC_constraints(model,grid,TEP)
 
-    
+    if grid.DCmode and grid.ACmode:
+        Converter_constraints(model,grid,Conv_info,TEP)
+
+
 
 def Generation_variables(model,grid,gen_info,TEP):
+    from .ACDC_OPF import get_gen_p_min_eff
+
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     _,_,_,_,lista_gen = gen_AC_info
     _,_,_,_,lista_gen_DC = gen_DC_info
     P_renSource, _, lista_rs = gen_rs_info
-    
+
     model.ren_sources= pyo.Set(initialize=lista_rs)
     model.P_renSource = pyo.Param(model.ren_sources,initialize=P_renSource,mutable=True)
-    
+
     def gamma_bounds(model,rs):
         ren_source= grid.RenSources[rs]
         if ren_source.curtailable:
@@ -80,37 +114,37 @@ def Generation_variables(model,grid,gen_info,TEP):
         else:
             return (1,1)
     model.gamma = pyo.Var(model.ren_sources, bounds=gamma_bounds, initialize=1)
-    
+
     def Qren_bounds(model,rs):
         ren_source= grid.RenSources[rs]
         if ren_source.connected == 'AC':
             return (ren_source.Qmin,ren_source.Qmax)
         else:
             return (0,0)
-    
-    
+
+
     model.Q_renSource = pyo.Var(model.ren_sources,bounds=Qren_bounds, initialize=0)
-    
-    
+
+
     def P_Gen_bounds(model, g):
         gen = grid.Generators[g]
-        return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
-        
+        return (get_gen_p_min_eff(gen, gen.np_gen), gen.Max_pow_gen * gen.np_gen)
+
     def Q_Gen_bounds(model, g):
         gen = grid.Generators[g]
         return (gen.Min_pow_genR*gen.np_gen,gen.Max_pow_genR*gen.np_gen)
-    
+
     def P_gen_ini(model,g):
         gen = grid.Generators[g]
-        min_pow_gen = gen.Min_pow_gen * gen.np_gen
+        min_pow_gen = get_gen_p_min_eff(gen, gen.np_gen)
         ini=gen.Pset * gen.np_gen
         max_pow_gen = gen.Max_pow_gen * gen.np_gen
         if  min_pow_gen>ini:
             ini=min_pow_gen
-        elif ini>max_pow_gen: 
+        elif ini>max_pow_gen:
             ini=max_pow_gen
         return (ini)
-    
+
     def Q_gen_ini(model,g):
         gen = grid.Generators[g]
         min_pow_genR = gen.Min_pow_genR * gen.np_gen
@@ -118,26 +152,28 @@ def Generation_variables(model,grid,gen_info,TEP):
         max_pow_genR = gen.Max_pow_genR * gen.np_gen
         if min_pow_genR>ini:
             ini=min_pow_genR
-        elif ini>max_pow_genR: 
-            ini=max_pow_genR    
+        elif ini>max_pow_genR:
+            ini=max_pow_genR
         return (ini)
-    
+
 
     if grid.ACmode:
         model.gen_AC     = pyo.Set(initialize=lista_gen)
- 
         if grid.GPR and TEP:
+            p_load_eff_ini = {gen.genNumber: gen.p_load_eff for gen in grid.Generators}
+            model.P_load_eff = pyo.Param(model.gen_AC, initialize=p_load_eff_ini, mutable=True)
+
             model.PGi_gen = pyo.Var(model.gen_AC, initialize=P_gen_ini)
-            model.QGi_gen = pyo.Var(model.gen_AC, initialize=Q_gen_ini) 
+            model.QGi_gen = pyo.Var(model.gen_AC, initialize=Q_gen_ini)
         else:
             model.PGi_gen = pyo.Var(model.gen_AC,bounds=P_Gen_bounds, initialize=P_gen_ini)
-            model.QGi_gen = pyo.Var(model.gen_AC,bounds=Q_Gen_bounds, initialize=Q_gen_ini) 
+            model.QGi_gen = pyo.Var(model.gen_AC,bounds=Q_Gen_bounds, initialize=Q_gen_ini)
         if grid.act_gen:
             model.gen_active = pyo.Var(model.gen_AC, domain=pyo.Binary, initialize=1)
     def P_Gen_bounds_DC(model, g):
         gen = grid.Generators_DC[g]
         return (gen.Min_pow_gen*gen.np_gen,gen.Max_pow_gen*gen.np_gen)
-        
+
     def P_gen_ini_DC(model,g):
         gen = grid.Generators_DC[g]
         min_pow_gen = gen.Min_pow_gen * gen.np_gen
@@ -145,25 +181,25 @@ def Generation_variables(model,grid,gen_info,TEP):
         max_pow_gen = gen.Max_pow_gen * gen.np_gen
         if  min_pow_gen>ini:
             ini=min_pow_gen
-        elif ini>max_pow_gen: 
+        elif ini>max_pow_gen:
             ini=max_pow_gen
         return (ini)
-    
+
     if grid.DCmode:
-        model.gen_DC     = pyo.Set(initialize=lista_gen_DC)    
-    
+        model.gen_DC     = pyo.Set(initialize=lista_gen_DC)
+
         if grid.GPR and TEP:
             model.PGi_gen_DC = pyo.Var(model.gen_DC, initialize=P_gen_ini_DC)
 
         else:
             model.PGi_gen_DC = pyo.Var(model.gen_DC,bounds=P_Gen_bounds_DC, initialize=P_gen_ini_DC)
-           
+
     s=1
-def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
+def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False):
 
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
-    
-    
+
+
     lista_nodos_AC, lista_lineas_AC,lista_lineas_AC_tf,AC_slack, AC_PV = AC_Lists
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
     S_lineAC_limit,S_lineACtf_limit,m_tf_og = AC_lines_info
@@ -175,63 +211,63 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
     "Model Sets"
     model.nodes_AC   = pyo.Set(initialize=lista_nodos_AC)
     model.lines_AC   = pyo.Set(initialize=lista_lineas_AC)
-    
+
     if grid.TEP_AC:
         model.lines_AC_exp = pyo.Set(initialize=lista_lineas_AC_exp)
     if grid.TAP_tf:
-        model.lines_AC_tf  = pyo.Set(initialize=lista_lineas_AC_tf) 
+        model.lines_AC_tf  = pyo.Set(initialize=lista_lineas_AC_tf)
     if grid.REC_AC:
         model.lines_AC_rec = pyo.Set(initialize=lista_lineas_AC_rec)
     if grid.CT_AC:
         model.lines_AC_ct = pyo.Set(initialize=lista_lineas_AC_ct)
-    
-    
-    
+
+
+
     model.AC_slacks  = pyo.Set(initialize=AC_slack)
     if PV_set:
         model.AC_PVs     = pyo.Set(initialize=AC_PV)
-            
+
     "AC Variables"
     #AC nodes variables
     model.V_AC       = pyo.Var(model.nodes_AC, bounds=lambda model, node: (u_min_ac[node], u_max_ac[node]), initialize=V_ini_AC)
-    model.thetha_AC  = pyo.Var(model.nodes_AC, bounds=(-1.6, 1.6), initialize=Theta_ini)
+    model.theta_AC  = pyo.Var(model.nodes_AC, bounds=(-1.6, 1.6), initialize=Theta_ini)
 
     model.P_known_AC = pyo.Param(model.nodes_AC, initialize=P_know,mutable=True)
     model.Q_known_AC = pyo.Param(model.nodes_AC, initialize=Q_know,mutable=True)
-        
+
     def Pren_bounds(model, node):
         nAC = grid.nodes_AC[node]
         if nAC.connected_RenSource == []:
             return (0,0)
         else:
             return (None,None)
-    
+
     def Qren_bounds(model, node):
         nAC = grid.nodes_AC[node]
         if nAC.connected_RenSource == []:
             return (0,0)
         else:
             return (None,None)
-    
+
     model.PGi_ren = pyo.Var(model.nodes_AC, bounds=Pren_bounds,initialize=0)
     model.QGi_ren = pyo.Var(model.nodes_AC, bounds=Qren_bounds,initialize=0)
-     
-    
+
+
     def PGi_opt_bounds(model, node):
         nAC = grid.nodes_AC[node]
         if nAC.connected_gen == []:
             return (0,0)
         else:
             return (None,None)
-            
+
     def QGi_opt_bounds(model, node):
         nAC = grid.nodes_AC[node]
         if nAC.connected_gen == []:
             return (0,0)
         else:
             return (None,None)
-   
-    
+
+
     model.PGi_opt = pyo.Var(model.nodes_AC,bounds=PGi_opt_bounds ,initialize=0)
     model.QGi_opt = pyo.Var(model.nodes_AC,bounds=QGi_opt_bounds, initialize=0)
 
@@ -257,13 +293,13 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
         model.Pfrom_Exp= pyo.Var(model.nodes_AC,bounds=fromExp_opt_bounds ,initialize=0)
         model.Qto_Exp  = pyo.Var(model.nodes_AC,bounds=toExp_opt_bounds ,initialize=0)
         model.Qfrom_Exp= pyo.Var(model.nodes_AC,bounds=fromExp_opt_bounds ,initialize=0)
-    
+
     if grid.TAP_tf:
         model.Pto_TF   = pyo.Var(model.nodes_AC,bounds=toTF_opt_bounds ,initialize=0)
         model.Pfrom_TF = pyo.Var(model.nodes_AC,bounds=fromTF_opt_bounds ,initialize=0)
         model.Qto_TF   = pyo.Var(model.nodes_AC,bounds=toTF_opt_bounds ,initialize=0)
         model.Qfrom_TF = pyo.Var(model.nodes_AC,bounds=fromTF_opt_bounds ,initialize=0)
-   
+
     if grid.REC_AC:
         model.Pto_REP   = pyo.Var(model.nodes_AC,bounds=toREC_opt_bounds ,initialize=0)
         model.Pfrom_REP = pyo.Var(model.nodes_AC,bounds=fromREC_opt_bounds ,initialize=0)
@@ -274,31 +310,31 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
         model.Pto_CT   = pyo.Var(model.nodes_AC,bounds=toCT_opt_bounds ,initialize=0)
         model.Pfrom_CT = pyo.Var(model.nodes_AC,bounds=fromCT_opt_bounds ,initialize=0)
         model.Qto_CT   = pyo.Var(model.nodes_AC,bounds=toCT_opt_bounds ,initialize=0)
-        model.Qfrom_CT = pyo.Var(model.nodes_AC,bounds=fromCT_opt_bounds ,initialize=0) 
+        model.Qfrom_CT = pyo.Var(model.nodes_AC,bounds=fromCT_opt_bounds ,initialize=0)
 
     def AC_V_slack_rule(model, node):
         return model.V_AC[node] == V_ini_AC[node]
 
     def AC_theta_slack_rule(model, node):
-        return model.thetha_AC[node] == Theta_ini[node]
+        return model.theta_AC[node] == Theta_ini[node]
 
     def AC_V_PV_rule(model, node):
         return model.V_AC[node] == V_ini_AC[node]
 
-    
+
     model.AC_theta_slack_constraint = pyo.Constraint(model.AC_slacks, rule=AC_theta_slack_rule)
     if PV_set:
         model.AC_V_slack_constraint = pyo.Constraint(model.AC_slacks, rule=AC_V_slack_rule)
         model.AC_V_PV_constraint = pyo.Constraint(model.AC_PVs, rule=AC_V_PV_rule)
-    
+
     #AC Lines variables
     def Sbounds_lines(model, line):
         if limit_flow_rate is False:
             return (None,None)
-        
+
         return (-S_lineAC_limit[line]*limit_flow_rate, S_lineAC_limit[line]*limit_flow_rate)
-    
-    
+
+
     model.PAC_to       = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
     model.PAC_from     = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
     model.QAC_to       = pyo.Var(model.lines_AC, bounds=Sbounds_lines, initialize=0)
@@ -306,17 +342,19 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
     model.PAC_line_loss= pyo.Var(model.lines_AC, initialize=0)
 
     def Sbounds_lines_exp(model, line):
+        if (not TEP) and NP_lineAC[line] <= 0:
+            return (0,0)
         if not limit_flow_rate:
             return (None,None)
         return (-S_lineACexp_limit[line], S_lineACexp_limit[line])
-   
+
     if grid.TEP_AC:
         model.exp_PAC_to       = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
         model.exp_PAC_from     = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
         model.exp_QAC_to       = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
         model.exp_QAC_from     = pyo.Var(model.lines_AC_exp, bounds=Sbounds_lines_exp, initialize=0)
         model.exp_PAC_line_loss= pyo.Var(model.lines_AC_exp, initialize=0)
-    
+
     def Sbounds_lines_tf(model, line):
         if not limit_flow_rate:
             return (None,None)
@@ -325,39 +363,39 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
         if not limit_flow_rate:
             return (None,None)
         return (0.95*m_tf_og[tf], 1.05*m_tf_og[tf])
-    
+
     if grid.TAP_tf:
         model.tf_PAC_to       = pyo.Var(model.lines_AC_tf, bounds=Sbounds_lines_tf, initialize=0)
         model.tf_PAC_from     = pyo.Var(model.lines_AC_tf, bounds=Sbounds_lines_tf, initialize=0)
         model.tf_QAC_to       = pyo.Var(model.lines_AC_tf, bounds=Sbounds_lines_tf, initialize=0)
         model.tf_QAC_from     = pyo.Var(model.lines_AC_tf, bounds=Sbounds_lines_tf, initialize=0)
         model.tf_m            = pyo.Var(model.lines_AC_tf, bounds=bounds_tf_tap   , initialize=m_tf_og)
-                  
+
         model.tf_PAC_line_loss= pyo.Var(model.lines_AC_tf, initialize=0)
 
     def state_based_bounds(model, line, state):
             max_min = max(S_lineACrec_lim[line], S_lineACrec_lim_new[line])
             return (-max_min, max_min)
-            
+
     if grid.REC_AC:
         # Define a set for the branch states (0=old, 1=new)
         model.branch_states = pyo.Set(initialize=[0, 1])
-        
+
         # Single variable for all power flows with two indices
         model.rec_PAC_to   = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
         model.rec_PAC_from = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
         model.rec_QAC_to   = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
         model.rec_QAC_from = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
         model.rec_PAC_line_loss = pyo.Var(model.lines_AC_rec,initialize=0)
-    
+
     def set_based_bounds(model, line, cab_type):
         # Check if this is a fixed route with no cable selected (inactive line)
         if grid.lines_AC_ct[line].active_config < 0:
             return (0, 0)  # Force variables to zero for inactive lines
         max_min = max(S_lineACct_lim[line,ct] for ct in cab_types_set)  # Use cab_types_set instead of model.ct_set
         return (-max_min, max_min)
-       
-    
+
+
     if grid.CT_AC:
 
         model.ct_set = pyo.Set(initialize=cab_types_set)
@@ -366,11 +404,11 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1):
         model.ct_QAC_to   = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
         model.ct_QAC_from = pyo.Var(model.lines_AC_ct,model.ct_set,initialize=0)
         model.ct_PAC_line_loss = pyo.Var(model.lines_AC_ct,initialize=0)
-        
 
-def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
-    
-    
+
+def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
+
+
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
     S_lineAC_limit,S_lineACtf_limit,m_tf_og = AC_lines_info
 
@@ -383,9 +421,9 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
     def P_AC_node_rule(model, node):
         P_sum = sum(
                 model.V_AC[node] * model.V_AC[k] *
-                (np.real(grid.Ybus_AC[node, k]) * pyo.cos(model.thetha_AC[node] - model.thetha_AC[k]) +
-                 np.imag(grid.Ybus_AC[node, k]) * pyo.sin(model.thetha_AC[node] - model.thetha_AC[k]))
-                for k in model.nodes_AC if grid.Ybus_AC[node, k] != 0   )   
+                (np.real(grid.Ybus_AC[node, k]) * pyo.cos(model.theta_AC[node] - model.theta_AC[k]) +
+                 np.imag(grid.Ybus_AC[node, k]) * pyo.sin(model.theta_AC[node] - model.theta_AC[k]))
+                for k in model.nodes_AC if grid.Ybus_AC[node, k] != 0   )
         P_var = model.P_known_AC[node] + model.PGi_ren[node] + model.PGi_opt[node]
         if grid.DCmode:
             P_var += model.P_conv_AC[node]
@@ -397,15 +435,15 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
             P_sum += model.Pto_REP[node]+model.Pfrom_REP[node]
         if grid.CT_AC:
             P_sum += model.Pto_CT[node]+model.Pfrom_CT[node]
-        
+
         return P_sum == P_var
 
     def Q_AC_node_rule(model, node):
 
         Q_sum = sum(
             model.V_AC[node] * model.V_AC[k] *
-            (np.real(grid.Ybus_AC[node, k]) * pyo.sin(model.thetha_AC[node] - model.thetha_AC[k]) -
-             np.imag(grid.Ybus_AC[node, k]) * pyo.cos(model.thetha_AC[node] - model.thetha_AC[k]))
+            (np.real(grid.Ybus_AC[node, k]) * pyo.sin(model.theta_AC[node] - model.theta_AC[k]) -
+             np.imag(grid.Ybus_AC[node, k]) * pyo.cos(model.theta_AC[node] - model.theta_AC[k]))
             for k in model.nodes_AC if grid.Ybus_AC[node, k] != 0)
         Q_var = model.Q_known_AC[node] + model.QGi_ren[node] + model.QGi_opt[node]
         if grid.DCmode:
@@ -418,114 +456,114 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
             Q_sum += model.Qto_REP[node]+model.Qfrom_REP[node]
         if grid.CT_AC:
             Q_sum += model.Qto_CT[node]+model.Qfrom_CT[node]
-        
+
         return Q_sum == Q_var
 
     model.P_AC_node_constraint = pyo.Constraint(model.nodes_AC, rule=P_AC_node_rule)
     model.Q_AC_node_constraint = pyo.Constraint(model.nodes_AC, rule=Q_AC_node_rule)
-    
+
     # Adds all generators in the AC nodes they are connected to
     def Gen_PAC_rule(model,node):
        nAC = grid.nodes_AC[node]
        if grid.act_gen:
-            P_gen = sum(model.PGi_gen[gen.genNumber]*model.gen_active[gen.genNumber] for gen in nAC.connected_gen)                  
+            P_gen = sum(model.PGi_gen[gen.genNumber]*model.gen_active[gen.genNumber] for gen in nAC.connected_gen)
        else:
-            P_gen = sum(model.PGi_gen[gen.genNumber] for gen in nAC.connected_gen)                  
+            P_gen = sum(model.PGi_gen[gen.genNumber] for gen in nAC.connected_gen)
        return  model.PGi_opt[node] ==   P_gen
-           
+
     def Gen_Q_rule(model,node):
        nAC = grid.nodes_AC[node]
        if grid.act_gen:
-            Q_gen = sum(model.QGi_gen[gen.genNumber]*model.gen_active[gen.genNumber] for gen in nAC.connected_gen)                  
+            Q_gen = sum(model.QGi_gen[gen.genNumber]*model.gen_active[gen.genNumber] for gen in nAC.connected_gen)
        else:
-            Q_gen = sum(model.QGi_gen[gen.genNumber] for gen in nAC.connected_gen)                  
+            Q_gen = sum(model.QGi_gen[gen.genNumber] for gen in nAC.connected_gen)
        return  model.QGi_opt[node] ==   Q_gen
-    
+
     model.Gen_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_PAC_rule)
     model.Gen_QAC_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_Q_rule)
-    
+
     def Gen_PREN_rule(model,node):
        nAC = grid.nodes_AC[node]
-       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)                  
+       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)
        return  model.PGi_ren[node] ==   P_gen
-   
+
     def Gen_QREN_rule(model,node):
        nAC = grid.nodes_AC[node]
-       Q_gen = sum(model.Q_renSource[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)                  
+       Q_gen = sum(model.Q_renSource[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)
        return  model.QGi_ren[node] ==   Q_gen
-   
+
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
-    model.Gen_QREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_QREN_rule) 
-    
-    
+    model.Gen_QREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_QREN_rule)
+
+
     def toPexp_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toPexp = sum(model.exp_PAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)                  
+       toPexp = sum(model.exp_PAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)
        return  model.Pto_Exp[node] ==  toPexp
     def fromPexp_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromPexp = sum(model.exp_PAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)                
+       fromPexp = sum(model.exp_PAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)
        return  model.Pfrom_Exp[node] ==   fromPexp
-    
+
     def toQexp_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toQexp = sum(model.exp_QAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)                  
+       toQexp = sum(model.exp_QAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)
        return  model.Qto_Exp[node] ==  toQexp
-    
+
     def fromQexp_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromQexp = sum(model.exp_QAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)                  
-       return  model.Qfrom_Exp[node] ==  fromQexp   
-   
+       fromQexp = sum(model.exp_QAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)
+       return  model.Qfrom_Exp[node] ==  fromQexp
+
     if grid.TEP_AC:
         model.exp_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPexp_rule)
         model.exp_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPexp_rule)
         model.exp_Qto_constraint  = pyo.Constraint(model.nodes_AC, rule=toQexp_rule)
         model.exp_Qfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromQexp_rule)
-    
+
     def toPtf_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toPtf = sum(model.tf_PAC_to[l.lineNumber] for l in nAC.connected_toTFLine)                  
+       toPtf = sum(model.tf_PAC_to[l.lineNumber] for l in nAC.connected_toTFLine)
        return  model.Pto_TF[node] ==   toPtf
     def fromPtf_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromPtf = sum(model.tf_PAC_from[l.lineNumber] for l in nAC.connected_fromTFLine)                
+       fromPtf = sum(model.tf_PAC_from[l.lineNumber] for l in nAC.connected_fromTFLine)
        return  model.Pfrom_TF[node] ==   fromPtf
-    
+
     def toQtf_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toQtf = sum(model.tf_QAC_to[l.lineNumber] for l in nAC.connected_toTFLine)                  
+       toQtf = sum(model.tf_QAC_to[l.lineNumber] for l in nAC.connected_toTFLine)
        return  model.Qto_TF[node] ==   toQtf
     def fromQtf_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromQtf = sum(model.tf_QAC_from[l.lineNumber] for l in nAC.connected_fromTFLine)                  
-       return  model.Qfrom_TF[node] ==  fromQtf   
+       fromQtf = sum(model.tf_QAC_from[l.lineNumber] for l in nAC.connected_fromTFLine)
+       return  model.Qfrom_TF[node] ==  fromQtf
 
     if grid.TAP_tf:
         model.Pto_TF_constraint   = pyo.Constraint(model.nodes_AC, rule=toPtf_rule)
         model.Pfrom_TF_constraint = pyo.Constraint(model.nodes_AC, rule=fromPtf_rule)
         model.Qto_TF_constraint   = pyo.Constraint(model.nodes_AC, rule=toQtf_rule)
         model.Qfrom_TF_constraint = pyo.Constraint(model.nodes_AC, rule=fromQtf_rule)
-   
+
     def toPre_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toPre = sum(model.rec_PAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)                  
+       toPre = sum(model.rec_PAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)
        return  model.Pto_REP[node] ==  toPre
     def fromPre_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromPre = sum(model.rec_PAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)                
+       fromPre = sum(model.rec_PAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)
        return  model.Pfrom_REP[node] ==   fromPre
-    
+
     def toQrec_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toQrep = sum(model.rec_QAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_QAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)                  
+       toQrep = sum(model.rec_QAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_QAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)
        return  model.Qto_REP[node] ==  toQrep
-    
+
     def fromQrec_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromQrep = sum(model.rec_QAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_QAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)                  
-       return  model.Qfrom_REP[node] ==  fromQrep   
-   
+       fromQrep = sum(model.rec_QAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_QAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)
+       return  model.Qfrom_REP[node] ==  fromQrep
+
     if grid.REC_AC:
         model.rec_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPre_rule)
         model.rec_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPre_rule)
@@ -546,7 +584,7 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
            for ct in model.ct_set:
                fromPre += model.ct_PAC_from[line.lineNumber,ct]*(model.ct_branch[line.lineNumber,ct])
        return  model.Pfrom_CT[node] ==   fromPre
-    
+
     def toQCT_rule(model,node):
        nAC = grid.nodes_AC[node]
        toQCT = 0
@@ -554,15 +592,15 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
            for ct in model.ct_set:
                toQCT += model.ct_QAC_to[line.lineNumber,ct]*(model.ct_branch[line.lineNumber,ct])
        return  model.Qto_CT[node] ==  toQCT
-    
+
     def fromQCT_rule(model,node):
        nAC = grid.nodes_AC[node]
        fromQCT = 0
        for line in nAC.connected_fromCTLine:
            for ct in model.ct_set:
                fromQCT += model.ct_QAC_from[line.lineNumber,ct]*(model.ct_branch[line.lineNumber,ct])
-       return  model.Qfrom_CT[node] ==  fromQCT   
-   
+       return  model.Qfrom_CT[node] ==  fromQCT
+
 
     if grid.CT_AC:
         model.ct_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toCT_rule)
@@ -575,23 +613,23 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
     def calculate_P(model, line, direction,idx=None):
         f = line.fromNode.nodeNumber
         t = line.toNode.nodeNumber
-        
+
         if idx is None:
             Ybus = line.Ybus_branch
         elif idx == 'new':
             Ybus = line.Ybus_branch_new
         else:
             Ybus = line.Ybus_list[idx]
-        
+
         if direction == 'to':
             Vf=model.V_AC[f]
             Vt=model.V_AC[t]
             Gtt=np.real(Ybus[1,1])
             Gtf=np.real(Ybus[1,0])
             Btf=np.imag(Ybus[1,0])
-            thf=model.thetha_AC[f]
-            tht=model.thetha_AC[t]
-            
+            thf=model.theta_AC[f]
+            tht=model.theta_AC[t]
+
             P= Vt*Vt*Gtt + Vf*Vt*(Gtf*pyo.cos(tht - thf) + Btf*pyo.sin(tht - thf))
         else:  # 'from'
             Vf=model.V_AC[f]
@@ -599,16 +637,16 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
             Gff=np.real(Ybus[0,0])
             Gft=np.real(Ybus[0,1])
             Bft=np.imag(Ybus[0,1])
-            thf=model.thetha_AC[f]
-            tht=model.thetha_AC[t]
-            
+            thf=model.theta_AC[f]
+            tht=model.theta_AC[t]
+
             P= Vf*Vf*Gff + Vf*Vt*(Gft*pyo.cos(thf - tht) + Bft*pyo.sin(thf - tht))
         return P
 
     def calculate_Q(model, line, direction,idx=None):
         f = line.fromNode.nodeNumber
         t = line.toNode.nodeNumber
-        
+
         if idx is None:
             Ybus = line.Ybus_branch
         elif idx == 'new':
@@ -619,169 +657,178 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
         if direction == 'to':
             Vf=model.V_AC[f]
             Vt=model.V_AC[t]
-        
-            thf=model.thetha_AC[f]
-            tht=model.thetha_AC[t]
-            
+
+            thf=model.theta_AC[f]
+            tht=model.theta_AC[t]
+
             Btt=np.imag(Ybus[1,1])
             Gtf=np.real(Ybus[1,0])
             Btf=np.imag(Ybus[1,0])
-            
+
             Q   = -Vt*Vt*Btt + Vf*Vt*(Gtf*pyo.sin(tht - thf) - Btf*pyo.cos(tht - thf))
         else:  # 'from'
             Vf=model.V_AC[f]
             Vt=model.V_AC[t]
-            
+
             Bff=np.imag(Ybus[0,0])
             Gft=np.real(Ybus[0,1])
             Bft=np.imag(Ybus[0,1])
-            thf=model.thetha_AC[f]
-            tht=model.thetha_AC[t]
-            
+            thf=model.theta_AC[f]
+            tht=model.theta_AC[t]
+
             Q = -Vf*Vf*Bff + Vf*Vt*(Gft*pyo.sin(thf - tht) - Bft*pyo.cos(thf - tht))
         return Q
 
-    def P_to_AC_line(model,line):   
+    def P_to_AC_line(model,line):
         l = grid.lines_AC[line]
         Pto = calculate_P(model,l,'to')
         return model.PAC_to[line] == Pto
-    
-    def P_from_AC_line(model,line):       
+
+    def P_from_AC_line(model,line):
        l = grid.lines_AC[line]
        Pfrom = calculate_P(model,l,'from')
        return model.PAC_from[line] == Pfrom
-    
-    def Q_to_AC_line(model,line):   
+
+    def Q_to_AC_line(model,line):
         l = grid.lines_AC[line]
         Qto = calculate_Q(model,l,'to')
 
         return model.QAC_to[line] == Qto
-    
-    def Q_from_AC_line(model,line):       
+
+    def Q_from_AC_line(model,line):
        l = grid.lines_AC[line]
        Qfrom = calculate_Q(model,l,'from')
-      
+
        return model.QAC_from[line] == Qfrom
-    
+
     def P_loss_AC_rule(model,line):
         return model.PAC_line_loss[line]== model.PAC_to[line]+model.PAC_from[line]
-    
-    
+
+
     model.Pto_AC_line_constraint   = pyo.Constraint(model.lines_AC, rule=P_to_AC_line)
     model.Pfrom_AC_line_constraint = pyo.Constraint(model.lines_AC, rule=P_from_AC_line)
     model.Qto_AC_line_constraint   = pyo.Constraint(model.lines_AC, rule=Q_to_AC_line)
     model.Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC, rule=Q_from_AC_line)
     model.P_AC_loss_constraint     = pyo.Constraint(model.lines_AC, rule=P_loss_AC_rule)
-    
-    def P_to_AC_line_exp(model,line):   
+
+    def P_to_AC_line_exp(model,line):
         l = grid.lines_AC_exp[line]
+        if (not TEP) and NP_lineAC[line] <= 0:
+            return pyo.Constraint.Skip
         Pto = calculate_P(model,l,'to')
         return model.exp_PAC_to[line] == Pto
-    
-    def P_from_AC_line_exp(model,line):       
+
+    def P_from_AC_line_exp(model,line):
        l = grid.lines_AC_exp[line]
+       if (not TEP) and NP_lineAC[line] <= 0:
+           return pyo.Constraint.Skip
        Pfrom = calculate_P(model,l,'from')
        return model.exp_PAC_from[line] == Pfrom
-    
-    def Q_to_AC_line_exp(model,line):   
+
+    def Q_to_AC_line_exp(model,line):
         l = grid.lines_AC_exp[line]
+        if (not TEP) and NP_lineAC[line] <= 0:
+            return pyo.Constraint.Skip
         Qto = calculate_Q(model,l,'to')
         return model.exp_QAC_to[line] == Qto
-    
-    def Q_from_AC_line_exp(model,line):       
-       l = grid.lines_AC_exp[line]
-       Qfrom = calculate_Q(model,l,'from')
 
+    def Q_from_AC_line_exp(model,line):
+       l = grid.lines_AC_exp[line]
+       if (not TEP) and NP_lineAC[line] <= 0:
+           return pyo.Constraint.Skip
+       Qfrom = calculate_Q(model,l,'from')
        return model.exp_QAC_from[line] == Qfrom
-    
+
     def P_loss_AC_rule_exp(model,line):
+        if (not TEP) and NP_lineAC[line] <= 0:
+            return pyo.Constraint.Skip
         return model.exp_PAC_line_loss[line]== model.exp_PAC_to[line]+model.exp_PAC_from[line]
-    
-    
+
+
     if grid.TEP_AC:
         model.exp_Pto_AC_line_constraint   = pyo.Constraint(model.lines_AC_exp, rule=P_to_AC_line_exp)
         model.exp_Pfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=P_from_AC_line_exp)
         model.exp_Qto_AC_line_constraint   = pyo.Constraint(model.lines_AC_exp, rule=Q_to_AC_line_exp)
         model.exp_Qfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_exp, rule=Q_from_AC_line_exp)
         model.exp_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_exp, rule=P_loss_AC_rule_exp)
-    
-    def P_to_AC_line_rec(model,line,state):   
+
+    def P_to_AC_line_rec(model,line,state):
         l = grid.lines_AC_rec[line]
         if state ==  0:
             Pto = calculate_P(model,l,'to')
         else:
             Pto = calculate_P(model,l,'to',idx='new')
         return model.rec_PAC_to[line,state] == Pto
-    
-    def P_from_AC_line_rec(model,line,state):       
+
+    def P_from_AC_line_rec(model,line,state):
        l = grid.lines_AC_rec[line]
        if state == 0:
            Pfrom = calculate_P(model,l,'from')
        else:
            Pfrom = calculate_P(model,l,'from',idx='new')
        return model.rec_PAC_from[line,state] == Pfrom
-    
-    def Q_to_AC_line_rec(model,line,state):   
+
+    def Q_to_AC_line_rec(model,line,state):
         l = grid.lines_AC_rec[line]
         if state == 0:
             Qto = calculate_Q(model,l,'to')
         else:
             Qto = calculate_Q(model,l,'to',idx='new')
         return model.rec_QAC_to[line,state] == Qto
-    
-    def Q_from_AC_line_rec(model,line,state):       
+
+    def Q_from_AC_line_rec(model,line,state):
        l = grid.lines_AC_rec[line]
        if state == 0:
            Qfrom = calculate_Q(model,l,'from')
        else:
            Qfrom = calculate_Q(model,l,'from',idx='new')
        return model.rec_QAC_from[line,state] == Qfrom
-   
+
     def P_loss_AC_rule_rec(model,line):
         return model.rec_PAC_line_loss[line]== (model.rec_PAC_to[line,0]+model.rec_PAC_from[line,0])*(1-model.rec_branch[line])+\
-                                               (model.rec_PAC_to[line,1]+model.rec_PAC_from[line,1])*model.rec_branch[line]  
-    
-    
+                                               (model.rec_PAC_to[line,1]+model.rec_PAC_from[line,1])*model.rec_branch[line]
+
+
     if grid.REC_AC:
-     
+
         model.rec_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=P_to_AC_line_rec)
         model.rec_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=P_from_AC_line_rec)
         model.rec_Qto_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=Q_to_AC_line_rec)
         model.rec_Qfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_rec, model.branch_states, rule=Q_from_AC_line_rec)
         model.rec_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_rec, rule=P_loss_AC_rule_rec)
-    
-    def P_to_AC_line_ct(model,line,ct):   
+
+    def P_to_AC_line_ct(model,line,ct):
         l = grid.lines_AC_ct[line]
         # Check if this is a fixed route with no cable selected (inactive line)
         if l.active_config < 0:
             return model.ct_PAC_to[line,ct] == 0
         Pto = calculate_P(model,l,'to',idx=ct)
         return model.ct_PAC_to[line,ct] == Pto
-    
-    def P_from_AC_line_ct(model,line,ct):       
+
+    def P_from_AC_line_ct(model,line,ct):
        l = grid.lines_AC_ct[line]
        # Check if this is a fixed route with no cable selected (inactive line)
        if l.active_config < 0:
            return model.ct_PAC_from[line,ct] == 0
        Pfrom = calculate_P(model,l,'from',idx=ct)
        return model.ct_PAC_from[line,ct] == Pfrom
-    
-    def Q_to_AC_line_ct(model,line,ct):   
+
+    def Q_to_AC_line_ct(model,line,ct):
         l = grid.lines_AC_ct[line]
         # Check if this is a fixed route with no cable selected (inactive line)
         if l.active_config < 0:
             return model.ct_QAC_to[line,ct] == 0
         Qto = calculate_Q(model,l,'to',idx=ct)
         return model.ct_QAC_to[line,ct] == Qto
-    
-    def Q_from_AC_line_ct(model,line,ct):       
+
+    def Q_from_AC_line_ct(model,line,ct):
        l = grid.lines_AC_ct[line]
        # Check if this is a fixed route with no cable selected (inactive line)
        if l.active_config < 0 :
            return model.ct_QAC_from[line,ct] == 0
        Qfrom = calculate_Q(model,l,'from',idx=ct)
        return model.ct_QAC_from[line,ct] == Qfrom
-   
+
     def P_loss_AC_rule_ct(model,line):
         l = grid.lines_AC_ct[line]
         if l.active_config < 0:
@@ -790,40 +837,40 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
         for ct in model.ct_set:
             loss += (model.ct_PAC_to[line,ct]+model.ct_PAC_from[line,ct])*(model.ct_branch[line,ct])
         return model.ct_PAC_line_loss[line]== loss
-    
-    
 
-    if grid.CT_AC:   
+
+
+    if grid.CT_AC:
         model.ct_Pto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_to_AC_line_ct)
         model.ct_Pfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=P_from_AC_line_ct)
         model.ct_Qto_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=Q_to_AC_line_ct)
         model.ct_Qfrom_AC_line_constraint = pyo.Constraint( model.lines_AC_ct, model.ct_set, rule=Q_from_AC_line_ct)
         model.ct_P_AC_loss_constraint     = pyo.Constraint(model.lines_AC_ct, rule=P_loss_AC_rule_ct)
 
-        
+
     s=1
-    def P_to_AC_line_tf(model,trafo):   
+    def P_to_AC_line_tf(model,trafo):
         tf = grid.lines_AC_tf[trafo]
         f = tf.fromNode.nodeNumber
         t = tf.toNode.nodeNumber
         Vf=model.V_AC[f]
         Vt=model.V_AC[t]
-        
+
         Gtt=np.real(tf.Ybus_branch[1,1])
         Gtf=np.real(tf.Ybus_branch[1,0])
         Btf=np.imag(tf.Ybus_branch[1,0])
-        
-      
-        thf=model.thetha_AC[f]
-        tht=model.thetha_AC[t]
-        
-        
+
+
+        thf=model.theta_AC[f]
+        tht=model.theta_AC[t]
+
+
         Pto= Vt*Vt*Gtt+ Vf/model.tf_m[tf]*Vt*(Gtf*pyo.cos(tht - thf) + Btf*pyo.sin(tht - thf))
-       
-        
+
+
         return model.tf_PAC_to[trafo] == Pto
-    
-    def P_from_AC_line_tf(model,trafo):       
+
+    def P_from_AC_line_tf(model,trafo):
        tf = grid.lines_AC_tf[trafo]
        f = tf.fromNode.nodeNumber
        t = tf.toNode.nodeNumber
@@ -832,58 +879,58 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
        Gff=np.real(tf.Ybus_branch[0,0])
        Gft=np.real(tf.Ybus_branch[0,1])
        Bft=np.imag(tf.Ybus_branch[0,1])
-       
-    
-       thf=model.thetha_AC[f]
-       tht=model.thetha_AC[t]
-       
+
+
+       thf=model.theta_AC[f]
+       tht=model.theta_AC[t]
+
        Pfrom= Vf*Vf*Gff/model.tf_m[tf]**2 + Vf/model.tf_m[tf]*Vt*(Gft*pyo.cos(thf - tht) + Bft*pyo.sin(thf - tht))
 
        return model.tf_PAC_from[trafo] == Pfrom
-    
-    def Q_to_AC_line_tf(model,trafo):   
+
+    def Q_to_AC_line_tf(model,trafo):
         tf = grid.lines_AC_tf[trafo]
         f = tf.fromNode.nodeNumber
         t = tf.toNode.nodeNumber
         Vf=model.V_AC[f]
         Vt=model.V_AC[t]
-       
-        thf=model.thetha_AC[f]
-        tht=model.thetha_AC[t]
-        
+
+        thf=model.theta_AC[f]
+        tht=model.theta_AC[t]
+
         Btt=np.imag(tf.Ybus_branch[1,1])
         Gtf=np.real(tf.Ybus_branch[1,0])
         Btf=np.imag(tf.Ybus_branch[1,0])
-        
+
         Qto   = -Vt*Vt*Btt + Vf/model.tf_m[tf]*Vt*(Gtf*pyo.sin(tht - thf) - Btf*pyo.cos(tht - thf))
-         
-        
+
+
         return model.tf_QAC_to[trafo] == Qto
-    
-    def Q_from_AC_line_tf(model,trafo):       
+
+    def Q_from_AC_line_tf(model,trafo):
        tf = grid.lines_AC_tf[trafo]
        f = tf.fromNode.nodeNumber
        t = tf.toNode.nodeNumber
        Vf=model.V_AC[f]
        Vt=model.V_AC[t]
-      
+
        Bff=np.imag(tf.Ybus_branch[0,0])
        Gft=np.real(tf.Ybus_branch[0,1])
        Bft=np.imag(tf.Ybus_branch[0,1])
-       
-       thf=model.thetha_AC[f]
-       tht=model.thetha_AC[t]
-       
+
+       thf=model.theta_AC[f]
+       tht=model.theta_AC[t]
+
 
        Qfrom = -Vf*Vf*Bff/model.tf_m[tf]**2 + Vf/model.tf_m[tf]*Vt*(Gft*pyo.sin(thf - tht) - Bft*pyo.cos(thf - tht))
-      
+
 
        return model.tf_QAC_from[trafo] == Qfrom
-    
+
     def P_loss_AC_rule_tf(model,trafo):
-        return model.tf_PAC_line_loss[trafo]== model.tf_PAC_to[trafo]+model.PAC_from[trafo]
-    
-    
+        return model.tf_PAC_line_loss[trafo]== model.tf_PAC_to[trafo]+model.tf_PAC_from[trafo]
+
+
     if grid.TAP_tf:
         model.tf_Pto_AC_line_constraint   = pyo.Constraint(model.lines_AC_tf, rule=P_to_AC_line_tf)
         model.tf_Pfrom_AC_line_constraint = pyo.Constraint(model.lines_AC_tf, rule=P_from_AC_line_tf)
@@ -897,10 +944,10 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
         if gen.Max_S is None:
             return pyo.Constraint.Skip
         else:
-            return model.PGi_gen[g]**2+model.QGi_gen[g]**2 <= (gen.Max_S*model.np_gen[g])**2 
-    
+            return model.PGi_gen[g]**2+model.QGi_gen[g]**2 <= (gen.Max_S*model.np_gen[g])**2
+
     model.S_gen_AC_limit_constraint   = pyo.Constraint(model.gen_AC, rule=S_gen_AC_limit_rule)
-    
+
     # Fix gen_active to 1 for generators where activate_gen_opf is False
     if grid.act_gen:
         def gen_active_fix_rule(model, g):
@@ -909,90 +956,94 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True):
                 return model.gen_active[g] == 1
             else:
                 return pyo.Constraint.Skip
-        
+
         model.gen_active_fix_constraint = pyo.Constraint(model.gen_AC, rule=gen_active_fix_rule)
-    
+
     #AC Ren sources inequality
-    
+
     def S_renS_AC_limit_rule(model,rs):
         ren_source = grid.RenSources[rs]
         if ren_source.Max_S is None or ren_source.connected =='DC':
             return pyo.Constraint.Skip
-        else:    
-            return (model.P_renSource[rs]*model.gamma[rs])**2+model.Q_renSource[rs]**2 <= ren_source.Max_S**2 
-    
+        else:
+            return (model.P_renSource[rs]*model.gamma[rs])**2+model.Q_renSource[rs]**2 <= ren_source.Max_S**2
+
     model.S_renS_AC_limit_constraint   = pyo.Constraint(model.ren_sources, rule=S_renS_AC_limit_rule)
-    
-    
+
+
     if limit_flow_rate is not False:
-        
+
         #AC lines inequality
         def S_to_AC_limit_rule(model,line):
-            
+
             return model.PAC_to[line]**2+model.QAC_to[line]**2 <= (S_lineAC_limit[line]*limit_flow_rate)**2
         def S_from_AC_limit_rule(model,line):
-            
+
             return model.PAC_from[line]**2+model.QAC_from[line]**2 <= (S_lineAC_limit[line]*limit_flow_rate)**2
-        
-        
+
+
         model.S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC, rule=S_to_AC_limit_rule)
         model.S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC, rule=S_from_AC_limit_rule)
-        
+
         def S_to_AC_limit_rule_exp(model,line):
+            if (not TEP) and NP_lineAC[line] <= 0:
+                return pyo.Constraint.Skip
             return model.exp_PAC_to[line]**2+model.exp_QAC_to[line]**2 <= (S_lineACexp_limit[line]*limit_flow_rate)**2
         def S_from_AC_limit_rule_exp(model,line):
+            if (not TEP) and NP_lineAC[line] <= 0:
+                return pyo.Constraint.Skip
             return model.exp_PAC_from[line]**2+model.exp_QAC_from[line]**2 <= (S_lineACexp_limit[line]*limit_flow_rate)**2
-        
+
         if grid.TEP_AC:
             model.exp_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_exp, rule=S_to_AC_limit_rule_exp)
             model.exp_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_exp, rule=S_from_AC_limit_rule_exp)
-        
+
         def S_to_AC_limit_rule_tf(model,line):
-            
+
             return model.tf_PAC_to[line]**2+model.tf_QAC_to[line]**2 <= (S_lineACtf_limit[line]*limit_flow_rate)**2
         def S_from_AC_limit_rule_tf(model,line):
-            
+
             return model.tf_PAC_from[line]**2+model.tf_QAC_from[line]**2 <= (S_lineACtf_limit[line]*limit_flow_rate)**2
-        
+
         if grid.TAP_tf:
             model.tf_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_tf, rule=S_to_AC_limit_rule_tf)
             model.tf_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_tf, rule=S_from_AC_limit_rule_tf)
-        
+
         def S_to_AC_line_rule_rec(model, line, state):
             if state == 0:
                 return (model.rec_PAC_to[line,0]**2+model.rec_QAC_to[line,0]**2)*(1-model.rec_branch[line]) <= (S_lineACrec_lim[line]*limit_flow_rate)**2
             else:
-                return (model.rec_PAC_to[line,1]**2+model.rec_QAC_to[line,1]**2)*model.rec_branch[line] <= (S_lineACrec_lim_new[line]*limit_flow_rate)**2 
+                return (model.rec_PAC_to[line,1]**2+model.rec_QAC_to[line,1]**2)*model.rec_branch[line] <= (S_lineACrec_lim_new[line]*limit_flow_rate)**2
         def S_from_AC_limit_rule_rec(model,line,state):
             if state == 0:
                 return (model.rec_PAC_from[line,0]**2+model.rec_QAC_from[line,0]**2)*(1-model.rec_branch[line]) <= (S_lineACrec_lim[line]*limit_flow_rate)**2
             else:
                 return (model.rec_PAC_from[line,1]**2+model.rec_QAC_from[line,1]**2)*model.rec_branch[line] <= (S_lineACrec_lim_new[line]*limit_flow_rate)**2
-    
+
         if grid.REC_AC:
             model.rec_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec)
             model.rec_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec)
-    
-    
+
+
         def S_to_AC_line_rule_ct(model, line, ct):
             return (model.ct_PAC_to[line,ct]**2+model.ct_QAC_to[line,ct]**2)*(model.ct_branch[line,ct]) <= (S_lineACct_lim[line,ct]*limit_flow_rate)**2
         def S_from_AC_limit_rule_ct(model,line,ct):
             return (model.ct_PAC_from[line,ct]**2+model.ct_QAC_from[line,ct]**2)*(model.ct_branch[line,ct]) <= (S_lineACct_lim[line,ct]*limit_flow_rate)**2
-    
-        
+
+
 
         if grid.CT_AC:
             model.ct_S_to_AC_limit_constraint   = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_to_AC_line_rule_ct)
             model.ct_S_from_AC_limit_constraint = pyo.Constraint(model.lines_AC_ct, model.ct_set, rule=S_from_AC_limit_rule_ct)
-        
+
     s=1
-        
+
 
 def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
 
 
     DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
-        
+
     lista_nodos_DC, lista_lineas_DC,DC_slack ,DC_nodes_connected_conv   = DC_Lists
     u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
     P_lineDC_limit,NP_lineDC    = DC_lines_info
@@ -1000,24 +1051,28 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
     "Model Sets"
     model.nodes_DC   = pyo.Set(initialize=lista_nodos_DC)
     model.lines_DC   = pyo.Set(initialize=lista_lineas_DC)
+
     model.DC_slacks  = pyo.Set(initialize=DC_slack)
+
 
     "DC variables"
     #DC nodes variables
     def DC_V_slack_rule(model, node):
         return model.V_DC[node] == V_ini_DC[node]
     def Pbounds_lines(model, line):
+        if (not TEP) and grid.lines_DC[line].np_line <= 0:
+            return (0,0)
         if limit_flow_rate is False:
             return (None,None)
         return (-P_lineDC_limit[line]*limit_flow_rate, P_lineDC_limit[line]*limit_flow_rate)
-       
-    
-    def P_conv_DC_node_bounds(model,node): #This limits the varable of those DC nodes that do not have a converter connected 
+
+
+    def P_conv_DC_node_bounds(model,node): #This limits the varable of those DC nodes that do not have a converter connected
          if node in DC_nodes_connected_conv:
              return (None,None)
          else:
              return (0,0)
-         
+
     def Pren_bounds_DC(model, node):
         nDC = grid.nodes_DC[node]
         if nDC.connected_RenSource == []:
@@ -1035,24 +1090,23 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
             return (0,0)
         else:
             return (None,None)
-            
-  
-    
-    model.PGi_opt_DC = pyo.Var(model.nodes_DC, bounds=PGi_opt_bounds_DC, initialize=0)
 
-    #if not TEP:
-    model.DC_V_slack_constraint = pyo.Constraint(model.DC_slacks, rule=DC_V_slack_rule)
-    
+
+
+    model.PGi_opt_DC = pyo.Var(model.nodes_DC, bounds=PGi_opt_bounds_DC, initialize=0)
+    if len(DC_slack) != 0:
+         model.DC_V_slack_constraint = pyo.Constraint(model.DC_slacks, rule=DC_V_slack_rule)
+
     #DC Lines variables
-    
+
 
     model.PDC_to       = pyo.Var(model.lines_DC,bounds=Pbounds_lines ,  initialize=0)
     model.PDC_from     = pyo.Var(model.lines_DC,bounds=Pbounds_lines , initialize=0)
     model.PDC_line_loss= pyo.Var(model.lines_DC,bounds=Pbounds_lines , initialize=0)
-    
-    
+
+
     model.P_conv_DC = pyo.Var(model.nodes_DC, bounds=P_conv_DC_node_bounds,initialize=0)
-   
+
     if grid.CDC:
         lista_DCDC,P_DCDC_limit,Pset_DCDC=DCDC_info
         "Converter Variables"
@@ -1065,8 +1119,8 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
 
         def DCDC_opt_bounds(model,conv):
             return (-P_DCDC_limit[conv],P_DCDC_limit[conv])
-        
-        
+
+
         model.P_DCDC_to = pyo.Var(model.nodes_DC, bounds=P_DCDC_bounds,initialize=0)
         model.P_DCDC_from = pyo.Var(model.nodes_DC, bounds=P_DCDC_bounds,initialize=0)
         model.P_DCDC = pyo.Var(model.nodes_DC, bounds=P_DCDC_bounds,initialize=0)
@@ -1076,22 +1130,22 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
         model.cn_DCDC_to = pyo.Var(model.DCDC_conv, bounds=DCDC_opt_bounds,initialize=0)
         model.CDC_loss= pyo.Var(model.DCDC_conv, initialize=0)
 
-def DC_constraints(model,grid):
-    
-    
-    
+def DC_constraints(model,grid,TEP=False):
+
+
+
 
     "DC equality constraints"
     #DC node constraints
-    
+
     def Gen_PREN_rule_DC(model,node):
        nDC = grid.nodes_DC[node]
-       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nDC.connected_RenSource)                  
+       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nDC.connected_RenSource)
        return  model.PGi_ren_DC[node] ==   P_gen
-   
+
     def Gen_P_rule_DC(model,node):
         nDC = grid.nodes_DC[node]
-        P_gen = sum(model.PGi_gen_DC[gen.genNumber_DC]*model.np_gen_DC[gen.genNumber_DC] for gen in nDC.connected_gen)                  
+        P_gen = sum(model.PGi_gen_DC[gen.genNumber_DC]*model.np_gen_DC[gen.genNumber_DC] for gen in nDC.connected_gen)
         return  model.PGi_opt_DC[node] ==   P_gen
 
 
@@ -1104,8 +1158,8 @@ def DC_constraints(model,grid):
                 if Y != 0:
                     line = grid.get_lineDC_by_nodes(i, k)
                     pol = line.pol
-                    G = 1/line.R
-                    
+                    G = 1/line.r
+
                     P_sum += pol*model.V_DC[i] * (model.V_DC[i]-model.V_DC[k])*(G)*model.NumLinesDCP[line.lineNumber]
 
         P_var = model.P_known_DC[node]+ model.PGi_ren_DC[node]+model.PGi_opt_DC[node]
@@ -1115,85 +1169,90 @@ def DC_constraints(model,grid):
             P_var += model.P_DCDC[node]
         return P_sum ==  P_var
 
-    # def P_DC_noconv_rule(model, node):
-    #     return model.P_conv_DC[node] == 0
-    
     model.Gen_PREN_constraint_DC =pyo.Constraint(model.nodes_DC, rule=Gen_PREN_rule_DC)
     model.Gen_P_constraint_DC    =pyo.Constraint(model.nodes_DC, rule=Gen_P_rule_DC)
     model.P_DC_node_constraint = pyo.Constraint(model.nodes_DC, rule=P_DC_node_rule)
-    
-    #DC lines equality constraints
-    
-    def P_from_DC_line(model,line):       
-        l = grid.lines_DC[line]
-        f = l.fromNode.nodeNumber
-        t = l.toNode.nodeNumber
-        pol = l.pol
-        
-        Pfrom= (model.V_DC[t]-model.V_DC[f])*grid.Ybus_DC[f,t]*model.V_DC[f]*pol
-        
-        return model.PDC_from[line] == Pfrom
-    
-    def P_to_DC_line(model,line):   
-        l = grid.lines_DC[line]
-        f = l.fromNode.nodeNumber
-        t = l.toNode.nodeNumber
-        pol = l.pol
 
-         
-        Pto= (model.V_DC[f]-model.V_DC[t])*grid.Ybus_DC[t,f]*model.V_DC[t]*pol 
-        
-        
+    #DC lines equality constraints
+
+    def P_from_DC_line(model,line):
+        l = grid.lines_DC[line]
+        if (not TEP) and l.np_line <= 0:
+            return pyo.Constraint.Skip
+        f = l.fromNode.nodeNumber
+        t = l.toNode.nodeNumber
+        pol = l.pol
+        G = 1/l.r
+
+        Pfrom = (model.V_DC[f] - model.V_DC[t]) * G * model.V_DC[f] * pol
+
+        return model.PDC_from[line] == Pfrom
+
+    def P_to_DC_line(model,line):
+        l = grid.lines_DC[line]
+        if (not TEP) and l.np_line <= 0:
+            return pyo.Constraint.Skip
+        f = l.fromNode.nodeNumber
+        t = l.toNode.nodeNumber
+        pol = l.pol
+        G = 1/l.r
+
+
+        Pto = (model.V_DC[t] - model.V_DC[f]) * G * model.V_DC[t] * pol
+
+
         return model.PDC_to[line] == Pto
-    
+
     def P_loss_DC_line_rule(model,line):
-        
+        if (not TEP) and grid.lines_DC[line].np_line <= 0:
+            return  pyo.Constraint.Skip
+
         return model.PDC_line_loss[line]==(model.PDC_from[line]+ model.PDC_to[line])
-    
+
     model.Pfrom_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_from_DC_line)
     model.Pto_DC_line_constraint     = pyo.Constraint(model.lines_DC, rule=P_to_DC_line)
-    model.Ploss_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_loss_DC_line_rule)    
-     
+    model.Ploss_DC_line_constraint   = pyo.Constraint(model.lines_DC, rule=P_loss_DC_line_rule)
+
     if grid.CDC:
 
-        def P_DCDC_rule(model,node): 
+        def P_DCDC_rule(model,node):
             return  model.P_DCDC[node] ==   model.P_DCDC_to[node] + model.P_DCDC_from[node]
 
         def P_DCDC_to_rule(model,node):
             nDC = grid.nodes_DC[node]
-            P_DCDC = sum(model.cn_DCDC_to[conv] for conv in nDC.connected_DCDC_to)     
+            P_DCDC = sum(model.cn_DCDC_to[conv] for conv in nDC.connected_DCDC_to)
             return  model.P_DCDC_to[node] ==   P_DCDC
-        
+
         def P_DCDC_from_rule(model,node):
             nDC = grid.nodes_DC[node]
-            P_DCDC = sum(model.cn_DCDC_from[conv] for conv in nDC.connected_DCDC_from)     
+            P_DCDC = sum(model.cn_DCDC_from[conv] for conv in nDC.connected_DCDC_from)
             return  model.P_DCDC_from[node] ==   P_DCDC
 
 
-        def DCDC_relation_rule(model,conv):  
+        def DCDC_relation_rule(model,conv):
             return  model.cn_DCDC_from[conv] + model.cn_DCDC_to[conv]+ model.CDC_loss[conv] == 0
-        
+
 
         def DCDC_loss_rule(model,conv):
             cn = grid.Converters_DCDC[conv]
             nt = cn.toNode.nodeNumber
             return  model.CDC_loss[conv] == (model.cn_DCDC_to[conv]/model.V_DC[nt])**2*cn.r
-        
+
         model.P_DCDC_rule = pyo.Constraint(model.nodes_DC, rule=P_DCDC_rule)
         model.P_DCDC_to_constraint = pyo.Constraint(model.nodes_DC, rule=P_DCDC_to_rule)
         model.P_DCDC_from_constraint = pyo.Constraint(model.nodes_DC, rule=P_DCDC_from_rule)
         model.DCDC_relation_constraint = pyo.Constraint(model.DCDC_conv, rule=DCDC_relation_rule)
         model.DCDC_loss_constraint = pyo.Constraint(model.DCDC_conv, rule=DCDC_loss_rule)
     "DC inequality constraints"
-    
-    #they set in the variables themselves
-       
 
-def Converter_variables(model,grid,Conv_info):
-    
+    #they set in the variables themselves
+
+
+def Converter_variables(model,grid,Conv_info,TEP=False):
+
     Conv_Lists, Conv_Volt = Conv_info
-        
-    lista_conv,np_conv_i = Conv_Lists
+
+    lista_conv,np_conv = Conv_Lists
     u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
 
 
@@ -1207,88 +1266,113 @@ def Converter_variables(model,grid,Conv_info):
             return (0,0)
         else:
             return (None,None)
-        
-    model.Uc   = pyo.Var(model.conv, bounds=lambda model, conv: (u_c_min[conv], u_c_max[conv]), initialize=1) 
-    model.Uf   = pyo.Var(model.conv, bounds=lambda model, conv: (u_c_min[conv], u_c_max[conv]), initialize=1) 
-    model.th_c   = pyo.Var(model.conv, bounds=(-1.6, 1.6), initialize=0) 
-    model.th_f   = pyo.Var(model.conv, bounds=(-1.6, 1.6), initialize=0) 
-    model.P_AC_loss_conv= pyo.Var(model.conv,within=pyo.NonNegativeReals)
-    
-        
-    model.P_conv_loss = pyo.Var(model.conv, initialize=0)
+
+    def conv_u_bounds(model, conv):
+        if (not TEP) and np_conv[conv] <= 0:
+            return (0,0)
+        return (u_c_min[conv], u_c_max[conv])
+    def conv_th_bounds(model, conv):
+        if (not TEP) and np_conv[conv] <= 0:
+            return (0,0)
+        return (-1.6, 1.6)
+    def conv_power_bounds(model, conv):
+        if (not TEP) and np_conv[conv] <= 0:
+            return (0,0)
+        return (None,None)
+    def conv_u_init(model, conv):
+        if (not TEP) and np_conv[conv] <= 0:
+            return 0
+        return 1
+    def conv_pcq_init(model, conv):
+        if (not TEP) and np_conv[conv] <= 0:
+            return 0
+        return 0.0001
+
+    model.Uc   = pyo.Var(model.conv, bounds=conv_u_bounds, initialize=conv_u_init)
+    model.Uf   = pyo.Var(model.conv, bounds=conv_u_bounds, initialize=conv_u_init)
+    model.th_c   = pyo.Var(model.conv, bounds=conv_th_bounds, initialize=0)
+    model.th_f   = pyo.Var(model.conv, bounds=conv_th_bounds, initialize=0)
+    model.P_AC_loss_conv= pyo.Var(model.conv,within=pyo.NonNegativeReals, initialize=0)
+
+
+    model.P_conv_loss = pyo.Var(model.conv, bounds=conv_power_bounds, initialize=0)
 
     model.P_conv_AC = pyo.Var(model.nodes_AC,bounds=conv_opt_bounds, initialize=0)
     model.Q_conv_AC = pyo.Var(model.nodes_AC,bounds=conv_opt_bounds, initialize=0)
-    
-    model.P_conv_s_AC  = pyo.Var(model.conv, initialize=0)   
-    model.Q_conv_s_AC = pyo.Var(model.conv, initialize=0)
 
-    model.P_conv_c_AC  = pyo.Var(model.conv, initialize=0.0001)   
-    model.Q_conv_c_AC = pyo.Var(model.conv, initialize=0.0001)
-    
-    model.P_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)   
-    model.Q_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)
-    
-def Converter_constraints(model,grid,Conv_info):
+    model.P_conv_s_AC  = pyo.Var(model.conv, bounds=conv_power_bounds, initialize=0)
+    model.Q_conv_s_AC = pyo.Var(model.conv, bounds=conv_power_bounds, initialize=0)
+
+    model.P_conv_c_AC  = pyo.Var(model.conv, bounds=conv_power_bounds, initialize=conv_pcq_init)
+    model.Q_conv_c_AC = pyo.Var(model.conv, bounds=conv_power_bounds, initialize=conv_pcq_init)
+
+    # model.P_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)
+    # model.Q_conv_c_AC_sq = pyo.Var(model.conv, bounds=(1e-100,None), initialize=0.1)
+
+def Converter_constraints(model,grid,Conv_info,TEP=False):
     Conv_Lists, Conv_Volt = Conv_info
-  
+
     u_c_min,u_c_max,S_limit_conv,P_conv_limit = Conv_Volt
-    
+
     "Converter equality Constraints"
-    
+
     def Conv_Ps_rule(model,conv):
        element=grid.Converters_ACDC[conv]
+       if (not TEP) and element.np_conv <= 0:
+           return pyo.Constraint.Skip
        nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
-        
-       Gc  = element.Gc   
-       Bc  = element.Bc   
-       Gtf = element.Gtf  
-       Btf = element.Btf  
-       Bf  = element.Bf   
-       
-       if element.Bf == 0:
+
+       Gc  = element.Gc
+       Bc  = element.Bc
+       Gtf = element.Gtf
+       Btf = element.Btf
+       Bf  = element.bf
+
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
            if Zeq == 0:
-               return model.thetha_AC[nAC]==model.th_c[conv]
+               return model.theta_AC[nAC]==model.th_c[conv]
            Yeq = 1/Zeq
-           
-           Gc = np.real(Yeq)  
-           Bc = np.imag(Yeq)  
-           
+
+           Gc = np.real(Yeq)
+           Bc = np.imag(Yeq)
+
            Ps = -model.V_AC[nAC]**2*Gc+model.V_AC[nAC]*model.Uc[conv] * \
-               (Gc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv])+Bc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv]))
-          
+               (Gc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv])+Bc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv]))
+
 
        elif element.Gtf == 0:
-   
+
            Bcf = Bc+Bf
 
            Ps = -model.V_AC[nAC]**2*Gc+model.V_AC[nAC]*model.Uc[conv] * \
-               (Gc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv])+Bc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv]))
-          
-           
+               (Gc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv])+Bc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv]))
+
+
        else:
 
            Ps = -model.V_AC[nAC]**2*Gtf+model.V_AC[nAC]*model.Uf[conv] * \
-               (Gtf*pyo.cos(model.thetha_AC[nAC]-model.th_f[conv])+Btf*pyo.sin(model.thetha_AC[nAC]-model.th_f[conv]))
-           
+               (Gtf*pyo.cos(model.theta_AC[nAC]-model.th_f[conv])+Btf*pyo.sin(model.theta_AC[nAC]-model.th_f[conv]))
+
        return model.P_conv_s_AC[conv]-Ps==0
-           
+
     def Conv_Qs_rule(model,conv):
        element=grid.Converters_ACDC[conv]
+       if (not TEP) and element.np_conv <= 0:
+           return pyo.Constraint.Skip
        nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
-       
-       Gc = element.Gc    
-       Bc = element.Bc    
-       Gtf = element.Gtf  
-       Btf = element.Btf  
-       Bf = element.Bf    
-       
-       if element.Bf == 0:
+
+       Gc = element.Gc
+       Bc = element.Bc
+       Gtf = element.Gtf
+       Btf = element.Btf
+       Bf = element.bf
+
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
@@ -1296,81 +1380,85 @@ def Converter_constraints(model,grid,Conv_info):
                return model.V_AC[nAC]==model.Uc[conv]
            Yeq = 1/Zeq
 
-           Gc = np.real(Yeq)  
-           Bc = np.imag(Yeq)  
-           
-           Qs = model.V_AC[nAC]**2*Bc+model.V_AC[nAC]*model.Uc[conv]*(Gc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv])-Bc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv]))
+           Gc = np.real(Yeq)
+           Bc = np.imag(Yeq)
+
+           Qs = model.V_AC[nAC]**2*Bc+model.V_AC[nAC]*model.Uc[conv]*(Gc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv])-Bc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv]))
 
        elif element.Gtf == 0:
-  
+
            Bcf = Bc+Bf
 
            Qs = model.V_AC[nAC]**2*Bcf+model.V_AC[nAC]*model.Uc[conv] * \
-                (Gc*pyo.sin(model.thetha_AC[nAC]-model.th_f[conv])-Bc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv]))
-         
+                (Gc*pyo.sin(model.theta_AC[nAC]-model.th_f[conv])-Bc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv]))
+
        else:
-                         
+
            Qs = model.V_AC[nAC]**2*Btf+model.V_AC[nAC]*model.Uf[conv] * \
-               (Gtf*pyo.sin(model.thetha_AC[nAC]-model.th_f[conv])-Btf*pyo.cos(model.thetha_AC[nAC]-model.th_f[conv]))
+               (Gtf*pyo.sin(model.theta_AC[nAC]-model.th_f[conv])-Btf*pyo.cos(model.theta_AC[nAC]-model.th_f[conv]))
 
        return model.Q_conv_s_AC[conv]-Qs==0
-       
-   
-    
+
+
+
 
     def Conv_Pc_rule(model,conv):
        element=grid.Converters_ACDC[conv]
+       if (not TEP) and element.np_conv <= 0:
+           return pyo.Constraint.Skip
        nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
-       
-       Gc = element.Gc    
-       Bc = element.Bc    
-       Gtf = element.Gtf  
-       Btf = element.Btf  
-       Bf = element.Bf    
-       
-       if element.Bf == 0:
+
+       Gc = element.Gc
+       Bc = element.Bc
+       Gtf = element.Gtf
+       Btf = element.Btf
+       Bf = element.bf
+
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
            if Zeq == 0:
                return -model.P_conv_s_AC[conv]+model.P_conv_c_AC[conv]==0
-           
+
            Yeq = 1/Zeq
 
-           Gc = np.real(Yeq)  
-           Bc = np.imag(Yeq)  
-           
+           Gc = np.real(Yeq)
+           Bc = np.imag(Yeq)
+
            Pc = model.Uc[conv]**2*Gc-model.V_AC[nAC]*model.Uc[conv] * \
-               (Gc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv])-Bc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv]))
-          
+               (Gc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv])-Bc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv]))
+
 
        elif element.Gtf == 0:
-                    
+
            Bcf = Bc+Bf
-        
-           Pc = model.Uc[conv]**2*Gc-model.V_AC[nAC]*model.Uc[conv]*(Gc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv])-Bc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv]))
-           
-           
+
+           Pc = model.Uc[conv]**2*Gc-model.V_AC[nAC]*model.Uc[conv]*(Gc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv])-Bc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv]))
+
+
        else:
-           
+
            Pc = model.Uc[conv]**2*Gc-model.Uf[conv]*model.Uc[conv]*(Gc*pyo.cos(model.th_f[conv]-model.th_c[conv])-Bc*pyo.sin(model.th_f[conv]-model.th_c[conv]))
-           
-           
+
+
        return -Pc+model.P_conv_c_AC[conv]==0
-           
+
     def Conv_Qc_rule(model,conv):
        element=grid.Converters_ACDC[conv]
+       if (not TEP) and element.np_conv <= 0:
+           return pyo.Constraint.Skip
        nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
-        
-       Gc = element.Gc    
-       Bc = element.Bc    
-       Gtf = element.Gtf  
-       Btf = element.Btf  
-       Bf = element.Bf    
-       
-       if element.Bf == 0:
+
+       Gc = element.Gc
+       Bc = element.Bc
+       Gtf = element.Gtf
+       Btf = element.Btf
+       Bf = element.bf
+
+       if element.bf == 0:
            Ztf = element.Ztf
            Zc = element.Zc
            Zeq = Ztf+Zc
@@ -1378,22 +1466,22 @@ def Converter_constraints(model,grid,Conv_info):
                return -model.Q_conv_s_AC[conv]+model.Q_conv_c_AC[conv]==0
            Yeq = 1/Zeq
 
-           Gc = np.real(Yeq)  
-           Bc = np.imag(Yeq)  
-           
-           
+           Gc = np.real(Yeq)
+           Bc = np.imag(Yeq)
+
+
            Qc = -model.Uc[conv]**2*Bc+model.V_AC[nAC]*model.Uc[conv] * \
-               (Gc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv])+Bc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv]))
+               (Gc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv])+Bc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv]))
 
        elif element.Gtf == 0:
-           
+
            Bcf = Bc+Bf
 
            Qc = -model.Uc[conv]*model.Uc[conv]*Bc+model.V_AC[nAC]*model.Uc[conv] * \
-               (Gc*pyo.sin(model.thetha_AC[nAC]-model.th_c[conv])+Bc*pyo.cos(model.thetha_AC[nAC]-model.th_c[conv]))
-     
+               (Gc*pyo.sin(model.theta_AC[nAC]-model.th_c[conv])+Bc*pyo.cos(model.theta_AC[nAC]-model.th_c[conv]))
+
        else:
-           
+
            Qc = -model.Uc[conv]*model.Uc[conv]*Bc+model.Uf[conv]*model.Uc[conv] * \
                (Gc*pyo.sin(model.th_f[conv]-model.th_c[conv])+Bc*pyo.cos(model.th_f[conv]-model.th_c[conv]))
 
@@ -1404,64 +1492,68 @@ def Converter_constraints(model,grid,Conv_info):
 
     def Conv_F1_rule(model,conv):
        element=grid.Converters_ACDC[conv]
+       if (not TEP) and element.np_conv <= 0:
+           return pyo.Constraint.Skip
        nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
 
-            
-       if element.Bf == 0 or element.Gtf == 0:
+
+       if element.bf == 0 or element.Gtf == 0:
         return pyo.Constraint.Skip
-           
+
        else:
-           Gc = element.Gc    
-           Bc = element.Bc    
-           Gtf = element.Gtf  
-           Btf = element.Btf  
-           Bf = element.Bf    
-                
+           Gc = element.Gc
+           Bc = element.Bc
+           Gtf = element.Gtf
+           Btf = element.Btf
+           Bf = element.bf
+
            Psf = model.Uf[conv]*model.Uf[conv]*Gtf-model.Uf[conv]*model.V_AC[nAC] * \
-               (Gtf*pyo.cos(model.thetha_AC[nAC]-model.th_f[conv])-Btf*pyo.sin(model.thetha_AC[nAC]-model.th_f[conv]))
-      
+               (Gtf*pyo.cos(model.theta_AC[nAC]-model.th_f[conv])-Btf*pyo.sin(model.theta_AC[nAC]-model.th_f[conv]))
+
            Pcf = -model.Uf[conv]*model.Uf[conv]*Gc+model.Uf[conv]*model.Uc[conv] * \
                (Gc*pyo.cos(model.th_f[conv]-model.th_c[conv])+Bc*pyo.sin(model.th_f[conv]-model.th_c[conv]))
-        
+
 
            F1 = Pcf-Psf
-            
+
        return F1==0
 
     def Conv_F2_rule(model,conv):
        element=grid.Converters_ACDC[conv]
+       if (not TEP) and element.np_conv <= 0:
+           return pyo.Constraint.Skip
        nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
        nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
        constraints = pyo.ConstraintList()
-       
-       if element.Bf == 0 or element.Gtf == 0:
+
+       if element.bf == 0 or element.Gtf == 0:
         return pyo.Constraint.Skip
-           
+
        else:
-           
-           Gc = element.Gc    
-           Bc = element.Bc    
-           Gtf = element.Gtf  
-           Btf = element.Btf  
-           Bf = element.Bf    
 
-         
+           Gc = element.Gc
+           Bc = element.Bc
+           Gtf = element.Gtf
+           Btf = element.Btf
+           Bf = element.bf
+
+
            Qsf = -model.Uf[conv]**2*Btf+model.Uf[conv]*model.V_AC[nAC] * \
-               (Gtf*pyo.sin(model.thetha_AC[nAC]-model.th_f[conv])+Btf*pyo.cos(model.thetha_AC[nAC]-model.th_f[conv]))
+               (Gtf*pyo.sin(model.theta_AC[nAC]-model.th_f[conv])+Btf*pyo.cos(model.theta_AC[nAC]-model.th_f[conv]))
 
-         
+
            Qcf = model.Uf[conv]**2*Bc+model.Uf[conv]*model.Uc[conv] * \
                (Gc*pyo.sin(model.th_f[conv]-model.th_c[conv])-Bc*pyo.cos(model.th_f[conv]-model.th_c[conv]))
 
            Qf = -model.Uf[conv]*model.Uf[conv]*Bf
 
-           
+
 
            F2 = Qcf-Qsf-Qf
-           
-           
-            
+
+
+
        return F2==0
 
     model.Conv_Ps_constraint = pyo.Constraint(model.conv,rule=Conv_Ps_rule)
@@ -1470,23 +1562,25 @@ def Converter_constraints(model,grid,Conv_info):
     model.Conv_Qc_constraint = pyo.Constraint(model.conv,rule=Conv_Qc_rule)
     model.Conv_F1_constraint = pyo.Constraint(model.conv,rule=Conv_F1_rule)
     model.Conv_F2_constraint = pyo.Constraint(model.conv,rule=Conv_F2_rule)
-    
+
     # Adds all converters in the AC nodes they are connected to
     def Conv_PAC_rule(model,node):
        nAC = grid.nodes_AC[node]
        P_conv = sum(model.P_conv_s_AC[conv]*model.np_conv[conv] for conv in nAC.connected_conv)
-                  
+
        return  model.P_conv_AC[node] ==   P_conv
-           
+
     def Conv_Q_rule(model,node):
        nAC = grid.nodes_AC[node]
        Q_conv = sum(model.Q_conv_s_AC[conv]*model.np_conv[conv] for conv in nAC.connected_conv)
-    
-       return   model.Q_conv_AC[node] ==   Q_conv       
-         
+
+       return   model.Q_conv_AC[node] ==   Q_conv
+
 
     # IGBTs losses
     def Conv_DC_rule(model, conv):
+        if (not TEP) and grid.Converters_ACDC[conv].np_conv <= 0:
+            return pyo.Constraint.Skip
         nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
         nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
 
@@ -1494,38 +1588,40 @@ def Converter_constraints(model,grid,Conv_info):
 
     def Conv_loss_rule(model, conv):
         element=grid.Converters_ACDC[conv]
+        if (not TEP) and element.np_conv <= 0:
+            return pyo.Constraint.Skip
         nAC = grid.Converters_ACDC[conv].Node_AC.nodeNumber
         nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
-        a = grid.Converters_ACDC[conv].a_conv 
+        a = grid.Converters_ACDC[conv].a_conv
         b = grid.Converters_ACDC[conv].b_conv
-      
+
         if element.power_loss_model == 'MMC':
              Vdc = model.V_DC[element.Node_DC.nodeNumber]
              Pc  = model.P_conv_c_AC[conv]
              Ra  = element.ra
-             
+
              I = (-Vdc +pyo.sqrt(Vdc**2-4*Ra*Pc/3))/(-2*Ra)
 
              P_loss = 3*I**2*Ra
-             
+
         else:
             # current = pyo.sqrt(model.P_conv_c_AC_sq[conv]+model.Q_conv_c_AC_sq[conv])/(model.Uc[conv])
             currentsqr = (model.P_conv_c_AC[conv]**2+model.Q_conv_c_AC[conv]**2)/(model.Uc[conv]**2)
-    
-            
-    
+
+
+
             # c_inver = (element.c_inver_og /model.np_conv[conv])*element.basekA**2/grid.S_base
-            # c_rect = (element.c_rect_og   /model.np_conv[conv])*element.basekA**2/grid.S_base 
-            
-            c_inver=grid.Converters_ACDC[conv].c_inver 
-            c_rect=grid.Converters_ACDC[conv].c_rect   
-        
-               
-        
-        
+            # c_rect = (element.c_rect_og   /model.np_conv[conv])*element.basekA**2/grid.S_base
+
+            c_inver=grid.Converters_ACDC[conv].c_inver
+            c_rect=grid.Converters_ACDC[conv].c_rect
+
+
+
+
             P_loss = a  +c_rect * currentsqr
-    
-        
+
+
         return model.P_conv_loss[conv] == P_loss
 
 
@@ -1533,51 +1629,61 @@ def Converter_constraints(model,grid,Conv_info):
     model.Conv_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Conv_PAC_rule)
     model.Conv_QAC_constraint = pyo.Constraint(model.nodes_AC, rule=Conv_Q_rule)
     model.Conv_loss_constraint = pyo.Constraint(model.conv, rule=Conv_loss_rule)
-   
+
 
     "Converters inequality constraints"
-    
+
     def Conv_ACc_Limit_rule(model, conv):
-        return (model.P_conv_c_AC[conv]**2+model.Q_conv_c_AC[conv]**2) <= (S_limit_conv[conv])**2 
-    
-    
+        if (not TEP) and grid.Converters_ACDC[conv].np_conv <= 0:
+            return pyo.Constraint.Skip
+        return (model.P_conv_c_AC[conv]**2+model.Q_conv_c_AC[conv]**2) <= (S_limit_conv[conv])**2
+
+
     def Conv_ACs_Limit_rule(model, conv):
+        if (not TEP) and grid.Converters_ACDC[conv].np_conv <= 0:
+            return pyo.Constraint.Skip
         return (model.P_conv_s_AC[conv]**2+model.Q_conv_s_AC[conv]**2) <= (S_limit_conv[conv])**2
-    
+
     def Conv_DC_Limit_rule(model, conv):
+        if (not TEP) and grid.Converters_ACDC[conv].np_conv <= 0:
+            return pyo.Constraint.Skip
         nDC = grid.Converters_ACDC[conv].Node_DC.nodeNumber
         return (model.P_conv_c_AC[conv]+ model.P_conv_loss[conv])**2 <= (P_conv_limit[nDC])**2
-    
-    
-   #AC elements losses 
+
+
+   #AC elements losses
     def Conv_AC_loss1(model,conv):
-        return  model.P_AC_loss_conv[conv] >= model.P_conv_c_AC[conv]-model.P_conv_s_AC[conv] 
+        if (not TEP) and grid.Converters_ACDC[conv].np_conv <= 0:
+            return pyo.Constraint.Skip
+        return  model.P_AC_loss_conv[conv] >= model.P_conv_c_AC[conv]-model.P_conv_s_AC[conv]
     def Conv_AC_loss2(model,conv):
+        if (not TEP) and grid.Converters_ACDC[conv].np_conv <= 0:
+            return pyo.Constraint.Skip
         return  model.P_AC_loss_conv[conv] >= model.P_conv_s_AC[conv]-model.P_conv_c_AC[conv]
-    
+
 
     model.Conv_ACc_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_ACc_Limit_rule)
     model.Conv_ACs_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_ACs_Limit_rule)
     model.Conv_DC_Limit_constraint = pyo.Constraint(model.conv, rule=Conv_DC_Limit_rule)
     model.Conv_AC_loss_constraint1= pyo.Constraint(model.conv,rule=Conv_AC_loss1)
     model.Conv_AC_loss_constraint2= pyo.Constraint(model.conv,rule=Conv_AC_loss2)
-    
-    
+
+
 
 def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
-    
+
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
-    
+
     u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
-    
+
     if grid.DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC = gen_DC_info
         u_min_dc, u_max_dc ,V_ini_DC,P_known_DC,price_dc  = DC_nodes_info
 
-    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
+    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info
     lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
     price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
 
@@ -1588,8 +1694,8 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
     "Price_Zone Variables"
     def Price_Zone_P_bounds(model, price_zone):
         nM = grid.Price_Zones[price_zone]
-        return (nM.PGL_min,nM.PGL_max)
-    
+        return (nM.min_PGL_min,nM.max_PGL_max)
+
     def lf_bounds(model, g):
         gen = grid.Generators[g]
         if gen.price_zone_link:
@@ -1614,8 +1720,8 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
     if grid.DCmode:
         model.price_dc = pyo.Var(model.nodes_DC,initialize=price_dc)
         model.lf_dc = pyo.Var (model.gen_DC,bounds=lf_bounds_DC,  initialize=lf_DC)
-        
-    
+
+
     model.price_zone_price = pyo.Var(model.M,initialize=0)
     model.price_zone_a = pyo.Param(model.M,initialize=price_zone_as,mutable=True)
     model.price_zone_b = pyo.Param(model.M,initialize=price_zone_bs,mutable=True)
@@ -1624,37 +1730,35 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
 
 def price_zone_constraints(model,grid,Price_Zone_info):
 
-    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info   
+    Price_Zone_Lists,Price_Zone_lim = Price_Zone_info
     lista_M, node2price_zone ,price_zone2node=Price_Zone_Lists
     price_zone_as,price_zone_bs,PGL_min, PGL_max = Price_Zone_lim
 
     "Price Zone equality constraints"
-    
+
     def price_zone_price_formula(model,price_zone):
         from .Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             return model.price_zone_price[price_zone]==2*model.price_zone_a[price_zone]*model.PN[price_zone]*grid.S_base+model.price_zone_b[price_zone]
         else :
             return pyo.Constraint.Skip
-    
+
     def node_price_set_AC(model,node):
-        try: 
+        if node in node2price_zone['AC']:
             price_zone=node2price_zone['AC'][node]
-            return model.price_zone_price[price_zone]== model.price[node] 
-        except:
-            return model.price[node]==0
+            return model.price_zone_price[price_zone]== model.price[node]
+        return model.price[node]==0
     def node_price_set_DC(model,node):
-        try: 
+        if node in node2price_zone['DC']:
             price_zone=node2price_zone['DC'][node]
-            return model.price_zone_price[price_zone]== model.price_dc[node] 
-        except:
-            return model.price_dc[node]==0
-    
-    
+            return model.price_zone_price[price_zone]== model.price_dc[node]
+        return model.price_dc[node]==0
+
+
     def P_price_zone(model,price_zone):
         Pm_AC=sum(model.P_known_AC[node]   + model.PGi_ren[node] + model.PGi_opt[node] for node in price_zone2node['AC'][price_zone])
         Pm_DC=sum(model.P_known_DC[node_DC]+ model.PGi_ren_DC[node_DC] for node_DC in price_zone2node['DC'][price_zone])
-        
+
         return model.PN[price_zone] ==Pm_AC+Pm_DC
 
     def PZ_cost_of_generation(model,price_zone):
@@ -1663,29 +1767,29 @@ def price_zone_constraints(model,grid,Price_Zone_info):
             return model.SocialCost[price_zone]== model.price_zone_a[price_zone]*(model.PN[price_zone]*grid.S_base)**2+model.price_zone_b[price_zone]*(model.PN[price_zone]*grid.S_base)
         else:
             return model.SocialCost[price_zone]==0
-        
+
     def Price_link(model,price_zone):
         from .Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             linked_price_zone=grid.Price_Zones[price_zone].linked_price_zone
-            if linked_price_zone is not None:   
+            if linked_price_zone is not None:
                 return model.price_zone_price[price_zone] == model.price_zone_price[linked_price_zone.price_zone_num]
-            else: 
+            else:
                 return pyo.Constraint.Skip
         else:
             return pyo.Constraint.Skip
-    
+
     # def MTDC_price_link(model,price_zone):
     #     from PyFlow_ACDC import MTDCPrice_Zone
-    #     if isinstance(grid.Price_Zones[price_zone], MTDCPrice_Zone): 
+    #     if isinstance(grid.Price_Zones[price_zone], MTDCPrice_Zone):
     #          pricing_strategy = grid.Price_Zones[price_zone].pricing_strategy
     #          linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[price_zone].linked_price_zones]
     #          if pricing_strategy == 'min':
     #             return model.price_zone_price[price_zone] <= min(model.price_zone_price[mkt] for mkt in linked_price_zones)  # Set upper limit to the minimum of linked price_zones
-    
+
     #          elif pricing_strategy == 'max':
     #             return model.price_zone_price[price_zone] >= max(model.price_zone_price[mkt] for mkt in linked_price_zones)  # Set lower limit to the maximum of linked price_zones
-    
+
     #          elif pricing_strategy == 'avg':
     #             return model.price_zone_price[price_zone] == sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
 
@@ -1694,7 +1798,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     #             return pyo.Constraint.Skip
     #     else:
     #         return pyo.Constraint.Skip
-        
+
     grid.OPF_Price_Zones_constraints_used=True
     model.price_zone_gen_link = pyo.ConstraintList()
     for node in grid.nodes_AC:  # Loop through all nodes
@@ -1702,101 +1806,90 @@ def price_zone_constraints(model,grid,Price_Zone_info):
         for g in node.connected_gen:  # Loop through all generators in the node
             if g.price_zone_link:
                 model.price_zone_gen_link.add(model.price[nAC] == model.lf[g.genNumber])
-    
-        
-        
+
+
+
     model.price_zone_price_constraint = pyo.Constraint(model.M,rule=price_zone_price_formula)
     model.price_zone_price_link_ = pyo.Constraint(model.M,rule=Price_link)
-    
-    model.price_zone_MTDC_link = pyo.ConstraintList()
-    
+
     from .Classes import MTDCPrice_Zone
-    # Step 1: Define sets for the MTDC price_zones and linked price_zones
-    model.MTDCPrice_Zones = pyo.Set(initialize=[m for m in model.M if isinstance(grid.Price_Zones[m], MTDCPrice_Zone)])
-    
-    for mtdc_price_zone in model.MTDCPrice_Zones:
-        linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[mtdc_price_zone].linked_price_zones]
-        
-        if not linked_price_zones:
-            break
-        # Define a set of linked price_zones for each MTDC price_zone
-        # model.LinkedPrice_Zones = pyo.Set(initialize=linked_price_zones)
-    
-        pricing_strategy = grid.Price_Zones[mtdc_price_zone].pricing_strategy
-    
-        if pricing_strategy == 'min':
-            grid.MixedBinCont=True
-            # Step 1: Create distinct binary variables for each MTDC price_zone and its linked price_zones
-            model.y_min = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=1)
+    mtdc_price_zone_ids = [m for m in model.M if isinstance(grid.Price_Zones[m], MTDCPrice_Zone)]
+    if mtdc_price_zone_ids:
+        model.price_zone_MTDC_link = pyo.ConstraintList()
+        model.MTDCPrice_Zones = pyo.Set(initialize=mtdc_price_zone_ids)
 
-            # Step 2: Ensure MTDC price_zone price is less than or equal to all linked price_zone prices
-            for mkt in linked_price_zones:
-                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] <= model.price_zone_price[mkt])
+        for mtdc_price_zone in model.MTDCPrice_Zones:
+            linked_price_zones = [mkt.price_zone_num for mkt in grid.Price_Zones[mtdc_price_zone].linked_price_zones]
 
-            # Step 3: Ensure that the MTDC price_zone price is equal to one of the linked price_zone prices
-            model.price_zone_MTDC_link.add(sum(model.y_min[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
+            if not linked_price_zones:
+                break
 
-            # Step 4: Link the binary variable to the actual price_zone prices
-            for mkt in linked_price_zones:
-                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_min[mkt, mtdc_price_zone])
+            pricing_strategy = grid.Price_Zones[mtdc_price_zone].pricing_strategy
 
-        elif pricing_strategy == 'max':
-            grid.MixedBinCont=True
-            # Step 2: Create binary variables indexed by both the linked price_zones and the MTDC price_zone
-            model.y_max = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=0)
-    
-            # Step 3: Ensure MTDC price_zone price is greater than or equal to all linked price_zone prices
-            for mkt in linked_price_zones:
-                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] >= model.price_zone_price[mkt])
-    
-            # Step 4: Ensure that the MTDC price_zone price is equal to one of the linked price_zone prices
-            model.price_zone_MTDC_link.add(sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
-    
-            # Step 5: Link the binary variable to the actual price_zone prices
-            for mkt in linked_price_zones:
-                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_max[mkt, mtdc_price_zone]/sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones))
-    
-        elif pricing_strategy == 'avg':
-            # MTDC price_zone price equals the average of linked price_zone prices
-            avg_expr = sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
-            model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == avg_expr)
-    
-        else:
-            raise ValueError(f"Unsupported pricing strategy: {pricing_strategy}")
-                
-                
-    
+            if pricing_strategy == PricingStrategy.MIN:
+                grid.MixedBinCont=True
+                model.y_min = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=1)
+
+                for mkt in linked_price_zones:
+                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] <= model.price_zone_price[mkt])
+
+                model.price_zone_MTDC_link.add(sum(model.y_min[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
+
+                for mkt in linked_price_zones:
+                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_min[mkt, mtdc_price_zone])
+
+            elif pricing_strategy == PricingStrategy.MAX:
+                grid.MixedBinCont=True
+                model.y_max = pyo.Var(linked_price_zones, model.MTDCPrice_Zones, domain=pyo.Binary, initialize=0)
+
+                for mkt in linked_price_zones:
+                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] >= model.price_zone_price[mkt])
+
+                model.price_zone_MTDC_link.add(sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones) == 1)
+
+                for mkt in linked_price_zones:
+                    model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == model.price_zone_price[mkt] * model.y_max[mkt, mtdc_price_zone]/sum(model.y_max[mkt, mtdc_price_zone] for mkt in linked_price_zones))
+
+            elif pricing_strategy == PricingStrategy.AVG:
+                avg_expr = sum(model.price_zone_price[mkt] for mkt in linked_price_zones) / len(linked_price_zones)
+                model.price_zone_MTDC_link.add(model.price_zone_price[mtdc_price_zone] == avg_expr)
+
+            else:
+                raise ValueError(f"Unsupported pricing strategy: {pricing_strategy}")
+
+
+
     model.price_constraint_AC = pyo.Constraint(model.nodes_AC,rule=node_price_set_AC)
     model.price_constraint_DC = pyo.Constraint(model.nodes_DC,rule=node_price_set_DC)
-    
+
     model.PN_constraint = pyo.Constraint(model.M,rule=P_price_zone)
     # model.PNL_constraint = pyo.Constraint(model.M,rule=P_price_zone_load)
     model.CG_constraint = pyo.Constraint(model.M,rule=PZ_cost_of_generation)
-        
+
     "Price_Zone inequality constraints"
-    
+
     def import_rule(model,price_zone):
         return model.PN[price_zone] >= model.PGL_min[price_zone]
     def export_rule(model,price_zone):
         return model.PN[price_zone] <= model.PGL_max[price_zone]
-    
-    # model.import_constraint = pyo.Constraint(model.M,rule=import_rule)
-    model.export_constraint = pyo.Constraint(model.M,rule=export_rule)    
+
+    model.import_constraint = pyo.Constraint(model.M,rule=import_rule)
+    model.export_constraint = pyo.Constraint(model.M,rule=export_rule)
 
 def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
     "Price Zone Parameters"
-    
+
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     if grid.ACmode:
         AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
-        
+
         lf,qf,fc,np_gen,lista_gen = gen_AC_info
-        
+
         u_min_ac,u_max_ac,V_ini_AC,Theta_ini, P_know,Q_know,price = AC_nodes_info
-        
+
         model.price  = pyo.Param(model.nodes_AC, initialize=price,mutable=True)
         model.lf = pyo.Param (model.gen_AC, initialize=lf, mutable=True)
-        
+
     if grid.DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC = gen_DC_info
@@ -1806,50 +1899,50 @@ def price_zone_parameters(model,grid,AC_info,DC_info,gen_info):
         model.lf_dc = pyo.Param (model.gen_DC, initialize=lf_DC, mutable=True)
 
 def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
-    
-    
-    
+
+
+
     from .ACDC_Static_TEP import get_TEP_variables
 
     tep_vars = get_TEP_variables(grid)
 
     # Extract converter variables
     np_conv = tep_vars['converters']['np_conv']
-    
+
     # Extract DC line variables
     NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
-    
+
     # Extract AC line variables
     NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
     REC_branch = tep_vars['ac_lines']['REC_branch']
     ct_ini = tep_vars['ac_lines']['ct_ini']
-    
+
     # Extract generator variables
     np_gen = tep_vars['generators']['np_gen']
     np_gen_DC = tep_vars['generators']['np_gen_DC']
     # Extract renewable source variables
     np_rsgen = tep_vars['ren_sources']['np_rsgen']
-   
-    
-   
+
+
+
     model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen,mutable=True)
     if grid.ACmode:
-        
+
         model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen,mutable=True)
-        
-        if grid.TEP_AC:    
-            model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC,mutable=True)    
+
+        if grid.TEP_AC:
+            model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC,mutable=True)
 
         if grid.REC_AC:
             model.rec_branch = pyo.Param(model.lines_AC_rec,initialize=REC_branch,mutable=True)
-        
+
         if grid.CT_AC:
             model.ct_branch = pyo.Param(model.lines_AC_ct,model.ct_set,initialize=ct_ini,mutable=True)
     if grid.DCmode:
         DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
         P_lineDC_limit,NP_lineDC    = DC_lines_info
         lista_DCDC = DCDC_info
-        
+
         model.np_gen_DC = pyo.Param(model.gen_DC,initialize=np_gen_DC,mutable=True)
         model.NumLinesDCP = pyo.Param(model.lines_DC,initialize=NP_lineDC,mutable=True)
 
@@ -1860,39 +1953,45 @@ def TEP_parameters(model,grid,AC_info,DC_info,Conv_info):
         model.np_conv = pyo.Param(model.conv,initialize=np_conv,mutable=True)
 
 
-def TEP_variables(model,grid):
+def TEP_variables(model,grid,n_init_install=None):
+    if n_init_install not in (None, "max", "mean"):
+        raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
 
     from .ACDC_Static_TEP import get_TEP_variables
+    from .ACDC_OPF import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 
     # Extract converter variables
     np_conv = tep_vars['converters']['np_conv']
-    np_conv_i = tep_vars['converters']['np_conv_i']
+    np_conv_model_first_guess = tep_vars['converters']['np_conv_model_first_guess']
     np_conv_max = tep_vars['converters']['np_conv_max']
     S_limit_conv = tep_vars['converters']['S_limit_conv']
-    
+
     # Extract DC line variables
     P_lineDC_limit = tep_vars['dc_lines']['P_lineDC_limit']
     NP_lineDC = tep_vars['dc_lines']['NP_lineDC']
-    NP_lineDC_i = tep_vars['dc_lines']['NP_lineDC_i']
+    NP_lineDC_model_first_guess = tep_vars['dc_lines']['NP_lineDC_model_first_guess']
     NP_lineDC_max = tep_vars['dc_lines']['NP_lineDC_max']
     Line_length = tep_vars['dc_lines']['Line_length']
-    
+
     # Extract AC line variables
     NP_lineAC = tep_vars['ac_lines']['NP_lineAC']
-    NP_lineAC_i = tep_vars['ac_lines']['NP_lineAC_i']
+    NP_lineAC_model_first_guess = tep_vars['ac_lines']['NP_lineAC_model_first_guess']
     NP_lineAC_max = tep_vars['ac_lines']['NP_lineAC_max']
     REC_branch = tep_vars['ac_lines']['REC_branch']
     ct_ini = tep_vars['ac_lines']['ct_ini']
-    
+
     # Extract generator variables
     np_gen = tep_vars['generators']['np_gen']
+    np_gen_model_first_guess = tep_vars['generators']['np_gen_model_first_guess']
     np_gen_max = tep_vars['generators']['np_gen_max']
     np_gen_DC = tep_vars['generators']['np_gen_DC']
-    np_gen_max_DC = tep_vars['generators']['np_gen_max_DC']    
+    np_gen_DC_model_first_guess = tep_vars['generators']['np_gen_DC_model_first_guess']
+    np_gen_max_DC = tep_vars['generators']['np_gen_max_DC']
 
     np_rsgen = tep_vars['ren_sources']['np_rsgen']
+    np_rsgen_model_first_guess = tep_vars['ren_sources']['np_rsgen_model_first_guess']
     np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
 
     "TEP variables"
@@ -1906,7 +2005,7 @@ def TEP_variables(model,grid):
                 return (np_rsgen[rs], np_rsgen_max[rs])
             else:
                 return (np_rsgen[rs], np_rsgen[rs])
-        model.np_rsgen = pyo.Var(model.ren_sources,within=pyo.NonNegativeIntegers,bounds=np_rsgen_bounds,initialize=np_rsgen)
+        model.np_rsgen = pyo.Var(model.ren_sources,within=pyo.NonNegativeIntegers,bounds=np_rsgen_bounds,initialize=np_rsgen_model_first_guess)
         model.np_rsgen_base = pyo.Param(model.ren_sources,initialize=np_rsgen)
     elif hasattr(model,'ren_sources'):
         model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen)
@@ -1920,12 +2019,12 @@ def TEP_variables(model,grid):
                 return (np_gen[g], np_gen_max[g])
             else:
                 return (np_gen[g], np_gen[g])
-    
+
         if grid.GPR:
 
             def P_gen_lower_bound_rule(model, g):
                 gen = grid.Generators[g]
-                return (gen.Min_pow_gen * model.np_gen[g] <= model.PGi_gen[g])
+                return (get_gen_p_min_eff(gen, model.np_gen[g], model.P_load_eff[g]) <= model.PGi_gen[g])
 
             def Q_gen_lower_bound_rule(model, g):
                 gen = grid.Generators[g]
@@ -1940,8 +2039,8 @@ def TEP_variables(model,grid):
                 return (model.QGi_gen[g] <= gen.Max_pow_genR * model.np_gen[g])
 
 
-            model.np_gen = pyo.Var(model.gen_AC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen)
-            model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)  
+            model.np_gen = pyo.Var(model.gen_AC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen_model_first_guess)
+            model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
 
             model.PGi_lower_bound = pyo.Constraint(model.gen_AC,rule=P_gen_lower_bound_rule)
             model.QGi_lower_bound = pyo.Constraint(model.gen_AC,rule=Q_gen_lower_bound_rule)
@@ -1951,7 +2050,7 @@ def TEP_variables(model,grid):
 
         elif hasattr(model,'gen_AC'):
             model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
-            
+
 
 
 
@@ -1962,8 +2061,8 @@ def TEP_variables(model,grid):
                     return (NP_lineAC[line], NP_lineAC[line])
                 else:
                     return (NP_lineAC[line], NP_lineAC_max[line])
-            
-            model.NumLinesACP = pyo.Var(model.lines_AC_exp, within=pyo.NonNegativeIntegers,bounds=NPline_bounds_AC,initialize=NP_lineAC_i)
+
+            model.NumLinesACP = pyo.Var(model.lines_AC_exp, within=pyo.NonNegativeIntegers,bounds=NPline_bounds_AC,initialize=NP_lineAC_model_first_guess)
             model.NumLinesACP_base  =pyo.Param(model.lines_AC_exp,initialize=NP_lineAC)
 
         if grid.REC_AC:
@@ -1985,7 +2084,7 @@ def TEP_variables(model,grid):
                 return (np_gen_DC[g],np_gen_max_DC[g])
             else:
                 return (np_gen_DC[g],np_gen_DC[g])
-        
+
         if grid.GPR:
 
             def P_gen_DC_lower_bound_rule(model, g):
@@ -1995,10 +2094,10 @@ def TEP_variables(model,grid):
                 gen = grid.Generators_DC[g]
                 return (model.PGi_gen_DC[g] <= gen.Max_pow_gen * model.np_gen_DC[g])
 
-    
 
-            model.np_gen_DC = pyo.Var(model.gen_DC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds_DC,initialize=np_gen_DC)
-            model.np_gen_DC_base = pyo.Param(model.gen_DC,initialize=np_gen_DC)  
+
+            model.np_gen_DC = pyo.Var(model.gen_DC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds_DC,initialize=np_gen_DC_model_first_guess)
+            model.np_gen_DC_base = pyo.Param(model.gen_DC,initialize=np_gen_DC)
 
             model.PGi_lower_bound = pyo.Constraint(model.gen_DC,rule=P_gen_DC_lower_bound_rule)
             model.PGi_upper_bound = pyo.Constraint(model.gen_DC,rule=P_gen_DC_upper_bound_rule)
@@ -2006,17 +2105,31 @@ def TEP_variables(model,grid):
 
         elif hasattr(model,'gen_DC'):
             model.np_gen_DC = pyo.Param(model.gen_DC,initialize=np_gen_DC)
-            
+
         def NPline_bounds(model, line):
             element=grid.lines_DC[line]
             if element.np_line_opf==False:
                 return (NP_lineDC[line], NP_lineDC[line])
             else:
                 return (NP_lineDC[line], NP_lineDC_max[line])
-        
-        model.NumLinesDCP = pyo.Var(model.lines_DC, within=pyo.NonNegativeIntegers,bounds=NPline_bounds,initialize=NP_lineDC_i)
+
+        def NP_lineDC_init(model, line):
+            if n_init_install == "max":
+                _, ub = NPline_bounds(model, line)
+                return ub
+            if n_init_install == "mean":
+                lb, ub = NPline_bounds(model, line)
+                return int(round((lb + ub) / 2.0))
+            return NP_lineDC_model_first_guess[line]
+
+        model.NumLinesDCP = pyo.Var(
+            model.lines_DC,
+            within=pyo.NonNegativeIntegers,
+            bounds=NPline_bounds,
+            initialize=NP_lineDC_init,
+        )
         model.NumLinesDCP_base  =pyo.Param(model.lines_DC,initialize=NP_lineDC)
-       
+
     if grid.ACmode and grid.DCmode:
         def NPconv_bounds(model, conv):
             element=grid.Converters_ACDC[conv]
@@ -2024,19 +2137,33 @@ def TEP_variables(model,grid):
                 return (np_conv[conv], np_conv[conv])
             else:
                 return (np_conv[conv], np_conv_max[conv])
-        
-        model.np_conv = pyo.Var(model.conv, within=pyo.NonNegativeIntegers,bounds=NPconv_bounds,initialize=np_conv_i)
+
+        def NP_conv_init(model, conv):
+            if n_init_install == "max":
+                _, ub = NPconv_bounds(model, conv)
+                return ub
+            if n_init_install == "mean":
+                lb, ub = NPconv_bounds(model, conv)
+                return int(round((lb + ub) / 2.0))
+            return np_conv_model_first_guess[conv]
+
+        model.np_conv = pyo.Var(
+            model.conv,
+            within=pyo.NonNegativeIntegers,
+            bounds=NPconv_bounds,
+            initialize=NP_conv_init,
+        )
         model.np_conv_base  =pyo.Param(model.conv,initialize=np_conv)
 
 
-def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
-    
-    
-    
-    
+def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
+
+
+
+
     grid.OPF_run=True
 
-    #Generation 
+    #Generation
     if grid.ACmode:
         PGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen.items()}
         QGen_values  = {k: np.float64(pyo.value(v)) for k, v in model.QGi_gen.items()}
@@ -2047,10 +2174,10 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             gen_active_values = {k: 1 for k in PGen_values.keys()}
     if grid.DCmode:
         PGen_DC_values = {k: np.float64(pyo.value(v)) for k, v in model.PGi_gen_DC.items()}
-    
+
     gamma_values = {k: np.float64(pyo.value(v)) for k, v in model.gamma.items()}
     Qren_values  = {k: np.float64(pyo.value(v)) for k, v in model.Q_renSource.items()}
-    
+
     def process_element(element):
         if hasattr(element, 'genNumber'):  # Generator
             element.PGen = PGen_values[element.genNumber]*gen_active_values[element.genNumber]
@@ -2064,11 +2191,11 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
 
     # Combine Generators and Renewable Sources into one iterable
     elements = grid.Generators + grid.RenSources + grid.Generators_DC
-    
-    # Parallelize processing    
+
+    # Parallelize processing
     with ThreadPoolExecutor() as executor:
         executor.map(process_element, elements)
-        
+
     if Price_Zones:
         # Parallelize price zone processing
         pz_price = {k: np.float64(pyo.value(v)) for k, v in model.price_zone_price.items()}
@@ -2083,15 +2210,15 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             executor.map(process_price_zone, grid.Price_Zones)
 
 
-    
+
     #AC bus
     if grid.ACmode:
-            
+
         grid.V_AC = np.zeros(grid.nn_AC)
         grid.Theta_V_AC = np.zeros(grid.nn_AC)
 
         V_AC_values     = {k: np.float64(pyo.value(v)) for k, v in model.V_AC.items()}
-        theta_AC_values = {k: np.float64(pyo.value(v)) for k, v in model.thetha_AC.items()}
+        theta_AC_values = {k: np.float64(pyo.value(v)) for k, v in model.theta_AC.items()}
         PGi_opt_values  = {k: np.float64(pyo.value(v)) for k, v in model.PGi_opt.items()}
         QGi_opt_values  = {k: np.float64(pyo.value(v)) for k, v in model.QGi_opt.items()}
         PGi_ren_values  = {k: np.float64(pyo.value(v)) for k, v in model.PGi_ren.items()}
@@ -2105,28 +2232,33 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             nAC = node.nodeNumber
             node.V = V_AC_values[nAC]
             node.theta = theta_AC_values[nAC]
-            
+
             node.PGi_opt = PGi_opt_values[nAC]
             node.QGi_opt = QGi_opt_values[nAC]
             node.PGi_ren = PGi_ren_values[nAC]
             node.QGi_ren = QGi_ren_values[nAC]
-            
+
             if grid.DCmode:
                 node.P_s = P_conv_AC_values[nAC]
                 node.Q_s = Q_conv_AC_values[nAC]
-            
+
             grid.V_AC[nAC] = node.V
             grid.Theta_V_AC[nAC] = node.theta
-            
-            
+
+
         with ThreadPoolExecutor() as executor:
             executor.map(process_node_AC, grid.nodes_AC)
-        
+
         if grid.GPR:
             np_gen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_gen.items()}
             for gen in grid.Generators:
                 gen.np_gen = np_gen_values[gen.genNumber]
-        
+
+        if grid.rs_GPR:
+            np_rsgen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_rsgen.items()}
+            for rs in grid.RenSources:
+                rs.np_rsgen = np_rsgen_values[rs.rsNumber]
+
         if grid.TEP_AC:
             lines_AC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}
             lines_AC_TEP_fromP = {k: np.float64(pyo.value(v)) for k, v in model.exp_PAC_from.items()}
@@ -2153,11 +2285,11 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             lines_AC_REC_fromQ = {k: {state: np.float64(pyo.value(model.rec_QAC_from[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
             lines_AC_REC_toQ = {k: {state: np.float64(pyo.value(model.rec_QAC_to[k, state])) for state in model.branch_states} for k in model.lines_AC_rec}
             lines_AC_REC_P_loss = {k: np.float64(pyo.value(v)) for k, v in model.rec_PAC_line_loss.items()}
-            
-            
+
+
             def process_line_AC_REP(line):
                 l = line.lineNumber
-                line.rec_branch = True if lines_AC_REP[l] >= 0.99999 else False
+                line.rec_branch = True if lines_AC_REP[l] >= BINARY_THRESHOLD else False
                 line.P_loss = lines_AC_REC_P_loss[l]
                 state = 1 if line.rec_branch else 0
                 line.fromS = (lines_AC_REC_fromP[l][state] + 1j*lines_AC_REC_fromQ[l][state])
@@ -2165,19 +2297,19 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
                 line.loss = line.fromS + line.toS
 
             with ThreadPoolExecutor() as executor:
-                executor.map(process_line_AC_REP, grid.lines_AC_rec)    
+                executor.map(process_line_AC_REP, grid.lines_AC_rec)
 
-        if grid.CT_AC:   
+        if grid.CT_AC:
             lines_AC_CT = {k: {ct: np.float64(pyo.value(model.ct_branch[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_fromP = {k: {ct: np.float64(pyo.value(model.ct_PAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_toP = {k: {ct: np.float64(pyo.value(model.ct_PAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_fromQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_from[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_toQ = {k: {ct: np.float64(pyo.value(model.ct_QAC_to[k, ct])) for ct in model.ct_set} for k in model.lines_AC_ct}
             lines_AC_CT_loss = {k: np.float64(pyo.value(v)) for k, v in model.ct_PAC_line_loss.items()}
-            
+
             def process_line_AC_CT(line):
                 l = line.lineNumber
-                ct_selected = [lines_AC_CT[l][ct] >= 0.90  for ct in model.ct_set]
+                ct_selected = [lines_AC_CT[l][ct] >= CT_SELECTION_THRESHOLD  for ct in model.ct_set]
                 if any(ct_selected):
                     line.active_config = np.where(ct_selected)[0][0]
                     ct = list(model.ct_set)[line.active_config]
@@ -2191,9 +2323,9 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
                     Pto   = 0
                     Qfrom = 0
                     Qto   = 0
-                
-                
-                
+
+
+
                 line.fromS = (Pfrom + 1j*Qfrom)
                 line.toS = (Pto + 1j*Qto)
                 line.loss = line.fromS + line.toS
@@ -2202,7 +2334,7 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_AC_CT, grid.lines_AC_ct)
 
-        
+
 
         if grid.TAP_tf:
             tf_PAC_to_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_PAC_to.items()}
@@ -2211,7 +2343,7 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             tf_QAC_from_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_QAC_from.items()}
             tf_m_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_m.items()}
             tf_loss_values = {k: np.float64(pyo.value(v)) for k, v in model.tf_PAC_line_loss.items()}
-            
+
             def process_line_AC_tf(tf):
                 tfN = tf.trafNumber
                 tf.P_loss = tf_loss_values[tfN]
@@ -2222,38 +2354,38 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
 
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_AC_tf, grid.lines_AC_tf)
-        
+
         grid.create_Ybus_AC()
-    
+
         Pf = np.zeros((grid.nn_AC, 1))
         Qf = np.zeros((grid.nn_AC, 1))
-        
+
 
         G = np.real(grid.Ybus_AC_full)
         B = np.imag(grid.Ybus_AC_full)
         V = grid.V_AC
         Theta = grid.Theta_V_AC
-        
+
         # Compute differences in voltage angles
         Theta_diff = Theta[:, None] - Theta
-        
+
         # Calculate power flow
         Pf = (V[:, None] * V * (G * np.cos(Theta_diff) + B * np.sin(Theta_diff))).sum(axis=1)
         Qf = (V[:, None] * V * (G * np.sin(Theta_diff) - B * np.cos(Theta_diff))).sum(axis=1)
-        
-        
+
+
 
         for node in grid.nodes_AC:
             i = node.nodeNumber
             node.P_INJ = Pf[i]
             node.Q_INJ = Qf[i]
-                    
-        grid.Line_AC_calc() 
-        
+
+        grid.line_ac_calc()
+
     if grid.DCmode:
-        
+
         # DC nodes
-        grid.V_DC = np.zeros(grid.nn_DC)  
+        grid.V_DC = np.zeros(grid.nn_DC)
         V_DC_values       = {k: np.float64(pyo.value(v)) for k, v in model.V_DC.items()}
         if grid.ACmode:
             P_conv_DC_values  = {k: np.float64(pyo.value(v)) for k, v in model.P_conv_DC.items()}
@@ -2263,8 +2395,8 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
         def process_node_DC(node):
             nDC = node.nodeNumber
             node.V        = V_DC_values[nDC]
-            
-            
+
+
             grid.V_DC[nDC]= node.V
 
             if grid.ACmode:
@@ -2286,7 +2418,8 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             with ThreadPoolExecutor() as executor:
                 executor.map(process_line_DC_TEP, grid.lines_DC)
 
-        
+            grid.create_Ybus_DC()
+
         if grid.CDC:
             P_DCDC_to_values = {k: np.float64(pyo.value(v)) for k, v in model.cn_DCDC_to.items()}
             P_DCDC_from_values = {k: np.float64(pyo.value(v)) for k, v in model.cn_DCDC_from.items()}
@@ -2299,7 +2432,7 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             with ThreadPoolExecutor() as executor:
                 executor.map(process_conv_DCDC, grid.Converters_DCDC)
 
-        grid.Line_DC_calc()
+        grid.line_dc_calc()
 
     if grid.ACmode and grid.DCmode:
         # converters
@@ -2318,12 +2451,12 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             nconv = conv.ConvNumber
             if TEP:
                 conv.np_conv = nconv_TEP[nconv]
-            conv.P_DC      = P_conv_DC_conv_values[conv.Node_DC.nodeNumber] 
             conv.P_AC      = P_conv_s_AC_values[nconv] * conv.np_conv
             conv.Q_AC      = Q_conv_s_AC_values[nconv] * conv.np_conv
             conv.Pc        = P_conv_c_AC_values[nconv] * conv.np_conv
             conv.Qc        = Q_conv_c_AC_values[nconv] * conv.np_conv
             conv.P_loss    = P_conv_loss_values[nconv] * conv.np_conv
+            conv.P_DC      = -(conv.Pc + conv.P_loss)
             conv.P_loss_tf = abs(conv.P_AC - conv.Pc)
             conv.U_c       = Uc_values[nconv]
             conv.U_f       = Uf_values[nconv]
@@ -2331,12 +2464,11 @@ def ExportACDC_NLmodel_toPyflowACDC(model,grid,Price_Zones,TEP=False):
             conv.th_c      = Uc_values[nconv]
             conv.th_f      = Uf_values[nconv]
             conv.th_s      = theta_AC_values[conv.Node_AC.nodeNumber]
-            
+
 
         with ThreadPoolExecutor() as executor:
             executor.map(process_converter, grid.Converters_ACDC)
-            
-    
-        
 
-    
+
+
+

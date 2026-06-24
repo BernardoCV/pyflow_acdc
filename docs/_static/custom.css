@@ -1,19 +1,24 @@
-/* Light mode background override */
-[data-theme="light"] {
-    --color-background-primary: #e8e8e8;  /* Main background */
-    --color-background-secondary: #d0d0d0;  /* Secondary background */
-    --color-content-background: #bdb9b902;  /* Content area background (keeping transparent) */
-    --color-code-background: #f8f8f818;     /* Code block background */
-    --color-code-border: #e1e4e531;         /* Code block border */
-    --color-code-figure: #3a3939;            /* Darker image color */
+/* Light mode: SCADA panel sidebar hover */
+[data-theme="light"] .sidebar-tree .reference.internal:hover {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        #2a4055 var(--sidebar-item-spacing-horizontal, 1rem),
+        #2a4055 100%
+    );
 }
 
-/* Figure background styling */
-
-[data-theme="light"] figure,
-[data-theme="auto"] figure {
-    background-color: #3a393969;  /* Slightly darker background for figures */
-    padding: 0.5rem 0rem;
-    border-radius: 0px;
+/* Center figures (including themed only-light / only-dark pairs) */
+figure.align-center {
+    text-align: center;
 }
 
+figure.align-center img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+figure.align-center .image-reference {
+    display: inline-block;
+}

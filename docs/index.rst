@@ -3,20 +3,20 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. figure:: images/logo_dark.svg
+.. themed-figure:: pyflowacdc_logo
    :align: right
    :width: 300px
 
-PyFlow ACDC
+pyflow-acdc
 ===========
 
-Welcome to PyFlow ACDC's documentation!
+Welcome to the pyflow-acdc documentation!
 
-This is a  python-based tool for the design and analysis of hybrid AC/DC grids
+This is a python-based tool for the design and analysis of hybrid AC/DC grids
 
-PyFlow ACDC is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_.
+pyflow-acdc is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_ by `CITCEA-UPC <https://www.linkedin.com/company/citcea>`_ in collaboration with `Youwind <https://youwindrenewables.com/>`_.
 
-.. figure:: images/ADOreD_logo_colours.png
+.. figure:: images/logos/ADOreD_logo_colours.png
    :align: right
    :width: 250px
 
@@ -46,6 +46,7 @@ API Documentation
    api/grid
    api/csv_import
    api/grid_mod
+   api/cable_database
    api/grid_analysis
    api/results
 
@@ -62,6 +63,7 @@ API Documentation
    :caption: Time Series & Analysis:
 
    api/ts_mod
+   api/clustering
    api/ts
    api/market_coef
 
@@ -70,9 +72,11 @@ API Documentation
    :caption: Transmission Expansion Planning:
 
    api/tep
+   api/sequential_step
    api/tep_pymoo
    api/tep_dynamic
    api/wf_array
+   
 
 .. toctree::
    :maxdepth: 3
@@ -83,6 +87,16 @@ API Documentation
    api/folium
    api/export_files
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Development:
+
+   architecture
+   testing
+   api/constants
+   api/solver_utils
+   api/windfarm_loader
+
 Quick Start
 -----------
 
@@ -90,18 +104,10 @@ Basic installation::
 
     pip install pyflow-acdc
 
-Basic usage::
+.. literalinclude:: ../pyflow_tests/doc_examples/index/basic_usage.py
+   :language: python
+   :lines: 2-
 
-   import pyflow_acdc as pyf
-
-   #Use pre saved grids to familiarize yourself with the package
-   [grid,res]=pyf.PEI_grid()
-
-   pyf.ACDC_sequential(grid,QLimit=False)
-
-   
-   res.All()
-   
 Indices and tables
 ==================
 

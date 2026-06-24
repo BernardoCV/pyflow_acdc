@@ -45,9 +45,9 @@ def run_test():
     res= pyf.Results(grid,decimals=3)
 
 
-    pyf.ACDC_sequential(grid)
+    pyf.acdc_sequential(grid)
 
-    res.All()
+    res.all()
 
 
 def test_grid_creation():
