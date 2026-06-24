@@ -2,19 +2,26 @@
 """Run all examples in doc_examples/dash/."""
 
 from pyflow_tests.run_doc_examples import run_doc_examples
+from pyflow_tests._test_solver_deps import (
+    dash_missing_for_run_test,
+    ipopt_missing_for_run_test,
+    require_dash,
+    require_ipopt,
+)
 
 FOLDER = "dash"
 
 
 def test_docs_dash():
+    require_dash()
+    require_ipopt()
     run_test()
 
 
 def run_test():
-    try:
-        import dash  # noqa: F401
-    except ImportError:
-        print("dash is not installed...")
+    if dash_missing_for_run_test():
+        return
+    if ipopt_missing_for_run_test():
         return
     run_doc_examples(FOLDER)
     print(f"✓ {FOLDER} doc examples passed")
