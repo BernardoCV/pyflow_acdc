@@ -48,6 +48,22 @@ def require_pyomo():
     _require(_pyomo_available, "pyomo is not installed")
 
 
+def ipopt_available():
+    if not _pyomo_available():
+        return False
+    return pyf.is_pyomo_solver_available("ipopt")
+
+
+def ipopt_missing_for_run_test():
+    """Return True when Ipopt is absent (``run_test`` should return early)."""
+    return _missing_for_run_test(ipopt_available, "Skipped: ipopt is not installed")
+
+
+def require_ipopt():
+    require_pyomo()
+    _require(ipopt_available, "ipopt is not installed")
+
+
 def _folium_available():
     try:
         __import__("folium")
