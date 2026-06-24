@@ -232,17 +232,30 @@ pip install dash
 ## Test
 
 Run the test suite:
+
 ```bash
 pyflow-acdc-test
 ```
 
-**Test Flags:**
+**Test flags** (see also `docs/testing.rst` and `CONTRIBUTING.md`):
+
 ```bash
---quick         # Quick tests only
+--quick         # Fast subset (run before opening a PR)
+--docs          # Documentation literalinclude examples
 --tep           # TEP tests only
 --opf           # OPF tests only
---show-output    # All tests with output
+--show-output   # Stream each case's output
 ```
+
+**Coverage** (maintained snapshot for contributors):
+
+```bash
+pip install -e ".[tests]"
+pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
+```
+
+See [`TEST_COVERAGE.md`](TEST_COVERAGE.md) for the current overall % and per-module gaps.
+Update that file and the coverage badge in this README when tests change materially.
 ## Documentation
 Online documentation can be found at:
 

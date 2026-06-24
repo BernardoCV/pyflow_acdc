@@ -110,5 +110,5 @@ Output is written to `docs/_build/html/index.html`.
 1. Create a feature branch off `main`.
 2. Keep PRs focused; describe the motivation ("why") in the description.
 3. Ensure tests pass and add/adjust tests for behavioural changes.
-4. Update [`TEST_COVERAGE.md`](TEST_COVERAGE.md) when tests change (see above).
+4. Update [`TEST_COVERAGE.md`](TEST_COVERAGE.md) and the README coverage badge when tests change (see above).
 5. To merge into `main`, contact the repository owner.

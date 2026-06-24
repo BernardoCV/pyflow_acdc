@@ -84,6 +84,8 @@ everything else builds on.
   aggregation.
 - **`Time_series_clustering.py`** — Representative-period clustering of
   time-series inputs.
+- **`Market_Coeff.py`** — Price-zone quadratic cost curves from EPEX order books
+  and ENTSO-E day-ahead CSVs (`price_zone_coef_data`, `clean_entsoe_data`, …).
 
 ## Output and visualisation
 

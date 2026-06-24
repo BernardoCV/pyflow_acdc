@@ -18,7 +18,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   for backward compatibility.
 - **`TEST_COVERAGE.md`**: shipped coverage snapshot (overall %, missing lines,
   function-level gaps with **Tested / Partial / Not tested** status). PRs that
-  change tests must update it (see `CONTRIBUTING.md`).
+  change tests must update it (see `CONTRIBUTING.md`). README coverage badge
+  tracks the same overall %.
 - **Tests**: `test_solver_utils.py` (mocked Pyomo/OR-Tools solver probes),
   `test_opf_result_helpers.py` (OPF result helpers after Ipopt solve),
   `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`),

@@ -46,6 +46,10 @@ Coverage::
 
     pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing -q
 
+The shipped snapshot lives in ``TEST_COVERAGE.md`` at the repository root (overall %,
+per-module miss counts, missing lines). Pull requests that change tests must update
+that file and the coverage badge in ``README.md`` (see ``CONTRIBUTING.md``).
+
 TEP tests use Ipopt by default (via ``tep_solver()``). For a full MINLP solve on
 one file, opt in to Bonmin::
 
