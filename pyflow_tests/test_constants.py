@@ -178,6 +178,7 @@ ALL_CASES = [
     "test_case39acdc_OPF.py",
     "test_case24_3zones_acdc_OPF.py",
     "test_matlab_loader.py",
+    "test_market_coeff.py",
     "test_folium.py",
     "test_plot.py",
     "test_case24_OPF.py",
