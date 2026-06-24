@@ -24,8 +24,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package
-        run: python -m pip install -e .
+      - name: Install package and test dependencies
+        run: python -m pip install -e ".[tests,OPF]"
 
       - name: Run quick test suite
         run: pyflow-acdc-test --quick
@@ -61,7 +61,7 @@ jobs:
           python-version: "3.10.20"
 
       - name: Install package and test dependencies
-        run: python -m pip install -e ".[tests,OPF]"
+        run: python -m pip install -e ".[tests,All]"
 
       - name: Run tests with coverage
         run: pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=xml -q
