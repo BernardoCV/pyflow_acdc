@@ -4,7 +4,6 @@ import time
 
 import pyflow_acdc as pyf
 import pyomo.environ as pyo
-import pytest
 
 from pyflow_acdc.Array_OPT import _create_master_problem_pyomo
 from pyflow_acdc.constants import MIPBackend
@@ -129,7 +128,6 @@ def _print_result(mip_solver, result):
     )
 
 
-@pytest.mark.slow
 def test_unified_array_pyomo_alpha_ventus():
     require_pyomo()
     require_dill()
