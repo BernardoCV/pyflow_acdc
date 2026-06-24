@@ -44,9 +44,29 @@ Tests that require an unavailable optional dependency are reported as
 PR, and run the relevant `--opf` / `--tep` subset if you touched those areas.
 
 When adding a new test case, add the file to the appropriate list
-(`ALL_CASES`, `QUICK_CASES`, `OPF_CASES`, `TEP_CASES`) in
-`pyflow_tests/run_tests.py`, and expose a top-level `run_test()` function in
+(`ALL_CASES`, `QUICK_CASES`, `OPF_CASES`, `TEP_CASES`, `DOCS_CASES`) in
+`pyflow_tests/test_constants.py`, and expose a top-level `run_test()` function in
 the case module.
+
+## Test coverage
+
+The package maintains a coverage snapshot in [`TEST_COVERAGE.md`](TEST_COVERAGE.md)
+(overall %, per-module miss counts, missing lines, and public API functions
+without dedicated tests).
+
+**Pull requests that add, remove, or materially change tests must update
+`TEST_COVERAGE.md`** — at minimum the header stats and any module sections
+affected by your change. Regenerate with:
+
+```bash
+pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
+```
+
+Copy updated totals and `Missing` line ranges from the report into the matching
+sections. Update the **Functions not covered** table and any **function / block**
+rows whose status changed (mark **Tested**, **Partial**, or **Not tested**).
+If you add tests for previously untested public API, remove or adjust the entry
+in **Functions not covered**.
 
 ## Coding conventions
 
@@ -88,4 +108,5 @@ Output is written to `docs/_build/html/index.html`.
 1. Create a feature branch off `main`.
 2. Keep PRs focused; describe the motivation ("why") in the description.
 3. Ensure tests pass and add/adjust tests for behavioural changes.
-4. To merge into `main`, contact the repository owner.
+4. Update [`TEST_COVERAGE.md`](TEST_COVERAGE.md) when tests change (see above).
+5. To merge into `main`, contact the repository owner.

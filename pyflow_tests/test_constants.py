@@ -180,6 +180,7 @@ ALL_CASES = [
     "test_opf_result_helpers.py",
     "test_matlab_loader.py",
     "test_market_coeff.py",
+    "test_solver_utils.py",
     "test_folium.py",
     "test_plot.py",
     "test_case24_OPF.py",
@@ -223,6 +224,7 @@ QUICK_CASES = [
     "test_model_build_only.py",
     "test_plot.py",
     "test_OPF_quick_runner.py",
+    "test_solver_utils.py",
 ]
 
 TEP_CASES = [

@@ -3,7 +3,7 @@ Export Files Module
 
 This module provides functions for exporting grid data to various file formats.
 
-Functions are found in `pyflow_acdc.Export_files` and `pyflow_acdc.ACDC_OPF`.
+Functions are found in `pyflow_acdc.Export_files` and `pyflow_acdc.pyomo_model_solve`.
 
 Grid Data Export
 ----------------

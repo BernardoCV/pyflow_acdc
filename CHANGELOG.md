@@ -11,6 +11,19 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`pyomo_model_solve.py`**: extracted generic Pyomo solve layer from
+  `ACDC_OPF.py` (`pyomo_model_solve`, log parsers, feasibility checks,
+  `reset_to_initialize`, `export_solver_progress_to_excel`). `ACDC_OPF` re-exports
+  for backward compatibility.
+- **`TEST_COVERAGE.md`**: shipped coverage snapshot (overall %, missing lines,
+  function-level gaps with **Tested / Partial / Not tested** status). PRs that
+  change tests must update it (see `CONTRIBUTING.md`).
+- **Tests**: `test_solver_utils.py` (mocked Pyomo/OR-Tools solver probes),
+  `test_opf_result_helpers.py` (OPF result helpers after Ipopt solve),
+  `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`).
+- **`ipopt_available` / `require_ipopt`** helpers in `pyflow_tests/_test_solver_deps.py`.
+
 ## [0.6.0] - 2026-06-16
 
 ### Added

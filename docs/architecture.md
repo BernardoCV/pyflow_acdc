@@ -10,6 +10,7 @@ reference (see the API pages for signatures).
 constants  →  Classes  →  grid_creator / grid_modifications / grid_analysis
                   │
                   ├─→  ACDC_PF                      (power flow)
+                  ├─→  pyomo_model_solve              (generic Pyomo solve)
                   ├─→  ACDC_OPF (+ NL / L models)   (optimal power flow)
                   ├─→  ACDC_*_TEP / Array_OPT        (planning / sizing)
                   ├─→  Time_series(_clustering)      (time-series studies)
@@ -47,8 +48,13 @@ everything else builds on.
   `dc_power_flow`, `acdc_sequential` (aliases `Power_flow`, etc. remain for
   backward compatibility). Pure Numpy no pyomo needed.
 - **`ACDC_OPF.py`** — OPF orchestration: `optimal_pf` / `optimal_l_pf`,
-  objective assembly (`obj_w_rule`, `opf_obj`), solve (`pyomo_model_solve`),
-  and result translation back onto the `Grid`.
+  objective assembly (`obj_w_rule`, `opf_obj`), result translation back onto the
+  `Grid` (`translate_pyf_opf`, `opf_line_res`, …). Calls
+  `pyomo_model_solve` for the actual solve.
+- **`pyomo_model_solve.py`** — Generic Pyomo solve layer shared by OPF, TEP,
+  array, and time-series drivers: `pyomo_model_solve`, solver log parsers,
+  feasibility checks, `reset_to_initialize`, `export_solver_progress_to_excel`.
+  Distinct from `solver_utils.py` (environment probe only).
 - **`ACDC_OPF_NL_model.py`** — Builds the non-linear Pyomo model (full AC/DC
   physics, converters, price zones, optional TEP variables).
 - **`AC_OPF_L_model.py`** — Builds the linear (DC-style) Pyomo model with
@@ -92,7 +98,8 @@ everything else builds on.
 
 - **`windfarm_loader.py`** — Load a bundled wind-farm case grid plus its
   GeoJSON context.
-- **`solver_utils.py`** — Detect available Pyomo solvers.
+- **`solver_utils.py`** — Detect available Pyomo solvers and OR-Tools backends
+  (does not run models).
 - **`__init__.py`** — Public API surface (`__all__`), optional-dependency
   guards, and the `cases` example-grid loader.
 
