@@ -157,6 +157,7 @@ DOCS_CASES = [
     "test_docs_modelling_dc.py",
     "test_docs_results.py",
     "test_docs_ts.py",
+    "test_docs_clustering.py",
     "test_docs_plotting.py",
     "test_docs_tep_pymoo.py",
     "test_docs_wf_array.py",

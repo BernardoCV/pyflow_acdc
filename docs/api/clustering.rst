@@ -13,15 +13,10 @@ Workflow guides: :doc:`../usage_tep` (TEP and MS TEP), :doc:`../usage_mp_tep`
 ----------------------
 
 TEP functions accept a ``clustering_options`` dict, normally processed by
-:func:`~pyflow_acdc.cluster_analysis`. The multi-scenario TEP doc example
-(:file:`pyflow_tests/doc_examples/tep/02_multi_scenario_tep.py`) uses:
-
-.. code-block:: python
-
-   clustering_options = {
-       "n_clusters": 4,
-       "precomputed_clusters_path": "examples/North_Sea_grid_data/clusters_kmeans_medoids_k4.json",
-   }
+:func:`~pyflow_acdc.cluster_analysis`. To reload saved clusters without
+re-running the algorithms, pass ``precomputed_clusters_path`` (see
+:ref:`clustering_example_precomputed` and the MS TEP example in
+:file:`pyflow_tests/doc_examples/tep/02_multi_scenario_tep.py`).
 
 Use with ``years_data="23,24"`` on ``NS_MTDC_2025`` so time-series length matches the
 JSON payload.
@@ -83,6 +78,33 @@ high-CV or highly correlated columns (``thresholds``,
 Set ``print_details=True`` while tuning a case; set it ``False`` once options
 are fixed.
 
+Examples
+--------
+
+Runnable scripts live in ``pyflow_tests/doc_examples/clustering/`` and are executed
+by ``test_docs_clustering.py``.
+
+.. _clustering_example_precomputed:
+
+Precomputed clusters
+~~~~~~~~~~~~~~~~~~~~
+
+.. literalinclude:: ../../pyflow_tests/doc_examples/clustering/01_precomputed_clusters.py
+
+.. _clustering_example_live:
+
+Live clustering
+~~~~~~~~~~~~~~~
+
+.. literalinclude:: ../../pyflow_tests/doc_examples/clustering/02_live_clustering.py
+
+.. _clustering_example_exploratory:
+
+Exploratory sweep
+~~~~~~~~~~~~~~~~~
+
+.. literalinclude:: ../../pyflow_tests/doc_examples/clustering/03_exploratory_clustering.py
+
 Cluster analysis
 ----------------
 
@@ -101,6 +123,9 @@ Precomputed clusters
 
 Exploratory analysis
 --------------------
+
+See :ref:`clustering_example_exploratory` for a minimal sweep with
+:func:`~pyflow_acdc.run_clustering_analysis`.
 
 .. autofunction:: pyflow_acdc.run_clustering_analysis
 

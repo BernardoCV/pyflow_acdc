@@ -79,7 +79,7 @@ Included in ``--docs`` (``DOCS_CASES``):
 * ``index/``, ``usage/``, ``tep/`` (static and MS TEP), ``tep_mp/`` (MP TEP and
   MP+MS; **ipopt** full solve, then ``res.all()`` in each example)
 * ``csv_import/``, ``modelling_ac/``, ``modelling_dc/``, ``results/``, ``ts/``,
-  ``plotting/``, ``tep_pymoo/``, ``wf_array/``, ``dash/``
+  ``clustering/``, ``plotting/``, ``tep_pymoo/``, ``wf_array/``, ``dash/``
 
 ``test_docs_tep.py`` runs ``tep/`` (static :func:`~pyflow_acdc.transmission_expansion`
 and MS :func:`~pyflow_acdc.multi_scenario_TEP` on **ipopt**).
