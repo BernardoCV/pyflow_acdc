@@ -16,7 +16,7 @@ https://doi.org/10.1016/j.ijepes.2025.111459.
 
 original source can be implemented for optimal power flow by setting TEP=False.
 
-Converted to PyFlowACDC format from
+Converted to pyflow_acdc format from
 
 %CASE39 Power flow data for 39 bus New England system.
 %   Please see CASEFORMAT for details on the case file format.

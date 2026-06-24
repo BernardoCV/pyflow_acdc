@@ -2427,7 +2427,7 @@ def import_orbit_cables(
     save_yaml=False,
     source_url='https://github.com/NLRWindSystems/ORBIT/tree/dev/library/cables',
 ):
-    """Import ORBIT-style cable library data into the PyFlow cable database.
+    """Import ORBIT-style cable library data into the pyflow-acdc cable database.
 
     Parameters
     ----------
@@ -2435,7 +2435,7 @@ def import_orbit_cables(
         Source table, CSV path, directory of CSV files, or URL. If None,
         ``source_url`` is fetched.
     column_map : dict, optional
-        Maps PyFlow field names to source columns (``name``, ``R_Ohm_km``,
+        Maps pyflow_acdc field names to source columns (``name``, ``R_Ohm_km``,
         ``L_mH_km``, ``C_uF_km``, ``G_uS_km``, ``A_rating``,
         ``Nominal_voltage_kV``, ``conductor_size``, ``Type``, ``Cost_per_km``,
         ``Reference``).

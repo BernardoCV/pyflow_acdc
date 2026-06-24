@@ -853,7 +853,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
 
     # Check for MixedBinCont warning (only if grid is provided)
     if grid is not None and hasattr(grid, 'MixedBinCont') and grid.MixedBinCont and solver == 'ipopt':
-        warnings.warn('PyFlow ACDC is not capable of ensuring the reliability of this solution.')
+        warnings.warn('pyflow-acdc is not capable of ensuring the reliability of this solution.')
 
     if callback:
         if solver == 'gurobi' and GUROBI_AVAILABLE:
@@ -1052,7 +1052,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
                 within_acc_pr = bool(last_inf_pr <= acceptable_pr_tol)
                 within_acc_du = bool(last_inf_du <= acceptable_du_tol)
                 # If both primal and dual are within these strict tolerances,
-                # PyFlow-ACDC takes this maxIterations point as an acceptable solution.
+                # pyflow-acdc takes this maxIterations point as an acceptable solution.
                 if within_acc_pr and within_acc_du:
                     trusted_termination = True
                     explicit_infeasible_termination = False

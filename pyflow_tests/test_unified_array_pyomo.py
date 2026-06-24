@@ -8,11 +8,9 @@ import pyomo.environ as pyo
 from pyflow_acdc.Array_OPT import _create_master_problem_pyomo
 from pyflow_acdc.constants import MIPBackend
 from pyflow_tests._test_solver_deps import (
-    dill_missing_for_run_test,
     mip_solvers,
     pyomo_mip_css_solver_available,
     pyomo_missing_for_run_test,
-    require_dill,
     require_pyomo,
 )
 
@@ -130,7 +128,6 @@ def _print_result(mip_solver, result):
 
 def test_unified_array_pyomo_alpha_ventus():
     require_pyomo()
-    require_dill()
     if pyomo_mip_css_solver_available():
         mip_solver, _ = mip_solvers()
         result = run_case(mip_solver=mip_solver)
@@ -141,8 +138,6 @@ def test_unified_array_pyomo_alpha_ventus():
 
 
 def run_test():
-    if dill_missing_for_run_test():
-        return
     if pyomo_missing_for_run_test():
         return
     if pyomo_mip_css_solver_available():

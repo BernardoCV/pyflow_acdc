@@ -96,22 +96,6 @@ def require_dash():
     _require(_dash_available, "dash is not installed")
 
 
-def _dill_available():
-    try:
-        __import__("dill")
-    except Exception:
-        return False
-    return True
-
-
-def dill_missing_for_run_test():
-    return _missing_for_run_test(_dill_available, "Skipped: dill is not installed")
-
-
-def require_dill():
-    _require(_dill_available, "dill is not installed")
-
-
 def _ortools_available():
     try:
         from ortools.sat.python import cp_model  # noqa: F401

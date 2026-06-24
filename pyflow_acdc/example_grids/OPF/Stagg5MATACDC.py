@@ -3,7 +3,7 @@
 import pyflow_acdc as pyf
 import pandas as pd
 """
-Converted to PyFlowACDC format from
+Converted to pyflow_acdc format from
 
 %case 5 nodes    Power flow data for 5 bus, 2 generator case.
 %   Please see 'help caseformat' for details on the case file format.

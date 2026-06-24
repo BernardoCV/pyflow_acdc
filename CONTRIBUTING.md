@@ -1,4 +1,4 @@
-# Contributing to PyFlow ACDC
+# Contributing to pyflow-acdc
 
 Thanks for your interest in contributing! This project is experimental and
 under active development — issue reports and pull requests are very welcome.

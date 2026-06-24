@@ -152,7 +152,7 @@ def test_format_solver_report_includes_sections(monkeypatch):
     result = su.check_available_solvers(pyomo_solvers=["appsi_maingo"], verbose=False)
     report = su._format_solver_report(result)
 
-    assert "PyFlow-ACDC Solver Availability" in report
+    assert "pyflow-acdc solver availability" in report.lower()
     assert "MAiNGO note" in report
     assert "appsi_maingo" in report
     assert "OR-Tools installed: Yes" in report

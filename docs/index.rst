@@ -7,14 +7,14 @@
    :align: right
    :width: 300px
 
-PyFlow ACDC
+pyflow-acdc
 ===========
 
-Welcome to PyFlow ACDC's documentation!
+Welcome to the pyflow-acdc documentation!
 
 This is a  python-based tool for the design and analysis of hybrid AC/DC grids
 
-PyFlow ACDC is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_ by `CITCEA-UPC <https://www.linkedin.com/company/citcea>`_ in collaboration with `Youwind <https://youwindrenewables.com/>`_.
+pyflow-acdc is a program worked on by `ADOreD Project <https://www.msca-adored.eu/>`_ by `CITCEA-UPC <https://www.linkedin.com/company/citcea>`_ in collaboration with `Youwind <https://youwindrenewables.com/>`_.
 
 .. figure:: images/logos/ADOreD_logo_colours.png
    :align: right

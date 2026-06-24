@@ -3,7 +3,7 @@
 import pyflow_acdc as pyf
 import pandas as pd
 """
-Converted to PyFlowACDC format from
+Converted to pyflow_acdc format from
 
 %CASE_ACTIVSG2000  Synthetic Texas 2000-bus power system model.
 %

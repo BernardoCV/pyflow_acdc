@@ -1,7 +1,7 @@
-Citing PyFlow ACDC
+Citing pyflow-acdc
 ==================
 
-If you use PyFlow ACDC in your work, please cite the following paper:
+If you use pyflow-acdc in your work, please cite the following paper:
 
 For the general framework:
 

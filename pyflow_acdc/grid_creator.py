@@ -27,11 +27,7 @@ from .constants import SQRT_3, MAX_RATING_PLACEHOLDER, DEFAULT_V_MIN_DC, DEFAULT
 import pickle
 import gzip
 
-try:
-    import dill  # optional fallback
-    _dill = dill
-except Exception:
-    _dill = None
+import dill
 
 
 __all__ = [ # Grid Creation and Import
@@ -1549,15 +1545,11 @@ def load_pickle(path, use_dill=False):
             with opener(path, "rb") as f:
                 obj = pickle.load(f)
         except Exception:
-            if _dill is not None:
-                with opener(path, "rb") as f:
-                    obj = _dill.load(f)
-            else:
-                raise
+            with opener(path, "rb") as f:
+                obj = dill.load(f)
     else:
-        lib = _dill if _dill is not None else pickle
         with opener(path, "rb") as f:
-            obj = lib.load(f)
+            obj = dill.load(f)
     if not isinstance(obj, Grid):
         raise TypeError(f"Expected a Grid object, got {type(obj).__name__}")
     _migrate_legacy_grid_attrs(obj)

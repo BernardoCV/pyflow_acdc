@@ -1,8 +1,20 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jul  8 09:46:59 2024
+"""Price-zone market coefficients from order-book and ENTSO-E data.
 
-@author: BernardoCastro
+Builds quadratic **benefit-of-consumption** and **cost-of-generation** curves
+for :class:`~pyflow_acdc.Classes.Price_Zone` OPF/TEP models from:
+
+* **EPEX Spot**-shaped intraday order books (supply/demand stacks per hour).
+* **ENTSO-E Transparency** CSV exports (generation by type and day-ahead load),
+  normalized to hourly profiles for time-series studies.
+
+Typical workflow::
+
+    market_data, timing = price_zone_coef_data(order_book_df, start=1, end=8760)
+    coef_table = price_zone_data_pd(market_data, save_csv="pz_coef.csv")
+    plot_curves(market_data, hour=12, name="Zone A")  # optional inspection
+
+See :doc:`market_coef` and :ref:`Price_zone_modelling`.
 """
 
 import time
@@ -23,7 +35,25 @@ __all__ = [
     'clean_entsoe_data'
     ]
 
-def price_zone_data_pd(data,save_csv=None):
+def price_zone_data_pd(data, save_csv=None):
+    """Flatten :func:`price_zone_coef_data` output to a coefficient table.
+
+    Parameters
+    ----------
+    data : list[dict]
+        One dict per hour from :func:`price_zone_coef_data`. Each dict must
+        contain ``Hour``, ``poly`` (with ``a_BC``, ``b_BC``, ``c_BC``, ``a_CG``,
+        ``b_CG``, ``c_CG``, ``P_min``, ``P_max``), ``Market_price``, and
+        ``Volume_eq``.
+    save_csv : str, optional
+        If given, write the table to CSV. ``.csv`` is appended when missing.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by hour (``time``). Columns: quadratic coefficients, clearing
+        price/volume, and power limits ``PGL_min`` / ``PGL_max``.
+    """
 
     df= pd.DataFrame(columns=['time','a_BC', 'b_BC', 'c_BC','a_CG', 'b_CG', 'c_CG','price','volume','PGL_min','PGL_max'])
 
@@ -56,7 +86,68 @@ def is_leap_year(year):
     """Check if a year is a leap year."""
     return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
 
-def price_zone_coef_data(df,start,end,increase_eq_price=50):
+def price_zone_coef_data(df, start, end, increase_eq_price=50):
+    """Fit price-zone quadratic coefficients from an EPEX-shaped order book.
+
+    Parses stacked sell/purchase curves per calendar hour, finds the market
+    clearing point, integrates surplus areas, and fits ``a``, ``b``, ``c``
+    polynomials for benefit-of-consumption and cost-of-generation (see
+    :ref:`Price_zone_modelling`).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame or str
+        Order-book table, or path to a CSV with the columns below.
+    start : int
+        First hour of year to process (1-based, inclusive).
+    end : int
+        Last hour of year to process (1-based, inclusive).
+    increase_eq_price : float, optional
+        Artificial price increment (€/MWh) used when extending supply curves
+        for high clearing prices (default ``50``).
+
+    Returns
+    -------
+    small_data : list[dict]
+        One entry per hour in ``[start, end]``. Each dict includes:
+
+        * ``Sell``, ``Purchase`` — order-book DataFrames (``volume``, ``price``).
+        * ``Integrated_sets`` — integrated welfare components.
+        * ``Market_price``, ``Volume_eq`` — clearing price and volume.
+        * ``poly`` — dict with ``a_BC``, ``b_BC``, ``c_BC``, ``a_CG``, ``b_CG``,
+          ``c_CG``, ``P_min``, ``P_max``.
+        * ``prediction_BC``, ``prediction_CG`` — fitted curve samples.
+    timing_info : dict
+        Keys ``load data``, ``avg process``, ``tot process`` (seconds).
+
+    Notes
+    -----
+    **Expected CSV columns** (EPEX Spot export style):
+
+    * ``Date`` — ``DD/MM/YYYY``
+    * ``Hour`` — integer hour, or ``3B`` style label on DST fall-back
+    * ``Volume``, ``Price`` — MW and €/MWh
+    * ``C3``, ``C4`` — optional metadata (ignored)
+    * ``Sale/Purchase`` — ``Sell`` or ``Purchase`` (column name must be exactly
+      this so :func:`pandas.DataFrame.itertuples` exposes it as ``row._6``)
+
+    DST spring/fall transitions are handled via hour labels and an internal
+    summer-time offset.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import pyflow_acdc as pyf
+    >>> rows = [
+    ...     {"Date": "01/01/2023", "Hour": 1, "Volume": 50, "Price": 30,
+    ...      "C3": 0, "C4": 0, "Sale/Purchase": "Sell"},
+    ...     {"Date": "01/01/2023", "Hour": 1, "Volume": 50, "Price": 80,
+    ...      "C3": 0, "C4": 0, "Sale/Purchase": "Purchase"},
+    ... ]
+    >>> data, _ = pyf.price_zone_coef_data(pd.DataFrame(rows), start=1, end=1)
+    >>> "poly" in data[0]
+    True
+    """
 
     if isinstance(df, str):
         df= pd.read_csv(df)
@@ -428,7 +519,13 @@ def plot_curves(data, hour, name=None):
     hour : int
         Hour to plot (1-based index into ``data``).
     name : str, optional
-        Title suffix for the plot window.
+        Price-zone label shown in the plot title.
+
+    Notes
+    -----
+    Opens the figure in a web browser via Plotly (``renderer='browser'``).
+    In tests, patch ``pyflow_acdc.Market_Coeff.pio.show`` to capture the figure
+    without a GUI.
 
     Returns
     -------
@@ -656,8 +753,41 @@ def compute_hour_of_year(df,production_types=None, Area= None):
 
 
 
-def clean_entsoe_data(key_list, year_list, production_types=None, output_excel=None,path=None):
-    """Process generation and load data for multiple areas/years and save to Excel"""
+def clean_entsoe_data(key_list, year_list, production_types=None, output_excel=None, path=None):
+    """Normalize ENTSO-E generation/load CSVs and write an Excel workbook.
+
+    Reads per-area folders of ENTSO-E Transparency exports, resamples to hourly
+    profiles (via :func:`compute_hour_of_year`), normalizes by annual maxima, and
+  writes one sheet per year plus a ``Maximum Values`` summary.
+
+    Parameters
+    ----------
+    key_list : list[str]
+        Subfolder names under ``path`` (one per bidding zone / area).
+    year_list : list[int]
+        Years to process. Expects files named like
+        ``AGGREGATED_GENERATION_PER_TYPE_GENERATION_{y-1}12312300-{y}12312300.csv``
+        and ``GUI_TOTAL_LOAD_DAYAHEAD_{y-1}12312300-{y}12312300.csv`` in each
+        area folder.
+    production_types : list[str], optional
+        Generation types to keep. Empty list means all types in the file.
+    output_excel : str, optional
+        Output ``.xlsx`` filename (default ``output_data.xlsx``).
+    path : str, optional
+        Root directory containing area subfolders. When ``None``, paths are
+        relative to the current working directory.
+
+    Returns
+    -------
+    str
+        Path to the written Excel file.
+
+    Notes
+    -----
+    Folder layout is documented in :doc:`market_coef`. Files must match ENTSO-E
+    download naming; MTU columns are detected automatically for 15/30/60 minute
+    data.
+    """
     if production_types is None:
         production_types = []
     combined_dict_all = {}
@@ -735,3 +865,5 @@ def clean_entsoe_data(key_list, year_list, production_types=None, output_excel=N
         # Write each year's combined_df_all to a separate sheet
         for idx, year in enumerate(combined_df_all.keys(), start=1):
             combined_df_all[year].to_excel(writer, sheet_name=f"{year}", index=True)
+
+    return output_excel

@@ -25,11 +25,7 @@ import os
 import pickle
 import gzip
 
-try:
-    import dill  # optional fallback
-    _dill = dill
-except Exception:
-    _dill = None
+import dill
 
 __all__ = [
     'save_grid_to_file',
@@ -484,7 +480,7 @@ def save_pickle(grid, path, compress=True, use_dill=False):
         Use ``dill`` instead of ``pickle`` when ``True``.
     """
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    lib = _dill if (use_dill and _dill is not None) else pickle
+    lib = dill if use_dill else pickle
     protocol = pickle.HIGHEST_PROTOCOL
 
     if compress:

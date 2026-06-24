@@ -2341,7 +2341,7 @@ def run_opf_for_all_investment_periods(
             }
         else:
             # MS=True: run a TS-OPF for each investment period instead of a single snapshot OPF.
-            # PyFlow-ACDC takes this as a time-series post-analysis on the MP solution.
+            # pyflow-acdc takes this as a time-series post-analysis on the MP solution.
             ts_prefix = f"{prefix}_TS"
             if tee:
                 print(

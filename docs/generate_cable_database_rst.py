@@ -11,7 +11,7 @@ CABLE_DIR = PKG_DIR / "Cable_database"
 OUTPUT = DOCS_DIR / "api" / "cable_database.rst"
 
 DISCLAIMER = (
-    "PyFlow-ACDC takes **no ownership** of the cable parameters bundled in "
+    "pyflow-acdc takes **no ownership** of the cable parameters bundled in "
     "``pyflow_acdc/Cable_database/``. Data were obtained from the sources cited "
     "below and are included for **academic and testing purposes only**. "
     "Electrical parameters and especially ``Cost_per_km`` values do not "

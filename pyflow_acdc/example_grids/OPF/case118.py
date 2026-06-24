@@ -4,7 +4,7 @@ import pyflow_acdc as pyf
 import pandas as pd
 
 """
-Converted to PyFlowACDC format from
+Converted to pyflow_acdc format from
 
 function mpc = case118
 %CASE118    Power flow data for IEEE 118 bus test case.

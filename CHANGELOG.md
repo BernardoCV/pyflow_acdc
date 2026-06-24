@@ -25,6 +25,15 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `test_graph_dash.py` (synthetic TS + Dash callback unit tests).
 - **`ipopt_available` / `require_ipopt`** helpers in `pyflow_tests/_test_solver_deps.py`.
 
+### Changed
+- **`dill`** is a required base dependency; removed optional-import fallbacks in
+  `grid_creator` / `Export_files` and `require_dill` test skips.
+- **`Market_Coeff`**: module and public-function docstrings; expanded
+  `docs/api/market_coef.rst` (EPEX CSV schema, workflow, ENTSO-E layout).
+  `clean_entsoe_data` now returns the output Excel path.
+- Docs and user-facing strings: **pyflow-acdc** / **pyflow_acdc** naming
+  (replacing mixed ``PyFlow-ACDC`` / ``PyFlow ACDC`` variants).
+
 ## [0.6.0] - 2026-06-16
 
 ### Added

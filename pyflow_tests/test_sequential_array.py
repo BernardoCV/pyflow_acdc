@@ -6,11 +6,9 @@ import pyflow_acdc as pyf
 import pyomo.environ as pyo
 
 from pyflow_tests._test_solver_deps import (
-    dill_missing_for_run_test,
     mip_solvers,
     pyomo_mip_css_solvers_missing_for_run_test,
     pyomo_missing_for_run_test,
-    require_dill,
     require_pyomo,
     require_pyomo_mip_css_solvers,
     tep_solver,
@@ -80,7 +78,6 @@ def run_case(mip_solver=None, css_l_solver=None):
 
 def test_sequential_array_alpha_ventus():
     require_pyomo()
-    require_dill()
     require_pyomo_mip_css_solvers()
     mip_solver, css_solver = mip_solvers()
     (
@@ -104,8 +101,6 @@ def test_sequential_array_alpha_ventus():
 
 
 def run_test():
-    if dill_missing_for_run_test():
-        return
     if pyomo_missing_for_run_test():
         return
     if pyomo_mip_css_solvers_missing_for_run_test():

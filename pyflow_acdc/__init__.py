@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-PyFlow-ACDC initialization module.
+pyflow-acdc package initialization.
 Provides grid simulation and power flow analysis functionality.
 """
 from pathlib import Path

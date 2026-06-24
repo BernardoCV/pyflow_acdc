@@ -200,7 +200,7 @@ def _format_solver_report(result):
     ortools_error = result["ortools_error"]
 
     lines = []
-    lines.append("=== PyFlow-ACDC Solver Availability ===")
+    lines.append("=== pyflow-acdc solver availability ===")
     if "appsi_maingo" in pyomo_available:
         lines.append("MAiNGO note: available via 'appsi_maingo' (alias from 'maingo').")
         lines.append("")

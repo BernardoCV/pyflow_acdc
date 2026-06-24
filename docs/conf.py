@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath("_extensions"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'pyflow acdc'
+project = 'pyflow-acdc'
 copyright = '2025-2026, Bernardo Castro Valerio'
 author = 'Bernardo Castro Valerio'
 

@@ -1,197 +1,129 @@
-Market Coefficients Module
-===========================
+Market coefficients
+===================
 
-This module provides functions for analyzing supply and demand market data to prepare values for the price zone coefficients based on EPEX Spot data format. As well as cleaning data downloaded from ENTSO-E for load and generation trends.
+Functions in ``pyflow_acdc.Market_Coeff`` build **price-zone quadratic cost curves**
+for OPF and TEP (:ref:`Price_zone_modelling`). Two data sources are supported:
 
-functions are found in pyflow_acdc.Market_Coeff
+* **EPEX Spot** order books → hourly ``a``, ``b``, ``c`` coefficients via
+  :func:`~pyflow_acdc.price_zone_coef_data`.
+* **ENTSO-E Transparency** generation/load CSVs → normalized hourly profiles via
+  :func:`~pyflow_acdc.clean_entsoe_data`.
 
-Price Zone Coefficient Analysis
--------------------------------
+Workflow (EPEX order book)
+--------------------------
 
-Obtain price zone coefficients
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: python
+
+   import pyflow_acdc as pyf
+
+   # df: CSV with columns Date, Hour, Volume, Price, Sale/Purchase (see below)
+   market_data, timing = pyf.price_zone_coef_data(df, start=1, end=8760)
+
+   coef_table = pyf.price_zone_data_pd(market_data, save_csv="price_zone_coef")
+
+   # Optional: inspect one hour
+   pyf.plot_curves(market_data, hour=100, name="Belgium")
+
+EPEX CSV format
+^^^^^^^^^^^^^^^
+
+The order-book reader expects an **EPEX Spot**-style export:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 12 50
+
+   * - Column
+     - Type
+     - Description
+   * - ``Date``
+     - str
+     - ``DD/MM/YYYY``
+   * - ``Hour``
+     - int or str
+     - Clock hour; use ``3B`` style labels on DST fall-back nights
+   * - ``Volume``
+     - float
+     - MW
+   * - ``Price``
+     - float
+     - €/MWh
+   * - ``C3``, ``C4``
+     - any
+     - Present in exports; ignored by the parser
+   * - ``Sale/Purchase``
+     - str
+     - **Must be exactly this header.** Values ``Sell`` or ``Purchase`` (supply vs demand)
+
+.. note::
+   The ``Sale/Purchase`` column name is required: :func:`pandas.DataFrame.itertuples`
+   exposes it as the seventh field (``row._6``). Renaming the column breaks parsing.
+
+``start`` and ``end`` are **hour-of-year** bounds (1–8760, or 8784 in leap years),
+not row indices in the CSV.
+
+API reference
+-------------
+
+Price zone coefficients
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: pyflow_acdc.price_zone_coef_data
 
-   Analyzes market data to generate price zone coefficients.
-
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``df``
-        - DataFrame
-        - Market data
-        - Required
-        - -
-      * - ``start``
-        - int
-        - Start hour
-        - Required
-        - hour
-      * - ``end``
-        - int
-        - End hour
-        - Required
-        - hour
-      * - ``increase_eq_price``
-        - float
-        - Price increase for equilibrium
-        - 50
-        - €/MWh
-
-   Returns a list of dictionaries containing:
-
-   - ``Date`` - Date of the data
-   - ``Hour`` - Hour of the data
-   - ``Sell`` - Supply curve data
-   - ``Purchase`` - Demand curve data
-   - ``Integrated_sets`` - Benefit of consumption and cost of generation from integral of supply and demand curves
-   - ``Dem_data_points`` - Number of demand data points
-   - ``Gen_data_points`` - Number of supply data points
-   - ``max_gen`` - Maximum supply value
-   - ``min_demand`` - Minimum demand value
-   - ``Market_price`` - Market clearing price
-   - ``Volume_eq`` - Market clearing volume
-   - ``poly`` - Dictionary containing polynomial coefficients
-   - ``prediction_BC`` - Predicted benefit of consumption
-   - ``prediction_CG`` - Predicted cost of generation
-   - ``Volume_0`` - Volume where first positive price is supplied
-
-   And timing information with the following keys:
-
-   - ``load data`` - Time taken to load data
-   - ``avg process`` - Average time taken to process data
-   - ``tot process`` - Total time taken to process data
-
-Export data to csv
-^^^^^^^^^^^^^^^^^^
-
 .. autofunction:: pyflow_acdc.price_zone_data_pd
 
-   Converts market data to pandas DataFrame and saves it to a csv file.
-
-   .. list-table::
-      :widths: 20 10 50 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``data``
-        - dict
-        - Market data
-        - Required
-      * - ``save_csv``
-        - str
-        - Save csv file
-        - None
-
 Visualization
-^^^^^^^^^^^^^^
-
-Generates plots of market curves.
+^^^^^^^^^^^^^
 
 .. autofunction:: pyflow_acdc.plot_curves
 
-   Creates visualization of market curves.
-
-   .. list-table::
-      :widths: 20 10 50 10 10
-      :header-rows: 1
-
-      * - Parameter
-        - Type
-        - Description
-        - Default
-        - Units
-      * - ``data``
-        - dict
-        - Market data
-        - Required
-        - -
-      * - ``hour``
-        - int
-        - Hour to plot
-        - Required
-        - hour
-      * - ``name``
-        - str
-        - Output filename
-        - None
-        - -
-
-   Creates subplots showing:
-
-   - Supply and demand curves
-   - Cost of generation curve
-   - Integrated supply and demand
-   - Price curves
-
-ENTSO-E Data Cleaning
+ENTSO-E data cleaning
 ---------------------
 
-For the use of entsoe data cleaning, the data has to be structured as follows:
+Use this path when load and generation profiles come from the
+`ENTSO-E Transparency Platform <https://transparency.entsoe.eu/>`_ rather than
+EPEX order books.
+
+Directory layout
+^^^^^^^^^^^^^^^^
+
+``key_list`` entries are subfolder names under ``path`` (e.g. bidding zones or
+areas). For each key and each year in ``year_list``, place one generation and
+one load file using ENTSO-E download names:
 
 .. code-block:: text
 
-    path
-    |-- key0
-    |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_0-1}12312300-{year_0}12312300.csv
-    |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_0-1}12312300-{year_0}12312300.csv
-    |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_1-1}12312300-{year_1}12312300.csv
-    |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_1-1}12312300-{year_1}12312300.csv
-    |   |-- ...
-    |-- key1
-    |   |-- ...
-    |-- ...  
+   path
+   |-- key0
+   |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_0-1}12312300-{year_0}12312300.csv
+   |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_0-1}12312300-{year_0}12312300.csv
+   |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_1-1}12312300-{year_1}12312300.csv
+   |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_1-1}12312300-{year_1}12312300.csv
+   |   |-- ...
+   |-- key1
+   |   |-- AGGREGATED_GENERATION_PER_TYPE_GENERATION_{year_0-1}12312300-{year_0}12312300.csv
+   |   |-- GUI_TOTAL_LOAD_DAYAHEAD_{year_0-1}12312300-{year_0}12312300.csv
+   |   |-- ...
+   |-- ...
 
-This is the name of the files when downloaded from ENTSO-E transparency platform.
+``key0``, ``key1``, … are whatever strings you pass in ``key_list`` (for example
+``"BE"``, ``"NL"``). ``{year_0}``, ``{year_1}``, … match ``year_list``.
 
+Example::
+
+   pyf.clean_entsoe_data(
+       key_list=["BE", "NL"],
+       year_list=[2022, 2023],
+       path="/data/entsoe",
+   )
 
 .. autofunction:: pyflow_acdc.clean_entsoe_data
-    
-   Process generation and load data for multiple areas/years and save to Excel.
 
-   .. list-table::
-      :widths: 20 10 30 30
-      :header-rows: 1
+The workbook contains:
 
-      * - Parameter
-        - Type
-        - Description
-        - Default
-      * - ``key_list``
-        - list
-        - List of keys
-        - Required
-      * - ``year_list``
-        - list  
-        - List of years
-        - Required
-      * - ``production_types``
-        - list
-        - Reduced list of production types
-        - All
-      * - ``output_excel``
-        - str
-        - Output excel file
-        - output_data.xlsx
-      * - ``path``
-        - str
-        - Path to save the excel file
-        - Current working directory
+* **Maximum Values** — per-area annual maxima used for normalization.
+* **One sheet per year** — hourly normalized profiles (generation types + load).
 
-   **Returns**
+**References**
 
-   Excel file containing the following sheets:
-
-   * ``Maximum values`` - Contains maximum values for each column
-   * ``year_0`` - Contains normalized data for the first year
-   * ``year_n`` - Contains normalized data for subsequent years
+See :ref:`Price_zone_modelling` and the OPF bibliography in :doc:`opf`.

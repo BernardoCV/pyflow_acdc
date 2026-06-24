@@ -23,7 +23,7 @@ Summary
 
 .. warning::
 
-   PyFlow-ACDC takes **no ownership** of the cable parameters bundled in ``pyflow_acdc/Cable_database/``. Data were obtained from the sources cited below and are included for **academic and testing purposes only**. Electrical parameters and especially ``Cost_per_km`` values do not represent commercial quotations or manufacturer warranties.
+   pyflow-acdc takes **no ownership** of the cable parameters bundled in ``pyflow_acdc/Cable_database/``. Data were obtained from the sources cited below and are included for **academic and testing purposes only**. Electrical parameters and especially ``Cost_per_km`` values do not represent commercial quotations or manufacturer warranties.
 
 .. list-table::
    :header-rows: 1

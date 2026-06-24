@@ -23,7 +23,7 @@ https://doi.org/10.1049/iet-gtd.2019.0383
 
 original source can be implemented for optimal power flow by setting TEP=False.
 
-Converted to PyFlowACDC format from
+Converted to pyflow_acdc format from
 %CASE24_IEEE_RTS1996_3zones  Power flow data for system based on the
 %IEEE RELIABILITY TEST SYSTEM.
 %   Please see CASEFORMAT for details on the case file format.
