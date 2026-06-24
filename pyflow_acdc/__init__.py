@@ -120,6 +120,7 @@ __all__ = [
     'save_network_svg',
     'plot_model_feasibility',
     'plot_3D',
+    'create_geometries_from_coords',
 
     # Market Analysis
     'price_zone_data_pd',

@@ -19,13 +19,16 @@ import folium
 import branca
 from folium.plugins import Draw,MarkerCluster,AntPath,TimestampedGeoJson
 import webbrowser
-from shapely.geometry import Point, LineString
-from .Graph_and_plot import update_hovertexts, create_subgraph_color_dict
+
+from .Graph_and_plot import (
+    update_hovertexts,
+    create_subgraph_color_dict,
+    create_geometries_from_coords,
+)
 from .Classes import Node_AC
 
 __all__ = [
     'darken_color',
-    'create_geometries_from_coords',
     'plot_folium_network',
     'plot_folium_ts_results',
     'plot_folium_inv_results',
@@ -110,24 +113,6 @@ def darken_color(color, factor=0.6):
     )
 
     return hex_color
-
-def create_geometries_from_coords(grid):
-    for node in grid.nodes_AC+grid.nodes_DC:
-        if node.x_coord is not None and node.y_coord is not None and node.geometry is None:
-            node.geometry = Point(node.x_coord, node.y_coord)
-    for line in grid.lines_AC+grid.lines_DC +grid.lines_AC_tf+grid.lines_AC_rec+grid.lines_AC_ct+grid.lines_AC_exp:
-        if line.fromNode.x_coord is not None and line.fromNode.y_coord is not None and line.toNode.x_coord is not None and line.toNode.y_coord is not None and line.geometry is None:
-            line.geometry = LineString([(line.fromNode.x_coord, line.fromNode.y_coord),
-                                        (line.toNode.x_coord, line.toNode.y_coord)])
-    for conv in grid.Converters_ACDC:
-        if conv.Node_AC.x_coord is not None and conv.Node_AC.y_coord is not None and conv.Node_DC.x_coord is not None and conv.Node_DC.y_coord is not None and conv.geometry is None:
-            conv.geometry = LineString([(conv.Node_AC.x_coord, conv.Node_AC.y_coord),
-                                        (conv.Node_DC.x_coord, conv.Node_DC.y_coord)])
-    for gen in grid.Generators+grid.Generators_DC+grid.RenSources:
-        if gen.x_coord is not None and gen.y_coord is not None and gen.geometry is None:
-            gen.geometry = Point(gen.x_coord, gen.y_coord)
-
-
 
 def plot_folium_network(
     grid,

@@ -47,7 +47,8 @@ __all__ = ['plot_graph',
            'plot_TS_res',
            'plot_model_feasibility',
            'save_network_svg',
-           'plot_3D']
+           'plot_3D',
+           'create_geometries_from_coords']
 
 def _installation_cost_meur(element):
     base_cost = getattr(element, 'base_cost', 0.0)
@@ -1172,6 +1173,50 @@ def create_subgraph_color_dict(G):
         subgraph_color_dict['UHV'][idx] = next(color_palette_3)
     return subgraph_color_dict
 
+
+def create_geometries_from_coords(grid):
+    """Build shapely Point/LineString geometries from element x/y coordinates."""
+    for node in grid.nodes_AC + grid.nodes_DC:
+        if node.x_coord is not None and node.y_coord is not None and node.geometry is None:
+            node.geometry = Point(node.x_coord, node.y_coord)
+    for line in (
+        grid.lines_AC
+        + grid.lines_DC
+        + grid.lines_AC_tf
+        + grid.lines_AC_rec
+        + grid.lines_AC_ct
+        + grid.lines_AC_exp
+    ):
+        if (
+            line.fromNode.x_coord is not None
+            and line.fromNode.y_coord is not None
+            and line.toNode.x_coord is not None
+            and line.toNode.y_coord is not None
+            and line.geometry is None
+        ):
+            line.geometry = LineString(
+                [
+                    (line.fromNode.x_coord, line.fromNode.y_coord),
+                    (line.toNode.x_coord, line.toNode.y_coord),
+                ]
+            )
+    for conv in grid.Converters_ACDC:
+        if (
+            conv.Node_AC.x_coord is not None
+            and conv.Node_AC.y_coord is not None
+            and conv.Node_DC.x_coord is not None
+            and conv.Node_DC.y_coord is not None
+            and conv.geometry is None
+        ):
+            conv.geometry = LineString(
+                [
+                    (conv.Node_AC.x_coord, conv.Node_AC.y_coord),
+                    (conv.Node_DC.x_coord, conv.Node_DC.y_coord),
+                ]
+            )
+    for gen in grid.Generators + grid.Generators_DC + grid.RenSources:
+        if gen.x_coord is not None and gen.y_coord is not None and gen.geometry is None:
+            gen.geometry = Point(gen.x_coord, gen.y_coord)
 
 
 def create_geometries_from_layout(grid):

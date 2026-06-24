@@ -15,8 +15,6 @@ from pathlib import Path
 import pytest
 import pyflow_acdc as pyf
 
-from pyflow_tests._test_solver_deps import require_mapping
-
 EXAMPLE_GRIDS_DIR = Path(pyf.__file__).resolve().parent / "example_grids"
 CASE_SUBDIRS = ("PF", "OPF", "TEP", "Wind_Array")
 
@@ -33,7 +31,6 @@ CASE_KWARGS = {
 }
 
 # Very large grids: excluded from the default parametrized run (~1 min each).
-# case118_TEP_benchmark needs mapping (create_geometries_from_coords).
 SKIP_CASES = {"Texas7k_20210804", "case118_TEP_benchmark"}
 
 
@@ -96,8 +93,6 @@ def _assert_grid_result(case_name, result):
 
 def _run_case_factory(case_file):
     case_name = case_file.stem
-    if case_name == "case118_TEP_benchmark":
-        require_mapping()
     module = _load_module_from_path(case_file)
     factory = _pick_factory(module, case_name)
     kwargs = CASE_KWARGS.get(case_name, {})
@@ -111,7 +106,7 @@ def test_example_grid_factory_loads_grid_and_results(case_file):
     _run_case_factory(case_file)
 
 
-@pytest.mark.parametrize("case_file", CASE_FILES, ids=lambda p: p.stem)
+@pytest.mark.parametrize("case_file", CASE_FILES_DEFAULT, ids=lambda p: p.stem)
 def test_example_grid_is_registered_in_pyf_cases(case_file):
     """Primary factory should be registered in pyf.cases and load a grid."""
     case_name = case_file.stem
@@ -121,6 +116,12 @@ def test_example_grid_is_registered_in_pyf_cases(case_file):
     kwargs = CASE_KWARGS.get(case_name, {})
     result = factory(**kwargs)
     _assert_grid_result(case_name, result)
+
+
+def test_slow_example_cases_are_registered_in_pyf_cases():
+    """Large cases stay registered even when excluded from the default factory run."""
+    for case_name in sorted(SKIP_CASES):
+        assert case_name in pyf.cases
 
 
 @pytest.mark.slow
