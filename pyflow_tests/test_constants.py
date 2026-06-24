@@ -177,6 +177,7 @@ ALL_CASES = [
     "test_case39ac_LOPF.py",
     "test_case39acdc_OPF.py",
     "test_case24_3zones_acdc_OPF.py",
+    "test_opf_result_helpers.py",
     "test_matlab_loader.py",
     "test_market_coeff.py",
     "test_folium.py",
@@ -206,6 +207,7 @@ OPF_CASES = [
     "test_case39ac_OPF.py",
     "test_case39acdc_OPF.py",
     "test_case24_3zones_acdc_OPF.py",
+    "test_opf_result_helpers.py",
 ]
 
 QUICK_CASES = [
@@ -239,6 +241,7 @@ FULL_OPF_TEP_CASE_MODULES = [
     "pyflow_tests.test_case39ac_OPF",
     "pyflow_tests.test_case39acdc_OPF",
     "pyflow_tests.test_case24_3zones_acdc_OPF",
+    "pyflow_tests.test_opf_result_helpers",
     "pyflow_tests.test_case24_OPF",
     "pyflow_tests.test_case39ac_LOPF",
     "pyflow_tests.test_case6_TEP_DC",
