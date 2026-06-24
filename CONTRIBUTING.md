@@ -56,7 +56,9 @@ without dedicated tests).
 
 **Pull requests that add, remove, or materially change tests must update
 `TEST_COVERAGE.md`** — at minimum the header stats and any module sections
-affected by your change. Regenerate with:
+affected by your change. Update the **Test coverage** badge percentage in
+[`README.md`](README.md) to match the overall % in the snapshot header.
+Regenerate with:
 
 ```bash
 pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing

@@ -1,11 +1,12 @@
 # Test coverage snapshot
 
-Last updated from Linux CI-style run (`Python 3.10.20`, pytest 9.0.2, cov 7.1.0).
+Last updated from Linux CI-style run (`Python 3.10.20`, pytest 9.0.2, cov 7.1.0, pluggy 1.6.0).
 
 ```
-collected 157 items (includes test_solver_utils; +9 vs prior snapshot)
-146+ passed, 1 skipped — refresh after next full Linux cov run
-overall coverage: ~66% baseline (25775 stmts, 8791 miss) — refresh header after full run
+collected 179 items
+178 passed, 1 skipped
+total time: ~470s
+overall coverage: 67% (25769 stmts, 8528 miss)
 ```
 
 Regenerate after test changes:
@@ -27,63 +28,51 @@ Sorted by miss count (core package only; `example_grids/` omitted unless noted).
 | Module | Cover | Miss | Dedicated test module |
 |--------|-------|------|------------------------|
 | `ACDC_Static_TEP.py` | 48% | 746 | Partial (static TEP solves; MS export cold) |
-| `ACDC_OPF.py` | ~49% | — | Partial (`test_opf_result_helpers`; OPF-only code) |
-| `pyomo_model_solve.py` | — | — | Partial (`test_solver_utils` mocks probe only; solve layer untested) |
-| `Time_series_clustering.py` | 40% | 595 | Partial (`test_docs_clustering`) |
-| `Graph_and_plot.py` | 57% | 590 | Partial (`test_plot`, doc plotting) |
-| `Array_OPT.py` | 54% | 538 | Partial (array / ortools tests) |
-| `grid_modifications.py` | 54% | 496 | Indirect (grid / case tests) |
-| `grid_creator.py` | 57% | 515 | `test_grid_creation`, csv import docs |
-| `Mapping.py` | 44% | 426 | Partial (`test_folium`) |
-| `Time_series.py` | 53% | 421 | Partial (`test_docs_ts`) |
-| `AC_OPF_L_model.py` | 38% | 423 | Indirect (OPF / LOPF cases) |
-| `ACDC_MultiPeriod_TEP.py` | 69% | 436 | Partial (MP solve; MP+MS build-only) |
 | `Results_class.py` | 60% | 758 | Indirect (`res.all()` in case tests) |
-| `Graph_Dash.py` | ~72% | 82 | **`test_graph_dash`** (synthetic TS; no server) + smoke (`test_docs_dash`) |
-| `Export_files.py` | 38% | 167 | Indirect (export flags rare in CI) |
-| `Market_Coeff.py` | 63% | 143 | Partial (`test_market_coeff`) |
-| `solver_utils.py` | 81% | 23 | `test_solver_utils` (mocked) |
+| `Time_series_clustering.py` | 40% | 596 | Partial (`test_docs_clustering`) |
+| `Graph_and_plot.py` | 57% | 590 | Partial (`test_plot`, doc plotting) |
+| `pyomo_model_solve.py` | 19% | 522 | Partial (Ipopt via case tests; `test_solver_utils` is env probe only) |
+| `Array_OPT.py` | 54% | 538 | Partial (array / ortools tests) |
+| `grid_creator.py` | 57% | 511 | `test_grid_creation`, csv import docs |
+| `grid_modifications.py` | 54% | 496 | Indirect (grid / case tests) |
+| `Mapping.py` | 44% | 426 | Partial (`test_folium`) |
+| `AC_OPF_L_model.py` | 38% | 423 | Indirect (OPF / LOPF cases) |
+| `Time_series.py` | 54% | 409 | Partial (`test_docs_ts`) |
+| `ACDC_MultiPeriod_TEP.py` | 69% | 436 | Partial (MP solve; MP+MS build-only) |
+| `ACDC_OPF_NL_model.py` | 86% | 224 | Indirect (OPF case tests) |
+| `ACDC_PF.py` | 73% | 193 | `test_cigreb4_pf`, case PF smoke |
+| `ACDC_TEP_pymoo.py` | 55% | 175 | Partial (`test_docs_tep_pymoo`) |
+| `Export_files.py` | 38% | 165 | Indirect (export flags rare in CI) |
+| `Market_Coeff.py` | 63% | 144 | Partial (`test_market_coeff`) |
+| `Graph_Dash.py` | 72% | 82 | **`test_graph_dash`** + smoke (`test_docs_dash`) |
 | `ACDC_sequential_STEP.py` | 61% | 120 | Partial (fake-solve abort only) |
+| `ACDC_OPF.py` | 83% | 102 | Partial (`test_opf_result_helpers`; OPF-only after solve split) |
+| `Classes.py` | 86% | 328 | Indirect (all case tests) |
+| `solver_utils.py` | 81% | 23 | `test_solver_utils` (mocked) |
+| `AC_L_CSS_ortools.py` | 87% | 43 | `test_sequential_array_ortools` |
 
 ---
 
 ## Functions not covered (or without dedicated tests)
 
-Public API (documented or commonly imported) that has **no focused test module** and is
-**not exercised** (or only lightly) by case/doc tests. Private helpers (`_…`) are listed
-when they account for large uncovered blocks.
-
 | Module | Function(s) | Status | Why / how to test |
 |--------|-------------|--------|-------------------|
-| `Market_Coeff` | `clean_entsoe_data` | **Not tested** | Needs ENTSO-E CSV tree on disk |
-| `Market_Coeff` | `compute_hour_of_year` | **Not tested** | Synthetic ENTSO-E-shaped DataFrame |
-| `Graph_Dash` | `run_ts_dash`, `run_mp_ts_dash` (server) | **Not tested** | `app.run()` blocks; use layout/callback unit tests |
-| `Graph_Dash` | `plot_TS_res_from_ts`, `create_dash_app`, `create_mp_ts_dash` | **Tested** | `test_graph_dash` (synthetic data, callbacks via `__wrapped__`) |
-| `Time_series_clustering` | `run_elbow_analysis`, `Time_series_cluster_relationship` | **Not tested** | Elbow / relationship workflows |
-| `Time_series_clustering` | `run_clustering_analysis_and_plot` | **Not tested** | Plotting + analysis wrapper |
-| `Time_series_clustering` | `cluster_Ward`, `cluster_PAM_Hierarchical` | **Not tested** | Doc example with `cluster_algorithm='ward'` |
-| `ACDC_Static_TEP` | `multi_scenario_TEP` (full solve) | **Not tested** | MS Ipopt solve too slow for CI |
-| `ACDC_Static_TEP` | `export_acdc_tep_ms_to_pyflow_acdc` | **Not tested** | MS solve + `mutate_grid=True` |
-| `ACDC_Static_TEP` | `alpha_pareto`, `*\_sensitivity`, `comprehensive_sensitivity_analysis` | **Not tested** | Pymoo / sensitivity workflows |
-| `ACDC_MultiPeriod_TEP` | `multi_period_MS_TEP` (full solve) | **Not tested** | MP+MS solve too slow for CI |
-| `ACDC_MultiPeriod_TEP` | `run_opf_for_investment_period`, `run_ts_opf_for_investment_period` | **Not tested** | Post-MP TS-OPF per period |
+| `Market_Coeff` | `clean_entsoe_data`, `compute_hour_of_year` | **Not tested** | ENTSO-E CSV tree or synthetic fixtures |
+| `Graph_Dash` | `run_ts_dash`, `run_mp_ts_dash` (server) | **Not tested** | `app.run()` blocks |
+| `Graph_Dash` | `plot_TS_res_from_ts`, `create_dash_app`, `create_mp_ts_dash` | **Tested** | `test_graph_dash` |
+| `Time_series_clustering` | `run_elbow_analysis`, ward/PAM, `run_clustering_analysis_and_plot` | **Not tested** | Doc examples / `plotting=True` |
+| `ACDC_Static_TEP` | `multi_scenario_TEP` (full solve), MS export/sensitivity | **Not tested** | MS solve too slow for CI |
+| `ACDC_MultiPeriod_TEP` | `multi_period_MS_TEP` (solve), post-MP TS-OPF | **Not tested** | MP+MS / per-period OPF too slow |
 | `ACDC_OPF` | `fx_conv` | **Not tested** | OPF with fixed converter setpoints |
-| `ACDC_OPF` | `opf_line_res`, `opf_step_results`, `opf_price_price_zone` | **Tested** | `test_opf_result_helpers` (Ipopt) |
-| `pyomo_model_solve` | `log_infeasible_constraints_limited` | **Not tested** | Deliberately infeasible OPF |
-| `pyomo_model_solve` | `_parse_bonmin_log`, `_gurobi_callback`, `_parse_highs_log` | **Not tested** | Alternate solvers (Bonmin/Gurobi/HiGHS) |
-| `pyomo_model_solve` | `pyomo_model_solve` (core) | Partial | Ipopt path via case tests; parser/callback branches cold |
-| `pyomo_model_solve` | `export_solver_progress_to_excel` | **Not tested** | Solve with progress + Excel export |
-| `pyomo_model_solve` | `reset_to_initialize` | Partial | TEP/TS retry paths |
-| `Export_files` | Excel export helpers | Partial | TEP/MP `export` flags on solve |
-| `Mapping` | Geo layout / neighbour graph bulk | Partial | `test_folium` smoke only |
-| `solver_utils` | `check_pyomo_solvers`, `check_ortools_backends`, `format_solver_report` | **Tested** | `test_solver_utils` (mocked) |
+| `ACDC_OPF` | `opf_line_res`, `opf_step_results`, `opf_price_price_zone` | **Tested** | `test_opf_result_helpers` |
+| `pyomo_model_solve` | parsers, callbacks, infeasibility logs | **Not tested** / Partial | Mocked unit tests or alternate solvers |
+| `pyomo_model_solve` | `pyomo_model_solve` (core Ipopt path) | Partial | All OPF/TEP case solves |
+| `pyomo_model_solve` | `export_solver_progress_to_excel` | **Not tested** | Progress + Excel export |
+| `solver_utils` | probe helpers | **Tested** | `test_solver_utils` (mocked) |
 
 ---
 
 ## Coverage gaps by module
-
-Each subsection lists raw **missing lines** from `term-missing`, then maps them to
-**functions / blocks** and whether CI currently hits them.
 
 ### `ACDC_Static_TEP.py` — 48%
 
@@ -93,45 +82,42 @@ Each subsection lists raw **missing lines** from `term-missing`, then maps them 
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| 61–504 | `identify_standalone_rs_conv_pairs`, `update_grid_scenario_frame`, `expand_elements_from_pd`, `repurpose_element_from_pd`, `update_attributes`, `expand_element`, `translate_pd_tep` | Partial — static TEP cases |
-| 684–927 | `_TEP_install_variables`, `_TEP_install_constraints`, `MS_TEP_constraints` | **Not tested** — needs MS full solve |
-| 1188–1248 | `linear_transmission_expansion` | **Not tested** |
-| 1270–1565 | `alpha_pareto`, `rate_sensitivity`, `kappa_sensitivity`, `comprehensive_sensitivity_analysis` | **Not tested** |
-| 1610–1777 | `multi_scenario_TEP` body | **Not tested** — MS Ipopt full solve |
-| 1936–2172 | `get_price_zone_data`, `get_curtailment_data`, `get_line_data`, `get_converter_data`, `get_gen_data` | **Not tested** — MS + price zones + clustered TS |
-| 2176–2391 | `export_acdc_tep_ms_to_pyflow_acdc` | **Not tested** |
-| 2417–2579 | `export_TEP_multiScenario_results_to_excel`, `calculate_STEP_objective_from_model` | **Not tested** — MS + export flags |
+| 684–927, 1610–1777, 2176–2579 | MS TEP solve, export, sensitivity | **Not tested** |
+| 61–504, 1188–1248 | Static TEP / linear TEP | Partial |
 
 ---
 
-### `ACDC_OPF.py` — OPF-only (refresh % after full cov run)
+### `ACDC_OPF.py` — 83% (OPF-only; solver code in `pyomo_model_solve.py`)
 
-OPF orchestration, objectives, and result helpers. Solver infrastructure moved to
-`pyomo_model_solve.py`.
+```
+49, 64, 69, 119-122, 143, 236, 245, 273-291, 297-307, 312, 320-331, 360, 370, 380-382, 388-397, 402-405, 410, 415-425, 430-438, 443-449, 459-471, 476, 597-598, 646-647, 865, 879, 905, 939
+```
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| — | `fx_conv` | **Not tested** — fixed converter setpoints |
+| 273–291 | `fx_conv` | **Not tested** |
+| 297–471 | `opf_obj*` branches (array losses, price zones, REC, …) | Partial |
+| 597–647, 865–939 | `translate_pyf_opf`, `calculate_objective*` | Partial |
 | — | `opf_line_res`, `opf_price_price_zone`, `opf_step_results` | **Tested** — `test_opf_result_helpers` |
-| — | `optimal_pf` / `optimal_l_pf`, `opf_obj*`, `translate_pyf_opf` | Partial — case OPF tests |
+| — | `optimal_pf` / `optimal_l_pf` | Partial — case OPF tests |
 
 ---
 
-### `pyomo_model_solve.py` — generic solve layer (refresh % after full cov run)
+### `pyomo_model_solve.py` — 19%
 
 ```
-(refresh from: pytest ... --cov=pyflow_acdc.pyomo_model_solve --cov-report=term-missing)
+16, 33-122, 143-224, 231-362, 390-483, 494-545, 560-653, 674, 680, 682, 689, 699-701, 721-724, 727-730, 795, 805-852, 856, 859-871, 876-881, 888, 890, 893-900, 904, 908-909, 944-945, 970-971, 999-1000, 1011, 1016-1060, 1077-1078, 1097-1098, 1107-1108, 1113-1114, 1118-1127, 1140-1146, 1149-1152, 1166-1220
 ```
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| — | `log_infeasible_constraints_limited` | **Not tested** — infeasible OPF |
-| — | `_gurobi_callback` | **Not tested** — Gurobi MIP/L |
-| — | `_parse_bonmin_log`, `_parse_highs_log`, `_parse_ipopt_log` | Partial — Ipopt via case solves |
-| — | `_solver_progress` | **Not tested** — `callback=True` |
-| — | `pyomo_model_solve` | Partial — Ipopt; alternate solvers / failure paths cold |
-| — | `export_solver_progress_to_excel` | **Not tested** |
-| — | `reset_to_initialize` | Partial — TEP/TS retries |
+| 33–122 | `log_infeasible_constraints_limited` | **Not tested** |
+| 143–362 | `_gurobi_callback`, `_parse_*_log`, `_solver_progress` | **Not tested** / Partial (Ipopt log parse via solves) |
+| 390–653 | `reset_to_initialize`, `_quick_feasible_point_check`, `_store_pyomo_results_on_grid` | Partial |
+| 674–1220 | `pyomo_model_solve` (NLP warmstart, callbacks, failure paths) | Partial — happy Ipopt path only |
+| 1166–1220 | `export_solver_progress_to_excel` | **Not tested** |
+
+Note: low **line %** is expected — module is large and mostly alternate-solver / failure / callback paths; the main Ipopt path runs on every OPF/TEP solve but does not cover all branches.
 
 ---
 
@@ -143,48 +129,53 @@ OPF orchestration, objectives, and result helpers. Solver infrastructure moved t
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| 40–972 | `_fill_investment_decisions`, `_MP_TEP_*` constraint/var branches | Partial — `case24_MP` full solve hits much |
-| 1220–1453 | `export_mp_tep_results_to_pyflow_acdc`, capex budget | Partial — MP solve + export flags |
-| 1486–1665 | `_resolve_mp_ms_clustering`, `_build_period_scenario_block` | **Not tested** — MP+MS full solve |
-| 1864–1962 | `multi_period_MS_TEP` solve/export tail | **Not tested** |
-| 2001–2233 | `run_opf_for_investment_period`, `run_ts_opf_for_investment_period`, `run_opf_for_all_investment_periods` | **Not tested** |
-| 2277–2457 | `_set_grid_to_multiperiod_state`, decommission helpers | **Not tested** — MP+MS multi-period |
+| 40–972, 1220–1453 | MP TEP core + export | Partial — `case24_MP` full solve |
+| 1486–2457 | MP+MS, post-MP OPF, decommission | **Not tested** |
 
 ---
 
 ### `Time_series_clustering.py` — 40%
 
 ```
-74-78, 107, 141-142, 154-155, 166, 182-191, 222, 241-262, 297-318, 321-330, 332-335, 363-505, 517-575, 586-607, 647-648, 658-701, 746, 752-756, 806-819, 823-830, 867-891, 925, 935-938, 944, 980-1003, 1015-1016, 1050, 1060-1063, 1069, 1091-1147, 1166-1230, 1237, 1261-1267, 1278-1298, 1340, 1342, 1344, 1346, 1348, 1378, 1388-1399, 1412-1414, 1444-1520, 1523-1537, 1557-1671, 1680-1746, 1751-1781, 1787-1789, 1840, 1850, 1893-1915, 1925-1956, 2016, 2024, 2030, 2035
+74-78, 107, 141-142, 154-155, 166, 182-191, 222, 241-262, 297-318, 321-330, 332-335, 363-505, 517-575, 586-607, 647-648, 658-701, 746, 752-756, 806-819, 823-830, 867-891, 925, 935-938, 944, 980-1003, 1015-1016, 1050, 1060-1063, 1069, 1091-1147, 1166-1230, 1237, 1261-1267, 1278-1298, 1340, 1342, 1344, 1346, 1348, 1378, 1388-1399, 1412-1414, 1444-1520, 1523-1537, 1557-1671, 1680-1746, 1751-1781, 1787-1789, 1829, 1840, 1850, 1893-1915, 1925-1956, 2016, 2024, 2030, 2035
 ```
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| 74–335 | `filter_data`, `identify_correlations` (methods 1–3) | Partial — live cluster uses `correlation_decisions=[False,…]` |
-| 363–505 | `identify_correlations` deep branches | **Not tested** — `correlation_decisions=[True, 3, True]` |
-| 517–607 | `plot_time_series`, `plot_correlation_matrix` | **Not tested** — `plotting=True` |
-| 647–701 | `cluster_TS` critical_idx / split clustering | **Not tested** — MS TEP with `critical_idx` |
-| 752–756, 1091–1230 | `cluster_Ward`, `cluster_PAM_Hierarchical` | **Not tested** |
-| 1340–1414 | `run_clustering_analysis` plotting branch | **Not tested** — `plotting=True` |
-| 1444–1537 | `plot_clustering_results`, `run_clustering_analysis_and_plot` | **Not tested** |
-| 1557–1781 | `run_elbow_analysis`, `Time_series_cluster_relationship` | **Not tested** |
-| 2016, 2024, 2030, 2035 | `cluster_analysis` error paths | **Not tested** — invalid payload tests |
+| 74–335, 363–505 | `identify_correlations` | Partial |
+| 517–1781 | plotting, ward/PAM, elbow, relationship | **Not tested** |
 
 ---
 
 ### `Market_Coeff.py` — 63%
 
 ```
-50, 62, 101-112, 116, 161, 167, 191, 212, 214, 319, 373-376, 389, 415, 515, 540-654, 661-737
+80, 153, 192-203, 207, 252, 258, 282, 303, 305, 410, 464-467, 480, 506, 612, 637-751, 791-869
 ```
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| 101–112 | DST spring/fall (`3B` hour) | **Not tested** — synthetic CSV with DST rows |
-| 319, 373–376, 389, 415 | `eq_price` branches in coef fit | **Not tested** — order book with `eq_price > 15` |
-| 540–654 | `compute_hour_of_year` | **Not tested** |
-| 661–737 | `clean_entsoe_data` | **Not tested** — ENTSO-E files on disk |
+| 192–203 | DST spring/fall (`3B` hour) | **Not tested** |
+| 410, 464–467 | `eq_price` branches (`eq_price > 15`) | **Not tested** |
+| 637–751 | `compute_hour_of_year` | **Not tested** |
+| 791–869 | `clean_entsoe_data` | **Not tested** |
 | (other) | `price_zone_coef_data`, `price_zone_data_pd`, `plot_curves` | **Tested** — `test_market_coeff` |
+
+---
+
+### `Graph_Dash.py` — 72%
+
+```
+138-140, 376, 396-416, 443, 459-460, 478, 483, 490, 494, 501, 536, 539-545, 672-674, 684-688, 698-702, 730-732, 761, 776, 796, 813-814, 816, 821-873, 879-880
+```
+
+| Lines | Function / block | Status |
+|-------|------------------|--------|
+| 47–201 | `plot_TS_res_from_ts` (all plot types) | **Tested** — `test_graph_dash` |
+| 218–447 | `create_dash_app` callbacks | Partial — toggle, options, graphs tested |
+| 396–416 | `update_limits` callback | **Not tested** (pandas edge on synthetic frame) |
+| 459–501, 879–880 | `run_dash` / `run_ts_dash` / `run_mp_ts_dash` | **Not tested** — `app.run()` |
+| 672–873 | MP dash compare mode + second plot | Partial |
 
 ---
 
@@ -196,36 +187,18 @@ OPF orchestration, objectives, and result helpers. Solver infrastructure moved t
 
 | Lines | Function / block | Status |
 |-------|------------------|--------|
-| 56–149, 175–236 | `check_pyomo_solvers`, `check_ortools_backends`, `check_available_solvers` | **Tested** — mocked in `test_solver_utils` |
-| 116–118, 128–129, 140, 145–147 | verbose OR-Tools probe branches | **Not tested** |
-| 212, 215–218, 227–234, 240–246 | `format_solver_report` edge cases | Partial |
-
----
-
-### `ACDC_sequential_STEP.py` — 61%
-
-```
-23-27, 38, 40, 50-52, 76, 78, 80, 82, 88, 108, 112, 116, 129, 134, 148, 155-156, 173-186, 190-206, 218-239, 285, 297, 337-340, 353, 356-427, 491-508, 613-641
-```
-
-| Lines | Function / block | Status |
-|-------|------------------|--------|
-| 356–427 | `sequential_STEP` main loop (success path) | **Not tested** — full solve (not fake-solve abort) |
-| 491–508, 613–641 | Export / SVG / step results | **Not tested** — `export_steps=True`, `save_svgs=True` |
+| 56–236 | `check_*`, `format_solver_report` | **Tested** / Partial |
+| 116–147 | verbose OR-Tools branches | **Not tested** |
 
 ---
 
 ### Other modules (missing lines only)
 
-**`Graph_Dash.py` ~72%:** remaining gaps — `run_ts_dash` / `run_mp_ts_dash` / `run_dash` auto-routing success paths (call `app.run`), `update_limits` callback, MP compare-mode subplot tail (821–873).
+**`Export_files.py` 38%:** `47, 75-86, 98, 107, 130-134, 151-163, 246, 296-312, 326-328, 355-358, 418-440, 482-491, 513, 522-736, 748-841`
 
-**`Export_files.py` 38%:** `31-32, 51, 79-90, 102, 111, 134-138, 155-167, 250, 300-316, 330-332, 359-362, 422-444, 486-495, 517, 526-740, 752-845` — Excel export paths; partial via TEP/MP `export` flags.
+**`Mapping.py` 44%:** `48-113, 125, 242-246, 252, 258, 287, 291, 294-303, 306-312, 342, 370, 375, 466, 486, 495, 502, 522, 531, 566-570, 576, 586-591, 622, 627-629, 632-633, 643, 670-671, 691-693, 716-724, 732, 759, 806, 812, 833, 855-861, 877-889, 893-898, 919-1126, 1148-1541, 1552, 1559-1561, 1568, 1570, 1572, 1574, 1582, 1611, 1613`
 
-**`Mapping.py` 44%:** `48-113, 125, 242-246, 252, 258, 287, 291, 294-303, 306-312, 342, 370, 375, 466, 486, 495, 502, 522, 531, 566-570, 576, 586-591, 622, 627-629, 632-633, 643, 670-671, 691-693, 716-724, 732, 759, 806, 812, 833, 855-861, 877-889, 893-898, 919-1126, 1148-1541, 1552, 1559-1561, 1568, 1570, 1572, 1574, 1582, 1611, 1613` — geo/plot helpers; `test_folium` partial.
-
-**`AC_OPF_L_model.py` 38%:** model-builder branches for grid features not in current OPF cases (TEP install vars, REC, array losses, price zones). Grows when OPF/TEP tests use richer grids — not isolated unit-test friendly.
-
-**`Time_series.py` 53%, `Results_class.py` 60%, `Array_OPT.py` 54%, `Graph_and_plot.py` 57%** — large indirect gaps; see `term-missing` output after full cov run.
+**`AC_OPF_L_model.py` 38%, `Time_series.py` 54%, `Results_class.py` 60%, `Array_OPT.py` 54%, `Graph_and_plot.py` 57%** — see `term-missing` from full run.
 
 ---
 

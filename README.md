@@ -6,6 +6,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/pyflow-acdc)](https://pypi.org/project/pyflow-acdc/)
 [![License](https://img.shields.io/github/license/CITCEA-UPC/pyflow_acdc)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/LICENSE)
 [![PR tests](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml)
+[![Test coverage](https://img.shields.io/badge/coverage-67%25-yellow)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/TEST_COVERAGE.md)
 [![Documentation Status](https://readthedocs.org/projects/pyflow-acdc/badge/?version=latest)](https://pyflow-acdc.readthedocs.io/en/latest/)
 
 A python-based tool for the design and analysis of hybrid AC/DC grids
