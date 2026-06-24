@@ -16,7 +16,7 @@ from .constants import HOURS_PER_YEAR, CT_SELECTION_THRESHOLD, BINARY_THRESHOLD,
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
 from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
+from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,opf_obj_l_array_losses,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
 
 from .Graph_and_plot import save_network_svg
 
@@ -1201,7 +1201,7 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
 
 
     obj_TEP = tep_obj(model,grid,NPV)
-    obj_OPF = opf_obj_l(model,grid,weights_def)
+    obj_OPF = opf_obj_l(model,grid,weights_def) + opf_obj_l_array_losses(model,grid,weights_def)
 
     present_value = present_value_factor(Hy, discount_rate, n_years)
     if NPV:

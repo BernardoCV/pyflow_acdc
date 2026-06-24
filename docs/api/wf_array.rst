@@ -11,7 +11,7 @@ Inter-array optimisation splits into two problems:
 - **Route** — ``MIP_path_graph`` selects which candidate CT lines are built
   (spanning tree, string flow, substation limits). With
   ``enable_cable_types=True``, cable types are chosen in the same MIP.
-- **CSS** — ``simple_CSS`` / ``optimal_l_css_ortools`` pick cable types on a
+- **CSS** — ``wind_farm_CSS`` / ``optimal_l_css_ortools`` pick cable types on a
   fixed topology (no routing). ``sequential_CSS`` alternates route MIP then CSS
   each iteration.
 
@@ -96,7 +96,7 @@ Sequential Cable Sizing (CSS)
 .. autofunction:: pyflow_acdc.sequential_CSS
 
    Outer loop for array sizing: each iteration runs ``MIP_path_graph`` (route)
-   then ``simple_CSS`` (cable types on that route), shrinking the allowed cable
+   then ``wind_farm_CSS`` (cable types on that route), shrinking the allowed cable
    catalogue until convergence or ``max_iter``. Returns models, iteration
    summary, timing info, solver stats, and the best iteration index.
 
@@ -227,7 +227,7 @@ MIP Path Selection (Array)
 Cable Size Selection (CSS)
 --------------------------
 
-.. autofunction:: pyflow_acdc.simple_CSS
+.. autofunction:: pyflow_acdc.wind_farm_CSS
 
    Cable size selection on a **fixed** inter-array topology (``line.active_config``
    set beforehand, typically by ``MIP_path_graph``). Does not optimise routing.
@@ -247,7 +247,7 @@ Linear CSS Solver (OR-Tools)
 .. autofunction:: pyflow_acdc.optimal_l_css_ortools
 
    OR-Tools ``linear_solver`` backend for CSS: one cable type per active CT line,
-   Ybus DC balance, optional discounted generator OPEX. Called by ``simple_CSS``
+   Ybus DC balance, optional discounted generator OPEX. Called by ``wind_farm_CSS``
    when ``CSS_L_solver='ortools'``. Route selection is not part of this model.
    See also :doc:`L_opf` for the Pyomo linear model (which may include TEP/CT
    network-flow when ``TEP=True``).

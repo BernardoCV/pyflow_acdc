@@ -16,11 +16,11 @@ CT = 3
 MIP_SOLVER = 'ortools'
 TL = 60
 NL = False
-TEE = True
+TEE = False
 FS = False
-OBJ = {'Energy_cost': 1}
 FLH = 8760
 WACC = 0.02
+L_OPEX = True
 
 
 def run_case(mip_solver='ortools'):
@@ -34,7 +34,7 @@ def run_case(mip_solver='ortools'):
         n_years=25,
         Hy=FLH,
         discount_rate=WACC,
-        ObjRule=OBJ,
+        L_OPEX=L_OPEX,
         MIP_solver=mip_solver,
         CSS_L_solver='ortools',
         CSS_NL_solver=tep_solver(),
@@ -57,7 +57,9 @@ def run_case(mip_solver='ortools'):
         1 for n in getattr(grid, 'nodes_AC', []) if getattr(n, 'type', None) == 'Slack'
     )
     total_time = time.perf_counter() - start_time
-
+    print(f"cable lenght: {cable_length}")
+    print(f"time: {total_time}")
+ 
     return (
         i, total_time, edges, substations, turbines, obj_value,
         path_time, css_time, summary_results, crossing, cable_length,

@@ -168,7 +168,7 @@ try:
     # Array_OPT depends on both OPF and Static_TEP modules
     try:
         from .Array_OPT import *
-        __all__.extend(['simple_CSS', 'sequential_CSS', 'MIP_path_graph', 'simple_assign_cable_types'])
+        __all__.extend(['wind_farm_CSS', 'sequential_CSS', 'MIP_path_graph', 'simple_assign_cable_types'])
     except ImportError:
         pass
 

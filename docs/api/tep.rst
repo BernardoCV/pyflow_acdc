@@ -102,7 +102,7 @@ Linear and Sensitivity Utilities
 .. autofunction:: pyflow_acdc.linear_transmission_expansion
 
    Linearized TEP workflow suitable for faster studies and large sweeps.
-   This is also the Pyomo backend for :func:`~pyflow_acdc.simple_CSS` when
+   This is also the Pyomo backend for :func:`~pyflow_acdc.wind_farm_CSS` when
    ``CSS_L_solver`` is a Pyomo LP/MIP solver (not ``'ortools'``).
 
 .. autofunction:: pyflow_acdc.alpha_pareto

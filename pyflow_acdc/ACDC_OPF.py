@@ -1457,6 +1457,22 @@ def opf_obj_l(model,grid,ObjRule):
     return AC
 
 
+def opf_obj_l_array_losses(model, grid, ObjRule):
+    """Linear array-loss OPEX term (matches :func:`opf_obj` ``formula_Array_losses``)."""
+    if ObjRule[ObjComponent.ARRAY_LOSSES]['w'] == 0:
+        return 0
+    ren_injected = 0
+    if grid.RenSources:
+        ren_injected = sum(
+            model.P_renSource[rs] * model.np_rsgen[rs]
+            for rs in model.ren_sources)
+    substations_extracted = sum(
+        model.PGi_opt[node]
+        for node in model.nodes_AC
+        if grid.nodes_AC[node].type == NodeType.SLACK)
+    return (ren_injected + substations_extracted) * grid.LCoE * grid.S_base
+
+
 def opf_obj(model,grid,weights_def,OnlyGen=True):
     """Build the weighted OPF objective from component weights.
 

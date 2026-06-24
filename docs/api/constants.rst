@@ -11,7 +11,7 @@ Array sizing enums
    :members:
 
    Cable-string-sizing mode for :func:`~pyflow_acdc.sequential_CSS` and
-   :func:`~pyflow_acdc.simple_CSS` (``NL`` argument). ``False`` selects the
+   :func:`~pyflow_acdc.wind_farm_CSS` (``NL`` argument). ``False`` selects the
    linear model; ``CssMode.PF`` runs linear CSS then a post-solve
    :func:`~pyflow_acdc.power_flow` for losses; ``CssMode.OPF`` uses the
    nonlinear OPF path.

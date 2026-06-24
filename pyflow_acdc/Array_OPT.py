@@ -6,7 +6,7 @@ Two coupled problems, usually run in sequence by ``sequential_CSS``:
   (spanning tree, turbine-string flow, substation connection limits).
   With ``enable_cable_types=True``, route and cable-type choice are solved
   together in one MIP; otherwise routing only.
-- **CSS** — ``simple_CSS`` picks cable types on the fixed topology via
+- **CSS** — ``wind_farm_CSS`` picks cable types on the fixed topology via
   ``linear_transmission_expansion`` (Pyomo) or ``optimal_l_css_ortools``
   (OR-Tools). Does not change which lines exist.
 
@@ -46,7 +46,7 @@ __all__ = [
     'sequential_CSS',
     'min_sub_connections',
     'MIP_path_graph',
-    'simple_CSS',
+    'wind_farm_CSS',
     'simple_assign_cable_types'
 ]
 
@@ -71,15 +71,18 @@ class MIPConfig:
     t_MW: float | None = None
 
 
-def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
+def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,L_OPEX=True,max_turbines_per_string=None,limit_crossings=True,sub_min_connections=True,
                    MIP_solver='glpk',CSS_L_solver='glpk',CSS_NL_solver='bonmin',svg=None,max_iter=None,time_limit=DEFAULT_TIME_LIMIT,NL=False,tee=False,fs=False,save_path=None,
                    MIP_gap=0.01,backend=MIPBackend.PYOMO.value,min_turbines_per_string=False,fixed_substation_connections=None,max_ns=None):
     """Iteratively alternate path MIP and CSS on a shrinking cable-type set.
 
     Each iteration: (1) ``MIP_path_graph`` fixes the inter-array route on
-    ``grid.lines_AC_ct``; (2) ``simple_CSS`` sizes cables on that topology
+    ``grid.lines_AC_ct``; (2) ``wind_farm_CSS`` sizes cables on that topology
     (no routing inside CSS). Stops when the largest usable cable type is
     eliminated or ``max_iter`` is reached.
+
+    ``L_OPEX`` enables discounted array-loss OPEX on linear CSS passes.
+    Nonlinear CSS (``NL=CssMode.OPF``) always includes array-loss OPEX.
     """
     if LCoE is not None:
         grid.LCoE = LCoE
@@ -107,7 +110,10 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
     i = 0
     seq_path_time = 0
     seq_css_time = 0
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(
+        grid,
+        {ObjComponent.ARRAY_LOSSES.value: 1} if L_OPEX else None,
+        True)
     t0 = time.perf_counter()
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
 
@@ -167,12 +173,10 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
         if not flag:
             if i == 0:
-                # If MIP fails on first iteration, return None
                 if tee:
                     print(f'MIP failed on first iteration, returning None')
                 return None, None, None, None,i
             else:
-                # If MIP fails on later iterations, break the loop
                 if tee:
                     print(f'MIP failed on iteration {i}, breaking loop')
                 break
@@ -209,9 +213,10 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
         # OPF uses NL solver; False and PF both use linear CSS
         css_NL = (NL == CssMode.OPF)
-        model, model_results, timing_info_CSS, solver_stats = simple_CSS(
-            grid, NPV, n_years, Hy, discount_rate, ObjRule, CSS_L_solver,
-            CSS_NL_solver, time_limit, css_NL, tee, fs=fs)
+        model, model_results, timing_info_CSS, solver_stats = wind_farm_CSS(
+            grid, NPV, n_years, Hy, discount_rate, L_OPEX=L_OPEX,
+            CSS_L_solver=CSS_L_solver, CSS_NL_solver=CSS_NL_solver,
+            time_limit=time_limit, NL=css_NL, tee=tee, fs=fs)
         css_ok = solver_stats.get('solution_found', False) if solver_stats else False
         feasible_solutions_CSS = solver_stats.get('feasible_solutions', []) if solver_stats else []
         t4 = time.perf_counter()
@@ -239,6 +244,10 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
             else:
                 obj_value = pyo.value(model.obj)
         else:
+            if NL != CssMode.OPF:
+                if tee:
+                    print(f'Iteration {i} linear CSS failed, stopping sequential_CSS')
+                return None, None, None, None, i
             if tee:
                 print(f'Iteration {i} CSS solver status not ok and no feasible solution found, skipping to next cable combo')
             obj_value = None
@@ -274,11 +283,8 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
                 new_cables.pop()
 
         else:
-            # Optimization failed, remove the largest cable type
+            # Nonlinear OPF CSS failed: remove the largest cable type and continue
             new_cables.pop()
-
-
-
 
         # Check if it's Pyomo or OR-Tools MockModel
         if hasattr(model_MIP, 'line_used') and hasattr(model_MIP, 'lines'):
@@ -622,7 +628,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     Selects a minimum-cost spanning forest over candidate CT lines. Set
     ``enable_cable_types=True`` to co-optimize cable types in the same MIP;
     otherwise only routing is optimized and cable sizing is delegated to
-    ``simple_CSS``.
+    ``wind_farm_CSS``.
 
     Parameters
     ----------
@@ -632,7 +638,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         - 'ortools': Uses OR-Tools CP-SAT solver (built-in, faster)
     enable_cable_types : bool
         If True, solve route + cable size selection in one MIP; if False,
-        route only (cable sizing is done separately by ``simple_CSS``).
+        route only (cable sizing is done separately by ``wind_farm_CSS``).
     t_MW : float
         Turbine MW rating (needed to calculate flow capacity from MVA ratings)
     cab_types_allowed : int, optional
@@ -2169,7 +2175,7 @@ def _plot_feasible_solutions_subplots(results_mip, results_css, suptitle=None, s
 
 
 
-def simple_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=1200,NL=False,tee=False,export=True,fs=False):
+def wind_farm_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,L_OPEX=True,CSS_L_solver='gurobi',CSS_NL_solver='bonmin',time_limit=1200,NL=False,tee=False,export=True,fs=False):
     """Run cable size selection (CSS) on a fixed inter-array topology.
 
     Does not optimize routing. Expects ``grid.lines_AC_ct`` active/inactive
@@ -2178,18 +2184,38 @@ def simple_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_
     Dispatches to ``transmission_expansion`` (``NL=True``),
     ``optimal_l_css_ortools`` (``CSS_L_solver='ortools'``), or
     ``linear_transmission_expansion`` (other linear Pyomo solvers).
+
+    ``L_OPEX=True`` adds discounted array-loss OPEX on linear CSS; ``L_OPEX=False`` is
+    investment-only (``min_gamma`` set to 1 so ``gamma`` cannot curtail). Nonlinear
+    CSS always includes array-loss OPEX.
     """
+    array_losses_obj = {ObjComponent.ARRAY_LOSSES.value: 1}
+    css_obj = array_losses_obj if L_OPEX else None
 
     grid.Array_opf = False
     if NL:
-        model, model_results , timing_info, solver_stats= transmission_expansion(grid,NPV,n_years,Hy,discount_rate,ObjRule,CSS_NL_solver,time_limit,tee,export,PV_set=True,callback=fs)
-    elif CSS_L_solver == MIPBackend.ORTOOLS.value:
-        from .AC_L_CSS_ortools import optimal_l_css_ortools
-        OPEX = ObjRule is not None and ObjRule.get(ObjComponent.ENERGY_COST.value, 0) != 0
-        model, model_results, timing_info, solver_stats = optimal_l_css_ortools(
-            grid, OPEX=OPEX, NPV=NPV, n_years=n_years, Hy=Hy,
-            discount_rate=discount_rate, tee=tee, time_limit=time_limit)
+        model, model_results , timing_info, solver_stats= transmission_expansion(
+            grid, NPV, n_years, Hy, discount_rate, array_losses_obj, CSS_NL_solver,
+            time_limit, tee, export, PV_set=True, callback=fs)
     else:
-        model, model_results , timing_info, solver_stats= linear_transmission_expansion(grid,NPV,n_years,Hy,discount_rate,None,CSS_L_solver,time_limit,tee,export,fs)
+        saved_min_gamma = None
+        if not L_OPEX:
+            saved_min_gamma = {rs.rsNumber: rs.min_gamma for rs in grid.RenSources}
+            for rs in grid.RenSources:
+                rs.min_gamma = 1.0
+        try:
+            if CSS_L_solver == MIPBackend.ORTOOLS.value:
+                from .AC_L_CSS_ortools import optimal_l_css_ortools
+                model, model_results, timing_info, solver_stats = optimal_l_css_ortools(
+                    grid, ObjRule=css_obj, NPV=NPV, n_years=n_years, Hy=Hy,
+                    discount_rate=discount_rate, tee=tee, time_limit=time_limit)
+            else:
+                model, model_results , timing_info, solver_stats= linear_transmission_expansion(
+                    grid, NPV, n_years, Hy, discount_rate, css_obj, CSS_L_solver,
+                    time_limit, tee, export, fs)
+        finally:
+            if saved_min_gamma is not None:
+                for rs in grid.RenSources:
+                    rs.min_gamma = saved_min_gamma[rs.rsNumber]
 
     return model, model_results , timing_info, solver_stats

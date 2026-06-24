@@ -64,7 +64,7 @@ everything else builds on.
   subproblems.
 - **`Array_OPT.py`** — Offshore inter-array sizing orchestration: **route**
   MIP (``MIP_path_graph``, Pyomo or OR-Tools CP-SAT; optional joint cable types
-  via ``enable_cable_types``) and **CSS** dispatch (``simple_CSS``,
+  via ``enable_cable_types``) and **CSS** dispatch (``wind_farm_CSS``,
   ``sequential_CSS``). Owns spanning-tree / flow / ``ct_limit`` constraints.
   Install ``[OPF]`` for Pyomo CSS; ``[ORTOOLS_ARRAY]`` for OR-Tools MIP/CSS.
 - **`AC_L_CSS_ortools.py`** — OR-Tools ``linear_solver`` CSS only: cable type
