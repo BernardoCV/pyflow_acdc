@@ -133,10 +133,12 @@ Export Multi-scenario TEP Time Series
 -------------------------------------
 
 .. autofunction:: pyflow_acdc.export_TEP_multiScenario_results_to_excel
+   :no-index:
 
    Excel export for MS and MP+MS scenario tables on ``grid.TEP_multiScenario_res``.
 
 .. function:: pyflow_acdc.export_TEP_TS_results_to_excel
+   :no-index:
 
    **Deprecated alias** for :func:`export_TEP_multiScenario_results_to_excel`.
    Prefer the canonical name in new scripts.

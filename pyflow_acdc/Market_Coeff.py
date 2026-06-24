@@ -758,7 +758,7 @@ def clean_entsoe_data(key_list, year_list, production_types=None, output_excel=N
 
     Reads per-area folders of ENTSO-E Transparency exports, resamples to hourly
     profiles (via :func:`compute_hour_of_year`), normalizes by annual maxima, and
-  writes one sheet per year plus a ``Maximum Values`` summary.
+    writes one sheet per year plus a ``Maximum Values`` summary.
 
     Parameters
     ----------

@@ -652,11 +652,11 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     Parameters
     ----------
     backend : str, optional
-        Backend to use: 'pyomo' (default) or 'ortools'
-        - 'pyomo': Pyomo model solved by ``solver_name`` (Gurobi, GLPK, etc.)
-        - 'ortools': OR-Tools CP-SAT path MIP by default; if ``solver_name``
-          is one of :data:`~pyflow_acdc.constants.ORTOOLS_LINEAR_SOLVERS`
-          (GUROBI / SCIP / CBC), falls back to the Pyomo path with that solver
+        ``'pyomo'`` (default) or ``'ortools'``. Pyomo uses ``solver_name``
+        (Gurobi, GLPK, etc.). OR-Tools uses CP-SAT by default; if
+        ``solver_name`` is in
+        :data:`~pyflow_acdc.constants.ORTOOLS_LINEAR_SOLVERS` (GUROBI / SCIP /
+        CBC), the Pyomo path is used with that solver instead.
     enable_cable_types : bool
         If True, solve route + cable size selection in one MIP; if False,
         route only (cable sizing is done separately by ``wind_farm_CSS``).
@@ -665,8 +665,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
     cab_types_allowed : int, optional
         Maximum number of cable types that can be used (linking constraint)
 
-    Returns:
-    --------
+    Returns
+    -------
     success : bool
         True if solution found, False otherwise
     high_flow : float or None
