@@ -52,6 +52,7 @@ __all__ = [
 
     # Add Time Series
     'add_TimeSeries',
+    'time_series_dict',
 
     #Add investment series
     'add_inv_series',
@@ -183,6 +184,7 @@ try:
         'export_and_save_inv_period_svgs',
         'run_opf_for_investment_period',
         'run_ts_opf_for_investment_period',
+        'run_opf_for_all_investment_periods',
     ])
 except ImportError:
     pass

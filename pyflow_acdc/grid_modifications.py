@@ -79,6 +79,7 @@ __all__ = [
 
     # Add Time Series
     'add_TimeSeries',
+    'time_series_dict',
 
     #Add investment series
     'add_inv_series',
