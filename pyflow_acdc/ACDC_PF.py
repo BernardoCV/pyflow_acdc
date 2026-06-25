@@ -45,7 +45,8 @@ def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Dro
     """
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
-        t, tol, _ = acdc_sequential(grid, tol_lim, maxIter, Droop_PF=Droop_PF)
+        t, tracker, _ = acdc_sequential(grid, maxIter=maxIter, Droop_PF=Droop_PF)
+        tol = tracker['final_sequential_tolerance']
     elif grid.ACmode:
         t, tol = ac_power_flow(grid, tol_lim, maxIter)
     elif grid.DCmode:
@@ -179,7 +180,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
 
         # Track AC power flow tolerance
-        ac_tol = load_flow_ac(grid, tol_lim=internal_tol)
+        ac_tol = load_flow_ac(grid, tol_lim=internal_tol, maxIter=maxIter)
         tolerance_tracker['ac_pf_tolerances'].append(ac_tol)
 
         for conv in grid.Converters_ACDC:
@@ -214,7 +215,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         grid.update_p_dc()
 
         # Track DC power flow tolerance
-        dc_tol = load_flow_dc(grid, tol_lim=internal_tol, Droop_PF=Droop_PF)
+        dc_tol = load_flow_dc(grid, tol_lim=internal_tol, maxIter=maxIter, Droop_PF=Droop_PF)
         tolerance_tracker['dc_pf_tolerances'].append(dc_tol)
 
         # Track converter tolerances
@@ -230,7 +231,7 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             conv.th_s = AC_node.theta
 
             # Get converter tolerance
-            conv_tol = flow_conv(grid, conv, tol_lim=internal_tol*1e-4)
+            conv_tol = flow_conv(grid, conv, tol_lim=internal_tol*1e-4, maxIter=maxIter)
             conv_tolerances.append(conv_tol)
             conv_names.append(conv.name)
 
