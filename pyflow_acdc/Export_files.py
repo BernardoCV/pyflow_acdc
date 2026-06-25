@@ -15,7 +15,6 @@ from .constants import (
     NodeType,
     ConverterDCType,
     AcDcSide,
-    Polarity,
     DataInput,
     PriceZoneCategory,
 )
@@ -240,11 +239,6 @@ def create_dictionaries(grid):
     if grid.lines_DC:
         for line in getattr(grid, "lines_DC", []):
             if line:
-                if line.pol   == 1:
-                    pol = Polarity.MONOPOLAR
-                else:
-                    pol = Polarity.BIPOLAR
-
                 data["lines_DC"].append({
                     "fromNode":   line.fromNode.name,
                     "toNode":     line.toNode.name,
@@ -252,7 +246,7 @@ def create_dictionaries(grid):
                     "MW_rating":  float(line.MW_rating),
                     "kV_base":    float(line.kV_base),
                     "Length_km":         float(line.Length_km),
-                    "Mono_Bi_polar":   pol,
+                    "Mono_Bi_polar":   line.m_sm_b.value,
                     "Line_id":       line.name,
                     "geometry": line.geometry.wkt if line.geometry is not None else None
                 })
