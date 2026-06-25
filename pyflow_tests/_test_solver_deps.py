@@ -14,7 +14,7 @@ import os
 import pytest
 
 import pyflow_acdc as pyf
-from pyflow_acdc.constants import ORTOOLS_LINEAR_SOLVERS
+from pyflow_acdc.constants import ORTOOLS_LINEAR_SOLVERS, PYOMO_LINEAR_SOLVERS
 
 PYOMO_MIP_CSS_SOLVERS = ("gurobi", "glpk")
 
@@ -234,14 +234,20 @@ def tep_solver():
 
 def mip_solvers():
     """Return ``(MIP_solver, CSS_L_solver)`` for :func:`sequential_CSS`."""
-    if pyf.is_pyomo_solver_available("gurobi"):
-        return "gurobi", "gurobi"
-    if pyf.is_pyomo_solver_available("glpk"):
-        print("Gurobi is not available; falling back to glpk for MIP and CSS.")
-        return "glpk", "glpk"
-    raise RuntimeError(
-        "no Pyomo MIP/CSS-L solver available (need gurobi or glpk)"
-    )
+    chosen = None
+    for name in PYOMO_LINEAR_SOLVERS:
+        if pyf.is_pyomo_solver_available(name):
+            chosen = name
+            break
+    if chosen is None:
+        raise RuntimeError(
+            "no Pyomo MIP/CSS-L solver available "
+            f"(need one of: {', '.join(PYOMO_LINEAR_SOLVERS)})"
+        )
+    preferred = PYOMO_LINEAR_SOLVERS[0]
+    if chosen != preferred:
+        print(f"{preferred} is not available; falling back to {chosen} for MIP and CSS.")
+    return chosen, chosen
 
 
 def lopf_solver():

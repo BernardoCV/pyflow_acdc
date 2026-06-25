@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Sequential CSS on alpha_ventus (Gurobi MIP with GLPK fallback)."""
+"""Sequential CSS on alpha_ventus (linear and PF loss post-processing)."""
 import time
 
 import pyflow_acdc as pyf
 import pyomo.environ as pyo
 
+from pyflow_acdc.constants import CssMode
 from pyflow_tests._test_solver_deps import (
     mip_solvers,
     pyomo_mip_css_solvers_missing_for_run_test,
@@ -17,7 +18,6 @@ from pyflow_tests._test_solver_deps import (
 ARRAY_CASE = "alpha_ventus"
 CT = 3
 TL = 60
-NL = False
 TEE = False
 FS = False
 FLH = 8760
@@ -25,7 +25,28 @@ WACC = 0.02
 L_OPEX = True
 
 
-def run_case(mip_solver=None, css_l_solver=None):
+def _format_result(nl_label, result):
+    (
+        i,
+        total_time,
+        edges,
+        substations,
+        turbines,
+        obj_value,
+        path_time,
+        css_time,
+        crossing,
+        cable_length,
+    ) = result
+    return (
+        f"{ARRAY_CASE} [{nl_label}] - iterations {i}, total time {total_time}, "
+        f"edges {edges}, subsations {substations}, turbines {turbines}, "
+        f"obj_value {obj_value}, path_time {path_time}, css_time {css_time}, "
+        f"crossing {crossing}, cable_length {cable_length}"
+    )
+
+
+def run_case(mip_solver=None, css_l_solver=None, *, nl=False):
     if mip_solver is None or css_l_solver is None:
         mip_solver, css_l_solver = mip_solvers()
 
@@ -44,11 +65,10 @@ def run_case(mip_solver=None, css_l_solver=None):
         CSS_NL_solver=tep_solver(),
         max_iter=None,
         time_limit=TL,
-        NL=NL,
+        NL=nl,
         tee=TEE,
         fs=FS,
     )
-
     i = len(summary_results["iteration"])
     obj_value = pyo.value(model[1].obj)
     cable_length = summary_results["cable_length"][best_i]
@@ -76,28 +96,20 @@ def run_case(mip_solver=None, css_l_solver=None):
     )
 
 
-def test_sequential_array_alpha_ventus():
+def test_sequential_array_alpha_ventus_linear():
     require_pyomo()
     require_pyomo_mip_css_solvers()
     mip_solver, css_solver = mip_solvers()
-    (
-        i,
-        total_time,
-        edges,
-        substations,
-        turbines,
-        obj_value,
-        path_time,
-        css_time,
-        crossing,
-        cable_length,
-    ) = run_case(mip_solver, css_solver)
-    print(
-        f"{ARRAY_CASE}- iterations {i}, total time {total_time}, edges {edges}, "
-        f"subsations {substations}, turbines {turbines}, obj_value {obj_value}, "
-        f"path_time {path_time}, css_time {css_time}, crossing {crossing}, "
-        f"cable_length {cable_length}"
-    )
+    result = run_case(mip_solver, css_solver, nl=False)
+    print(_format_result("linear", result))
+
+
+def test_sequential_array_alpha_ventus_pf():
+    require_pyomo()
+    require_pyomo_mip_css_solvers()
+    mip_solver, css_solver = mip_solvers()
+    result = run_case(mip_solver, css_solver, nl=CssMode.PF)
+    print(_format_result("PF", result))
 
 
 def run_test():
@@ -106,25 +118,9 @@ def run_test():
     if pyomo_mip_css_solvers_missing_for_run_test():
         return
     mip_solver, css_solver = mip_solvers()
-    (
-        i,
-        total_time,
-        edges,
-        substations,
-        turbines,
-        obj_value,
-        path_time,
-        css_time,
-        crossing,
-        cable_length,
-    ) = run_case(mip_solver, css_solver)
-    print(
-        f"{ARRAY_CASE}- iterations {i}, total time {total_time}, edges {edges}, "
-        f"subsations {substations}, turbines {turbines}, obj_value {obj_value}, "
-        f"path_time {path_time}, css_time {css_time}, crossing {crossing}, "
-        f"cable_length {cable_length}"
-    )
-
+    for nl, label in ((False, "linear"), (CssMode.PF, "PF")):
+        result = run_case(mip_solver, css_solver, nl=nl)
+        print(_format_result(label, result))
 
 if __name__ == "__main__":
     run_test()
