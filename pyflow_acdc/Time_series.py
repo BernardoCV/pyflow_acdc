@@ -80,15 +80,13 @@ def time_series_pf(grid):
     >>> import pyflow_acdc as pyf
     >>> pyf.time_series_pf(grid)
     """
-    if grid.nodes_AC is None:
-        print("only DC")
-        ts_dc_pf(grid)
-    elif grid.nodes_DC is None:
-        print("only AC")
-        ts_ac_pf(grid)
-    else:
-        print("Sequential")
+    analyse_grid(grid)
+    if grid.ACmode and grid.DCmode:
         ts_acdc_pf(grid)
+    elif grid.ACmode:
+        ts_ac_pf(grid)
+    elif grid.DCmode:
+        ts_dc_pf(grid)
 
 def combine_TS(ts_list, rep_year=False):
     """Combines multiple time series while maintaining the order of the input list.
@@ -906,6 +904,7 @@ def ts_acdc_opf(
     obj_scaling=1.0,
     warm_start_mode='roll',
     export_to_grid=True,
+    build_only=False,
 ):
     """Run sequential AC/DC OPF over a time-series window.
 
@@ -939,6 +938,11 @@ def ts_acdc_opf(
         Warm-start strategy between hours.
     export_to_grid : bool, optional
         Export the final model state back onto ``grid``.
+    build_only : bool, optional
+        If ``True``, build and update the Pyomo model each hour but skip the
+        solver. Post-processing (including
+        :func:`_calculate_line_loading_from_model`) still runs using the
+        model's current variable values (typically the initializer).
 
     Returns
     -------
@@ -1088,39 +1092,42 @@ def ts_acdc_opf(
         t2= time.perf_counter()
         t_modelupdate = t2-t1
 
-        results, solver_stats = pyomo_model_solve(model,grid,solver,suppress_warnings=True)
-        termination_condition = str((solver_stats or {}).get('termination_condition') or '').lower()
-        solution_found = bool((solver_stats or {}).get('solution_found', False))
-        if (results is None) or (not solution_found):
-            # Retry with opposite initialization strategy for this timestep.
-            retry_mode = 'roll' if warm_start_mode == 'hard' else 'hard'
-            if print_step:
-                print(f"{idx+1} Failed with {warm_start_mode}")
-            retry_model = _build_ts_model()
-            if retry_mode == 'hard':
-                reset_to_initialize(retry_model, initial_values)
-            elif t_minus_1_values is not None:
-                reset_to_initialize(retry_model, t_minus_1_values)
-            _modify_parameters(grid,retry_model,price_zone_restrictions)
-            retry_results, retry_stats = pyomo_model_solve(retry_model,grid,solver,suppress_warnings=True)
-            retry_solution_found = bool((retry_stats or {}).get('solution_found', False))
-            if retry_results is not None and retry_solution_found:
-                model = retry_model
-                results, solver_stats = retry_results, retry_stats
-                if print_step:
-                    print(f"{idx+1} Passed with {retry_mode} returning to {warm_start_mode}")
-            else:
-                infeasible += 1
-                inf_list.append(idx+1)
-                if print_step:
-                    reason = str((retry_stats or {}).get('termination_condition') or termination_condition or 'solver error').lower()
-                    print(f"{idx+1} Failed with {retry_mode}")
-                    print(f"{idx+1} skipped ({reason})")
-                idx += 1
-                continue
-        t_modelsolve = (solver_stats or {}).get('time')
-        if t_modelsolve is None:
+        if build_only:
             t_modelsolve = 0.0
+        else:
+            results, solver_stats = pyomo_model_solve(model,grid,solver,suppress_warnings=True)
+            termination_condition = str((solver_stats or {}).get('termination_condition') or '').lower()
+            solution_found = bool((solver_stats or {}).get('solution_found', False))
+            if (results is None) or (not solution_found):
+                # Retry with opposite initialization strategy for this timestep.
+                retry_mode = 'roll' if warm_start_mode == 'hard' else 'hard'
+                if print_step:
+                    print(f"{idx+1} Failed with {warm_start_mode}")
+                retry_model = _build_ts_model()
+                if retry_mode == 'hard':
+                    reset_to_initialize(retry_model, initial_values)
+                elif t_minus_1_values is not None:
+                    reset_to_initialize(retry_model, t_minus_1_values)
+                _modify_parameters(grid,retry_model,price_zone_restrictions)
+                retry_results, retry_stats = pyomo_model_solve(retry_model,grid,solver,suppress_warnings=True)
+                retry_solution_found = bool((retry_stats or {}).get('solution_found', False))
+                if retry_results is not None and retry_solution_found:
+                    model = retry_model
+                    results, solver_stats = retry_results, retry_stats
+                    if print_step:
+                        print(f"{idx+1} Passed with {retry_mode} returning to {warm_start_mode}")
+                else:
+                    infeasible += 1
+                    inf_list.append(idx+1)
+                    if print_step:
+                        reason = str((retry_stats or {}).get('termination_condition') or termination_condition or 'solver error').lower()
+                        print(f"{idx+1} Failed with {retry_mode}")
+                        print(f"{idx+1} skipped ({reason})")
+                    idx += 1
+                    continue
+            t_modelsolve = (solver_stats or {}).get('time')
+            if t_modelsolve is None:
+                t_modelsolve = 0.0
 
         total_update_time+= t_modelupdate
         total_solve_time += t_modelsolve

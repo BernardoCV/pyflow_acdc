@@ -126,6 +126,7 @@ packages = ["pyflow_acdc","pyflow_tests"]
     "examples/North_Sea_grid_data/README.md",
 ]
 "examples/Case24_MP" = ["examples/Case24_MP/*.csv", "examples/Case24_MP/README.md"]
+"examples/Case118_benchmark" = ["examples/Case118_benchmark/*.csv", "examples/Case118_benchmark/README.md"]
 
 [project.scripts]
 pyflow-acdc-test = "pyflow_tests.run_tests:main"
