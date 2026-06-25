@@ -155,7 +155,7 @@ try:
             'transmission_expansion', 'linear_transmission_expansion',
             'multi_scenario_TEP', 'expand_elements_from_pd',
             'repurpose_element_from_pd', 'update_attributes', 'expand_element',
-            'translate_pd_tep', 'export_TEP_multiScenario_results_to_excel',
+            'export_TEP_multiScenario_results_to_excel',
             'alpha_pareto', 'rate_sensitivity', 'kappa_sensitivity',
             'comprehensive_sensitivity_analysis'
         ])

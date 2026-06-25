@@ -27,7 +27,6 @@ __all__ = [
     'repurpose_element_from_pd',
     'update_attributes',
     'expand_element',
-    'translate_pd_tep',
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
@@ -469,39 +468,6 @@ def base_cost_calculation(element):
     from .Classes import Ren_Source
     if isinstance(element, Ren_Source):
         element.base_cost= element.cost_perMVA*element.Max_S
-
-def translate_pd_tep(grid):
-    """Translation of element wise to internal numbering"""
-    # Price_Zones
-    price_zone2node, price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max, PL_price_zone = {}, {}, {}, {}, {}, {}, {}
-    nn_M, node2price_zone, lista_M = 0, {}, []
-
-    for m in grid.Price_Zones:
-        price_zone2node[m.price_zone_num] = []
-        nn_M += 1
-        price_zone_prices[m.price_zone_num] = m.price
-        price_zone_as[m.price_zone_num] = m.a
-        price_zone_bs[m.price_zone_num] = m.b
-        PGLmin = m.PGL_min
-        PGLmax = m.PGL_max
-        import_M = m.import_pu_L
-        export_M = m.export_pu_G * (sum(node.PGi_ren + node.Max_pow_gen for node in m.nodes_AC))
-        PL_price_zone[m.price_zone_num] = 0
-        for n in m.nodes_AC:
-            price_zone2node[m.price_zone_num].append(n.nodeNumber)
-            node2price_zone[n.nodeNumber] = m.price_zone_num
-            PL_price_zone[m.price_zone_num] += n.PLi
-        PGL_min[m.price_zone_num] = max(PGLmin, -import_M * PL_price_zone[m.price_zone_num])
-        PGL_max[m.price_zone_num] = min(PGLmax, export_M)
-    lista_M = list(range(0, nn_M))
-
-    Price_Zone_Lists = pack_variables(lista_M, node2price_zone, price_zone2node)
-    Price_Zone_lim = pack_variables(price_zone_as, price_zone_bs, PGL_min, PGL_max)
-
-
-    Price_Zone_info = pack_variables(Price_Zone_Lists, Price_Zone_lim)
-
-    return Price_Zone_info
 
 def get_TEP_variables(grid):
 

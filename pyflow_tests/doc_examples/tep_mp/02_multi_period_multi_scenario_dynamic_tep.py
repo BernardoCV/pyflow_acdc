@@ -2,9 +2,7 @@
 import pyflow_acdc as pyf
 from pyflow_tests.test_constants import north_sea_ms_clustering_options
 
-if not pyf.is_pyomo_solver_available("ipopt"):
-    print("Skipped: Ipopt solver not available")
-    raise SystemExit(0)
+
 
 grid, res = pyf.cases["NS_MTDC_2025"](years_data="23,24", expandable="mp", online=True)
 mp_load_series = list(grid.Price_Zones[0].investment_decisions["Load"])
