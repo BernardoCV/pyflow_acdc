@@ -2975,6 +2975,8 @@ class Line_DC:
         self.lineNumber = Line_DC.lineNumber
         Line_DC.lineNumber += 1
 
+        if type(polarity) is str:
+            polarity = Polarity(polarity)
         self.m_sm_b = polarity
         self.S_base = S_base
         if polarity == Polarity.MONOPOLAR:
