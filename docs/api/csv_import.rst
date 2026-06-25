@@ -156,7 +156,7 @@ Data in per unit (pu)
      - Power_Gained
      - 0
    * - Active Power Load (pu)
-     - Power_Load
+     - Power_load
      - 0
    * - Minimum Voltage (pu)
      - Umin
@@ -459,7 +459,7 @@ Data in Ohms affects AC and DC branch components, where the user specifies the a
      - Power_Gained
      - 0
    * - Active Power Load (MW)
-     - Power_Load
+     - Power_load
      - 0
    * - Minimum Voltage (pu)
      - Umin
@@ -762,7 +762,7 @@ Data in Real values
      - Power_Gained
      - 0
    * - Active Power Load (MW)
-     - Power_Load
+     - Power_load
      - 0
    * - Minimum Voltage
      - Umin

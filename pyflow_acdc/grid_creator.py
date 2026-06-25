@@ -441,7 +441,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
             Voltage_0     = DC_node_data.at[index, 'Voltage_0']     if 'Voltage_0'     in DC_node_data.columns else 1.01
             Power_Gained  = DC_node_data.at[index, 'Power_Gained']  if 'Power_Gained'  in DC_node_data.columns else 0
-            Power_load    = DC_node_data.at[index, 'Power_Load']    if 'Power_Load'    in DC_node_data.columns else 0
+            Power_load    = DC_node_data.at[index, 'Power_load']    if 'Power_load'    in DC_node_data.columns else 0
             kV_base       = DC_node_data.at[index, 'kV_base']
             Umin          = DC_node_data.at[index, 'Umin']          if 'Umin'          in DC_node_data.columns else DEFAULT_V_MIN_DC
             Umax          = DC_node_data.at[index, 'Umax']          if 'Umax'          in DC_node_data.columns else DEFAULT_V_MAX_DC
@@ -467,7 +467,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
             Voltage_0     = DC_node_data.at[index, 'Voltage_0']     if 'Voltage_0'     in DC_node_data.columns else 1.01
             Power_Gained  = DC_node_data.at[index, 'Power_Gained']  if 'Power_Gained'  in DC_node_data.columns else 0
-            Power_load    = DC_node_data.at[index, 'Power_Load']    if 'Power_Load'    in DC_node_data.columns else 0
+            Power_load    = DC_node_data.at[index, 'Power_load']    if 'Power_load'    in DC_node_data.columns else 0
             kV_base       = DC_node_data.at[index, 'kV_base']
             Umin          = DC_node_data.at[index, 'Umin']          if 'Umin'          in DC_node_data.columns else DEFAULT_V_MIN_DC
             Umax          = DC_node_data.at[index, 'Umax']          if 'Umax'          in DC_node_data.columns else DEFAULT_V_MAX_DC

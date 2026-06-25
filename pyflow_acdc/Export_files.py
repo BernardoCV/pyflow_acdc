@@ -269,7 +269,7 @@ def create_dictionaries(grid):
                     "kV_base": float(node.kV_base),
                     "Power_Gained": float(node.PGi),
                     "Reactive_Gained": float(node.QGi),
-                    "Power_load": float(node.PLi),
+                    "Power_load": float(node._PLi_base),
                     "Reactive_load": float(node.QLi),
                     "Umin": float(node.Umin),
                     "Umax": float(node.Umax),
@@ -309,7 +309,7 @@ def create_dictionaries(grid):
                     "type": _enum_value(node.type),
                     "Voltage_0": float(node.V_ini),
                     "Power_Gained": float(node.PGi),
-                    "Power_load": float(node.PLi),
+                    "Power_load": float(node._PLi_base),
                     "kV_base": float(node.kV_base),
                     "Node_id": node.name,
                     "Umin": float(node.Umin),
@@ -367,8 +367,8 @@ def create_dictionaries(grid):
                     "Ucmax": float(conv.Ucmax),
                     "geometry": conv.geometry.wkt if conv.geometry is not None else None
                 }
-                if getattr(conv, "ra_og", 0) != 0:
-                    conv_row["A_r"] = float(conv.ra_og / conv.cn_pol)
+                if getattr(conv, "ra_og", 0.001) != 0.001:
+                    conv_row["A_r"] = float(conv.ra_og)
                 data["Converters_ACDC"].append(conv_row)
 
     # Step 1: Define sets for the MTDC price_zones and linked price_zones
