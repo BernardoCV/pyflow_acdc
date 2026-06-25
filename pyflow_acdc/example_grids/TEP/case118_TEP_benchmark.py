@@ -55,11 +55,14 @@ def _resolve_example_path(filename, *, online=False):
 
 def _add_benchmark_time_series(grid, gen_ac):
     """Attach per-node load and renewable availability series from benchmark CSVs."""
-    loads = pd.read_csv(_resolve_example_path("118_benchmark_loads.csv"))
-    loads.loc[0] = loads.loc[0].astype(str)
-    pyf.add_TimeSeries(grid, loads, TS_type="Load")
+    loads_raw = pd.read_csv(_resolve_example_path("118_benchmark_loads.csv"))
+    bus_names = loads_raw.iloc[0].astype(int).astype(str)
+    loads_data = loads_raw.iloc[1:].apply(pd.to_numeric)
+    loads_ts = pd.concat([bus_names.to_frame().T, loads_data], ignore_index=True)
+    loads_ts.columns = loads_raw.columns
+    pyf.add_TimeSeries(grid, loads_ts, TS_type="Load")
 
-    rgen = pd.read_csv(_resolve_example_path("118_benchmark_rgen.csv"))
+    rgen_raw = pd.read_csv(_resolve_example_path("118_benchmark_rgen.csv"), dtype=str)
     zone_gen = {}
     for _, row in gen_ac.iterrows():
         zone = row["Ren_zone"]
@@ -69,12 +72,12 @@ def _add_benchmark_time_series(grid, gen_ac):
             zone_gen.setdefault(zone, row["Gen_name"])
 
     for zone, gen_name in sorted(zone_gen.items()):
-        if gen_name not in rgen.columns:
+        if gen_name not in rgen_raw.columns:
             raise ValueError(
                 f"Renewable zone {zone!r} expects column {gen_name!r} in 118_benchmark_rgen.csv"
             )
         ts_type = "Solar" if zone == "Solar_1" else "WPP"
-        values = pd.to_numeric(rgen.iloc[1:][gen_name], errors="coerce").fillna(0).to_numpy()
+        values = pd.to_numeric(rgen_raw.iloc[1:][gen_name], errors="coerce").fillna(0).to_numpy()
         pyf.add_TimeSeries(grid, pd.DataFrame({zone: values}), associated=zone, TS_type=ts_type)
 
 
