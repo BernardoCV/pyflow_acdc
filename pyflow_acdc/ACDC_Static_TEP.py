@@ -992,6 +992,7 @@ def transmission_expansion(
     obj_scaling=1.0,
     nlp_warmstart=False,
     initiate_max=False,
+    build_only=False,
 ):
     """Build and solve the (non-linear) static transmission-expansion problem.
 
@@ -1036,6 +1037,8 @@ def transmission_expansion(
         Warm-start the NLP from a relaxed/previous solution.
     initiate_max : bool, optional
         Initialise expandable elements at their maximum allowed installation.
+    build_only : bool, optional
+        Build the Pyomo model and skip the solver call.
 
     Returns
     -------
@@ -1071,6 +1074,21 @@ def transmission_expansion(
 
     t2 = time.perf_counter()
     t_modelcreate = t2-t1
+
+    if build_only:
+        timing_info = {
+            "create": t_modelcreate,
+            "solve": None,
+            "export": 0.0,
+        }
+        solver_stats = {
+            "solver": None,
+            "termination_condition": "build_only",
+            "solver_message": "build_only=True: model built and solve skipped.",
+            "solution_found": None,
+            "time": None,
+        }
+        return model, None, timing_info, solver_stats
 
     # model.obj.pprint()
 

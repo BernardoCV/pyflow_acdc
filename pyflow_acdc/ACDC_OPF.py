@@ -168,7 +168,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0):
+def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0,build_only=False):
     """Build and solve the non-linear AC/DC OPF for ``grid``.
 
     Constructs the full non-linear Pyomo model (AC/DC physics, converters,
@@ -197,6 +197,8 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
         Enable the solver-progress callback.
     obj_scaling : float, optional
         Divide the objective by this factor for numerical conditioning.
+    build_only : bool, optional
+        Build the Pyomo model and skip the solver call.
 
     Returns
     -------
@@ -243,6 +245,20 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
         if any(conv.OPF_fx for conv in grid.Converters_ACDC):
                     fx_conv(model, grid)
 
+    if build_only:
+        timing_info = {
+            "create": t_modelcreate,
+            "solve": None,
+            "export": 0.0,
+        }
+        solver_stats = {
+            "solver": None,
+            "termination_condition": "build_only",
+            "solver_message": "build_only=True: model built and solve skipped.",
+            "solution_found": None,
+            "time": None,
+        }
+        return model, None, timing_info, solver_stats
 
     """
     """
