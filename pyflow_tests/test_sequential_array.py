@@ -17,7 +17,7 @@ from pyflow_tests._test_solver_deps import (
 
 ARRAY_CASE = "alpha_ventus"
 CT = 3
-TL = 60
+TL = 600
 TEE = False
 FS = False
 FLH = 8760
