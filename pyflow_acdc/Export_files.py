@@ -159,6 +159,17 @@ def generate_add_ren_source_code(ren_sources,S_base):
 
     return code
 
+def _price_zone_import_expand_base(price_zone, grid):
+    """Return import_expand as passed to ``add_price_zone``, not RenSource-inflated."""
+    value = price_zone.import_expand
+    for ren_source in getattr(grid, "RenSources", []) or []:
+        if getattr(ren_source, "price_zone", None) != price_zone.name:
+            continue
+        if getattr(ren_source, "Offshore", False) or getattr(ren_source, "MTDC", None) is not None:
+            value -= ren_source.PGi_ren_base
+    return value
+
+
 def create_dictionaries(grid):
     data = {
         "S_base": grid.S_base,
@@ -309,7 +320,7 @@ def create_dictionaries(grid):
                         "a":           price_zone.a,
                         "b":           price_zone.b,
                         "c":           price_zone.c,
-                        "import_expand_pu": price_zone.import_expand,
+                        "import_expand_pu": _price_zone_import_expand_base(price_zone, grid),
                         "type": PriceZoneCategory.MAIN.value,
                     })
 
