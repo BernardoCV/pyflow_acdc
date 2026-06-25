@@ -8,6 +8,8 @@ Owns: serialization/export and code generation.
 Does not own: the in-memory data model (see ``Classes``).
 """
 
+import enum
+
 import numpy as np
 import os
 from .Classes import MTDCPrice_Zone, OffshorePrice_Zone
@@ -18,6 +20,12 @@ from .constants import (
     DataInput,
     PriceZoneCategory,
 )
+
+
+def _enum_value(value):
+    if isinstance(value, enum.Enum):
+        return value.value
+    return value
 
 import pickle
 import gzip
@@ -70,44 +78,91 @@ def generate_add_price_zone_code(price_zone_data):
 
     # Loop through each entry in the data list and generate the corresponding function call
     for zone in price_zone_data:
-        if zone["type"] == PriceZoneCategory.MAIN:
-            code += f"    pyf.add_price_zone(grid,'{zone['name']}',{zone['price']},import_pu_L={zone['import_pu_L']},export_pu_G={zone['export_pu_G']},a={zone['a']},b={zone['b']},c={zone['c']},import_expand_pu={zone['import_expand_pu']})\n"
+        if zone["type"] == PriceZoneCategory.MAIN.value:
+            args = (
+                f"pyf.add_price_zone(grid,'{zone['name']}',{zone['price']},"
+                f"import_pu_L={zone['import_pu_L']},export_pu_G={zone['export_pu_G']},"
+                f"a={zone['a']},b={zone['b']},c={zone['c']},"
+                f"import_expand_pu={zone['import_expand_pu']}"
+            )
+            if zone.get("curvature_factor", 1) != 1:
+                args += f",curvature_factor={zone['curvature_factor']}"
+            if zone.get("positive_price_delta") is not None:
+                args += f",positive_price_delta={zone['positive_price_delta']}"
+            code += f"    {args})\n"
     for zone in price_zone_data:
-        if zone["type"] == PriceZoneCategory.OFFSHORE:
+        if zone["type"] == PriceZoneCategory.OFFSHORE.value:
             code += f"    pyf.add_offshore_price_zone(grid,'{zone['main_price_zone']}','{zone['name']}')\n"
     for zone in price_zone_data:
-        if zone["type"] == PriceZoneCategory.MTDC:
-            code += f"    pyf.add_MTDC_price_zone(grid, '{zone['name']}',linked_price_zones={zone['linked_price_zones']},pricing_strategy='{zone['pricing_strategy']}')\n"
+        if zone["type"] == PriceZoneCategory.MTDC.value:
+            code += (
+                f"    pyf.add_MTDC_price_zone(grid, '{zone['name']}',"
+                f"linked_price_zones={zone['linked_price_zones']!r},"
+                f"pricing_strategy='{zone['pricing_strategy']}')\n"
+            )
 
 
     return code
 
-def generate_add_gen_code(gens,S_base):
-    """
-    Generate Python code with a for loop to call `add_gen` for each generator in the list `gens`.
-
-    :param gens: List of dictionaries, where each dictionary contains the arguments for add_gen.
-    :return: Python code as a string to call add_gen for each generator.
-    """
-
+def generate_add_gen_code(gens, S_base):
+    """Generate ``add_gen`` / ``add_extgrid`` calls for AC generators."""
     code = ""
     if not gens:
         return code
 
-    # Loop through each generator in the list and generate the corresponding function call
     for gen in gens:
-        # Start building the add_gen function call
+        if gen.get("is_ext_grid"):
+            code += f"    pyf.add_extgrid(grid, '{gen['node']}', gen_name='{gen['name']}', "
+            if gen["price_zone_link"]:
+                code += f"price_zone_link={gen['price_zone_link']}, "
+            code += (
+                f"lf={gen['lf']}, qf={gen['qf']}, "
+                f"MVAmax={gen['MVAmax']}, MWmax={gen['MWmax']}, MWmin={gen['MWmin']}, "
+                f"MVArmax={gen['MVArmax']}, MVArmin={gen['MVArmin']}, "
+                f"Allow_sell={gen['allow_sell']}, P_load_MW={gen['P_load_MW']})\n"
+            )
+            continue
+
         code += f"    pyf.add_gen(grid, '{gen['node']}', '{gen['name']}', "
-
-        # Dynamically handle parameters
-        if gen['price_zone_link'] != False:
+        if gen["price_zone_link"]:
             code += f"price_zone_link={gen['price_zone_link']}, "
-        code += f"np_gen={gen['np_gen']}, "
-        code += f"fc={gen['fc']},lf={gen['lf']}, qf={gen['qf']}, "
-        code += f"MWmax={gen['Max_pow_gen']*S_base}, MWmin={gen['Min_pow_gen']*S_base}, "
-        code += f"MVArmax={gen['Max_pow_genR']*S_base}, MVArmin={gen['Min_pow_genR']*S_base}, "
-        code += f"PsetMW={gen['Pset']*S_base}, QsetMVA={gen['Qset']*S_base})\n"
+        code += (
+            f"np_gen={gen['np_gen']}, fc={gen['fc']}, lf={gen['lf']}, qf={gen['qf']}, "
+            f"MWmax={gen['Max_pow_gen'] * S_base}, MWmin={gen['Min_pow_gen'] * S_base}, "
+            f"MVArmax={gen['Max_pow_genR'] * S_base}, MVArmin={gen['Min_pow_genR'] * S_base}, "
+            f"PsetMW={gen['Pset'] * S_base}, QsetMVA={gen['Qset'] * S_base}"
+        )
+        if gen.get("fuel_type") is not None:
+            code += f", fuel_type='{gen['fuel_type']}'"
+        if gen.get("installation_cost"):
+            code += f", installation_cost={gen['installation_cost']}"
+        if gen.get("Smax") is not None:
+            code += f", Smax={gen['Smax']}"
+        code += ")\n"
 
+    return code
+
+
+def generate_add_gen_dc_code(gens, S_base):
+    """Generate ``add_gen_DC`` calls for DC generators."""
+    code = ""
+    if not gens:
+        return code
+
+    for gen in gens:
+        code += f"    pyf.add_gen_DC(grid, '{gen['node']}', gen_name='{gen['name']}', "
+        if gen["price_zone_link"]:
+            code += f"price_zone_link={gen['price_zone_link']}, "
+        code += (
+            f"np_gen={gen['np_gen']}, fc={gen['fc']}, lf={gen['lf']}, qf={gen['qf']}, "
+            f"MWmax={gen['Max_pow_gen'] * S_base}, MWmin={gen['Min_pow_gen'] * S_base}, "
+            f"PsetMW={gen['Pset'] * S_base}"
+        )
+        if gen.get("fuel_type") is not None:
+            code += f", fuel_type='{gen['fuel_type']}'"
+        if gen.get("installation_cost"):
+            code += f", installation_cost={gen['installation_cost']}"
+        code += ")\n"
 
     return code
 
@@ -146,16 +201,33 @@ def generate_add_ren_source_code(ren_sources,S_base):
         return code
 
     for ren_source in ren_sources:
-        # Start building the add_RenSource function call
-        code += f"    pyf.add_RenSource(grid, '{ren_source['node_name']}', {ren_source['base']*S_base}, "
-
-        # Dynamically handle optional parameters
-        code += f"ren_source_name='{ren_source['ren_source_name']}', " if ren_source['ren_source_name'] else ""
+        code += (
+            f"    pyf.add_RenSource(grid, '{ren_source['node_name']}', "
+            f"{ren_source['base'] * S_base}, "
+        )
+        if ren_source["ren_source_name"]:
+            code += f"ren_source_name='{ren_source['ren_source_name']}', "
         code += f"available={ren_source['available']}, "
-        code += f"zone='{ren_source['zone']}', " if ren_source['zone'] else ""
-        code += f"price_zone='{ren_source['price_zone']}', " if ren_source['price_zone'] else ""
+        if ren_source.get("zone"):
+            code += f"zone='{ren_source['zone']}', "
+        if ren_source.get("price_zone"):
+            code += f"price_zone='{ren_source['price_zone']}', "
         code += f"Offshore={ren_source['Offshore']}, "
-        code += f"MTDC={ren_source['MTDC']})\n"
+        if ren_source.get("MTDC") is not None:
+            code += f"MTDC='{ren_source['MTDC']}', "
+        else:
+            code += "MTDC=None, "
+        if ren_source.get("ren_type") not in (None, "Wind"):
+            code += f"ren_type='{ren_source['ren_type']}', "
+        if ren_source.get("min_gamma"):
+            code += f"min_gamma={ren_source['min_gamma']}, "
+        if ren_source.get("np_rsgen", 1) != 1:
+            code += f"np_rsgen={ren_source['np_rsgen']}, "
+        if ren_source.get("Qmin") is not None:
+            code += f"Qmin={ren_source['Qmin'] * S_base}, "
+        if ren_source.get("Qmax") is not None:
+            code += f"Qmax={ren_source['Qmax'] * S_base}, "
+        code = code.rstrip(", ") + ")\n"
 
     return code
 
@@ -181,6 +253,7 @@ def create_dictionaries(grid):
         "Price_Zone": [],
         "RenSource_zone": [],
         "Generators": [],
+        "Generators_DC": [],
         "RenSources": [],
     }
 
@@ -190,7 +263,7 @@ def create_dictionaries(grid):
             if node:
                 data["nodes_AC"].append({
                     "Node_id": node.name,
-                    "type": node.type,
+                    "type": _enum_value(node.type),
                     "Voltage_0": float(node.V_ini),
                     "theta_0": float(node.theta_ini),
                     "kV_base": float(node.kV_base),
@@ -221,6 +294,7 @@ def create_dictionaries(grid):
                     "g": float(line.g),
                     "b": float(line.b),
                     "MVA_rating": float(line.MVA_rating),
+                    "kV_base": float(line.kV_base),
                     "m": float(line.m),
                     "shift": float(line.shift),
                     "Length_km": float(line.Length_km),
@@ -232,7 +306,7 @@ def create_dictionaries(grid):
         for node in getattr(grid, "nodes_DC", []):
             if node:
                 data["nodes_DC"].append({
-                    "type": node.type,
+                    "type": _enum_value(node.type),
                     "Voltage_0": float(node.V_ini),
                     "Power_Gained": float(node.PGi),
                     "Power_load": float(node.PLi),
@@ -266,9 +340,9 @@ def create_dictionaries(grid):
     if grid.Converters_ACDC:
         for conv in getattr(grid, "Converters_ACDC", []):
             if conv:
-                data["Converters_ACDC"].append({
-                    "AC_type": conv.AC_type,
-                    "DC_type": conv.type,
+                conv_row = {
+                    "AC_type": _enum_value(conv.AC_type),
+                    "DC_type": _enum_value(conv.type),
                     "AC_node": conv.Node_AC.name,
                     "DC_node": conv.Node_DC.name,
                     "P_AC": float(conv.P_AC),
@@ -278,7 +352,7 @@ def create_dictionaries(grid):
                     "T_x": float(conv.x_t * conv.cn_pol),
                     "PR_r": float(conv.pr_r * conv.cn_pol),
                     "PR_x": float(conv.pr_x * conv.cn_pol),
-                    "Filter": float(conv.bf / conv.cn_pol),
+                    "Filter_b": float(conv.bf / conv.cn_pol),
                     "Droop": float(conv.Droop_rate),
                     "AC_kV_base": float(conv.AC_kV_base),
                     "MVA_rating": float(conv.MVA_max / conv.cn_pol),
@@ -292,7 +366,10 @@ def create_dictionaries(grid):
                     "Ucmin": float(conv.Ucmin),
                     "Ucmax": float(conv.Ucmax),
                     "geometry": conv.geometry.wkt if conv.geometry is not None else None
-                })
+                }
+                if getattr(conv, "ra_og", 0) != 0:
+                    conv_row["A_r"] = float(conv.ra_og / conv.cn_pol)
+                data["Converters_ACDC"].append(conv_row)
 
     # Step 1: Define sets for the MTDC price_zones and linked price_zones
     if grid.Price_Zones:
@@ -301,8 +378,8 @@ def create_dictionaries(grid):
                 if isinstance(price_zone, MTDCPrice_Zone):
                     data["Price_Zone"].append({
                         "name": price_zone.name,
-                        "linked_price_zones": price_zone.linked_price_zones,
-                        "pricing_strategy": price_zone.pricing_strategy,
+                        "linked_price_zones": [pz.name for pz in price_zone.linked_price_zones],
+                        "pricing_strategy": _enum_value(price_zone.pricing_strategy),
                         "type": PriceZoneCategory.MTDC.value,
                     })
                 elif isinstance(price_zone, OffshorePrice_Zone):
@@ -317,10 +394,12 @@ def create_dictionaries(grid):
                         "price":       price_zone._price,
                         "import_pu_L": price_zone.import_pu_L,
                         "export_pu_G": price_zone.export_pu_G,
-                        "a":           price_zone.a,
+                        "a":           price_zone.a_base,
                         "b":           price_zone.b,
                         "c":           price_zone.c,
                         "import_expand_pu": _price_zone_import_expand_base(price_zone, grid),
+                        "curvature_factor": price_zone.curvature_factor,
+                        "positive_price_delta": price_zone.positive_price_delta,
                         "type": PriceZoneCategory.MAIN.value,
                     })
 
@@ -332,41 +411,80 @@ def create_dictionaries(grid):
                     "name": ren_zone.name,
                 })
 
-    # Generators
+    # Generators (AC, including external grid)
     if grid.Generators:
         for gen in getattr(grid, "Generators", []):
             if gen:
-                data["Generators"].append({
+                gen_row = {
                     "name": gen.name,
                     "node": gen.Node_AC,
-                    "Max_pow_gen":  gen.Max_pow_gen,
-                    "Min_pow_gen":  gen.Min_pow_gen,
+                    "Max_pow_gen": gen.Max_pow_gen,
+                    "Min_pow_gen": gen.Min_pow_gen,
                     "Max_pow_genR": gen.Max_pow_genR,
                     "Min_pow_genR": gen.Min_pow_genR,
                     "np_gen": gen.np_gen,
                     "qf": gen.qf,
-                    "lf":  gen.lf,
+                    "lf": gen.lf,
                     "fc": gen.fc,
                     "Pset": gen.Pset,
                     "Qset": gen.Qset,
                     "S_rated": gen.Max_S,
-                    "price_zone_link" :gen.price_zone_link,
+                    "price_zone_link": gen.price_zone_link,
+                    "is_ext_grid": gen.is_ext_grid,
+                    "allow_sell": gen.allow_sell,
+                    "P_load_MW": gen.p_load_base * grid.S_base,
+                    "fuel_type": gen.gen_type,
+                    "installation_cost": gen._base_cost,
+                }
+                if gen.is_ext_grid:
+                    mva_pu = gen.Max_S if gen.Max_S is not None else gen.Max_pow_gen
+                    gen_row["MVAmax"] = mva_pu * grid.S_base
+                    gen_row["MWmax"] = gen.Max_pow_gen * grid.S_base
+                    gen_row["MWmin"] = gen.Min_pow_gen * grid.S_base
+                    gen_row["MVArmax"] = gen.Max_pow_genR * grid.S_base
+                    gen_row["MVArmin"] = gen.Min_pow_genR * grid.S_base
+                elif gen.Max_S is not None:
+                    gen_row["Smax"] = gen.Max_S * grid.S_base
+                data["Generators"].append(gen_row)
+
+    # DC generators
+    if grid.Generators_DC:
+        for gen in getattr(grid, "Generators_DC", []):
+            if gen:
+                data["Generators_DC"].append({
+                    "name": gen.name,
+                    "node": gen.Node_DC,
+                    "Max_pow_gen": gen.Max_pow_gen,
+                    "Min_pow_gen": gen.Min_pow_gen,
+                    "np_gen": gen.np_gen,
+                    "qf": gen.qf,
+                    "lf": gen.lf,
+                    "fc": gen.fc,
+                    "Pset": gen.Pset,
+                    "price_zone_link": gen.price_zone_link,
+                    "fuel_type": gen.gen_type,
+                    "installation_cost": gen._base_cost,
                 })
 
     # RenSources
     if grid.RenSources:
         for ren_source in getattr(grid, "RenSources", []):
             if ren_source:
-
                 data["RenSources"].append({
-                    "ren_source_name" : ren_source.name,
+                    "ren_source_name": ren_source.name,
                     "node_name": ren_source.Node,
                     "base": ren_source.PGi_ren_base,
                     "available": ren_source._PRGi_available,
-                    "zone":       getattr(ren_source, "zone", None),
+                    "zone": getattr(ren_source, "zone", None),
                     "price_zone": getattr(ren_source, "price_zone", None),
-                    "Offshore":   getattr(ren_source, "Offshore", False),
-                    "MTDC":       getattr(ren_source, "MTDC", None),
+                    "Offshore": getattr(ren_source, "Offshore", False),
+                    "MTDC": getattr(ren_source, "MTDC", None),
+                    "ren_type": ren_source.rs_type,
+                    "min_gamma": ren_source.min_gamma,
+                    "np_rsgen": ren_source.np_rsgen,
+                    "Qmin": ren_source.Qmin,
+                    "Qmax": ren_source.Qmax,
+                    "geometry": ren_source.geometry.wkt if ren_source.geometry is not None else None,
                 })
 
     return data
@@ -388,7 +506,8 @@ def generate_loading_code(grid,file_name):
 
 
     pz_code = generate_add_price_zone_code(data_dict["Price_Zone"])
-    gen_code = generate_add_gen_code(data_dict["Generators"],data_dict['S_base'])
+    gen_code = generate_add_gen_code(data_dict["Generators"], data_dict['S_base'])
+    gen_dc_code = generate_add_gen_dc_code(data_dict["Generators_DC"], data_dict['S_base'])
 
 
     rz_code = generate_add_ren_source_zone_code(data_dict["RenSource_zone"])
@@ -453,6 +572,9 @@ def {file_name}():
     main_code+=f"""
     # Add Generators
 {gen_code}
+
+    # Add DC Generators
+{gen_dc_code}
 
     # Add Renewable Source Zones
 {rz_code}
@@ -623,7 +745,7 @@ def gather_grid_data(grid):
                 "type_dc": tpdc,
                 "type_ac": tpac,
                 "P_g": conv.P_AC,
-                "Q_g": conv.P_DC,
+                "Q_g": conv.Q_AC,
                 "islcc": 0,
                 "Vtar": 1,
                 "rtf": conv.r_t/conv.np_conv,
@@ -643,7 +765,7 @@ def gather_grid_data(grid):
                 "LossA": conv.a_conv_og*conv.np_conv,
                 "LossB": conv.b_conv_og,
                 "LossCrec": conv.c_rect_og/conv.np_conv,
-                "LossCinv": conv.c_rect_og/conv.np_conv,
+                "LossCinv": conv.c_inver_og/conv.np_conv,
                 "droop": conv.Droop_rate,
                 "Pdcset": conv.P_DC,
                 "Vdcset": conv.Node_DC.V,

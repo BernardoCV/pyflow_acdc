@@ -928,6 +928,18 @@ def add_MTDC_price_zone(grid, name,  linked_price_zones=None,pricing_strategy=Pr
     MTDCPrice_Zone
         Created zone in ``grid.Price_Zones``.
     """
+    if linked_price_zones:
+        resolved = []
+        for pz in linked_price_zones:
+            if isinstance(pz, str):
+                pz_obj = next((M for M in grid.Price_Zones if M.name == pz), None)
+                if pz_obj is None:
+                    raise ValueError(f"Price zone '{pz}' not found for MTDC link.")
+                resolved.append(pz_obj)
+            else:
+                resolved.append(pz)
+        linked_price_zones = resolved
+
     mtdc_price_zone = MTDCPrice_Zone(name=name, linked_price_zones=linked_price_zones, pricing_strategy=pricing_strategy)
     grid.Price_Zones.append(mtdc_price_zone)
 
