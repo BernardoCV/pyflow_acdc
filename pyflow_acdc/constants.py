@@ -105,7 +105,7 @@ class MIPBackend(str, Enum):
 
 # OR-Tools ``linear_solver`` backends (CSS MILP and optional Pyomo path-MIP fallback).
 ORTOOLS_LINEAR_SOLVERS = ('GUROBI', 'SCIP', 'CBC')
-
+PYOMO_LINEAR_SOLVERS = ('gurobi', 'highs','cbc','glpk')
 
 class PricingStrategy(str, Enum):
     """How an `MTDCPrice_Zone` derives its price from linked price zones."""

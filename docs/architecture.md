@@ -72,7 +72,7 @@ everything else builds on.
   MIP (``MIP_path_graph``, Pyomo or OR-Tools CP-SAT; optional joint cable types
   via ``enable_cable_types``) and **CSS** dispatch (``wind_farm_CSS``,
   ``sequential_CSS``). Owns spanning-tree / flow / ``ct_limit`` constraints.
-  Install ``[OPF]`` for Pyomo CSS; ``[ORTOOLS_ARRAY]`` for OR-Tools MIP/CSS.
+  Install ``[OPF]`` for Pyomo CSS; ``[LINEAR_ARRAY]`` for OR-Tools MIP/CSS + HiGHS.
 - **`AC_L_CSS_ortools.py`** — OR-Tools ``linear_solver`` CSS only: cable type
   per active CT line on a fixed topology; no routing. Used when
   ``CSS_L_solver='ortools'``.

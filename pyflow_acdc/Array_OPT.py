@@ -640,7 +640,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                    min_sub_connections=False, sub_k_max=None,
                    mip_cfg: MIPConfig | None = None,
                    flow_dir_tightening='auto',
-                   solver_options_override: dict | None = None):
+                   solver_options_override: dict | None = None,
+                   build_only=False):
     """
     Solve the inter-array path MIP (route selection).
 
@@ -664,6 +665,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         Turbine MW rating (needed to calculate flow capacity from MVA ratings)
     cab_types_allowed : int, optional
         Maximum number of cable types that can be used (linking constraint)
+    build_only : bool, optional
+        If True, build the Pyomo model and skip the solver (``backend='pyomo'`` only).
 
     Returns
     -------
@@ -721,7 +724,10 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                 mip_cfg=mip_cfg,
                 flow_dir_tightening=flow_dir_tightening,
                 solver_options_override=solver_options_override,
+                build_only=build_only,
             )
+        if build_only:
+            raise ValueError("build_only=True requires backend='pyomo'")
         if not ORTOOLS_AVAILABLE:
             raise ImportError(
                 "OR-Tools is not installed. Please install it with: pip install ortools\n"
@@ -750,6 +756,9 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                          min_sub_connections=min_sub_connections,
                                          sub_k_max=sub_k_max,
                                          flow_dir_tightening=flow_dir_tightening)
+    if build_only:
+        return False, None, model, []
+
     # Build solver options based on solver and grid attributes
     solver_options = {}
     time_limit = getattr(grid, "MIP_time", None)

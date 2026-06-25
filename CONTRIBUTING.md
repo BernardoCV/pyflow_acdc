@@ -16,7 +16,7 @@ README for the full list), e.g.:
 
 ```bash
 pip install -e ".[OPF]"            # pyomo for optimal power flow
-pip install -e ".[ORTOOLS_ARRAY]"  # ortools for OR-Tools route MIP + CSS
+pip install -e ".[LINEAR_ARRAY]"  # ortools + highspy for array MIP/CSS
 pip install -e ".[tests]"          # pytest + pytest-cov
 pip install -e ".[All]"        # everything except gurobipy (needs a license)
 ```

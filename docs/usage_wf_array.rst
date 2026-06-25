@@ -1,7 +1,7 @@
 Wind Array Sizing
 =================
 
-Requires ``[OPF]`` for Pyomo CSS (optional Gurobi) or ``[ORTOOLS_ARRAY]`` for
+Requires ``[OPF]`` for Pyomo CSS (optional Gurobi) or ``[LINEAR_ARRAY]`` for
 OR-Tools route MIP and CSS (see :doc:`installation`).
 
 Workflow

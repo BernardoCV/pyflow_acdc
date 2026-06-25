@@ -142,8 +142,7 @@ pip install pyflow-acdc[All]
 pip install pyflow-acdc[mapping]      # For mapping features (folium, branca)
 pip install pyflow-acdc[OPF]          # For optimal power flow (pyomo)
 pip install pyflow-acdc[Dash]         # For Dash web applications
-pip install pyflow-acdc[ORTOOLS_ARRAY]  # For OR-Tools route MIP + OR-Tools CSS (ortools)
-pip install pyflow-acdc[Array_OPT]    # Deprecated alias for ORTOOLS_ARRAY (ortools only)
+pip install pyflow-acdc[LINEAR_ARRAY]  # OR-Tools route MIP + CSS + HiGHS (ortools, highspy)
 pip install pyflow-acdc[TEP_pymoo]    # For TEP with pymoo (pymoo, pyomo)
 pip install pyflow-acdc[Gurobi]       # For Gurobi solver (requires license)
 pip install pyflow-acdc[plotting]     # For static image export (kaleido)
