@@ -45,7 +45,7 @@ def run_test():
     res= pyf.Results(grid,decimals=3)
 
 
-    pyf.acdc_sequential(grid)
+    pyf.power_flow(grid)
 
     res.all()
 

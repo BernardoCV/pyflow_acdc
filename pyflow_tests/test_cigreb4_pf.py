@@ -17,7 +17,7 @@ def run_test():
 
     grid, res = pyf.cases['CigreB4_ACDC']()
 
-    t = pyf.acdc_sequential(grid, Droop_PF=True,maxIter=500)
+    t, tol = pyf.power_flow(grid, Droop_PF=True, maxIter=500)
     #model, timing_info, model_res,solver_stats=pyf.Optimal_PF(grid)
 
     res.all()

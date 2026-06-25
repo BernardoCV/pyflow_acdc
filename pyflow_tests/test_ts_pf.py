@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Time-series power flow (``time_series_pf`` / ``ts_*_pf``) smoke tests."""
+"""Time-series power flow (``time_series_pf``) smoke tests."""
 
 import pandas as pd
 import pytest
@@ -35,26 +35,8 @@ def _assert_ts_pf_results(grid, *, expect_ac=False, expect_dc=False, expect_conv
         assert not conv_loading.isna().any().any()
 
 
-def test_time_series_pf_cigreb4_wind():
-    """Hybrid CIGRE B4: renewable availability time series."""
-    grid, _res = pyf.cases["CigreB4_ACDC"]()
-    pyf.add_RenSource(grid, "BaB1", base_MW=50.0, ren_source_name="wind_ts")
-    pyf.add_TimeSeries(
-        grid,
-        _factor_ts(TS_FACTORS, "wind_ts"),
-        associated="wind_ts",
-        TS_type="WPP",
-    )
-
-    pyf.time_series_pf(grid)
-
-    wind = grid.RenSources_dict["wind_ts"]
-    assert wind.PRGi_available == pytest.approx(TS_FACTORS[-1])
-    _assert_ts_pf_results(grid, expect_ac=True, expect_dc=True, expect_conv=True)
-
-
-def test_ts_ac_pf_stagg5_load():
-    """MATACDC case 5 (Stagg5): AC node load-factor time series."""
+def test_time_series_pf_stagg5_acdc_load():
+    """Hybrid MATACDC case 5: load-factor time series via ``ts_acdc_pf`` dispatch."""
     grid, _res = pyf.cases["Stagg5MATACDC"]()
     load_node = "4"
     pyf.add_TimeSeries(
@@ -64,14 +46,32 @@ def test_ts_ac_pf_stagg5_load():
         TS_type="Load",
     )
 
-    pyf.ts_ac_pf(grid, start=1, end=N_STEPS)
+    pyf.time_series_pf(grid)
+
+    node = grid.nodes_AC_dict[load_node]
+    assert node.PLi_factor == pytest.approx(TS_FACTORS[-1])
+    _assert_ts_pf_results(grid, expect_ac=True, expect_dc=True, expect_conv=True)
+
+
+def test_time_series_pf_case24_ac_load():
+    """IEEE RTS-24 (``case24_OPF``): pure AC load-factor time series."""
+    grid, _res = pyf.cases["case24_OPF"]()
+    load_node = "4"
+    pyf.add_TimeSeries(
+        grid,
+        _factor_ts(TS_FACTORS, "load_4"),
+        associated=load_node,
+        TS_type="Load",
+    )
+
+    pyf.time_series_pf(grid)
 
     node = grid.nodes_AC_dict[load_node]
     assert node.PLi_factor == pytest.approx(TS_FACTORS[-1])
     _assert_ts_pf_results(grid, expect_ac=True)
 
 
-def test_ts_dc_pf_dc_opf_simple_load():
+def test_time_series_pf_dc_opf_simple_load():
     """Small DC grid (``DC_OPF_simple``): DC load-factor time series."""
     grid, _res = pyf.cases["DC_OPF_simple"]()
     load_node = "Node_2"
@@ -82,7 +82,7 @@ def test_ts_dc_pf_dc_opf_simple_load():
         TS_type="Load",
     )
 
-    pyf.ts_dc_pf(grid, start=1, end=N_STEPS)
+    pyf.time_series_pf(grid)
 
     node = grid.nodes_DC_dict[load_node]
     assert node.PLi_factor == pytest.approx(TS_FACTORS[-1])
@@ -91,9 +91,9 @@ def test_ts_dc_pf_dc_opf_simple_load():
 
 def run_test():
     """Script entrypoint for ``pyflow-acdc-test``."""
-    test_time_series_pf_cigreb4_wind()
-    test_ts_ac_pf_stagg5_load()
-    test_ts_dc_pf_dc_opf_simple_load()
+    test_time_series_pf_stagg5_acdc_load()
+    test_time_series_pf_case24_ac_load()
+    test_time_series_pf_dc_opf_simple_load()
     print("✓ Time-series PF tests passed")
 
 

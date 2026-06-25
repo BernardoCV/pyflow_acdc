@@ -16,7 +16,7 @@ __all__ = [
     'power_flow'
 ]
 
-def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
+def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Droop_PF=True):
     """Run power flow on ``grid``, dispatching on its AC/DC content.
 
     Picks the AC-only, DC-only, or sequential AC/DC solver based on the grid's
@@ -30,6 +30,9 @@ def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
         Convergence tolerance on the mismatch.
     maxIter : int, optional
         Maximum Newton iterations.
+    Droop_PF : bool, optional
+        Passed to the DC and hybrid solvers. If ``True``, include
+        droop-controlled DC nodes in the solve.
 
     Returns
     -------
@@ -42,12 +45,12 @@ def power_flow(grid,tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     """
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
-        t,tol,_=acdc_sequential(grid,tol_lim, maxIter)
+        t, tol, _ = acdc_sequential(grid, tol_lim, maxIter, Droop_PF=Droop_PF)
     elif grid.ACmode:
-        t,tol=ac_power_flow(grid,tol_lim, maxIter)
+        t, tol = ac_power_flow(grid, tol_lim, maxIter)
     elif grid.DCmode:
-        t,tol=dc_power_flow(grid,tol_lim, maxIter)
-    return t,tol
+        t, tol = dc_power_flow(grid, tol_lim, maxIter, Droop_PF=Droop_PF)
+    return t, tol
 
 
 def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
