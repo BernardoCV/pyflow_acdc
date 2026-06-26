@@ -3865,10 +3865,10 @@ class Price_Zone:
             self.calc_curvature_effect()
 
     def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,curvature_factor=1,S_base:float=100,name=None,positive_price_delta=None):
+        self._S_base = S_base
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
 
-        self.expand_import = False
         self._import_expand = import_expand
         self._a_base = a
         self._curvature_factor = curvature_factor
@@ -3885,9 +3885,8 @@ class Price_Zone:
         self._b=b
         self.c=c
         self.positive_price_delta = positive_price_delta
-        self.PGL_min_base=-np.inf
+        self.PGL_min_base = -np.inf
 
-        self.PGL_min=self.PGL_min_base
         self.PGL_max=np.inf
 
         self.PN= 0
@@ -3932,8 +3931,6 @@ class Price_Zone:
 
         # To hold the linked price_zone
         self.linked_price_zone = None
-
-        self.S_base = S_base
 
 
     def link_mtdc_price_zone(self, mtdc_price_zone):
