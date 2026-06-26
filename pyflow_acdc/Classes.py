@@ -3869,6 +3869,7 @@ class Price_Zone:
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
 
+        self.expand_import = False
         self._import_expand = import_expand
         self._a_base = a
         self._curvature_factor = curvature_factor
