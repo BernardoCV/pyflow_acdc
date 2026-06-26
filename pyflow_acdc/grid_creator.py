@@ -36,7 +36,8 @@ __all__ = [ # Grid Creation and Import
     'create_grid_from_turbine_graph',
     'extend_grid_from_data',
     'initialize_pyflowacdc',
-    'create_grid_from_pickle'
+    'create_grid_from_pickle',
+    'change_S_base',
 ]
 
 def initialize_pyflowacdc():
@@ -490,7 +491,6 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
 def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
     if data_in == DataInput.PU:
-       
         DC_line_data = DC_line_data.set_index('Line_id')
         DC_lines = {}
         for index, row in DC_line_data.iterrows():
@@ -520,8 +520,6 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
                 DC_lines[var_name].geometry = geometry
 
     elif data_in == DataInput.OHM:
-    
-
         DC_line_data = DC_line_data.set_index('Line_id')
         DC_lines = {}
         for index, row in DC_line_data.iterrows():
@@ -1523,6 +1521,8 @@ def _migrate_legacy_converter_impedance(conv):
 
 def _migrate_legacy_grid_attrs(grid):
     """Apply pickle attribute renames once after deserialization."""
+    if not hasattr(grid, 'S_base_ref'):
+        grid.S_base_ref = grid.S_base
     for line in (
         grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
         + grid.lines_AC_tf + grid.lines_AC_ct + grid.lines_DC
@@ -1553,8 +1553,23 @@ def load_pickle(path, use_dill=False):
     _migrate_legacy_grid_attrs(obj)
     return obj
 
-def change_S_base(grid,Sbase_new):
+def change_S_base(grid, Sbase_new):
     """Change the system power base of a grid (rescales per-unit quantities).
+
+    Physical ratings (``MVA_rating``, ``MW_rating``, etc.) are unchanged.
+    Per-unit injections, loads, and admittances are rescaled so MW/MVAr stay
+    the same after the base change.
+
+    ``grid.S_base_ref`` (set at grid creation) is **not** updated. After a base
+    change, :attr:`~pyflow_acdc.Classes.Grid.tol_scaler` becomes
+    ``S_base_ref / S_base`` so power-flow tolerances stay MW-normalized:
+    ``effective_tol = tol_lim * grid.tol_scaler``.
+
+    .. warning::
+        Re-run :func:`~pyflow_acdc.power_flow` after a base change. Voltages,
+        angles, line flows, bus injections, and other stored solve results are
+        not updated and are invalid under the new base until power flow is run
+        again.
 
     Parameters
     ----------
@@ -1573,28 +1588,84 @@ def change_S_base(grid,Sbase_new):
     >>> import pyflow_acdc as pyf
     >>> pyf.change_S_base(grid, 100)
     """
+    if Sbase_new <= 0:
+        raise ValueError("Sbase_new must be positive")
     Sbase_old = grid.S_base
-    rate = Sbase_old/Sbase_new
-    for line in grid.lines_AC:
+    if Sbase_old == Sbase_new:
+        return grid
+    rate = Sbase_old / Sbase_new
+
+    for line in (
+        grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec + grid.lines_AC_ct
+    ):
         line.S_base = Sbase_new
+
     for line in grid.lines_DC:
         line.S_base = Sbase_new
-    for conv in grid.Converters:
-        conv.S_base = Sbase_new
+
+    for tf in grid.lines_AC_tf:
+        tf.Ybus_branch /= rate
+
     for node in grid.nodes_AC:
         node.PGi *= rate
-        node.PLi *= rate
+        node._PLi_base *= rate
+        node._PLi_extgrid *= rate
+        node.update_PLi()
         node.QGi *= rate
         node.QLi *= rate
 
+    for node in grid.nodes_DC:
+        node.PGi *= rate
+        node._PLi_base *= rate
+        node.update_PLi()
+
     for gen in grid.Generators:
-        gen.PGen *= rate
-        gen.Pset *= rate
-        gen.QGen *= rate
-        gen.Qset *= rate
-    grid.update_pq_ac()
-    grid.create_Ybus_AC()
-    grid.S_base=Sbase_new
+        gen.S_base = Sbase_new
+
+    for gen in getattr(grid, 'Generators_DC', []):
+        gen.S_base = Sbase_new
+
+    for rs in grid.RenSources:
+        rs.S_base = Sbase_new
+
+    for conv in grid.Converters_ACDC:
+        conv.S_base = Sbase_new
+        conv.basekA = Sbase_new / (SQRT_3 * conv.AC_kV_base)
+        conv.basekA_DC = Sbase_new / conv.DC_kV_base
+        conv.a_conv = conv.a_conv_og / Sbase_new
+        conv.b_conv = conv.b_conv_og * conv.basekA / Sbase_new
+        conv.c_inver = conv.c_inver_og * conv.basekA**2 / Sbase_new
+        conv.c_rect = conv.c_rect_og * conv.basekA**2 / Sbase_new
+        if hasattr(conv, 'ra_og'):
+            conv.ra = conv.ra_og * conv.basekA_DC**2 / Sbase_new
+
+    for conv in grid.Converters_DCDC:
+        conv.Pset *= rate
+        conv.r *= rate
+        p = conv.Pset
+        conv.Powerto = p
+        conv.Powerfrom = -(p + p**2 * conv.r)
+        conv.loss = p**2 * conv.r
+
+    for pz in getattr(grid, 'Price_Zones', []):
+        pz.import_pu_L *= rate
+        pz.export_pu_G *= rate
+        pz.PN *= rate
+        if np.isfinite(pz.PGL_min_base):
+            pz.PGL_min_base *= rate
+        pz.S_base = Sbase_new
+        if getattr(pz, 'expand_import', False):
+            pz.calc_import_expand()
+        else:
+            pz.calc_curvature_effect()
+
+    grid.S_base = Sbase_new
+    if grid.nn_AC > 0:
+        grid.update_pq_ac()
+        grid.create_Ybus_AC()
+    if grid.nn_DC > 0:
+        grid.update_p_dc()
+        grid.create_Ybus_DC()
 
     return grid
 

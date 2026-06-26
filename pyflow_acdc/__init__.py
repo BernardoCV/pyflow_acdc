@@ -64,6 +64,7 @@ __all__ = [
     'create_grid_from_turbine_graph',
     'extend_grid_from_data',
     'create_grid_from_pickle',
+    'change_S_base',
 
     # Line Modifications
     'change_line_AC_to_expandable',

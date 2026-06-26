@@ -7,7 +7,18 @@ import numpy as np
 import warnings
 import time
 from .grid_analysis import analyse_grid, pol2cartz, cartz2pol
-from .constants import DEFAULT_TOLERANCE, PF_OUTER_TOLERANCE, PF_INNER_TOLERANCE, CONV_TOLERANCE, DEFAULT_PF_MAX_ITER, DEFAULT_CONV_MAX_ITER, NodeType, ConverterDCType, PowerLossModel
+from .constants import (
+    DEFAULT_TOLERANCE,
+    PF_OUTER_TOLERANCE,
+    PF_INNER_TOLERANCE,
+    PF_SEQ_TOL_FACTOR,
+    CONV_TOLERANCE,
+    DEFAULT_PF_MAX_ITER,
+    DEFAULT_CONV_MAX_ITER,
+    NodeType,
+    ConverterDCType,
+    PowerLossModel,
+)
 
 __all__ = [
     'ac_power_flow',
@@ -15,6 +26,12 @@ __all__ = [
     'acdc_sequential',
     'power_flow'
 ]
+
+
+def _effective_pf_tol(grid, tol_lim):
+    """Scale a per-unit PF tolerance for MW-normalized stopping after base changes."""
+    return tol_lim * grid.tol_scaler
+
 
 def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Droop_PF=True):
     """Run power flow on ``grid``, dispatching on its AC/DC content.
@@ -27,7 +44,12 @@ def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Dro
     grid : Grid
         Network to solve (mutated in place).
     tol_lim : float, optional
-        Convergence tolerance on the mismatch.
+        Convergence tolerance on the mismatch (per unit on ``grid.S_base``).
+        The solver uses ``effective_tol = tol_lim * grid.tol_scaler``, where
+        ``tol_scaler`` is ``1`` until :func:`~pyflow_acdc.change_S_base` changes
+        ``S_base`` away from ``S_base_ref`` (MW-normalized stopping). For hybrid
+        grids, :func:`acdc_sequential` is called with ``internal_tol=tol_lim``
+        and outer ``tol_lim * PF_SEQ_TOL_FACTOR`` (four orders looser).
     maxIter : int, optional
         Maximum Newton iterations.
     Droop_PF : bool, optional
@@ -45,7 +67,13 @@ def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Dro
     """
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
-        t, tracker, _ = acdc_sequential(grid, maxIter=maxIter, Droop_PF=Droop_PF)
+        t, tracker, _ = acdc_sequential(
+            grid,
+            tol_lim=tol_lim * PF_SEQ_TOL_FACTOR,
+            internal_tol=tol_lim,
+            maxIter=maxIter,
+            Droop_PF=Droop_PF,
+        )
         tol = tracker['final_sequential_tolerance']
     elif grid.ACmode:
         t, tol = ac_power_flow(grid, tol_lim, maxIter)
@@ -60,6 +88,12 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     Builds ``Ybus``, solves the AC network, and writes bus voltages and line
     flows back onto ``grid``.
 
+    Parameters
+    ----------
+    tol_lim : float, optional
+        Per-unit convergence tolerance. Scaled by ``grid.tol_scaler`` when
+        ``S_base`` differs from ``S_base_ref`` (see :func:`power_flow`).
+
     Returns
     -------
     tuple
@@ -69,6 +103,7 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     --------
     >>> time, tol = pyf.ac_power_flow(grid)
     """
+    tol_lim = _effective_pf_tol(grid, tol_lim)
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.update_pq_ac()
@@ -88,6 +123,9 @@ def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
 
     Parameters
     ----------
+    tol_lim : float, optional
+        Per-unit convergence tolerance. Scaled by ``grid.tol_scaler`` when
+        ``S_base`` differs from ``S_base_ref`` (see :func:`power_flow`).
     Droop_PF : bool, optional
         If ``True``, include droop-controlled nodes in the solve.
 
@@ -100,6 +138,7 @@ def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
     --------
     >>> time, tol = pyf.dc_power_flow(grid)
     """
+    tol_lim = _effective_pf_tol(grid, tol_lim)
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.update_p_dc()
@@ -119,9 +158,12 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
     Parameters
     ----------
     tol_lim : float, optional
-        Outer (interface) convergence tolerance.
+        Outer (interface) convergence tolerance (per unit). Scaled by
+        ``grid.tol_scaler`` when ``S_base`` differs from ``S_base_ref``.
     internal_tol : float, optional
-        Inner AC/DC solve tolerance.
+        Inner AC/DC solve tolerance (per unit). Scaled the same way. Defaults to
+        ``PF_OUTER_TOLERANCE / PF_SEQ_TOL_FACTOR``. Converter solves use
+        ``internal_tol / PF_SEQ_TOL_FACTOR`` (``CONV_TOLERANCE`` at defaults).
     change_slack2Droop : bool, optional
         Convert slack-controlled DC nodes to droop control during the solve.
     QLimit : bool, optional
@@ -139,6 +181,8 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
     --------
     >>> time, tol, ps_iterations = pyf.acdc_sequential(grid)
     """
+    tol_lim = _effective_pf_tol(grid, tol_lim)
+    internal_tol = _effective_pf_tol(grid, internal_tol)
     time_1 = time.perf_counter()
     tolerance = 1
     grid.reset_run_flags()
@@ -231,7 +275,11 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
             conv.th_s = AC_node.theta
 
             # Get converter tolerance
-            conv_tol = flow_conv(grid, conv, tol_lim=internal_tol*1e-4, maxIter=maxIter)
+            conv_tol = flow_conv(
+                grid, conv,
+                tol_lim=internal_tol / PF_SEQ_TOL_FACTOR,
+                maxIter=maxIter,
+            )
             conv_tolerances.append(conv_tol)
             conv_names.append(conv.name)
 

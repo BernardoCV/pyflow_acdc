@@ -72,6 +72,9 @@ class Grid:
     ----------
     S_base : float
         System power base in MVA.
+    S_base_ref : float
+        Power base at grid creation (unchanged by :func:`~pyflow_acdc.change_S_base`).
+        Used for :attr:`tol_scaler` when rescaling PF tolerances after a base change.
     nodes_AC, lines_AC, Converters, nodes_DC, lines_DC : list, optional
         Initial element lists; default to empty and are normally populated via
         the ``add_*`` helpers.
@@ -89,6 +92,7 @@ class Grid:
         self.Graph_toPlot= nx.MultiGraph()
         self.node_positions={}
         self.S_base = S_base
+        self.S_base_ref = S_base
 
         self._nodes_AC = nodes_AC if nodes_AC else []
         self._nodes_DC = nodes_DC if nodes_DC else []
@@ -364,6 +368,16 @@ class Grid:
     @property
     def n_gen_DC(self):
         return len(self.Generators_DC) if self.Generators_DC is not None else 0
+
+    @property
+    def tol_scaler(self):
+        """PF tolerance factor for MW-normalized stopping after ``S_base`` changes.
+
+        Equals ``1`` when ``S_base == S_base_ref``. After
+        :func:`~pyflow_acdc.change_S_base`, power-flow solvers use
+        ``effective_tol = tol_lim * tol_scaler``.
+        """
+        return self.S_base_ref / self.S_base
 
     # AC grid properties
     @property
@@ -1161,7 +1175,8 @@ class Gen_AC:
                 self.QGen *= rate
                 self.Pset *= rate
                 self.Qset *= rate
-                self.Max_S *= rate
+                if self.Max_S is not None:
+                    self.Max_S *= rate
         self._S_base = new_S_base
 
     @property
@@ -2730,12 +2745,12 @@ class Cable_options:
             Cable_options._cable_database = cable_database.copy()
 
         # If cable_types is None or empty, create empty cable option
+        self.lines = []
         if cable_types is None or len(cable_types) == 0:
             self._cable_types = []
             self.MVA_ratings = []
         else:
             self._cable_types = cable_types
-            self.lines = []
             self.active_config = None
             # Efficiently calculate MVA ratings in one pass
             self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
@@ -2832,6 +2847,10 @@ class TF_Line_AC:
             self._name = name
 
         TF_Line_AC.names.add(self.name)
+
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating
 
 
 class Line_DC:

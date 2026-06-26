@@ -1,189 +1,258 @@
 # -*- coding: utf-8 -*-
-"""``grid_creator`` tests: sub-grid, turbine-graph build, and extend-from-data."""
+"""Tests for ``grid_modifications``: build-from-empty, CSV templates, cable DB."""
 
-import copy
-import gzip
-import pickle
 from pathlib import Path
 
 import pandas as pd
 import pyflow_acdc as pyf
-from pyflow_acdc.grid_creator import create_sub_grid
+from pyflow_acdc.Classes import Cable_options, Line_AC, Line_DC
 
-ARRAY_BUNDLE_PATH = Path(__file__).resolve().parent / "alpha_ventus_flat.pkl.gz"
-_STAGG5_DATA = Path(__file__).resolve().parents[1] / "examples" / "Stagg5MATACDC"
-
-
-def _load_array_bundle(path=ARRAY_BUNDLE_PATH):
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Array graph bundle not found: {path} "
-            "(run Graph_Creation/saving_farms.py to generate alpha_ventus_flat.pkl.gz)"
-        )
-    with gzip.open(path, "rb") as f:
-        bundle = pickle.load(f)
-    if not isinstance(bundle, (tuple, list)) or len(bundle) != 3:
-        raise TypeError(
-            f"Expected (array_graph, Data, cable_types) tuple, got {type(bundle).__name__}"
-        )
-    return bundle
+DUMMY_CABLE_KEY = "PYTEST_DUMMY_AC_CABLE_XYZ"
+ORBIT_CABLE_PREFIX = "PYTEST_ORBIT"
 
 
-def _bundle_to_extend_tables(array_graph, Data):
-    """Build AC node and line DataFrames from an array graph bundle for ``extend_grid_from_data``."""
-    sub_key = (
-        "offshore_substation"
-        if "offshore_substation" in Data
-        else "transformer_station"
-    )
-    node_rows = []
-    for i, attrs in array_graph.nodes(data=True):
-        point_type = attrs.get("point_type")
-        if point_type == "access_point":
-            continue
-        if point_type == "turbine":
-            src = Data["turbine"].loc[attrs["original_idx"]]
-        elif point_type == "substation":
-            src = Data[sub_key].loc[attrs["original_idx"]]
-        else:
-            continue
-        node_rows.append({
-            "Node_id": str(i),
-            "geometry": src["geometry"],
-            "kV_base": float(src["kV_rating"]),
-        })
-    nodes = pd.DataFrame(node_rows)
-
-    line_rows = []
-    for line_id, (u, v, attrs) in enumerate(array_graph.edges(data=True)):
-        u_type = array_graph.nodes[u].get("point_type")
-        v_type = array_graph.nodes[v].get("point_type")
-        if u_type == "access_point" or v_type == "access_point":
-            continue
-        line_rows.append({
-            "Line_id": f"AC{line_id}",
-            "fromNode": str(u),
-            "toNode": str(v),
-            "R_Ohm_km": 0.1,
-            "L_mH_km": 0.4,
-            "C_uF_km": 0.2,
-            "A_rating": 500.0,
-            "Length_km": attrs["length"] / 1000.0,
-            "geometry": attrs.get("geometry"),
-        })
-    lines = pd.DataFrame(line_rows)
-    return nodes, lines
-
-
-def test_create_sub_grid_ns_mtdc_be():
-    grid, _ = pyf.cases["NS_MTDC"]()
-    n_ac_full = len(grid.nodes_AC)
-    n_dc_full = len(grid.nodes_DC)
-    assert n_ac_full > 0
-    assert n_dc_full > 0
-
-    grid_copy = copy.deepcopy(grid)
-    subgrid, res = create_sub_grid(grid_copy, Area_name="BE")
-
-    assert res is not None
-    assert len(subgrid.nodes_AC) > 0
-    assert len(subgrid.nodes_AC) < n_ac_full
-    assert len(subgrid.nodes_DC) <= n_dc_full
-    assert any(pz.name == "BE" for pz in subgrid.Price_Zones)
-    assert any(node.PZ == "BE" for node in subgrid.nodes_AC)
-
-
-def test_create_grid_from_turbine_graph_alpha_ventus_bundle():
-    array_graph, Data, cable_types = _load_array_bundle()
-    n_turbines = len(Data["turbine"])
-    n_edges = array_graph.number_of_edges()
-    assert n_turbines > 0
-    assert n_edges > 0
-    assert len(cable_types) > 0
-
-    grid, res = pyf.create_grid_from_turbine_graph(
-        array_graph,
-        Data,
-        cable_types=cable_types,
-        name="alpha_ventus",
+def _snapshot_cable_databases():
+    Line_AC.load_cable_database()
+    Line_DC.load_cable_database()
+    Cable_options.load_cable_database()
+    return (
+        Line_AC._cable_database.copy(),
+        Line_DC._cable_database.copy(),
+        Cable_options._cable_database.copy()
+        if Cable_options._cable_database is not None
+        else None,
     )
 
-    assert res is not None
-    assert grid.Array_opf is True
-    assert len(grid.nodes_AC) > 0
-    assert len(grid.lines_AC_ct) > 0
-    assert len(grid.RenSources) == n_turbines
-    assert len(grid.Cable_options) == 1
-    assert grid.crossing_groups is not None
+
+def _restore_cable_databases(snap):
+    ac, dc, co = snap
+    Line_AC._cable_database = ac
+    Line_DC._cable_database = dc
+    Cable_options._cable_database = co
 
 
-def _read_stagg5_csv(name):
-    df = pd.read_csv(
-        _STAGG5_DATA / name,
-        delimiter=",",
-        quotechar="'",
-        encoding="utf-8",
-    )
-    for col in ("Node_id", "fromNode", "toNode", "AC_node", "DC_node"):
-        if col in df.columns:
-            df[col] = df[col].astype(str)
-    return df
-
-
-def test_extend_grid_from_data_stagg5_partial_csv():
-    """Extend an empty grid with Stagg5MATACDC CSV tables (nodes first, then rest)."""
-    grid, _ = pyf.create_grid_from_data(
-        100,
-        AC_node_data=_read_stagg5_csv("MATACDC_AC_node_data.csv"),
-        data_in="pu",
-    )
-    n_ac_nodes = len(grid.nodes_AC)
-    assert n_ac_nodes == 5
-    assert len(grid.lines_AC) == 0
-
-    pyf.extend_grid_from_data(
-        grid,
-        AC_line_data=_read_stagg5_csv("MATACDC_AC_line_data.csv"),
-        DC_node_data=_read_stagg5_csv("MATACDC_DC_node_data.csv"),
-        DC_line_data=_read_stagg5_csv("MATACDC_DC_line_data.csv"),
-        Converter_data=_read_stagg5_csv("MATACDC_Converter_data.csv"),
-        data_in="pu",
-    )
-
-    assert len(grid.nodes_AC) == n_ac_nodes
-    assert len(grid.lines_AC) == 7
-    assert len(grid.nodes_DC) == 3
-    assert len(grid.lines_DC) == 3
-    assert len(grid.Converters_ACDC) == 3
-
-
-def test_extend_grid_from_data_alpha_ventus_bundle():
-    """Extend empty grid with Real-valued node/line tables built from array bundle."""
-    array_graph, Data, _ = _load_array_bundle()
-    nodes, lines = _bundle_to_extend_tables(array_graph, Data)
-
+def test_empty_grid_add_elements_price_zones_and_line_types():
+    """Build a hybrid grid from empty via grid_modifications API."""
     grid, _ = pyf.create_grid_from_data(100)
     assert len(grid.nodes_AC) == 0
-    assert len(grid.lines_AC) == 0
 
-    pyf.extend_grid_from_data(
+    pyf.add_AC_node(
         grid,
-        AC_node_data=nodes,
-        AC_line_data=lines,
-        data_in="Real",
+        138,
+        node_type="Slack",
+        name="n1",
+        geometry="POINT (0 0)",
+        x_coord=0,
+        y_coord=0,
+    )
+    pyf.add_AC_node(grid, 138, name="n2", geometry="POINT (1 0)")
+    pyf.add_AC_node(grid, 138, name="n3", geometry="POINT (2 0)")
+    pyf.add_DC_node(grid, 320, node_type="P", name="d1", geometry="POINT (1 1)")
+    pyf.add_DC_node(grid, 320, node_type="Slack", name="d2", geometry="POINT (2 1)")
+
+    pyf.add_line_AC(
+        grid,
+        "n1",
+        "n2",
+        r=0.02,
+        x=0.06,
+        b=0.06,
+        MVA_rating=150,
+        name="l12",
+        geometry="LINESTRING (0 0, 1 0)",
+    )
+    pyf.add_line_AC(
+        grid,
+        "n2",
+        "n3",
+        r=0.04,
+        x=0.12,
+        b=0.03,
+        MVA_rating=100,
+        name="l23_exp",
+        Expandable=True,
+        geometry="LINESTRING (1 0, 2 0)",
+    )
+    pyf.add_line_AC(
+        grid,
+        "n1",
+        "n3",
+        r=0.01,
+        x=0.03,
+        b=0.02,
+        MVA_rating=80,
+        name="l13_tf",
+        tap_changer=True,
+        m=1.02,
+        shift=0.05,
+    )
+    pyf.add_line_AC(
+        grid,
+        "n2",
+        "n3",
+        r=0.05,
+        x=0.15,
+        b=0.03,
+        MVA_rating=90,
+        name="l23_rec",
+    )
+    pyf.add_line_DC(
+        grid,
+        "d1",
+        "d2",
+        r=0.01,
+        MW_rating=500,
+        name="dc12",
+        geometry="LINESTRING (1 1, 2 1)",
     )
 
-    assert len(grid.nodes_AC) == len(nodes)
-    assert len(grid.lines_AC) == len(lines)
-    assert len(grid.nodes_AC) > len(Data["turbine"])
+    conv = pyf.add_ACDC_converter(
+        grid,
+        "n2",
+        "d1",
+        MVA_max=500,
+        name="conv_n2_d1",
+        geometry="POINT (1 0.5)",
+    )
+    pyf.add_DCDC_converter(grid, "d1", "d2", MW_rating=200, name="dcdc_12")
+
+    pyf.add_gen(grid, "n1", gen_name="g1", MWmax=100, np_gen=1)
+    pyf.add_RenSource(grid, "n3", base_MW=50, ren_source_name="wind1", np_rsgen=1)
+    pyf.add_RenSource_zone(grid, "offshore_wind")
+
+    onshore = pyf.add_price_zone(grid, "Z_on", price=45.0)
+    offshore = pyf.add_offshore_price_zone(grid, onshore, "o_Z_on")
+    pyf.add_MTDC_price_zone(grid, "mtdc_agg", linked_price_zones=["Z_on"])
+
+    pyf.assign_nodeToPrice_Zone(grid, "n2", "Z_on", ACDC="AC")
+    pyf.assign_nodeToPrice_Zone(grid, "d2", "Z_on", ACDC="DC")
+    pyf.assign_ConvToPrice_Zone(grid, conv, "Z_on")
+
+    pyf.Line_AC.load_cable_database()
+    cable_types = ["NREL_66kV_185mm2", "NREL_66kV_630mm2"]
+    cable_opt = pyf.add_cable_option(grid, cable_types=cable_types, name="pytest_opt")
+    pyf.add_line_sizing(
+        grid,
+        "n2",
+        "n3",
+        cable_types=cable_types,
+        name="ct_n2_n3",
+        cable_option=cable_opt.name,
+        geometry="LINESTRING (1 0, 2 0)",
+    )
+
+    pyf.change_line_AC_to_expandable(grid, "l12")
+    pyf.change_line_AC_to_reconducting(
+        grid,
+        "l23_rec",
+        r_new=0.008,
+        x_new=0.02,
+        g_new=0.0,
+        b_new=0.015,
+        MVA_rating_new=120,
+        Life_time=30,
+        base_cost=1e6,
+    )
+    pyf.add_line_AC(
+        grid,
+        "n1",
+        "n2",
+        r=0.03,
+        x=0.09,
+        b=0.04,
+        MVA_rating=100,
+        name="l12_tf_src",
+    )
+    pyf.change_line_AC_to_tap_transformer(grid, "l12_tf_src")
+
+    assert len(grid.nodes_AC) == 3
+    assert len(grid.nodes_DC) == 2
+    assert len(grid.lines_AC_exp) >= 2
+    assert len(grid.lines_AC_tf) >= 1
+    assert len(grid.lines_AC_rec) >= 1
+    assert len(grid.lines_AC_ct) >= 1
+    assert len(grid.Converters_ACDC) == 1
+    assert len(grid.Converters_DCDC) == 1
+    assert len(grid.Price_Zones) == 3
+    assert offshore.name == "o_Z_on"
+    assert any(n.PZ == "Z_on" for n in grid.nodes_AC)
+    assert conv in onshore.ConvACDC
     assert grid.Graph_AC is not None
 
 
+def test_case24_mp_csv_templates(tmp_path):
+    """case24_MP grid should yield gen-mix and investment CSV templates."""
+    grid, _ = pyf.cases["case24_MP"]()
+    assert len(grid.Generators) > 0 or len(grid.RenSources) > 0
+
+    gen_path = pyf.create_gen_limit_csv_template(
+        grid, file_path=tmp_path / "gen_mix_limits.csv"
+    )
+    inv_path = pyf.create_inv_csv_template(
+        grid, file_path=tmp_path / "inv_series.csv"
+    )
+
+    gen_df = pd.read_csv(gen_path, header=None)
+    inv_df = pd.read_csv(inv_path, header=None)
+    assert gen_df.shape[0] >= 2
+    assert gen_df.shape[1] >= 1
+    assert inv_df.shape[0] >= 2
+    assert inv_df.shape[1] >= 1
+
+
+def test_cable_database_expand_and_orbit_import_do_not_persist():
+    """expand_cable_database and import_orbit_cables (GitHub fetch) do not persist."""
+    snap = _snapshot_cable_databases()
+    ac_count_before = len(Line_AC._cable_database)
+    try:
+        assert DUMMY_CABLE_KEY not in Line_AC._cable_database.index
+
+        dummy_cable = {
+            DUMMY_CABLE_KEY: {
+                "R_Ohm_km": 0.1,
+                "L_mH_km": 0.4,
+                "C_uF_km": 0.2,
+                "G_uS_km": 0.0,
+                "A_rating": 500,
+                "Nominal_voltage_kV": 33,
+                "MVA_rating": 30.0,
+                "conductor_size": 185,
+                "Type": "AC",
+                "Reference": "pytest",
+            }
+        }
+        pyf.expand_cable_database(dummy_cable, format="yaml")
+        assert DUMMY_CABLE_KEY in Line_AC._cable_database.index
+        assert len(Line_AC._cable_database) == ac_count_before + 1
+
+        ac_indices_before_orbit = set(Line_AC._cable_database.index)
+        out = pyf.import_orbit_cables(name_prefix=ORBIT_CABLE_PREFIX, default_type="AC")
+        assert len(out) > 0
+        assert all(str(name).startswith(f"{ORBIT_CABLE_PREFIX}_") for name in out.index)
+        orbit_names = [
+            name
+            for name in Line_AC._cable_database.index
+            if str(name).startswith(f"{ORBIT_CABLE_PREFIX}_")
+            and name not in ac_indices_before_orbit
+        ]
+        assert len(orbit_names) > 0
+    finally:
+        _restore_cable_databases(snap)
+
+    assert DUMMY_CABLE_KEY not in Line_AC._cable_database.index
+    assert not any(
+        str(name).startswith(f"{ORBIT_CABLE_PREFIX}_")
+        for name in Line_AC._cable_database.index
+    )
+    assert len(Line_AC._cable_database) == ac_count_before
+
+
 def run_test():
-    test_create_sub_grid_ns_mtdc_be()
-    test_create_grid_from_turbine_graph_alpha_ventus_bundle()
-    test_extend_grid_from_data_stagg5_partial_csv()
-    test_extend_grid_from_data_alpha_ventus_bundle()
+    import tempfile
+
+    test_empty_grid_add_elements_price_zones_and_line_types()
+    test_case24_mp_csv_templates(Path(tempfile.mkdtemp()))
+    test_cable_database_expand_and_orbit_import_do_not_persist()
     print("✓ grid_mod tests passed")
 
 

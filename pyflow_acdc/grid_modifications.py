@@ -494,24 +494,20 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     if l is not None:
             grid.lines_AC.remove(l)
             l.remove()
-            line_vars=line_vars = {
-            'fromNode': l.fromNode,
-            'toNode': l.toNode,
-            'Resistance': l.r,
-            'Reactance': l.x,
-            'Conductance': l.g,
-            'Susceptance': l.b,
-            'MVA_rating': l.MVA_rating,
-            'Length_km': l.Length_km,
-            'm': l.m,
-            'shift': l.shift,
-            'N_cables': l.N_cables,
-            'name': l.name,
-            'geometry': l.geometry,
-            'S_base': l.S_base,
-            'Cable_type': l.Cable_type
-        }
-            trafo = TF_Line_AC(**line_vars)
+            trafo = TF_Line_AC(
+                l.fromNode,
+                l.toNode,
+                l.r,
+                l.x,
+                l.g,
+                l.b,
+                l.MVA_rating,
+                l.fromNode.kV_base,
+                l.m,
+                l.shift,
+                l.name,
+            )
+            trafo.geometry = l.geometry
             grid.lines_AC_tf.append(trafo)
     else:
         raise ValueError(f"Line '{line_name}' not found in grid.lines_AC")
@@ -2338,6 +2334,10 @@ def assign_lineToCable_options(grid, line, new_cable_option_name):
 def expand_cable_database(data, format='yaml', save_yaml=False):
     """Merge new cable entries into the bundled AC/DC cable database.
 
+    Use this for local or custom cable data (YAML dict, DataFrame, or CSV path).
+    To fetch the upstream ORBIT library from GitHub, use
+    :func:`import_orbit_cables` instead.
+
     Parameters
     ----------
     data : str, pathlib.Path, dict, or pandas.DataFrame
@@ -2433,20 +2433,21 @@ def expand_cable_database(data, format='yaml', save_yaml=False):
 
 
 def import_orbit_cables(
-    data=None,
     column_map=None,
     default_type='AC',
     name_prefix='NREL',
     save_yaml=False,
     source_url='https://github.com/NLRWindSystems/ORBIT/tree/dev/library/cables',
 ):
-    """Import ORBIT-style cable library data into the pyflow-acdc cable database.
+    """Fetch ORBIT cable library data from GitHub and merge into the cable database.
+
+    Fetches YAML/CSV files from ``source_url``, normalises ORBIT column names
+    and units, then calls :func:`expand_cable_database`. For local dict,
+    DataFrame, or CSV input already in pyflow schema, call
+    :func:`expand_cable_database` directly.
 
     Parameters
     ----------
-    data : pandas.DataFrame, str, or None, optional
-        Source table, CSV path, directory of CSV files, or URL. If None,
-        ``source_url`` is fetched.
     column_map : dict, optional
         Maps pyflow_acdc field names to source columns (``name``, ``R_Ohm_km``,
         ``L_mH_km``, ``C_uF_km``, ``G_uS_km``, ``A_rating``,
@@ -2459,7 +2460,7 @@ def import_orbit_cables(
     save_yaml : bool, optional
         If True, persist imported entries as YAML files.
     source_url : str, optional
-        ORBIT GitHub directory used when ``data`` is None.
+        ORBIT GitHub directory URL (``.../tree/<ref>/<path>``).
 
     Returns
     -------
@@ -2513,27 +2514,6 @@ def import_orbit_cables(
                 rows.extend(pd.read_csv(dl).to_dict(orient='records'))
         return rows
 
-    def _as_dataframe(obj):
-        if obj is None:
-            obj = source_url
-        if isinstance(obj, pd.DataFrame):
-            return obj.copy()
-        if isinstance(obj, str) and obj.startswith(('http://', 'https://')):
-            rows = _github_dir_to_rows(obj)
-            if not rows:
-                raise ValueError(f'No cable files found at URL: {obj}')
-            return pd.DataFrame(rows)
-        p = Path(obj)
-        if p.is_dir():
-            csv_files = sorted(p.glob('*.csv'))
-            if not csv_files:
-                raise ValueError(f'No CSV files found in directory: {p}')
-            frames = [pd.read_csv(fp) for fp in csv_files]
-            return pd.concat(frames, ignore_index=True)
-        if p.is_file():
-            return pd.read_csv(p)
-        raise ValueError('data must be DataFrame, CSV file path, or directory with CSV files')
-
     def _slug(text):
         s = re.sub(r'[^A-Za-z0-9]+', '_', str(text)).strip('_')
         return s or 'Cable'
@@ -2550,7 +2530,10 @@ def import_orbit_cables(
             raise KeyError(f"Missing required source column. Tried: {candidates}")
         return None
 
-    src = _as_dataframe(data)
+    rows = _github_dir_to_rows(source_url)
+    if not rows:
+        raise ValueError(f'No cable files found at URL: {source_url}')
+    src = pd.DataFrame(rows)
     cmap = column_map or {}
 
     c_name = _pick_col(src, cmap.get('name'),
