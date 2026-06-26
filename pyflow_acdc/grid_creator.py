@@ -490,8 +490,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
 def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
     if data_in == DataInput.PU:
-        DC_nodes_list = list(DC_nodes.values())
-
+       
         DC_line_data = DC_line_data.set_index('Line_id')
         DC_lines = {}
         for index, row in DC_line_data.iterrows():
@@ -521,7 +520,7 @@ def process_DC_line(S_base,data_in,DC_line_data,DC_nodes=None,grid=None):
                 DC_lines[var_name].geometry = geometry
 
     elif data_in == DataInput.OHM:
-        DC_nodes_list = list(DC_nodes.values())
+    
 
         DC_line_data = DC_line_data.set_index('Line_id')
         DC_lines = {}
@@ -1265,7 +1264,6 @@ def create_grid_from_mat(matfile):
             DC_nodes[var_name] = Node_DC(
                 node_type,kV_base, Voltage_0, Power_Gained, Power_load ,name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
         DC_nodes_list = list(DC_nodes.values())
-
         # DC_line_data = DC_line_data.set_index('Line_id')
         DC_lines = {}
         for index, row in DC_line_data.iterrows():
