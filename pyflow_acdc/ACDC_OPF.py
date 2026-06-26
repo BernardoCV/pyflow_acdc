@@ -15,6 +15,7 @@ from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow
 from .grid_analysis import analyse_grid
 from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights
 from .pyomo_model_solve import (
+    build_only_solver_stats,
     export_solver_progress_to_excel,
     pyomo_model_solve,
     reset_to_initialize,
@@ -198,7 +199,8 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     obj_scaling : float, optional
         Divide the objective by this factor for numerical conditioning.
     build_only : bool, optional
-        Build the Pyomo model and skip the solver call.
+        Build the Pyomo model, skip the solver, and export initializer values
+        onto ``grid`` so :class:`~pyflow_acdc.Results_class.Results` can run.
 
     Returns
     -------
@@ -246,23 +248,9 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
                     fx_conv(model, grid)
 
     if build_only:
-        timing_info = {
-            "create": t_modelcreate,
-            "solve": None,
-            "export": 0.0,
-        }
-        solver_stats = {
-            "solver": None,
-            "termination_condition": "build_only",
-            "solver_message": "build_only=True: model built and solve skipped.",
-            "solution_found": None,
-            "time": None,
-        }
-        return model, None, timing_info, solver_stats
-
-    """
-    """
-    model_res,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
+        model_res, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_res, solver_stats = pyomo_model_solve(model, grid, solver, tee, callback=callback)
 
     t1 = time.perf_counter()
     export_acdc_nl_model_to_pyflow_acdc(model, grid, Price_Zones)
@@ -277,11 +265,11 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     grid.OPF_run=True
     grid.OPF_obj=weights_def
     timing_info = {
-    "create": t_modelcreate,
-    "solve": solver_stats['time'],
-    "export": t_modelexport,
+        "create": t_modelcreate,
+        "solve": solver_stats["time"],
+        "export": t_modelexport,
     }
-    return model, model_res , timing_info, solver_stats
+    return model, model_res, timing_info, solver_stats
 
 
 def fx_conv(model,grid):

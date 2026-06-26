@@ -16,7 +16,17 @@ from .constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER,
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
 from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,opf_obj_l_array_losses,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
+from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from .ACDC_OPF import (
+    opf_obj,
+    opf_obj_l,
+    opf_obj_l_array_losses,
+    obj_w_rule,
+    export_acdc_nl_model_to_pyflow_acdc,
+    calculate_objective,
+    reset_to_initialize,
+    calculate_objective_from_model,
+)
 
 from .Graph_and_plot import save_network_svg
 
@@ -1076,32 +1086,18 @@ def transmission_expansion(
     t_modelcreate = t2-t1
 
     if build_only:
-        timing_info = {
-            "create": t_modelcreate,
-            "solve": None,
-            "export": 0.0,
-        }
-        solver_stats = {
-            "solver": None,
-            "termination_condition": "build_only",
-            "solver_message": "build_only=True: model built and solve skipped.",
-            "solution_found": None,
-            "time": None,
-        }
-        return model, None, timing_info, solver_stats
-
-    # model.obj.pprint()
-
-    model_results,solver_stats = pyomo_model_solve(
-        model,
-        grid,
-        solver,
-        tee,
-        time_limit,
-        callback=callback,
-        solver_options=solver_options,
-        nlp_warmstart=nlp_warmstart,
-    )
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_results, solver_stats = pyomo_model_solve(
+            model,
+            grid,
+            solver,
+            tee,
+            time_limit,
+            callback=callback,
+            solver_options=solver_options,
+            nlp_warmstart=nlp_warmstart,
+        )
 
     t1 = time.perf_counter()
     if export:
@@ -1122,11 +1118,11 @@ def transmission_expansion(
     grid.OPF_obj = weights_def
 
     timing_info = {
-    "create": t_modelcreate,
-    "solve": solver_stats['time'],
-    "export": t_modelexport,
+        "create": t_modelcreate,
+        "solve": solver_stats["time"],
+        "export": t_modelexport,
     }
-    return model, model_results , timing_info, solver_stats
+    return model, model_results, timing_info, solver_stats
 
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0):
     """Build and solve the linear (MILP) static transmission-expansion problem.
@@ -1722,24 +1718,15 @@ def multi_scenario_TEP(
         print('Model loaded')
 
     if build_only:
-        timing_info = {
-            "create": t_modelcreate,
-            "solve": None,
-            "export": 0.0,
-        }
-        solver_stats = {
-            "solver": None,
-            "termination_condition": "build_only",
-            "solver_message": "build_only=True: model built and solve skipped.",
-            "solution_found": None,
-            "time": None,
-        }
-        return model, None, timing_info, solver_stats, {}
-
-    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback,solver_options=solver_options,nlp_warmstart=nlp_warmstart)
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_results, solver_stats = pyomo_model_solve(
+            model, grid, solver, tee, callback=callback,
+            solver_options=solver_options, nlp_warmstart=nlp_warmstart,
+        )
 
     t1 = time.perf_counter()
-    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zones)
+    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model, grid, n_clusters, clustering, Price_Zones)
 
     TEP_multiScenario_res['OPF_obj'] = weights_def
 
@@ -1753,12 +1740,12 @@ def multi_scenario_TEP(
     grid.OPF_obj = weights_def
 
     timing_info = {
-    "create": t_modelcreate,
-    "solve": solver_stats.get('time', None),
-    "export": t_modelexport,
+        "create": t_modelcreate,
+        "solve": solver_stats["time"],
+        "export": t_modelexport,
     }
 
-    return model, model_results , timing_info, solver_stats , TEP_multiScenario_res
+    return model, model_results, timing_info, solver_stats, TEP_multiScenario_res
 
 
 def tep_sub_obj(scenario_model,grid,ObjRule):

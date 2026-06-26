@@ -74,9 +74,11 @@ def test_case24_multi_period_transmission_expansion_build_only():
     assert len(model.inv_periods) >= 1
     assert model_results is None
     assert timing_info["create"] >= 0
-    assert timing_info["solve"] is None
+    assert timing_info["solve"] == 0.0
+    assert timing_info["export"] >= 0
     assert solver_stats["termination_condition"] == "build_only"
     assert solver_stats["solution_found"] is False
+    assert hasattr(grid, "MP_TEP_obj_res")
 
 
 def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):

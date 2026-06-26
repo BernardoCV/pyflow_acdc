@@ -853,6 +853,11 @@ def export_acdc_l_model_to_pyflow_acdc(model,grid, solver_results=None, tee=Fals
 
         with ThreadPoolExecutor() as executor:
             executor.map(process_line_AC_CT, grid.lines_AC_ct)
+
+        for line in grid.lines_AC_ct:
+            if line.active_config >= 0 and line.network_flow is None:
+                line.network_flow = 0.0
+
      # After export is complete, analyze and fix oversizing issues if time limit was reached
     if solver_results is not None:
         # Check for time limit termination in Pyomo
@@ -917,8 +922,9 @@ def analyze_oversizing_issues_grid(grid, tee=True):
     for line in grid.lines_AC_ct:
         # Check if line is active (has a selected cable type)
         if  line.active_config >= 0:
-            # Get network flow value from grid
-            network_flow = getattr(line, 'network_flow', 0.0)
+            network_flow = getattr(line, 'network_flow', None)
+            if network_flow is None:
+                network_flow = 0.0
 
             active_lines_data.append({
                 'line_number': line.lineNumber,

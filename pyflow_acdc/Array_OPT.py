@@ -35,7 +35,13 @@ except ImportError:
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables
 from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize
+from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from .ACDC_OPF import (
+    obj_w_rule,
+    export_acdc_nl_model_to_pyflow_acdc,
+    calculate_objective,
+    
+)
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
@@ -217,7 +223,6 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
 
         t3 = time.perf_counter()
         if NL == CssMode.OPF:
-            from .Graph_and_plot import save_network_svg
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
             os.makedirs(intermediate_dir, exist_ok=True)
             save_network_svg(grid, name=f'{intermediate_dir}/{svg}_{i}_preCSS', width=1000, height=1000, journal=True,square_ratio=True, legend=True)
@@ -241,7 +246,6 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
         if svg is not None:
             if tee:
                 print(f'Iteration {i} saving SVG')
-            from .Graph_and_plot import save_network_svg
             CSS_solver = CSS_NL_solver if NL == CssMode.OPF else CSS_L_solver
             # Save SVG in the sequential_CSS folder
             intermediate_dir = os.path.join(save_dir, 'intermediate_networks')
@@ -757,48 +761,49 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                          sub_k_max=sub_k_max,
                                          flow_dir_tightening=flow_dir_tightening)
     if build_only:
-        return False, None, model, []
+        results, solver_stats = build_only_solver_stats(solver_name, model)
+        feasible_solutions = []
+        feasible_solution_found = True
+    else:
+        # Build solver options based on solver and grid attributes
+        solver_options = {}
+        time_limit = getattr(grid, "MIP_time", None)
 
-    # Build solver options based on solver and grid attributes
-    solver_options = {}
-    time_limit = getattr(grid, "MIP_time", None)
+        if solver_name == 'gurobi':
+            mip_focus = getattr(grid, "MIP_focus", 2)
+            solver_options = {
+                'MIPFocus': mip_focus,
+                'Cuts': 2,
+                'Heuristics': 0.05,
+                'Presolve': 2,
+            }
+            if MIP_gap is not None:
+                solver_options['MIPGap'] = MIP_gap
+        elif solver_name == 'cbc':
+            if MIP_gap is not None:
+                solver_options['ratioGap'] = MIP_gap
+        elif solver_name == 'highs':
+            if MIP_gap is not None:
+                solver_options['mip_rel_gap'] = MIP_gap
 
-    if solver_name == 'gurobi':
-        mip_focus = getattr(grid, "MIP_focus", 2)
-        solver_options = {
-            'MIPFocus': mip_focus,
-            'Cuts': 2,
-            'Heuristics': 0.05,
-            'Presolve': 2,
-        }
-        if MIP_gap is not None:
-            solver_options['MIPGap'] = MIP_gap
-    elif solver_name == 'cbc':
-        if MIP_gap is not None:
-            solver_options['ratioGap'] = MIP_gap
-    elif solver_name == 'highs':
-        if MIP_gap is not None:
-            solver_options['mip_rel_gap'] = MIP_gap
+        if solver_options_override is not None:
+            solver_options.update(solver_options_override)
 
-    if solver_options_override is not None:
-        solver_options.update(solver_options_override)
+        results, solver_stats = pyomo_model_solve(
+            model,
+            grid=None,
+            solver=solver_name,
+            tee=tee,
+            time_limit=time_limit,
+            callback=callback,
+            solver_options=solver_options if solver_options else None,
+            objective_name='objective',
+            suppress_warnings=True,
+        )
 
-    # Use pyomo_model_solve to handle all solver logic
-    results, solver_stats = pyomo_model_solve(
-        model,
-        grid=None,  # Not needed for MIP
-        solver=solver_name,
-        tee=tee,
-        time_limit=time_limit,
-        callback=callback,
-        solver_options=solver_options if solver_options else None,
-        objective_name='objective',  # MIP model uses 'objective'
-        suppress_warnings=True  # Suppress warnings for MIP failures
-    )
+        feasible_solutions = solver_stats['feasible_solutions'] if solver_stats else []
+        feasible_solution_found = solver_stats['solution_found'] if solver_stats else False
 
-    # Extract results
-    feasible_solutions = solver_stats['feasible_solutions'] if solver_stats else []
-    feasible_solution_found = solver_stats['solution_found'] if solver_stats else False
     high_flow = None
 
     # === Post-solve handling ===

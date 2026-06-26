@@ -7,7 +7,8 @@ import os
 import copy
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables,export_acdc_nl_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective_from_model,optimal_pf
+from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from .ACDC_OPF import opf_obj, obj_w_rule, calculate_objective_from_model, optimal_pf
 from .ACDC_Static_TEP import (
     get_TEP_variables,
     _initialize_MS_STEP_sets_model,
@@ -1044,39 +1045,28 @@ def multi_period_transmission_expansion(
     t2 = time.time()
 
     if build_only:
-        timing_info = {
-            "create": t2 - t1,
-            "solve": None,
-            "export": 0.0,
-        }
-        solver_stats = {
-            "solution_found": False,
-            "termination_condition": "build_only",
-            "solver_message": "build_only=True: model built and solve skipped.",
-            "time": None,
-        }
-        return model, None, timing_info, solver_stats
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+        t3 = t2
+    else:
+        model_results, solver_stats = pyomo_model_solve(
+            model, grid, solver, time_limit=time_limit, tee=tee,
+            callback=callback, solver_options=solver_options, nlp_warmstart=nlp_warmstart
+        )
+        t3 = time.time()
 
-    model_results,solver_stats = pyomo_model_solve(
-        model, grid, solver, time_limit=time_limit, tee=tee,
-        callback=callback, solver_options=solver_options, nlp_warmstart=nlp_warmstart
-    )
-
-    t3 = time.time()
-
-    if not (solver_stats and solver_stats.get('solution_found', False)):
-        termination = solver_stats.get('termination_condition', 'unknown') if solver_stats else 'unknown'
-        solver_message = solver_stats.get('solver_message', '') if solver_stats else ''
-        if tee:
-            print(f"MP-TEP failed: no feasible solution found (termination: {termination}).")
-            if solver_message:
-                print(f"Solver message: {solver_message}")
-        timing_info = {
-            "create": t2 - t1,
-            "solve": solver_stats['time'] if solver_stats else None,
-            "export": 0.0,
-        }
-        return model, model_results, timing_info, solver_stats
+        if not (solver_stats and solver_stats.get("solution_found", False)):
+            termination = solver_stats.get("termination_condition", "unknown") if solver_stats else "unknown"
+            solver_message = solver_stats.get("solver_message", "") if solver_stats else ""
+            if tee:
+                print(f"MP-TEP failed: no feasible solution found (termination: {termination}).")
+                if solver_message:
+                    print(f"Solver message: {solver_message}")
+            timing_info = {
+                "create": t2 - t1,
+                "solve": solver_stats["time"] if solver_stats else None,
+                "export": 0.0,
+            }
+            return model, model_results, timing_info, solver_stats
 
     MINLP = False
     if solver != 'ipopt':
@@ -1125,14 +1115,12 @@ def multi_period_transmission_expansion(
                                               'STEP_Objective_Economic','NPV_STEP_Objective_Economic'])
     grid.MP_TEP_obj_res = obj_res
     timing_info = {
-    "create": t2-t1,
-    "solve": solver_stats['time'],
-    "export": t4-t3,
+        "create": t2 - t1,
+        "solve": solver_stats["time"],
+        "export": t4 - t3,
     }
 
-
-
-    return model, model_results ,timing_info, solver_stats
+    return model, model_results, timing_info, solver_stats
 
 def _initialize_MPTEP_sets_model(model,grid):
 
@@ -1846,36 +1834,26 @@ def multi_period_MS_TEP(
     model.obj_scaling = obj_scaling
 
     if build_only:
-        timing_info = {
-            "create": time.time() - t1,
-            "solve": None,
-            "export": 0.0,
-        }
-        solver_stats = {
-            "solver": None,
-            "termination_condition": "build_only",
-            "solver_message": "build_only=True: model built and solve skipped.",
-            "solution_found": None,
-            "time": None,
-        }
-        return model, None, timing_info, solver_stats, {}
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+        t2 = time.time()
+        t3 = t2
+    else:
+        t2 = time.time()
+        model_results, solver_stats = pyomo_model_solve(
+            model, grid, solver, tee=tee, time_limit=time_limit, callback=callback,
+            solver_options=solver_options, nlp_warmstart=nlp_warmstart
+        )
+        t3 = time.time()
 
-    t2 = time.time()
-    model_results, solver_stats = pyomo_model_solve(
-        model, grid, solver, tee=tee, time_limit=time_limit, callback=callback,
-        solver_options=solver_options, nlp_warmstart=nlp_warmstart
-    )
-    t3 = time.time()
+        if not (solver_stats and solver_stats.get("solution_found", False)):
+            termination = solver_stats.get("termination_condition", "unknown") if solver_stats else "unknown"
+            solver_message = solver_stats.get("solver_message", "") if solver_stats else ""
+            msg = f"MP-MS-TEP failed: no feasible solution found (termination: {termination})."
+            if solver_message:
+                msg = f"{msg} Solver message: {solver_message}"
+            raise RuntimeError(msg)
 
-    if not (solver_stats and solver_stats.get('solution_found', False)):
-        termination = solver_stats.get('termination_condition', 'unknown') if solver_stats else 'unknown'
-        solver_message = solver_stats.get('solver_message', '') if solver_stats else ''
-        msg = f"MP-MS-TEP failed: no feasible solution found (termination: {termination})."
-        if solver_message:
-            msg = f"{msg} Solver message: {solver_message}"
-        raise RuntimeError(msg)
-
-    MINLP = solver != 'ipopt'
+    MINLP = solver != "ipopt"
     export_mp_tep_results_to_pyflow_acdc(
         model,
         grid,
@@ -1955,7 +1933,7 @@ def multi_period_MS_TEP(
     t4 = time.time()
     timing_info = {
         "create": t2 - t1,
-        "solve": solver_stats['time'],
+        "solve": solver_stats["time"],
         "export": t4 - t3,
     }
     return model, model_results, timing_info, solver_stats, grid.MP_MS_TEP_results
