@@ -12,6 +12,7 @@ TS_MK = pd.read_csv(NS_MTDC_MARKET_PRICES_URL)
 pyf.add_TimeSeries(grid, TS_MK)
 TS_wl = pd.read_csv(NS_MTDC_WIND_LOAD_URL)
 pyf.add_TimeSeries(grid, TS_wl)
-pyf.ts_acdc_opf(grid, start, end, ObjRule=obj)
+build_only = not pyf.is_pyomo_solver_available("ipopt")
+pyf.ts_acdc_opf(grid, start, end, ObjRule=obj, build_only=build_only)
 app = create_dash_app(grid)
 assert app.layout is not None

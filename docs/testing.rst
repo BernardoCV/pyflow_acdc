@@ -48,12 +48,8 @@ Coverage::
 
 CI uploads coverage to Codecov on each push/PR to ``main`` (see the ``coverage``
 job in ``.github/workflows/pr-tests.yml``; requires the ``CODECOV_TOKEN`` repository
-secret).
-
-The shipped snapshot lives in ``TEST_COVERAGE.md`` at the repository root (overall %,
-per-module miss counts, missing lines). Pull requests that change tests must update
-that file and the **Test coverage** badge in ``README.md`` (see ``CONTRIBUTING.md``).
-The Codecov badge in ``README.md`` updates automatically from CI uploads.
+secret). Per-module reports and the coverage badge in ``README.md`` are maintained
+on Codecov.
 
 TEP tests use Ipopt by default (via ``tep_solver()``). For a full MINLP solve on
 one file, opt in to Bonmin::

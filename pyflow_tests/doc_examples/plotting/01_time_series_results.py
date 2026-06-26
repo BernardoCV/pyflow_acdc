@@ -10,6 +10,7 @@ TS_MK = pd.read_csv(NS_MTDC_MARKET_PRICES_URL)
 pyf.add_TimeSeries(grid,TS_MK)
 TS_wl = pd.read_csv(NS_MTDC_WIND_LOAD_URL)
 pyf.add_TimeSeries(grid,TS_wl)
-times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj)  
+build_only = not pyf.is_pyomo_solver_available("ipopt")
+times=pyf.ts_acdc_opf(grid,start,end,ObjRule=obj,build_only=build_only)
 #show is set to False for testing suit, change it to True to see the plot
 pyf.plot_TS_res(grid, start, end, save_format='svg', show=False)
