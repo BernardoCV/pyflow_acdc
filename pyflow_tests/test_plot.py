@@ -47,24 +47,13 @@ def _load_moray_grid():
     return load_case_grid_and_geo("moray_east", source_tag="gebco")
 
 
-def _build_exp_tf_ct_grid():
-    """Minimal grid with expandable, transformer, and cable-type AC lines."""
+def _build_tf_ct_grid():
+    """Minimal grid with transformer and cable-type AC lines."""
     grid, _ = pyf.create_grid_from_data(100)
     pyf.add_AC_node(grid, 138, node_type="Slack", name="n1", x_coord=0, y_coord=0)
     pyf.add_AC_node(grid, 138, name="n2", x_coord=1, y_coord=0)
     pyf.add_AC_node(grid, 138, name="n3", x_coord=2, y_coord=0)
 
-    pyf.add_line_AC(
-        grid,
-        "n1",
-        "n2",
-        r=0.02,
-        x=0.06,
-        b=0.06,
-        MVA_rating=150,
-        name="l12_exp",
-        Expandable=True,
-    )
     pyf.add_line_AC(
         grid,
         "n1",
@@ -145,10 +134,10 @@ def test_moray_east_assign_and_plot_outputs(tmp_path):
 
 def test_hovertexts_exp_tf_and_ct():
     """Hover text for expandable, transformer, and cable-type AC lines."""
-    mat = Path(__file__).resolve().parent / "case6_acdc_tnep_var.mat"
-    grid_mat, _ = pyf.create_grid_from_mat(str(mat))
+    grid_tep, _ = pyf.cases["case24_TEP"]()
+    assert len(grid_tep.lines_AC_exp) > 0
     _assert_hovertext_modes(
-        grid_mat,
+        grid_tep,
         lambda g: g.lines_AC_exp[0],
         {
             "data": ["Line:", "Number of lines", "Installation cost"],
@@ -157,23 +146,14 @@ def test_hovertexts_exp_tf_and_ct():
         },
     )
 
-    grid = _build_exp_tf_ct_grid()
-    _assert_hovertext_modes(
-        grid,
-        lambda g: g.lines_AC_exp[0],
-        {
-            "data": ["Line:", "Number of lines"],
-            "inPu": ["Loading", "Number of lines"],
-            "Real": ["MVA", "Number of lines"],
-        },
-    )
+    grid = _build_tf_ct_grid()
     _assert_hovertext_modes(
         grid,
         lambda g: g.lines_AC_tf[0],
         {
-            "data": ["Transformer:", "Rating"],
-            "inPu": ["Transformer:", "Loading"],
-            "Real": ["Transformer:", "MVA"],
+            "data": ["Transformer:", "Tap:", "Shift:", "Rating"],
+            "inPu": ["Transformer:", "Tap:", "Loading"],
+            "Real": ["Transformer:", "Tap:", "MVA"],
         },
     )
     _assert_hovertext_modes(

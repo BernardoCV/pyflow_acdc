@@ -2851,6 +2851,7 @@ class TF_Line_AC:
 
         self.ts_max_loading = 0
         self.ts_avg_loading = 0
+        self.Length_km = 1.0
 
         self.m =m
         self.shift = shift
@@ -2891,6 +2892,15 @@ class TF_Line_AC:
     @property
     def capacity_MVA(self):
         return self.MVA_rating
+
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.fromS), abs(self.toS)) * self.S_base
+
+    @property
+    def loading(self):
+        cap = self.capacity_MVA
+        return 0.0 if cap == 0 else (self.apparent_MVA / cap) * 100.0
 
     @property
     def S_base(self):
