@@ -47,6 +47,61 @@ def _load_moray_grid():
     return load_case_grid_and_geo("moray_east", source_tag="gebco")
 
 
+def _build_exp_tf_ct_grid():
+    """Minimal grid with expandable, transformer, and cable-type AC lines."""
+    grid, _ = pyf.create_grid_from_data(100)
+    pyf.add_AC_node(grid, 138, node_type="Slack", name="n1", x_coord=0, y_coord=0)
+    pyf.add_AC_node(grid, 138, name="n2", x_coord=1, y_coord=0)
+    pyf.add_AC_node(grid, 138, name="n3", x_coord=2, y_coord=0)
+
+    pyf.add_line_AC(
+        grid,
+        "n1",
+        "n2",
+        r=0.02,
+        x=0.06,
+        b=0.06,
+        MVA_rating=150,
+        name="l12_exp",
+        Expandable=True,
+    )
+    pyf.add_line_AC(
+        grid,
+        "n1",
+        "n3",
+        r=0.01,
+        x=0.03,
+        b=0.02,
+        MVA_rating=80,
+        name="l13_tf",
+        tap_changer=True,
+        m=1.02,
+        shift=0.05,
+    )
+
+    pyf.Line_AC.load_cable_database()
+    cable_types = ["NREL_66kV_185mm2", "NREL_66kV_630mm2"]
+    cable_opt = pyf.add_cable_option(grid, cable_types=cable_types, name="pytest_hover_opt")
+    pyf.add_line_sizing(
+        grid,
+        "n2",
+        "n3",
+        cable_types=cable_types,
+        name="ct_n2_n3",
+        cable_option=cable_opt.name,
+    )
+    return grid
+
+
+def _assert_hovertext_modes(grid, element_getter, required_by_mode):
+    for mode, fragments in required_by_mode.items():
+        update_hovertexts(grid, mode)
+        element = element_getter(grid)
+        assert element.hover_text, f"Missing hover_text for {mode}"
+        for fragment in fragments:
+            assert fragment in element.hover_text, f"{mode}: expected {fragment!r} in hover_text"
+
+
 def test_moray_east_assign_and_plot_outputs(tmp_path):
     pytest.importorskip("folium")
     pytest.importorskip("branca")
@@ -86,6 +141,50 @@ def test_moray_east_assign_and_plot_outputs(tmp_path):
     assert Path(f"{svg_prefix}.svg").exists(), "SVG export was not created."
     assert html_3d_path.exists(), "3D HTML export was not created."
     assert Path(f"{folium_prefix}.html").exists(), "Folium HTML export was not created."
+
+
+def test_hovertexts_exp_tf_and_ct():
+    """Hover text for expandable, transformer, and cable-type AC lines."""
+    mat = Path(__file__).resolve().parent / "case6_acdc_tnep_var.mat"
+    grid_mat, _ = pyf.create_grid_from_mat(str(mat))
+    _assert_hovertext_modes(
+        grid_mat,
+        lambda g: g.lines_AC_exp[0],
+        {
+            "data": ["Line:", "Number of lines", "Installation cost"],
+            "inPu": ["Loading", "Number of lines"],
+            "Real": ["MVA", "Number of lines"],
+        },
+    )
+
+    grid = _build_exp_tf_ct_grid()
+    _assert_hovertext_modes(
+        grid,
+        lambda g: g.lines_AC_exp[0],
+        {
+            "data": ["Line:", "Number of lines"],
+            "inPu": ["Loading", "Number of lines"],
+            "Real": ["MVA", "Number of lines"],
+        },
+    )
+    _assert_hovertext_modes(
+        grid,
+        lambda g: g.lines_AC_tf[0],
+        {
+            "data": ["Transformer:", "Rating"],
+            "inPu": ["Transformer:", "Loading"],
+            "Real": ["Transformer:", "MVA"],
+        },
+    )
+    _assert_hovertext_modes(
+        grid,
+        lambda g: g.lines_AC_ct[0],
+        {
+            "data": ["Cable type line:", "Installation cost"],
+            "inPu": ["Cable type line:", "Cable type:"],
+            "Real": ["MVA", "Cable type:"],
+        },
+    )
 
 
 def test_ns_mtdc_generates_hovertexts():
