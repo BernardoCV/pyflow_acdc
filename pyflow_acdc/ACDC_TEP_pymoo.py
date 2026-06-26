@@ -7,7 +7,8 @@ from pymoo.optimize import minimize
 import time
 import matplotlib.pyplot as plt
 from .ACDC_OPF_NL_model import export_acdc_nl_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,obj_w_rule,calculate_objective
+from .pyomo_model_solve import pyomo_model_solve
+from .ACDC_OPF import opf_obj, obj_w_rule, calculate_objective
 from .grid_analysis import analyse_grid
 from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
 

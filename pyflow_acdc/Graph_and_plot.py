@@ -379,17 +379,17 @@ def update_lineACct_hovertext(line,S_base,text):
 def update_tf_hovertext(line,S_base,text):
      dec=2
      line.direction = 'from' if line.fromS >= 0 else 'to'
+     tap_m = np.round(line.m, decimals=4)
+     shift_deg = np.round(np.degrees(line.shift), decimals=2)
+     tap_string = f"Tap: {tap_m}<br>Shift: {shift_deg}°"
      if text =='data':
          name = line.name
-         fromnode = line.fromNode.name
-         tonode = line.toNode.name
-         l = int(line.Length_km)
          z= np.round(line.Z,decimals=5)
          y= np.round(line.Y,decimals=5)
          rating = line.MVA_rating
          rating = np.round(rating,decimals=0)
          Line_tf = 'Transformer' if line.isTf else 'Line'
-         line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>Length: {l}km<br>Rating: {rating}MVA"
+         line.hover_text = f"{Line_tf}: {name}<br> Z:{z}<br>Y:{y}<br>{tap_string}<br>Rating: {rating}MVA"
 
      elif text=='inPu':
 
@@ -404,7 +404,7 @@ def update_tf_hovertext(line,S_base,text):
              line_string = f"{fromnode} -> {tonode}"
          else:
              line_string = f"{fromnode} <- {tonode}"
-         line.hover_text = f"Transformer: {name}<br> {line_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%"
+         line.hover_text = f"Transformer: {name}<br> {line_string}<br>{tap_string}<br>S from: {Sfrom}<br>S to: {Sto}<br>Loading: {Loading}%"
      else:
         name= line.name
         fromnode = line.fromNode.name
@@ -417,7 +417,7 @@ def update_tf_hovertext(line,S_base,text):
             line_string = f"{fromnode} -> {tonode}"
         else:
             line_string = f"{fromnode} <- {tonode}"
-        line.hover_text = f"Transformer: {name}<br>  {line_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%"
+        line.hover_text = f"Transformer: {name}<br>  {line_string}<br>{tap_string}<br>S from: {Sfrom}MVA<br>S to: {Sto}MVA<br>Loading: {Loading}%"
 
 def update_conv_hovertext(conv,S_base,text):
      if text =='data':

@@ -55,26 +55,34 @@ def price_zone_data_pd(data, save_csv=None):
         price/volume, and power limits ``PGL_min`` / ``PGL_max``.
     """
 
-    df= pd.DataFrame(columns=['time','a_BC', 'b_BC', 'c_BC','a_CG', 'b_CG', 'c_CG','price','volume','PGL_min','PGL_max'])
-
-
+    rows = []
     for i in data:
-        hour=i['Hour']
-        a_BC=i['poly']['a_BC']
-        b_BC=i['poly']['b_BC']
-        c_BC=i['poly']['c_BC']
-        a_CG=i['poly']['a_CG']
-        b_CG=i['poly']['b_CG']
-        c_CG=i['poly']['c_CG']
+        hour = i['Hour']
+        a_BC = i['poly']['a_BC']
+        b_BC = i['poly']['b_BC']
+        c_BC = i['poly']['c_BC']
+        a_CG = i['poly']['a_CG']
+        b_CG = i['poly']['b_CG']
+        c_CG = i['poly']['c_CG']
         price = i['Market_price']
         volume = i['Volume_eq']
-        PGL_min=i['poly']['P_min']
-        PGL_max=i['poly']['P_max']
-        new_row = pd.DataFrame({'time':[hour],'a_BC':[a_BC],'b_BC':[b_BC],'c_BC':[c_BC],'a_CG':[a_CG],'b_CG':[b_CG],'c_CG':[c_CG],'price':[price],'volume':[volume],'PGL_min': [PGL_min],'PGL_max':[PGL_max]})
-        df = pd.concat([df, new_row], ignore_index=True)
+        PGL_min = i['poly']['P_min']
+        PGL_max = i['poly']['P_max']
+        rows.append({
+            'time': hour,
+            'a_BC': a_BC,
+            'b_BC': b_BC,
+            'c_BC': c_BC,
+            'a_CG': a_CG,
+            'b_CG': b_CG,
+            'c_CG': c_CG,
+            'price': price,
+            'volume': volume,
+            'PGL_min': PGL_min,
+            'PGL_max': PGL_max,
+        })
 
-
-    df.set_index('time', inplace=True)
+    df = pd.DataFrame(rows).set_index('time')
     if save_csv is not None:
         if save_csv.endswith('.csv'):
             df.to_csv(save_csv, index=True)

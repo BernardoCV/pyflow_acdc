@@ -2,6 +2,8 @@
 import pyflow_acdc as pyf
 import pandas as pd
 
+build_only = not pyf.is_pyomo_solver_available("ipopt")
+
 S_base = 100
 
 nodes_AC_data = [
@@ -33,7 +35,11 @@ pyf.add_gen(grid, '5.0', '5', lf=10, qf=0, MWmax=600.0, MWmin=0.0, MVArmax=450.0
 
 obj = {'Energy_cost': 1}
 
-model, timing_info, model_res, solver_stats = pyf.optimal_pf(grid, ObjRule=obj)
+model, timing_info, model_res, solver_stats = pyf.optimal_pf(
+    grid,
+    ObjRule=obj,
+    build_only=build_only,
+)
 
 res.all()
 print('------')

@@ -10,4 +10,3 @@ coverage:
 
 ignore:
   - "pyflow_tests/**"
-  - "pyflow_acdc/example_grids/**"

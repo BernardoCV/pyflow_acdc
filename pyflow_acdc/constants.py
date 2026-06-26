@@ -105,7 +105,7 @@ class MIPBackend(str, Enum):
 
 # OR-Tools ``linear_solver`` backends (CSS MILP and optional Pyomo path-MIP fallback).
 ORTOOLS_LINEAR_SOLVERS = ('GUROBI', 'SCIP', 'CBC')
-
+PYOMO_LINEAR_SOLVERS = ('gurobi', 'highs','cbc','glpk')
 
 class PricingStrategy(str, Enum):
     """How an `MTDCPrice_Zone` derives its price from linked price zones."""
@@ -200,12 +200,15 @@ DEFAULT_TOLERANCE = 1e-10
 """ ACDC_PF (ACDC_sequential outer loop), ACDC_OPF """
 PF_OUTER_TOLERANCE = 1e-4
 
+""" ACDC_PF (:func:`power_flow` hybrid path): outer sequential tol = inner * factor """
+PF_SEQ_TOL_FACTOR = 1e4
+
 """ ACDC_PF (load_flow_dc, load_flow_ac, acdc_sequential internal_tol),
     ACDC_MultiPeriod_TEP """
-PF_INNER_TOLERANCE = 1e-8
+PF_INNER_TOLERANCE = PF_OUTER_TOLERANCE / PF_SEQ_TOL_FACTOR
 
 """ ACDC_PF (flow_conv — converter inner iterations) """
-CONV_TOLERANCE = 1e-12
+CONV_TOLERANCE = PF_OUTER_TOLERANCE / PF_SEQ_TOL_FACTOR**2
 
 # ── Iteration caps ───────────────────────────────────────────────────────
 """ ACDC_PF, Time_series """

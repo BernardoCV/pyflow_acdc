@@ -48,7 +48,11 @@ except ImportError:
     pyomo_imp= False
 
 
-def find_value_from_cdf(cdf, x):
+def _to_dataframe(data):
+    return pd.DataFrame(data).set_index('time')
+
+
+def _find_value_from_cdf(cdf, x):
     for i in range(len(cdf)):
         if cdf[i] >= x:
             return i
@@ -76,15 +80,13 @@ def time_series_pf(grid):
     >>> import pyflow_acdc as pyf
     >>> pyf.time_series_pf(grid)
     """
-    if grid.nodes_AC is None:
-        print("only DC")
-        ts_dc_pf(grid)
-    elif grid.nodes_DC is None:
-        print("only AC")
-        ts_ac_pf(grid)
-    else:
-        print("Sequential")
+    analyse_grid(grid)
+    if grid.ACmode and grid.DCmode:
         ts_acdc_pf(grid)
+    elif grid.ACmode:
+        ts_ac_pf(grid)
+    elif grid.DCmode:
+        ts_dc_pf(grid)
 
 def combine_TS(ts_list, rep_year=False):
     """Combines multiple time series while maintaining the order of the input list.
@@ -239,7 +241,7 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
         if rs:
             rs.PRGi_available = ts_data[idx]
 
-def update_ac_nodes(grid, idx):
+def _update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
     for node in grid.nodes_AC:
         if node.type == NodeType.SLACK:
@@ -256,7 +258,7 @@ def update_ac_nodes(grid, idx):
             })
     return row_data
 
-def update_converters(grid, idx):
+def _update_converters(grid, idx):
     row_data = {'time': idx+1}
     for conv in grid.Converters_ACDC:
         S_AC = np.sqrt(conv.P_AC**2 + conv.Q_AC**2)
@@ -267,24 +269,35 @@ def update_converters(grid, idx):
         })
     return row_data
 
-def calculate_line_loading(grid,idx):
-    loadS_AC = np.zeros(grid.Num_Grids_AC)
-    loadP_DC = np.zeros(grid.Num_Grids_DC)
+def _obtain_line_power_from_grid(grid,idx):
+    loadS_AC = np.zeros(grid.Num_Grids_AC) if grid.ACmode else np.zeros(0)
+    loadP_DC = np.zeros(grid.Num_Grids_DC) if grid.DCmode else np.zeros(0)
     line_data = {'time': idx+1}
 
-    for line in grid.lines_AC:
-        G = grid.Graph_line_to_Grid_index_AC[line]
-        load = line.apparent_MVA
-        loadS_AC[G] += load
-        line_data[f'AC_Load_{line.name}'] = line.loading/100
-        line_data[f'AC_to_{line.name}']   = np.real(line.toS) * grid.S_base
+    if grid.ACmode:
+        for line in (
+            grid.lines_AC
+            + grid.lines_AC_exp
+            + grid.lines_AC_rec
+            + grid.lines_AC_tf
+            + grid.lines_AC_ct
+        ):
+            active_config = getattr(line, 'active_config', None)
+            if active_config is not None and active_config < 0:
+                continue
+            G = grid.Graph_line_to_Grid_index_AC[line]
+            load = line.apparent_MVA
+            loadS_AC[G] += load
+            line_data[f'AC_Load_{line.name}'] = line.loading
+            line_data[f'AC_to_{line.name}']   = np.real(line.toS) * grid.S_base
 
-    for line in grid.lines_DC:
-        G = grid.Graph_line_to_Grid_index_DC[line]
-        load = line.apparent_MVA
-        loadP_DC[G] += load
-        line_data[f'DC_Load_{line.name}'] = line.loading/100
-        line_data[f'DC_to_{line.name}']   = line.toP * grid.S_base
+    if grid.DCmode:
+        for line in grid.lines_DC:
+            G = grid.Graph_line_to_Grid_index_DC[line]
+            load = line.power_MW
+            loadP_DC[G] += load
+            line_data[f'DC_Load_{line.name}'] = line.loading
+            line_data[f'DC_to_{line.name}']   = line.toP * grid.S_base
 
     return line_data, loadS_AC, loadP_DC
 
@@ -372,7 +385,7 @@ def _calculate_line_loading_from_model(grid,model,idx):
 
     return line_data, loadS_AC, loadP_DC
 
-def calculate_grid_loading(grid, loadS_AC, loadP_DC,idx):
+def _calculate_grid_loading(grid, loadS_AC, loadP_DC,idx):
     grid_data_loading = {'time': idx+1}
     total_loading = 0
     total_rating = 0
@@ -395,14 +408,14 @@ def calculate_grid_loading(grid, loadS_AC, loadP_DC,idx):
     grid_data_loading['Total'] = 0 if total_rating == 0 else total_loading /total_rating
     return grid_data_loading
 
-def calculate_price_zone_price(grid,idx):
+def _calculate_price_zone_price(grid,idx):
     price_zone_price = {'time': idx+1}
     for m in grid.Price_Zones:
          price_zone_price[m.name]=m.price
 
     return price_zone_price
 
-def calculate_price_zone_price_from_model(grid,model,idx):
+def _calculate_price_zone_price_from_model(grid,model,idx):
     price_zone_price = {'time': idx+1}
     prices    = {k: np.float64(pyo.value(v)) for k, v in model.price_zone_price.items()}
     for m in grid.Price_Zones:
@@ -411,7 +424,7 @@ def calculate_price_zone_price_from_model(grid,model,idx):
     return price_zone_price
 
 
-def calculate_pz_social_cost_kEUR_from_model(grid, model, idx):
+def _calculate_pz_social_cost_kEUR_from_model(grid, model, idx):
     """Per price zone social cost of generation in k€ (model SocialCost / 1000), aligned with MS export."""
     row = {'time': idx + 1}
     if not getattr(grid, 'Price_Zones', None) or not hasattr(model, 'SocialCost'):
@@ -423,7 +436,7 @@ def calculate_pz_social_cost_kEUR_from_model(grid, model, idx):
     return row
 
 
-def calculate_pz_p_known_mw_from_model(grid, model, idx):
+def _calculate_pz_p_known_mw_from_model(grid, model, idx):
     """
     Per price zone: sum of model P_known (pu) on zone nodes × S_base → MW.
     Same definition as MS export ``PZ_load`` / ``get_price_zone_data`` row_data_load.
@@ -442,7 +455,7 @@ def calculate_pz_p_known_mw_from_model(grid, model, idx):
     return row
 
 
-def calculate_net_price_zone_power_from_model(grid, model, idx):
+def _calculate_net_price_zone_power_from_model(grid, model, idx):
     net_price_zone_power = {'time': idx + 1}
     if hasattr(model, 'PN'):
         pn_values = {k: np.float64(pyo.value(v)) for k, v in model.PN.items()}
@@ -472,7 +485,7 @@ def calculate_net_price_zone_power_from_model(grid, model, idx):
                 pm_pu += pyo.value(model.PGi_ren_DC[n])
         net_price_zone_power[m.name] = pm_pu * grid.S_base
     return net_price_zone_power
-def calculate_res_available_from_model(grid, model, idx):
+def _calculate_res_available_from_model(grid, model, idx):
     res_available = {'time': idx + 1}
     if hasattr(model, 'ren_sources'):
         res_available_values = {k: np.float64(pyo.value(v)) for k, v in model.P_renSource.items()}
@@ -481,7 +494,7 @@ def calculate_res_available_from_model(grid, model, idx):
             res_available[rs.name] = res_available_values[rs.rsNumber] * np_rsgen_values[rs.rsNumber] * grid.S_base
     return res_available
 
-def calculate_pn_min_max_from_model(grid, model, idx):
+def _calculate_pn_min_max_from_model(grid, model, idx):
     """
     Compute PN lower/upper bounds (MW) from the model's PN bounds.
 
@@ -583,10 +596,10 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
 
         with ThreadPoolExecutor() as executor:
             # Submit the functions to the executor
-            future_row_data = executor.submit(update_ac_nodes, grid, idx)
-            future_line_data = executor.submit(calculate_line_loading, grid, idx)
+            future_row_data = executor.submit(_update_ac_nodes, grid, idx)
+            future_line_data = executor.submit(_obtain_line_power_from_grid, grid, idx)
             if grid.ACmode and grid.DCmode:
-                future_conv_data = executor.submit(update_converters, grid, idx)
+                future_conv_data = executor.submit(_update_converters, grid, idx)
                 conv_data = future_conv_data.result()
             else:
                 conv_data = None
@@ -594,7 +607,7 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
             row_data = future_row_data.result()
             line_data, loadS_AC, loadP_DC = future_line_data.result()
 
-        grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC,idx)
+        grid_data_loading = _calculate_grid_loading(grid, loadS_AC, loadP_DC,idx)
         row_data['time'] = idx+1
         Time_series_res.append(row_data)
         if conv_data is not None:
@@ -611,10 +624,8 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
         idx += 1
 
     # Create the DataFrame from the list of rows
-    def to_dataframe(data):
-        return pd.DataFrame(data).set_index('time')
-    grid.time_series_results['PF_results']   = to_dataframe(Time_series_res)
-    line_data_df = to_dataframe(Time_series_line_res)
+    grid.time_series_results['PF_results']   = _to_dataframe(Time_series_res)
+    line_data_df = _to_dataframe(Time_series_line_res)
     # Split line time-series into explicit loading and MW-to datasets
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)
@@ -633,8 +644,8 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
     grid.time_series_results['dc_MW_to'] = dc_mw_to
 
     if grid.ACmode and grid.DCmode:
-        grid.time_series_results['converter_loading'] = to_dataframe(Time_series_conv_res)
-    grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
+        grid.time_series_results['converter_loading'] = _to_dataframe(Time_series_conv_res)
+    grid.time_series_results['grid_loading'] = _to_dataframe(Time_series_grid_loading)
 
     grid.Time_series_ran = True
 
@@ -689,12 +700,12 @@ def ts_ac_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
         ac_power_flow(grid, tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
-            future_row_data = executor.submit(update_ac_nodes, grid, idx)
-            future_line_data = executor.submit(calculate_line_loading, grid, idx)
+            future_row_data = executor.submit(_update_ac_nodes, grid, idx)
+            future_line_data = executor.submit(_obtain_line_power_from_grid, grid, idx)
             row_data = future_row_data.result()
             line_data, loadS_AC, loadP_DC = future_line_data.result()
 
-        grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC, idx)
+        grid_data_loading = _calculate_grid_loading(grid, loadS_AC, loadP_DC, idx)
         row_data['time'] = idx+1
         Time_series_res.append(row_data)
         line_data['time'] = idx+1
@@ -706,17 +717,15 @@ def ts_ac_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
             print(idx+1)
         idx += 1
 
-    def to_dataframe(data):
-        return pd.DataFrame(data).set_index('time')
-    grid.time_series_results['PF_results'] = to_dataframe(Time_series_res)
-    line_data_df = to_dataframe(Time_series_line_res)
+    grid.time_series_results['PF_results'] = _to_dataframe(Time_series_res)
+    line_data_df = _to_dataframe(Time_series_line_res)
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     ac_mw_to = line_data_df.filter(like='AC_to_', axis=1)
     ac_loading.columns = ac_loading.columns.str.replace('AC_Load_', '', regex=False)
     ac_mw_to.columns = ac_mw_to.columns.str.replace('AC_to_', '', regex=False)
     grid.time_series_results['ac_loading'] = ac_loading
     grid.time_series_results['ac_MW_to'] = ac_mw_to
-    grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
+    grid.time_series_results['grid_loading'] = _to_dataframe(Time_series_grid_loading)
 
     grid.Time_series_ran = True
 
@@ -771,12 +780,12 @@ def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
         dc_power_flow(grid, tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
-            future_row_data = executor.submit(update_ac_nodes, grid, idx)
-            future_line_data = executor.submit(calculate_line_loading, grid, idx)
+            future_row_data = executor.submit(_update_ac_nodes, grid, idx)
+            future_line_data = executor.submit(_obtain_line_power_from_grid, grid, idx)
             row_data = future_row_data.result()
             line_data, loadS_AC, loadP_DC = future_line_data.result()
 
-        grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC, idx)
+        grid_data_loading = _calculate_grid_loading(grid, loadS_AC, loadP_DC, idx)
         row_data['time'] = idx+1
         Time_series_res.append(row_data)
         line_data['time'] = idx+1
@@ -788,17 +797,15 @@ def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
             print(idx+1)
         idx += 1
 
-    def to_dataframe(data):
-        return pd.DataFrame(data).set_index('time')
-    grid.time_series_results['PF_results'] = to_dataframe(Time_series_res)
-    line_data_df = to_dataframe(Time_series_line_res)
+    grid.time_series_results['PF_results'] = _to_dataframe(Time_series_res)
+    line_data_df = _to_dataframe(Time_series_line_res)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)
     dc_mw_to = line_data_df.filter(like='DC_to_', axis=1)
     dc_loading.columns = dc_loading.columns.str.replace('DC_Load_', '', regex=False)
     dc_mw_to.columns = dc_mw_to.columns.str.replace('DC_to_', '', regex=False)
     grid.time_series_results['dc_loading'] = dc_loading
     grid.time_series_results['dc_MW_to'] = dc_mw_to
-    grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
+    grid.time_series_results['grid_loading'] = _to_dataframe(Time_series_grid_loading)
 
     grid.Time_series_ran = True
 
@@ -897,6 +904,7 @@ def ts_acdc_opf(
     obj_scaling=1.0,
     warm_start_mode='roll',
     export_to_grid=True,
+    build_only=False,
 ):
     """Run sequential AC/DC OPF over a time-series window.
 
@@ -930,6 +938,11 @@ def ts_acdc_opf(
         Warm-start strategy between hours.
     export_to_grid : bool, optional
         Export the final model state back onto ``grid``.
+    build_only : bool, optional
+        If ``True``, build and update the Pyomo model each hour but skip the
+        solver. Post-processing (including
+        :func:`_calculate_line_loading_from_model`) still runs using the
+        model's current variable values (typically the initializer).
 
     Returns
     -------
@@ -1079,39 +1092,42 @@ def ts_acdc_opf(
         t2= time.perf_counter()
         t_modelupdate = t2-t1
 
-        results, solver_stats = pyomo_model_solve(model,grid,solver,suppress_warnings=True)
-        termination_condition = str((solver_stats or {}).get('termination_condition') or '').lower()
-        solution_found = bool((solver_stats or {}).get('solution_found', False))
-        if (results is None) or (not solution_found):
-            # Retry with opposite initialization strategy for this timestep.
-            retry_mode = 'roll' if warm_start_mode == 'hard' else 'hard'
-            if print_step:
-                print(f"{idx+1} Failed with {warm_start_mode}")
-            retry_model = _build_ts_model()
-            if retry_mode == 'hard':
-                reset_to_initialize(retry_model, initial_values)
-            elif t_minus_1_values is not None:
-                reset_to_initialize(retry_model, t_minus_1_values)
-            _modify_parameters(grid,retry_model,price_zone_restrictions)
-            retry_results, retry_stats = pyomo_model_solve(retry_model,grid,solver,suppress_warnings=True)
-            retry_solution_found = bool((retry_stats or {}).get('solution_found', False))
-            if retry_results is not None and retry_solution_found:
-                model = retry_model
-                results, solver_stats = retry_results, retry_stats
-                if print_step:
-                    print(f"{idx+1} Passed with {retry_mode} returning to {warm_start_mode}")
-            else:
-                infeasible += 1
-                inf_list.append(idx+1)
-                if print_step:
-                    reason = str((retry_stats or {}).get('termination_condition') or termination_condition or 'solver error').lower()
-                    print(f"{idx+1} Failed with {retry_mode}")
-                    print(f"{idx+1} skipped ({reason})")
-                idx += 1
-                continue
-        t_modelsolve = (solver_stats or {}).get('time')
-        if t_modelsolve is None:
+        if build_only:
             t_modelsolve = 0.0
+        else:
+            results, solver_stats = pyomo_model_solve(model,grid,solver,suppress_warnings=True)
+            termination_condition = str((solver_stats or {}).get('termination_condition') or '').lower()
+            solution_found = bool((solver_stats or {}).get('solution_found', False))
+            if (results is None) or (not solution_found):
+                # Retry with opposite initialization strategy for this timestep.
+                retry_mode = 'roll' if warm_start_mode == 'hard' else 'hard'
+                if print_step:
+                    print(f"{idx+1} Failed with {warm_start_mode}")
+                retry_model = _build_ts_model()
+                if retry_mode == 'hard':
+                    reset_to_initialize(retry_model, initial_values)
+                elif t_minus_1_values is not None:
+                    reset_to_initialize(retry_model, t_minus_1_values)
+                _modify_parameters(grid,retry_model,price_zone_restrictions)
+                retry_results, retry_stats = pyomo_model_solve(retry_model,grid,solver,suppress_warnings=True)
+                retry_solution_found = bool((retry_stats or {}).get('solution_found', False))
+                if retry_results is not None and retry_solution_found:
+                    model = retry_model
+                    results, solver_stats = retry_results, retry_stats
+                    if print_step:
+                        print(f"{idx+1} Passed with {retry_mode} returning to {warm_start_mode}")
+                else:
+                    infeasible += 1
+                    inf_list.append(idx+1)
+                    if print_step:
+                        reason = str((retry_stats or {}).get('termination_condition') or termination_condition or 'solver error').lower()
+                        print(f"{idx+1} Failed with {retry_mode}")
+                        print(f"{idx+1} skipped ({reason})")
+                    idx += 1
+                    continue
+            t_modelsolve = (solver_stats or {}).get('time')
+            if t_modelsolve is None:
+                t_modelsolve = 0.0
 
         total_update_time+= t_modelupdate
         total_solve_time += t_modelsolve
@@ -1133,20 +1149,20 @@ def ts_acdc_opf(
         line_data, loadS_AC, loadP_DC = _calculate_line_loading_from_model( grid, model,idx)
 
 
-        grid_data_loading = calculate_grid_loading(grid, loadS_AC, loadP_DC,idx)
+        grid_data_loading = _calculate_grid_loading(grid, loadS_AC, loadP_DC,idx)
 
         if price_zone_restrictions:
-            price_zone_price = calculate_price_zone_price_from_model(grid,model,idx)
+            price_zone_price = _calculate_price_zone_price_from_model(grid,model,idx)
         else:
-            price_zone_price = calculate_price_zone_price(grid,idx)
-        net_price_zone_power = calculate_net_price_zone_power_from_model(grid, model, idx)
+            price_zone_price = _calculate_price_zone_price(grid,idx)
+        net_price_zone_power = _calculate_net_price_zone_power_from_model(grid, model, idx)
 
-        pz_cost_kEUR = calculate_pz_social_cost_kEUR_from_model(grid, model, idx)
-        pz_load_mw = calculate_pz_p_known_mw_from_model(grid, model, idx)
+        pz_cost_kEUR = _calculate_pz_social_cost_kEUR_from_model(grid, model, idx)
+        pz_load_mw = _calculate_pz_p_known_mw_from_model(grid, model, idx)
 
-        pn_min, pn_max, a, b = calculate_pn_min_max_from_model(grid, model, idx)
+        pn_min, pn_max, a, b = _calculate_pn_min_max_from_model(grid, model, idx)
 
-        res_available = calculate_res_available_from_model(grid, model, idx)
+        res_available = _calculate_res_available_from_model(grid, model, idx)
 
         Time_series_price.append(price_zone_price)
         Time_series_PZ_cost_kEUR.append(pz_cost_kEUR)
@@ -1200,7 +1216,7 @@ def ts_acdc_opf(
 
     # Always persist time-series result frames for plotting/reporting.
     # export_to_grid only controls whether final model state is written back to grid objects.
-    save_TS_to_grid(grid, ts_results, infeasible)
+    _save_TS_to_grid(grid, ts_results, infeasible)
     grid.OPF_obj = weights_def
     grid.OPF_run = True
     grid.Time_series_ran = True
@@ -1218,7 +1234,7 @@ def ts_acdc_opf(
     return timing_info
 
 
-def save_TS_to_grid (grid,ts_results,infeasible):
+def _save_TS_to_grid (grid,ts_results,infeasible):
     # Create the DataFrame from the list of rows
     (Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
     Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
@@ -1226,37 +1242,29 @@ def save_TS_to_grid (grid,ts_results,infeasible):
     Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
     Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available)= ts_results
 
-    def to_dataframe(data):
-        df = pd.DataFrame(data)
-        if df.empty:
-            return pd.DataFrame()
-        if 'time' in df.columns:
-            return df.set_index('time')
-        return df
+    grid.time_series_results['converter_p_dc'] = _to_dataframe(Time_series_Opt_res_P_conv_DC)
+    grid.time_series_results['converter_q_ac'] = _to_dataframe(Time_series_Opt_res_Q_conv_AC)
+    grid.time_series_results['converter_p_ac'] = _to_dataframe(Time_series_Opt_res_P_conv_AC)
+    grid.time_series_results['converter_loading'] = _to_dataframe(Time_series_conv_res)
 
-    grid.time_series_results['converter_p_dc'] = to_dataframe(Time_series_Opt_res_P_conv_DC)
-    grid.time_series_results['converter_q_ac'] = to_dataframe(Time_series_Opt_res_Q_conv_AC)
-    grid.time_series_results['converter_p_ac'] = to_dataframe(Time_series_Opt_res_P_conv_AC)
-    grid.time_series_results['converter_loading'] = to_dataframe(Time_series_conv_res)
+    grid.time_series_results['real_load_opf'] = _to_dataframe(Time_series_Opt_res_P_Load)
+    grid.time_series_results['real_power_opf'] = _to_dataframe(Time_series_Opt_res_P_extGrid)
+    grid.time_series_results['reactive_power_opf'] = _to_dataframe(Time_series_Opt_res_Q_extGrid)
 
-    grid.time_series_results['real_load_opf'] = to_dataframe(Time_series_Opt_res_P_Load)
-    grid.time_series_results['real_power_opf'] = to_dataframe(Time_series_Opt_res_P_extGrid)
-    grid.time_series_results['reactive_power_opf'] = to_dataframe(Time_series_Opt_res_Q_extGrid)
+    grid.time_series_results['curtailment'] = _to_dataframe(Time_series_Opt_curtailment)
 
-    grid.time_series_results['curtailment'] = to_dataframe(Time_series_Opt_curtailment)
+    line_data_df = _to_dataframe(Time_series_line_res)
+    grid.time_series_results['grid_loading'] = _to_dataframe(Time_series_grid_loading)
 
-    line_data_df = to_dataframe(Time_series_line_res)
-    grid.time_series_results['grid_loading'] = to_dataframe(Time_series_grid_loading)
-
-    grid.time_series_results['prices_by_zone'] = to_dataframe(Time_series_price)
-    grid.time_series_results['PZ_cost_of_generation'] = to_dataframe(Time_series_PZ_cost_kEUR)
-    grid.time_series_results['PZ_load'] = to_dataframe(Time_series_PZ_load)
-    grid.time_series_results['net_price_zone_power'] = to_dataframe(Time_series_net_price_zone_power)
-    grid.time_series_results['PZ_lb'] = to_dataframe(Time_series_PN_min)
-    grid.time_series_results['PZ_ub'] = to_dataframe(Time_series_PN_max)
-    grid.time_series_results['a'] = to_dataframe(Time_series_a)
-    grid.time_series_results['b'] = to_dataframe(Time_series_b)
-    grid.time_series_results['res_available'] = to_dataframe(Time_series_res_available)
+    grid.time_series_results['prices_by_zone'] = _to_dataframe(Time_series_price)
+    grid.time_series_results['PZ_cost_of_generation'] = _to_dataframe(Time_series_PZ_cost_kEUR)
+    grid.time_series_results['PZ_load'] = _to_dataframe(Time_series_PZ_load)
+    grid.time_series_results['net_price_zone_power'] = _to_dataframe(Time_series_net_price_zone_power)
+    grid.time_series_results['PZ_lb'] = _to_dataframe(Time_series_PN_min)
+    grid.time_series_results['PZ_ub'] = _to_dataframe(Time_series_PN_max)
+    grid.time_series_results['a'] = _to_dataframe(Time_series_a)
+    grid.time_series_results['b'] = _to_dataframe(Time_series_b)
+    grid.time_series_results['res_available'] = _to_dataframe(Time_series_res_available)
     # Split line time-series into explicit loading and MW-to datasets
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)
@@ -1351,7 +1359,7 @@ def time_series_statistics(grid, curtail=0.99,over_loading=0.9):
             sorted_data = np.sort(ts.data)
             cumulative_prob = np.linspace(0, 1, len(sorted_data))
 
-            i = find_value_from_cdf(cumulative_prob, curtail)
+            i = _find_value_from_cdf(cumulative_prob, curtail)
             name=ts.name
             if 'loading' in name:
                 n = sum(1 for num in ts.data if num > over_loading)
@@ -1417,7 +1425,7 @@ def time_series_statistics(grid, curtail=0.99,over_loading=0.9):
             sorted_data = np.sort(merged_df[col])
             cumulative_prob = np.linspace(0, 1, len(sorted_data))
 
-            i = find_value_from_cdf(cumulative_prob, curtail)
+            i = _find_value_from_cdf(cumulative_prob, curtail)
 
 
             if 'loading' in col:

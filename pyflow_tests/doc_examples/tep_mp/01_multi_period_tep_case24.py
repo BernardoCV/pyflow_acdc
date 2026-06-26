@@ -5,9 +5,7 @@ from pyflow_tests.test_constants import (
     CASE24_MP_INV_SERIES_URL,
 )
 
-if not pyf.is_pyomo_solver_available("ipopt"):
-    print("Skipped: Ipopt solver not available")
-    raise SystemExit(0)
+build_only = not pyf.is_pyomo_solver_available("ipopt")
 
 grid, res = pyf.cases["case24_MP"]()
 pyf.add_inv_series(grid, CASE24_MP_INV_SERIES_URL)
@@ -22,5 +20,6 @@ model, model_results, timing_info, solver_stats = pyf.multi_period_transmission_
     solver="ipopt",
     tee=False,
     obj_scaling=1e9,
+    build_only=build_only,
 )
 res.all()

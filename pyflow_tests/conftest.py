@@ -8,6 +8,12 @@ import pyflow_acdc as pyf
 
 
 @pytest.fixture(autouse=True)
+def isolate_test_cwd(tmp_path, monkeypatch):
+    """Write cwd-relative plot/export artifacts into a per-test temp directory."""
+    monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture(autouse=True)
 def reset_pyflow_state():
     """Reset all element class counters/registries before each test.
 

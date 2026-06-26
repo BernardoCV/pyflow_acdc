@@ -1,27 +1,87 @@
+"""IEEE 118-bus Barrios TEP benchmark with bundled time-series data.
+
+Time-series CSVs live in ``examples/Case118_benchmark/`` (or GitHub raw URLs under
+the same folder). Load the grid with ``pyf.cases["case118_TEP_benchmark"]()``.
+
+This case is built upon the data of:
+
+H. Barrios, A. Roehder, H. Natemeyer and A. Schnettler, "A benchmark case for
+network expansion methods," 2015 IEEE Eindhoven PowerTech, Eindhoven, Netherlands,
+2015, pp. 1-6, doi: 10.1109/PTC.2015.7232601.
+
+and used in:
+
+Bernardo Castro Valerio, Marc Cheah-Mane, Vinicius A. Lacerda, Pieter Gebraad,
+Oriol Gomis-Bellmunt, Transmission expansion planning for hybrid AC/DC grids using
+a mixed-integer non-linear programming approach, International Journal of Electrical
+Power & Energy Systems, Volume 174, 2026, 111459,
+https://doi.org/10.1016/j.ijepes.2025.111459.
+"""
+
 import pyflow_acdc as pyf
 import pandas as pd
 from pathlib import Path
-"""
 
-This case is built uppon the data of 
+CASE118_BENCHMARK_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/Case118_benchmark/"
+)
 
-H. Barrios, A. Roehder, H. Natemeyer and A. Schnettler, "A benchmark case for network expansion methods," 2015 IEEE Eindhoven PowerTech, Eindhoven, Netherlands, 2015, pp. 1-6, doi: 10.1109/PTC.2015.7232601. keywords: {Load modeling;Time series analysis;Biological system modeling;Load flow;Generators;Poles and towers;Wind;Power system planning;Power system economics;RES integration;hybrid AC/DC Systems},
 
-and used in the following paper:
+def _is_url(path):
+    text = str(path)
+    return text.startswith("http://") or text.startswith("https://")
 
-Bernardo Castro Valerio, Marc Cheah-Mane, Vinicius A. Lacerda, Pieter Gebraad, Oriol Gomis-Bellmunt,
-Transmission expansion planning for hybrid AC/DC grids using a mixed-integer non-linear programming approach,
-International Journal of Electrical Power & Energy Systems,
-Volume 174,
-2026,
-111459,
-ISSN 0142-0615,
-https://doi.org/10.1016/j.ijepes.2025.111459.
 
-"""
-current_file = Path(__file__).resolve()
-path = str(current_file.parent)
-def case118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=1,load_factor=1,export_capacity=15000,Gen_Pmin=True,DC=False,DC_exp=False):    
+def _case118_benchmark_data_dir():
+    data_dir = Path(__file__).resolve().parents[3] / "examples" / "Case118_benchmark"
+    if not data_dir.is_dir():
+        raise FileNotFoundError(
+            f"Case118_benchmark example data directory not found: {data_dir}. "
+            "Expected examples/Case118_benchmark/ at the pyflow_acdc repository root."
+        )
+    return data_dir
+
+
+def _resolve_example_path(filename, *, online=False):
+    if _is_url(filename):
+        return str(filename)
+    if online:
+        return CASE118_BENCHMARK_GITHUB_BASE + Path(filename).name
+    path = _case118_benchmark_data_dir() / filename
+    if not path.exists():
+        raise FileNotFoundError(f"Case118_benchmark example file not found: {path}")
+    return str(path)
+
+
+def _add_benchmark_time_series(grid, gen_ac):
+    """Attach per-node load and renewable availability series from benchmark CSVs."""
+    loads_raw = pd.read_csv(_resolve_example_path("118_benchmark_loads.csv"))
+    bus_names = loads_raw.iloc[0].astype(int).astype(str)
+    loads_data = loads_raw.iloc[1:].apply(pd.to_numeric)
+    loads_ts = pd.concat([bus_names.to_frame().T, loads_data], ignore_index=True)
+    loads_ts.columns = loads_raw.columns
+    pyf.add_TimeSeries(grid, loads_ts, TS_type="Load")
+
+    rgen_raw = pd.read_csv(_resolve_example_path("118_benchmark_rgen.csv"), dtype=str)
+    zone_gen = {}
+    for _, row in gen_ac.iterrows():
+        zone = row["Ren_zone"]
+        if zone == "Gen" or not isinstance(zone, str):
+            continue
+        if zone.startswith("Wind_") or zone == "Solar_1":
+            zone_gen.setdefault(zone, row["Gen_name"])
+
+    for zone, gen_name in sorted(zone_gen.items()):
+        if gen_name not in rgen_raw.columns:
+            raise ValueError(
+                f"Renewable zone {zone!r} expects column {gen_name!r} in 118_benchmark_rgen.csv"
+            )
+        ts_type = "Solar" if zone == "Solar_1" else "WPP"
+        values = pd.to_numeric(rgen_raw.iloc[1:][gen_name], errors="coerce").fillna(0).to_numpy()
+        pyf.add_TimeSeries(grid, pd.DataFrame({zone: values}), associated=zone, TS_type=ts_type)
+
+
+def case118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=1,load_factor=1,export_capacity=15000,Gen_Pmin=True,DC=False,DC_exp=False):
     exp_tf=False
     if exp_380 or exp_220:
         exp_tf =True
@@ -775,8 +835,6 @@ def case118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=
     if not upgradable_data.empty:
         pyf.repurpose_element_from_pd(grid,upgradable_data)
 
-    TS_wl= pd.read_csv(f'{path}/118_benchmark_wl.csv')
-    pyf.add_TimeSeries(grid,TS_wl)
-    
-    # Return the grid
+    _add_benchmark_time_series(grid, gen_AC)
+
     return grid,res

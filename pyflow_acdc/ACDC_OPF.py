@@ -15,6 +15,7 @@ from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow
 from .grid_analysis import analyse_grid
 from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights
 from .pyomo_model_solve import (
+    build_only_solver_stats,
     export_solver_progress_to_excel,
     pyomo_model_solve,
     reset_to_initialize,
@@ -168,7 +169,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0):
+def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0,build_only=False):
     """Build and solve the non-linear AC/DC OPF for ``grid``.
 
     Constructs the full non-linear Pyomo model (AC/DC physics, converters,
@@ -197,6 +198,9 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
         Enable the solver-progress callback.
     obj_scaling : float, optional
         Divide the objective by this factor for numerical conditioning.
+    build_only : bool, optional
+        Build the Pyomo model, skip the solver, and export initializer values
+        onto ``grid`` so :class:`~pyflow_acdc.Results_class.Results` can run.
 
     Returns
     -------
@@ -243,10 +247,10 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
         if any(conv.OPF_fx for conv in grid.Converters_ACDC):
                     fx_conv(model, grid)
 
-
-    """
-    """
-    model_res,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
+    if build_only:
+        model_res, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_res, solver_stats = pyomo_model_solve(model, grid, solver, tee, callback=callback)
 
     t1 = time.perf_counter()
     export_acdc_nl_model_to_pyflow_acdc(model, grid, Price_Zones)
@@ -261,11 +265,11 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     grid.OPF_run=True
     grid.OPF_obj=weights_def
     timing_info = {
-    "create": t_modelcreate,
-    "solve": solver_stats['time'],
-    "export": t_modelexport,
+        "create": t_modelcreate,
+        "solve": solver_stats["time"],
+        "export": t_modelexport,
     }
-    return model, model_res , timing_info, solver_stats
+    return model, model_res, timing_info, solver_stats
 
 
 def fx_conv(model,grid):

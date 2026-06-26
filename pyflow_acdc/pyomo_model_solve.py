@@ -21,10 +21,33 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "pyomo_model_solve",
+    "build_only_solver_stats",
     "reset_to_initialize",
     "export_solver_progress_to_excel",
     "log_infeasible_constraints_limited",
 ]
+
+
+def build_only_solver_stats(solver=None, model=None):
+    """Return ``(None, solver_stats)`` matching :func:`pyomo_model_solve` for ``build_only``."""
+    return None, {
+        "solver": solver,
+        "iterations": None,
+        "best_objective": None,
+        "lower_bound": None,
+        "time": 0.0,
+        "termination_condition": "build_only",
+        "solver_status": None,
+        "solver_message": "build_only=True: model built and solve skipped.",
+        "feasible_solutions": [],
+        "all_solutions": [],
+        "bound_solutions": [],
+        "solution_found": False,
+        "solution_check_info": None,
+        "solution_check_reason": "build_only",
+        "solution_check_tol": None,
+        "obj_scaling": getattr(model, "obj_scaling", 1.0) if model is not None else 1.0,
+    }
 
 def log_infeasible_constraints_limited(model, max_per_type=5):
     """

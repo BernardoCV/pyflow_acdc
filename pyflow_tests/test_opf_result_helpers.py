@@ -1,26 +1,29 @@
 # -*- coding: utf-8 -*-
 """OPF post-solve result helpers (public API not called from res.all()).
 
-Requires a real Ipopt solve (helpers read ``pyo.value(...)`` on the model).
+Uses ``build_only`` when Ipopt is unavailable (helpers read ``pyo.value(...)``
+on initializer values).
 """
 
 import pyflow_acdc as pyf
 
 from pyflow_tests._test_solver_deps import (
-    ipopt_missing_for_run_test,
     pyomo_missing_for_run_test,
-    require_ipopt,
     require_pyomo,
 )
 
 
 def _solve_case39_acdc(*, require_solution=True):
     grid, _ = pyf.cases["case39_acdc"]()
+    build_only = not pyf.is_pyomo_solver_available("ipopt")
     model, model_results, _, solver_stats = pyf.optimal_pf(
         grid,
         ObjRule={"Energy_cost": 1},
         solver="ipopt",
+        build_only=build_only,
     )
+    if build_only:
+        return grid, model
     ok = model_results is not None and solver_stats.get("solution_found") is not False
     if not ok:
         if require_solution:
@@ -57,11 +60,16 @@ def _assert_opf_step_results(grid, model):
 def _solve_case24_3zones_price_zone(*, require_solution=True):
     grid, _ = pyf.cases["case24_3zones_acdc"]()
     assert len(grid.Price_Zones) >= 1
+    build_only = not pyf.is_pyomo_solver_available("ipopt")
     model, model_results, _, solver_stats = pyf.optimal_pf(
         grid,
         ObjRule={"PZ_cost_of_generation": 1},
         solver="ipopt",
+        build_only=build_only,
     )
+    if build_only:
+        assert hasattr(model, "price_zone_price")
+        return grid, model
     ok = model_results is not None and solver_stats.get("solution_found") is not False
     if not ok:
         if require_solution:
@@ -81,21 +89,18 @@ def _assert_opf_price_zone(grid, model):
 
 def test_opf_line_res_case39_acdc():
     require_pyomo()
-    require_ipopt()
     grid, model = _solve_case39_acdc()
     _assert_opf_line_res(grid, model)
 
 
 def test_opf_step_results_case39_acdc():
     require_pyomo()
-    require_ipopt()
     grid, model = _solve_case39_acdc()
     _assert_opf_step_results(grid, model)
 
 
 def test_opf_price_zone_case24_3zones():
     require_pyomo()
-    require_ipopt()
     grid, model = _solve_case24_3zones_price_zone()
     _assert_opf_price_zone(grid, model)
 
@@ -103,22 +108,11 @@ def test_opf_price_zone_case24_3zones():
 def run_test():
     if pyomo_missing_for_run_test():
         return
-    if ipopt_missing_for_run_test():
-        return
 
-    solved = _solve_case39_acdc(require_solution=False)
-    if solved is None:
-        print("Skipped: OPF solve did not produce a solution (need ipopt)")
-        return
-    grid, model = solved
+    grid, model = _solve_case39_acdc()
     _assert_opf_line_res(grid, model)
     _assert_opf_step_results(grid, model)
-
-    solved_pz = _solve_case24_3zones_price_zone(require_solution=False)
-    if solved_pz is None:
-        print("Skipped: price-zone OPF solve did not produce a solution (need ipopt)")
-        return
-    _assert_opf_price_zone(*solved_pz)
+    _assert_opf_price_zone(*_solve_case24_3zones_price_zone())
 
     print("✓ OPF result helper tests passed")
 

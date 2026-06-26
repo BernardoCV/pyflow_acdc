@@ -16,7 +16,17 @@ from .constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER,
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
 from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
-from .ACDC_OPF import pyomo_model_solve,opf_obj,opf_obj_l,opf_obj_l_array_losses,obj_w_rule,export_acdc_nl_model_to_pyflow_acdc,calculate_objective,reset_to_initialize,calculate_objective_from_model,pack_variables
+from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from .ACDC_OPF import (
+    opf_obj,
+    opf_obj_l,
+    opf_obj_l_array_losses,
+    obj_w_rule,
+    export_acdc_nl_model_to_pyflow_acdc,
+    calculate_objective,
+    reset_to_initialize,
+    calculate_objective_from_model,
+)
 
 from .Graph_and_plot import save_network_svg
 
@@ -27,7 +37,6 @@ __all__ = [
     'repurpose_element_from_pd',
     'update_attributes',
     'expand_element',
-    'translate_pd_tep',
     'transmission_expansion',
     'linear_transmission_expansion',
     'multi_scenario_TEP',
@@ -469,39 +478,6 @@ def base_cost_calculation(element):
     from .Classes import Ren_Source
     if isinstance(element, Ren_Source):
         element.base_cost= element.cost_perMVA*element.Max_S
-
-def translate_pd_tep(grid):
-    """Translation of element wise to internal numbering"""
-    # Price_Zones
-    price_zone2node, price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max, PL_price_zone = {}, {}, {}, {}, {}, {}, {}
-    nn_M, node2price_zone, lista_M = 0, {}, []
-
-    for m in grid.Price_Zones:
-        price_zone2node[m.price_zone_num] = []
-        nn_M += 1
-        price_zone_prices[m.price_zone_num] = m.price
-        price_zone_as[m.price_zone_num] = m.a
-        price_zone_bs[m.price_zone_num] = m.b
-        PGLmin = m.PGL_min
-        PGLmax = m.PGL_max
-        import_M = m.import_pu_L
-        export_M = m.export_pu_G * (sum(node.PGi_ren + node.Max_pow_gen for node in m.nodes_AC))
-        PL_price_zone[m.price_zone_num] = 0
-        for n in m.nodes_AC:
-            price_zone2node[m.price_zone_num].append(n.nodeNumber)
-            node2price_zone[n.nodeNumber] = m.price_zone_num
-            PL_price_zone[m.price_zone_num] += n.PLi
-        PGL_min[m.price_zone_num] = max(PGLmin, -import_M * PL_price_zone[m.price_zone_num])
-        PGL_max[m.price_zone_num] = min(PGLmax, export_M)
-    lista_M = list(range(0, nn_M))
-
-    Price_Zone_Lists = pack_variables(lista_M, node2price_zone, price_zone2node)
-    Price_Zone_lim = pack_variables(price_zone_as, price_zone_bs, PGL_min, PGL_max)
-
-
-    Price_Zone_info = pack_variables(Price_Zone_Lists, Price_Zone_lim)
-
-    return Price_Zone_info
 
 def get_TEP_variables(grid):
 
@@ -1026,6 +1002,7 @@ def transmission_expansion(
     obj_scaling=1.0,
     nlp_warmstart=False,
     initiate_max=False,
+    build_only=False,
 ):
     """Build and solve the (non-linear) static transmission-expansion problem.
 
@@ -1070,6 +1047,8 @@ def transmission_expansion(
         Warm-start the NLP from a relaxed/previous solution.
     initiate_max : bool, optional
         Initialise expandable elements at their maximum allowed installation.
+    build_only : bool, optional
+        Build the Pyomo model and skip the solver call.
 
     Returns
     -------
@@ -1106,18 +1085,19 @@ def transmission_expansion(
     t2 = time.perf_counter()
     t_modelcreate = t2-t1
 
-    # model.obj.pprint()
-
-    model_results,solver_stats = pyomo_model_solve(
-        model,
-        grid,
-        solver,
-        tee,
-        time_limit,
-        callback=callback,
-        solver_options=solver_options,
-        nlp_warmstart=nlp_warmstart,
-    )
+    if build_only:
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_results, solver_stats = pyomo_model_solve(
+            model,
+            grid,
+            solver,
+            tee,
+            time_limit,
+            callback=callback,
+            solver_options=solver_options,
+            nlp_warmstart=nlp_warmstart,
+        )
 
     t1 = time.perf_counter()
     if export:
@@ -1138,11 +1118,11 @@ def transmission_expansion(
     grid.OPF_obj = weights_def
 
     timing_info = {
-    "create": t_modelcreate,
-    "solve": solver_stats['time'],
-    "export": t_modelexport,
+        "create": t_modelcreate,
+        "solve": solver_stats["time"],
+        "export": t_modelexport,
     }
-    return model, model_results , timing_info, solver_stats
+    return model, model_results, timing_info, solver_stats
 
 def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0):
     """Build and solve the linear (MILP) static transmission-expansion problem.
@@ -1738,24 +1718,15 @@ def multi_scenario_TEP(
         print('Model loaded')
 
     if build_only:
-        timing_info = {
-            "create": t_modelcreate,
-            "solve": None,
-            "export": 0.0,
-        }
-        solver_stats = {
-            "solver": None,
-            "termination_condition": "build_only",
-            "solver_message": "build_only=True: model built and solve skipped.",
-            "solution_found": None,
-            "time": None,
-        }
-        return model, None, timing_info, solver_stats, {}
-
-    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback,solver_options=solver_options,nlp_warmstart=nlp_warmstart)
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_results, solver_stats = pyomo_model_solve(
+            model, grid, solver, tee, callback=callback,
+            solver_options=solver_options, nlp_warmstart=nlp_warmstart,
+        )
 
     t1 = time.perf_counter()
-    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model,grid,n_clusters,clustering,Price_Zones)
+    TEP_multiScenario_res = export_acdc_tep_ms_to_pyflow_acdc(model, grid, n_clusters, clustering, Price_Zones)
 
     TEP_multiScenario_res['OPF_obj'] = weights_def
 
@@ -1769,12 +1740,12 @@ def multi_scenario_TEP(
     grid.OPF_obj = weights_def
 
     timing_info = {
-    "create": t_modelcreate,
-    "solve": solver_stats.get('time', None),
-    "export": t_modelexport,
+        "create": t_modelcreate,
+        "solve": solver_stats["time"],
+        "export": t_modelexport,
     }
 
-    return model, model_results , timing_info, solver_stats , TEP_multiScenario_res
+    return model, model_results, timing_info, solver_stats, TEP_multiScenario_res
 
 
 def tep_sub_obj(scenario_model,grid,ObjRule):

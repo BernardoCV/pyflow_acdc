@@ -6,7 +6,6 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/pyflow-acdc)](https://pypi.org/project/pyflow-acdc/)
 [![License](https://img.shields.io/github/license/CITCEA-UPC/pyflow_acdc)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/LICENSE)
 [![PR tests](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml)
-[![Test coverage](https://img.shields.io/badge/coverage-67%25-yellow)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/TEST_COVERAGE.md)
 [![codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc/graph/badge.svg)](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
 [![Documentation Status](https://readthedocs.org/projects/pyflow-acdc/badge/?version=latest)](https://pyflow-acdc.readthedocs.io/en/latest/)
 
@@ -142,8 +141,7 @@ pip install pyflow-acdc[All]
 pip install pyflow-acdc[mapping]      # For mapping features (folium, branca)
 pip install pyflow-acdc[OPF]          # For optimal power flow (pyomo)
 pip install pyflow-acdc[Dash]         # For Dash web applications
-pip install pyflow-acdc[ORTOOLS_ARRAY]  # For OR-Tools route MIP + OR-Tools CSS (ortools)
-pip install pyflow-acdc[Array_OPT]    # Deprecated alias for ORTOOLS_ARRAY (ortools only)
+pip install pyflow-acdc[LINEAR_ARRAY]  # OR-Tools route MIP + CSS + HiGHS (ortools, highspy)
 pip install pyflow-acdc[TEP_pymoo]    # For TEP with pymoo (pymoo, pyomo)
 pip install pyflow-acdc[Gurobi]       # For Gurobi solver (requires license)
 pip install pyflow-acdc[plotting]     # For static image export (kaleido)
@@ -248,7 +246,7 @@ pyflow-acdc-test
 --show-output   # Stream each case's output
 ```
 
-**Coverage** (maintained snapshot for contributors):
+**Coverage**:
 
 ```bash
 pip install -e ".[tests]"
@@ -256,11 +254,8 @@ pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
 ```
 
 CI uploads coverage to [Codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc) on each
-push/PR to `main` (requires the `CODECOV_TOKEN` repository secret).
-
-See [`TEST_COVERAGE.md`](TEST_COVERAGE.md) for a maintained per-module snapshot and
-function-level gaps. Update that file and the **Test coverage** badge above when tests
-change materially (keep the badge % in sync with the snapshot header).
+push/PR to `main` (requires the `CODECOV_TOKEN` repository secret). Per-module
+reports and the coverage badge are maintained there.
 ## Documentation
 Online documentation can be found at:
 

@@ -8,7 +8,7 @@ import pandas as pd
 import pyflow_acdc as pyf
 
 
-def case24_OPF():
+def case24_OPF(TEP:bool=False):
 
     S_base=100
 
@@ -131,7 +131,7 @@ def case24_OPF():
     ]
 
         
-
+    
     expandable_data = pd.DataFrame(expandable_data)
 
 
@@ -176,7 +176,9 @@ def case24_OPF():
     pyf.add_gen(grid, '23', '33', np_gen=1, fc=665.1094,lf=11.8495, qf=0.004895, MWmax=350.0, MWmin=140.0, MVArmax=150.0, MVArmin=-25.0, PsetMW=350.0, QsetMVA=0.0)
         
         
-
-    pyf.expand_elements_from_pd(grid, expandable_data)
-    grid.name = 'case24_OPF'
+    if TEP:
+        pyf.expand_elements_from_pd(grid, expandable_data)
+        grid.name = 'case24_TEP'
+    else:
+        grid.name = 'case24_OPF'
     return grid, res

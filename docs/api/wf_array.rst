@@ -41,14 +41,14 @@ Solver and install matrix
      - ``pip install pyflow-acdc[OPF]`` (+ optional ``[Gurobi]``)
      - ``backend='pyomo'`` with ``gurobi`` or ``glpk`` (see :doc:`solver_utils`)
    * - Route MIP (OR-Tools)
-     - ``pip install pyflow-acdc[ORTOOLS_ARRAY]``
+     - ``pip install pyflow-acdc[LINEAR_ARRAY]``
      - ``backend='ortools'`` (CP-SAT)
    * - CSS (Pyomo linear)
      - ``pip install pyflow-acdc[OPF]`` (+ optional ``[Gurobi]``)
      - ``CSS_L_solver='gurobi'`` or other Pyomo LP/MIP solver →
        :func:`~pyflow_acdc.linear_transmission_expansion`
    * - CSS (OR-Tools)
-     - ``pip install pyflow-acdc[ORTOOLS_ARRAY]``
+     - ``pip install pyflow-acdc[LINEAR_ARRAY]``
      - ``CSS_L_solver='ortools'`` → :func:`~pyflow_acdc.optimal_l_css_ortools`
    * - CSS (nonlinear OPF)
      - ``pip install pyflow-acdc[OPF]`` + Bonmin/Ipopt
@@ -65,8 +65,7 @@ Solver and install matrix
 - ``enable_cable_types``: ``False``; set ``True`` only for the unified route+CSS
   MIP
 
-See :doc:`../installation` for ``[OPF]``, ``[ORTOOLS_ARRAY]``, and the
-deprecated ``[Array_OPT]`` alias.
+See :doc:`../installation` for ``[OPF]`` and ``[LINEAR_ARRAY]``.
 
 CssMode.PF vs CssMode.OPF
 ---------------------------
@@ -255,9 +254,10 @@ Linear CSS Solver (OR-Tools)
 **References**
 ^^^^^^^^^^^^^^
 
-.. [1] B.C. Valerio, P. Gebraad, M. Cheah-Mane, V. A. Lacerda and O. Gomis-Bellmunt,
-       "Strategies for wind park inter array optimisation through Mixed Integer Linear Programming"
+.. [1] Bernardo Castro Valerio et al 2026 J. Phys.: Conf. Ser. 3224 052005
+       DOI 10.1088/1742-6596/3224/5/052005
 
-.. [2] B.C. Valerio, P. Gebraad, M. Cheah-Mane, V. A. Lacerda and O. Gomis-Bellmunt,
-       "Strategies for wind park inter array optimisation through Mixed Integer Linear Programming,"
-       Wind Energy Science, 2026 (preprint). https://doi.org/10.5194/wes-2026-53
+.. [2] Castro Valerio, B., Gebraad, P. M. O., Cheah-Mane, M., A. Lacerda, V., 
+      and Gomis-Bellmunt, O.: A multi-stage methodology for wind park inter-array 
+      cabling: graph preparation, layout, and sizing, Wind Energ. Sci. Discuss. 
+      [preprint], https://doi.org/10.5194/wes-2026-53, in review, 2026.

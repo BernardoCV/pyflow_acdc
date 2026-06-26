@@ -157,7 +157,7 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
     --------
     >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1', node_type='PQ')
     """
-    node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord)
+    node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord, S_base=grid.S_base)
     if geometry is not None:
        if isinstance(geometry, str):
             geometry = loads(geometry)
@@ -203,7 +203,7 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
     --------
     >>> node = pyf.add_DC_node(grid, kV_base=525, name='dc_bus1')
     """
-    node = Node_DC(node_type, kV_base, Voltage_0, Power_Gained, Power_load, name,Umin, Umax,x_coord,y_coord)
+    node = Node_DC(node_type, kV_base, Voltage_0, Power_Gained, Power_load, name,Umin, Umax,x_coord,y_coord, S_base=grid.S_base)
     grid.nodes_DC.append(node)
     if geometry is not None:
        if isinstance(geometry, str):
@@ -211,7 +211,6 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
        node.geometry = geometry
        node.x_coord = geometry.x
        node.y_coord = geometry.y
-
 
     return node
 
@@ -297,7 +296,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
 
 
     if tap_changer:
-        line = TF_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,m, shift, name)
+        line = TF_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,m, shift, name, S_base=grid.S_base)
         grid.lines_AC_tf.append(line)
         if update_grid:
             grid.update_graph_ac()
@@ -494,24 +493,21 @@ def change_line_AC_to_tap_transformer(grid, line_name):
     if l is not None:
             grid.lines_AC.remove(l)
             l.remove()
-            line_vars=line_vars = {
-            'fromNode': l.fromNode,
-            'toNode': l.toNode,
-            'Resistance': l.r,
-            'Reactance': l.x,
-            'Conductance': l.g,
-            'Susceptance': l.b,
-            'MVA_rating': l.MVA_rating,
-            'Length_km': l.Length_km,
-            'm': l.m,
-            'shift': l.shift,
-            'N_cables': l.N_cables,
-            'name': l.name,
-            'geometry': l.geometry,
-            'S_base': l.S_base,
-            'Cable_type': l.Cable_type
-        }
-            trafo = TF_Line_AC(**line_vars)
+            trafo = TF_Line_AC(
+                l.fromNode,
+                l.toNode,
+                l.r,
+                l.x,
+                l.g,
+                l.b,
+                l.MVA_rating,
+                l.fromNode.kV_base,
+                l.m,
+                l.shift,
+                l.name,
+                S_base=l.S_base,
+            )
+            trafo.geometry = l.geometry
             grid.lines_AC_tf.append(trafo)
     else:
         raise ValueError(f"Line '{line_name}' not found in grid.lines_AC")
@@ -736,19 +732,8 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
              geometry = loads(geometry)
         conv.geometry = geometry
 
-    conv.basekA  = grid.S_base/(SQRT_3*conv.AC_kV_base)
-    conv.basekA_DC = grid.S_base/(conv.DC_kV_base)
     if Arm_R is not None:
-        conv.ra  = Arm_R*conv.basekA_DC**2/grid.S_base
-    else:
-        conv.ra = 0.001
-    conv.a_conv  = conv.a_conv_og/grid.S_base
-    conv.b_conv  = conv.b_conv_og*conv.basekA/grid.S_base
-    conv.c_inver = conv.c_inver_og*conv.basekA**2/grid.S_base
-    conv.c_rect  = conv.c_rect_og*conv.basekA**2/grid.S_base
-
-
-
+        conv.ra = Arm_R * conv.basekA_DC**2 / grid.S_base
 
     grid.Converters_ACDC.append(conv)
     return conv
@@ -793,7 +778,7 @@ def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r
     if Pset is None:
         Pset = MW_rating/(2*grid.S_base)
 
-    conv = DCDC_converter(fromNode , toNode , Pset, r, MW_rating,name,geometry)
+    conv = DCDC_converter(fromNode , toNode , Pset, r, MW_rating, name, geometry, S_base=grid.S_base)
     grid.Converters_DCDC.append(conv)
     return conv
 
@@ -928,6 +913,18 @@ def add_MTDC_price_zone(grid, name,  linked_price_zones=None,pricing_strategy=Pr
     MTDCPrice_Zone
         Created zone in ``grid.Price_Zones``.
     """
+    if linked_price_zones:
+        resolved = []
+        for pz in linked_price_zones:
+            if isinstance(pz, str):
+                pz_obj = next((M for M in grid.Price_Zones if M.name == pz), None)
+                if pz_obj is None:
+                    raise ValueError(f"Price zone '{pz}' not found for MTDC link.")
+                resolved.append(pz_obj)
+            else:
+                resolved.append(pz)
+        linked_price_zones = resolved
+
     mtdc_price_zone = MTDCPrice_Zone(name=name, linked_price_zones=linked_price_zones, pricing_strategy=pricing_strategy)
     grid.Price_Zones.append(mtdc_price_zone)
 
@@ -2326,6 +2323,10 @@ def assign_lineToCable_options(grid, line, new_cable_option_name):
 def expand_cable_database(data, format='yaml', save_yaml=False):
     """Merge new cable entries into the bundled AC/DC cable database.
 
+    Use this for local or custom cable data (YAML dict, DataFrame, or CSV path).
+    To fetch the upstream ORBIT library from GitHub, use
+    :func:`import_orbit_cables` instead.
+
     Parameters
     ----------
     data : str, pathlib.Path, dict, or pandas.DataFrame
@@ -2421,20 +2422,21 @@ def expand_cable_database(data, format='yaml', save_yaml=False):
 
 
 def import_orbit_cables(
-    data=None,
     column_map=None,
     default_type='AC',
     name_prefix='NREL',
     save_yaml=False,
     source_url='https://github.com/NLRWindSystems/ORBIT/tree/dev/library/cables',
 ):
-    """Import ORBIT-style cable library data into the pyflow-acdc cable database.
+    """Fetch ORBIT cable library data from GitHub and merge into the cable database.
+
+    Fetches YAML/CSV files from ``source_url``, normalises ORBIT column names
+    and units, then calls :func:`expand_cable_database`. For local dict,
+    DataFrame, or CSV input already in pyflow schema, call
+    :func:`expand_cable_database` directly.
 
     Parameters
     ----------
-    data : pandas.DataFrame, str, or None, optional
-        Source table, CSV path, directory of CSV files, or URL. If None,
-        ``source_url`` is fetched.
     column_map : dict, optional
         Maps pyflow_acdc field names to source columns (``name``, ``R_Ohm_km``,
         ``L_mH_km``, ``C_uF_km``, ``G_uS_km``, ``A_rating``,
@@ -2447,7 +2449,7 @@ def import_orbit_cables(
     save_yaml : bool, optional
         If True, persist imported entries as YAML files.
     source_url : str, optional
-        ORBIT GitHub directory used when ``data`` is None.
+        ORBIT GitHub directory URL (``.../tree/<ref>/<path>``).
 
     Returns
     -------
@@ -2501,27 +2503,6 @@ def import_orbit_cables(
                 rows.extend(pd.read_csv(dl).to_dict(orient='records'))
         return rows
 
-    def _as_dataframe(obj):
-        if obj is None:
-            obj = source_url
-        if isinstance(obj, pd.DataFrame):
-            return obj.copy()
-        if isinstance(obj, str) and obj.startswith(('http://', 'https://')):
-            rows = _github_dir_to_rows(obj)
-            if not rows:
-                raise ValueError(f'No cable files found at URL: {obj}')
-            return pd.DataFrame(rows)
-        p = Path(obj)
-        if p.is_dir():
-            csv_files = sorted(p.glob('*.csv'))
-            if not csv_files:
-                raise ValueError(f'No CSV files found in directory: {p}')
-            frames = [pd.read_csv(fp) for fp in csv_files]
-            return pd.concat(frames, ignore_index=True)
-        if p.is_file():
-            return pd.read_csv(p)
-        raise ValueError('data must be DataFrame, CSV file path, or directory with CSV files')
-
     def _slug(text):
         s = re.sub(r'[^A-Za-z0-9]+', '_', str(text)).strip('_')
         return s or 'Cable'
@@ -2538,7 +2519,10 @@ def import_orbit_cables(
             raise KeyError(f"Missing required source column. Tried: {candidates}")
         return None
 
-    src = _as_dataframe(data)
+    rows = _github_dir_to_rows(source_url)
+    if not rows:
+        raise ValueError(f'No cable files found at URL: {source_url}')
+    src = pd.DataFrame(rows)
     cmap = column_map or {}
 
     c_name = _pick_col(src, cmap.get('name'),

@@ -64,9 +64,11 @@ def test_ns_mtdc_multi_period_ms_tep_build_only():
     assert hasattr(model, "inv_periods")
     assert len(model.inv_periods) >= 1
     assert model_results is None
-    assert mp_ms_results == {}
+    assert isinstance(mp_ms_results, dict)
+    assert mp_ms_results.get("period_results") is not None
     assert timing_info["create"] >= 0
-    assert timing_info["solve"] is None
+    assert timing_info["solve"] == 0.0
+    assert timing_info["export"] >= 0
     assert solver_stats["termination_condition"] == "build_only"
 
 

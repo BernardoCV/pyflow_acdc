@@ -16,7 +16,7 @@ README for the full list), e.g.:
 
 ```bash
 pip install -e ".[OPF]"            # pyomo for optimal power flow
-pip install -e ".[ORTOOLS_ARRAY]"  # ortools for OR-Tools route MIP + CSS
+pip install -e ".[LINEAR_ARRAY]"  # ortools + highspy for array MIP/CSS
 pip install -e ".[tests]"          # pytest + pytest-cov
 pip install -e ".[All]"        # everything except gurobipy (needs a license)
 ```
@@ -52,27 +52,14 @@ the case module.
 
 CI uploads pytest coverage to [Codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
 on each push/PR to `main` (`.github/workflows/pr-tests.yml`, `coverage` job).
-The repository must have a `CODECOV_TOKEN` Actions secret.
+The repository must have a `CODECOV_TOKEN` Actions secret. Per-module reports
+and the README coverage badge are maintained on Codecov.
 
-The package also maintains a coverage snapshot in [`TEST_COVERAGE.md`](TEST_COVERAGE.md)
-(overall %, per-module miss counts, missing lines, and public API functions
-without dedicated tests).
-
-**Pull requests that add, remove, or materially change tests must update
-`TEST_COVERAGE.md`** — at minimum the header stats and any module sections
-affected by your change. Update the **Test coverage** badge percentage in
-[`README.md`](README.md) to match the overall % in the snapshot header.
-Regenerate with:
+To inspect coverage locally:
 
 ```bash
 pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
 ```
-
-Copy updated totals and `Missing` line ranges from the report into the matching
-sections. Update the **Functions not covered** table and any **function / block**
-rows whose status changed (mark **Tested**, **Partial**, or **Not tested**).
-If you add tests for previously untested public API, remove or adjust the entry
-in **Functions not covered**.
 
 ## Coding conventions
 
@@ -114,5 +101,4 @@ Output is written to `docs/_build/html/index.html`.
 1. Create a feature branch off `main`.
 2. Keep PRs focused; describe the motivation ("why") in the description.
 3. Ensure tests pass and add/adjust tests for behavioural changes.
-4. Update [`TEST_COVERAGE.md`](TEST_COVERAGE.md) and the README coverage badge when tests change (see above).
-5. To merge into `main`, contact the repository owner.
+4. To merge into `main`, contact the repository owner.

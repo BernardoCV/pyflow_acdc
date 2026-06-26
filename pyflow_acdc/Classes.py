@@ -72,6 +72,9 @@ class Grid:
     ----------
     S_base : float
         System power base in MVA.
+    S_base_ref : float
+        Power base at grid creation (unchanged by :func:`~pyflow_acdc.change_S_base`).
+        Used for :attr:`tol_scaler` when rescaling PF tolerances after a base change.
     nodes_AC, lines_AC, Converters, nodes_DC, lines_DC : list, optional
         Initial element lists; default to empty and are normally populated via
         the ``add_*`` helpers.
@@ -89,9 +92,14 @@ class Grid:
         self.Graph_toPlot= nx.MultiGraph()
         self.node_positions={}
         self.S_base = S_base
+        self.S_base_ref = S_base
 
         self._nodes_AC = nodes_AC if nodes_AC else []
         self._nodes_DC = nodes_DC if nodes_DC else []
+        for node in self._nodes_AC:
+            node.S_base = self.S_base
+        for node in self._nodes_DC:
+            node.S_base = self.S_base
 
         self._nodes_dict_AC = None  # Cache for AC nodes dictionary
         self._pq_nodes = None  # Cache for PQ nodes
@@ -127,13 +135,7 @@ class Grid:
         self.Converters_ACDC = Converters if Converters else []
         for conv in self.Converters_ACDC:
             if not hasattr(conv, 'basekA'):
-                conv.basekA    = self.S_base/(SQRT_3*conv.AC_kV_base)
-
-                conv.a_conv = conv.a_conv_og/self.S_base
-                conv.b_conv = conv.b_conv_og*conv.basekA/self.S_base
-                conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
-                conv.c_inver = conv.c_inver_og*conv.basekA**2/self.S_base
-                conv.c_rect = conv.c_rect_og*conv.basekA**2/self.S_base
+                conv._apply_S_base_dependent_params()
 
         self.lines_DC = []
         if lines_DC:
@@ -364,6 +366,16 @@ class Grid:
     @property
     def n_gen_DC(self):
         return len(self.Generators_DC) if self.Generators_DC is not None else 0
+
+    @property
+    def tol_scaler(self):
+        """PF tolerance factor for MW-normalized stopping after ``S_base`` changes.
+
+        Equals ``1`` when ``S_base == S_base_ref``. After
+        :func:`~pyflow_acdc.change_S_base`, power-flow solvers use
+        ``effective_tol = tol_lim * tol_scaler``.
+        """
+        return self.S_base_ref / self.S_base
 
     # AC grid properties
     @property
@@ -1149,9 +1161,9 @@ class Gen_AC:
     def S_base(self, new_S_base):
         if new_S_base <= 0:
             raise ValueError("S_base must be positive")
-
-        old_S_base = getattr(self, "_S_base", None)
-        if old_S_base is not None and old_S_base != new_S_base:
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
                 rate = old_S_base / new_S_base
                 self.Max_pow_gen *= rate
                 self.Max_pow_genR *= rate
@@ -1161,7 +1173,8 @@ class Gen_AC:
                 self.QGen *= rate
                 self.Pset *= rate
                 self.Qset *= rate
-                self.Max_S *= rate
+                if self.Max_S is not None:
+                    self.Max_S *= rate
         self._S_base = new_S_base
 
     @property
@@ -1186,7 +1199,6 @@ class Gen_AC:
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
         self.S_base = S_base
-        self.S_base_i = S_base
 
         self.Node_AC=node.name
         self._node = node
@@ -1319,9 +1331,9 @@ class Gen_DC:
     def S_base(self, new_S_base):
         if new_S_base <= 0:
             raise ValueError("S_base must be positive")
-
-        old_S_base = getattr(self, "_S_base", None)
-        if old_S_base is not None and old_S_base != new_S_base:
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
                 rate = old_S_base / new_S_base
                 self.Max_pow_gen *= rate
                 self.PGen *= rate
@@ -1341,7 +1353,6 @@ class Gen_DC:
         Gen_DC.genNumber_DC += 1
 
         self.S_base = S_base
-        self.S_base_i = S_base
 
         self.Node_DC=node.name
         self.x_coord = node.x_coord
@@ -1481,14 +1492,15 @@ class Ren_Source:
     def S_base(self, new_S_base):
         if new_S_base <= 0:
             raise ValueError("S_base must be positive")
-        old_S_base = getattr(self, "_S_base", None)
-        if old_S_base is not None and old_S_base != new_S_base:
-            rate = old_S_base / new_S_base
-            self.Max_S *= rate
-            self.PGi_ren_base *= rate
-            self.QGi_ren *= rate
-            self.Qmin *= rate
-            self.Qmax *= rate
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.Max_S *= rate
+                self.PGi_ren_base *= rate
+                self.QGi_ren *= rate
+                self.Qmin *= rate
+                self.Qmax *= rate
         self._S_base = new_S_base
 
     @property
@@ -1514,7 +1526,6 @@ class Ren_Source:
 
         self.life_time = 50
         self._S_base = S_base
-        self.S_base_i = S_base
 
         self.Node=node.name
         self.x_coord = node.x_coord
@@ -1677,7 +1688,7 @@ class Node_AC:
     def name(self):
         return self._name
 
-    def __init__(self, node_type: str, Voltage_0: float, theta_0: float,kV_base:float, Power_Gained: float=0, Reactive_Gained: float=0, Power_load: float=0, Reactive_load: float=0, name=None, Umin=0.9, Umax=1.1,Gs:float= 0,Bs:float=0,x_coord=None,y_coord=None):
+    def __init__(self, node_type: str, Voltage_0: float, theta_0: float,kV_base:float, Power_Gained: float=0, Reactive_Gained: float=0, Power_load: float=0, Reactive_load: float=0, name=None, Umin=0.9, Umax=1.1,Gs:float= 0,Bs:float=0,x_coord=None,y_coord=None, S_base: float=100):
 
         self.nodeNumber = Node_AC.nodeNumber
         Node_AC.nodeNumber += 1
@@ -1780,6 +1791,29 @@ class Node_AC:
             self._name = name
 
         Node_AC.names.add(self.name)
+
+        self.S_base = S_base
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.PGi *= rate
+                self._PLi_base *= rate
+                self._PLi_extgrid *= rate
+                self.update_PLi()
+                self.QGi *= rate
+                self.QLi *= rate
+                self.Reactor *= rate
+        self._S_base = new_S_base
 
     @property
     def PLi_base(self):
@@ -1916,7 +1950,7 @@ class Node_DC:
     def name(self):
         return self._name
 
-    def __init__(self, node_type: str,kV_base:float, Voltage_0: float=1, Power_Gained: float=0, Power_load: float=0, name=None, Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC,x_coord=None,y_coord=None):
+    def __init__(self, node_type: str,kV_base:float, Voltage_0: float=1, Power_Gained: float=0, Power_load: float=0, name=None, Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC,x_coord=None,y_coord=None, S_base: float=100):
 
         self.nodeNumber = Node_DC.nodeNumber
         Node_DC.nodeNumber += 1
@@ -1986,6 +2020,25 @@ class Node_DC:
             self._name = name
 
         Node_DC.names.add(self.name)
+
+        self.S_base = S_base
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.PGi *= rate
+                self._PLi_base *= rate
+                self.update_PLi()
+        self._S_base = new_S_base
 
     @property
     def PLi_base(self):
@@ -2161,7 +2214,6 @@ class Line_AC:
         Line_AC.lineNumber += 1
 
         self.S_base = S_base
-        self.S_base_i = S_base
         self.Length_km = Length_km
         self.N_cables = N_cables
 
@@ -2230,9 +2282,10 @@ class Line_AC:
             raise ValueError("S_base must be positive")
         if hasattr(self, '_S_base'):
             old_S_base = self._S_base
-            rate = old_S_base / new_S_base
-            if self.Ybus_branch is not None and old_S_base != new_S_base:
-                self.Ybus_branch /= rate
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                if self.Ybus_branch is not None:
+                    self.Ybus_branch *= rate
         self._S_base = new_S_base
 
     @property
@@ -2730,12 +2783,12 @@ class Cable_options:
             Cable_options._cable_database = cable_database.copy()
 
         # If cable_types is None or empty, create empty cable option
+        self.lines = []
         if cable_types is None or len(cable_types) == 0:
             self._cable_types = []
             self.MVA_ratings = []
         else:
             self._cable_types = cable_types
-            self.lines = []
             self.active_config = None
             # Efficiently calculate MVA ratings in one pass
             self.MVA_ratings = self._calculate_MVA_ratings(self._cable_types)
@@ -2780,7 +2833,7 @@ class TF_Line_AC:
     def name(self):
         return self._name
 
-    def __init__(self, fromNode: Node_AC, toNode: Node_AC,  r: float, x: float, g: float, b: float, MVA_rating: float, kV_base: float,m:float=1, shift:float=0, name=None):
+    def __init__(self, fromNode: Node_AC, toNode: Node_AC,  r: float, x: float, g: float, b: float, MVA_rating: float, kV_base: float,m:float=1, shift:float=0, name=None, S_base: float=100):
         self.trafNumber = TF_Line_AC.trafNumber
         TF_Line_AC.trafNumber += 1
 
@@ -2798,6 +2851,7 @@ class TF_Line_AC:
 
         self.ts_max_loading = 0
         self.ts_avg_loading = 0
+        self.Length_km = 1.0
 
         self.m =m
         self.shift = shift
@@ -2813,6 +2867,8 @@ class TF_Line_AC:
         branch_tt=(1/self.Z+self.Y/2)
 
         self.Ybus_branch=np.array([[branch_ff, branch_ft],[branch_tf, branch_tt]])
+
+        self.S_base = S_base
 
         self.fromS=0
         self.toS=0
@@ -2832,6 +2888,35 @@ class TF_Line_AC:
             self._name = name
 
         TF_Line_AC.names.add(self.name)
+
+    @property
+    def capacity_MVA(self):
+        return self.MVA_rating
+
+    @property
+    def apparent_MVA(self):
+        return max(abs(self.fromS), abs(self.toS)) * self.S_base
+
+    @property
+    def loading(self):
+        cap = self.capacity_MVA
+        return 0.0 if cap == 0 else (self.apparent_MVA / cap) * 100.0
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                if self.Ybus_branch is not None:
+                    self.Ybus_branch *= rate
+        self._S_base = new_S_base
 
 
 class Line_DC:
@@ -2975,6 +3060,8 @@ class Line_DC:
         self.lineNumber = Line_DC.lineNumber
         Line_DC.lineNumber += 1
 
+        if type(polarity) is str:
+            polarity = Polarity(polarity)
         self.m_sm_b = polarity
         self.S_base = S_base
         if polarity == Polarity.MONOPOLAR:
@@ -3054,9 +3141,10 @@ class Line_DC:
             raise ValueError("S_base must be positive")
         if hasattr(self, '_S_base'):
             old_S_base = self._S_base
-            rate = old_S_base / new_S_base
-            if self.r is not None and old_S_base != new_S_base:
-                self.r *= rate
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                if self.r is not None:
+                    self.r /= rate
         self._S_base = new_S_base
     @property
     def Cable_type(self):
@@ -3212,19 +3300,33 @@ class AC_DC_converter:
             raise ValueError("S_base must be positive")
         if hasattr(self, '_S_base'):
             old_S_base = self._S_base
-            rate = old_S_base / new_S_base
-            if hasattr(self, 'r_t') and old_S_base != new_S_base:
-                self.r_t *= rate
-                self.x_t *= rate
-                self.pr_r *= rate
-                self.pr_x *= rate
-                self.bf *= rate
-                self.P_DC *= rate
-                self.P_AC *= rate
-                self.Q_AC *= rate
-                self.Z_Y_parameters()
-
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                if hasattr(self, 'r_t'):
+                    self.r_t /= rate
+                    self.x_t /= rate
+                    self.pr_r /= rate
+                    self.pr_x /= rate
+                    self.bf *= rate
+                    self.P_DC *= rate
+                    self.P_AC *= rate
+                    self.Q_AC *= rate
+                    self.Z_Y_parameters()
         self._S_base = new_S_base
+        self._apply_S_base_dependent_params()
+
+    def _apply_S_base_dependent_params(self):
+        if not hasattr(self, 'a_conv_og'):
+            return
+        s = self._S_base
+        self.basekA = s / (SQRT_3 * self.AC_kV_base)
+        self.basekA_DC = s / self.DC_kV_base
+        self.a_conv = self.a_conv_og / s
+        self.b_conv = self.b_conv_og * self.basekA / s
+        self.c_inver = self.c_inver_og * self.basekA**2 / s
+        self.c_rect = self.c_rect_og * self.basekA**2 / s
+        if hasattr(self, 'ra_og'):
+            self.ra = self.ra_og * self.basekA_DC**2 / s
 
 
     def Z_Y_parameters(self):
@@ -3409,6 +3511,8 @@ class AC_DC_converter:
         AC_DC_converter.names.add(self.name)
         self.Node_AC.connected_conv.add(self.ConvNumber)
 
+        self._apply_S_base_dependent_params()
+
 
 
 class DCDC_converter:
@@ -3425,7 +3529,7 @@ class DCDC_converter:
     def name(self):
         return self._name
 
-    def __init__(self, fromNode: Node_DC, toNode: Node_DC, Pset: float, r: float, MW_rating: float, name=None,geometry=None):
+    def __init__(self, fromNode: Node_DC, toNode: Node_DC, Pset: float, r: float, MW_rating: float, name=None,geometry=None, S_base: float=100):
         self.ConvNumber = DCDC_converter.ConvNumber
         DCDC_converter.ConvNumber += 1
         # type: (1=P, 2=droop, 3=Slack)
@@ -3439,9 +3543,7 @@ class DCDC_converter:
         self.Pset = Pset
         self.r = r
         self.MW_rating = MW_rating
-        self.Powerto = Pset
-        self.Powerfrom = -( Pset+Pset**2*r) #Current assumed at VDC = 1 pu
-        self.loss = Pset**2*r               #Current assumed at VDC = 1 pu
+        self._update_power_state()
         fromNode.PconvDC += self.Powerfrom
         fromNode.connected_DCDC_from.add(self.ConvNumber)
         toNode.PconvDC += self.Powerto
@@ -3453,6 +3555,30 @@ class DCDC_converter:
             self._name = name
 
         DCDC_converter.names.add(self.name)
+        self.S_base = S_base
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.Pset *= rate
+                self.r *= rate
+                self._update_power_state()
+        self._S_base = new_S_base
+
+    def _update_power_state(self):
+        p = self.Pset
+        self.Powerto = p
+        self.Powerfrom = -(p + p**2 * self.r)
+        self.loss = p**2 * self.r
 
 class Ren_source_zone:
     ren_source_num = 0
@@ -3725,7 +3851,31 @@ class Price_Zone:
         # Keep aggregated zone load consistent with node updates.
         self._sync_PLi_total()
 
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.import_pu_L *= rate
+                self.export_pu_G *= rate
+                self.PN *= rate
+                if np.isfinite(self._PGL_min_base):
+                    self._PGL_min_base *= rate
+        self._S_base = new_S_base
+        if getattr(self, 'expand_import', False):
+            self.calc_import_expand()
+        else:
+            self.calc_curvature_effect()
+
     def __init__(self,price=1,import_pu_L=1,export_pu_G=1,a=0,b=1,c=0,import_expand=0,curvature_factor=1,S_base:float=100,name=None,positive_price_delta=None):
+        self._S_base = S_base
         self.price_zone_num = Price_Zone.price_zone_num
         Price_Zone.price_zone_num += 1
 
@@ -3737,8 +3887,6 @@ class Price_Zone:
         self.import_pu_L=import_pu_L
         self.export_pu_G=export_pu_G
 
-        self.S_base=S_base
-
         self.nodes_AC=[]
         self.nodes_DC=[]
         self.ConvACDC=[]
@@ -3748,9 +3896,8 @@ class Price_Zone:
         self._b=b
         self.c=c
         self.positive_price_delta = positive_price_delta
-        self.PGL_min_base=-np.inf
+        self.PGL_min_base = -np.inf
 
-        self.PGL_min=self.PGL_min_base
         self.PGL_max=np.inf
 
         self.PN= 0

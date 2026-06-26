@@ -13,20 +13,20 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
-  ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets).
+  ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets). Coverage
+  reports and the README badge are maintained on Codecov.
 - **`pyomo_model_solve.py`**: extracted generic Pyomo solve layer from
   `ACDC_OPF.py` (`pyomo_model_solve`, log parsers, feasibility checks,
   `reset_to_initialize`, `export_solver_progress_to_excel`). `ACDC_OPF` re-exports
   for backward compatibility.
-- **`TEST_COVERAGE.md`**: shipped coverage snapshot (overall %, missing lines,
-  function-level gaps with **Tested / Partial / Not tested** status). PRs that
-  change tests must update it (see `CONTRIBUTING.md`). README coverage badge
-  tracks the same overall %.
 - **Tests**: `test_solver_utils.py` (mocked Pyomo/OR-Tools solver probes),
   `test_opf_result_helpers.py` (OPF result helpers after Ipopt solve),
   `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`),
   `test_graph_dash.py` (synthetic TS + Dash callback unit tests).
 - **`ipopt_available` / `require_ipopt`** helpers in `pyflow_tests/_test_solver_deps.py`.
+
+### Removed
+- **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
 - **`dill`** is a required base dependency; removed optional-import fallbacks in

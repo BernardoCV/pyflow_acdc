@@ -140,10 +140,6 @@ Element Expansion Helpers
 
    Enables or updates one element for TEP investment modeling.
 
-.. autofunction:: pyflow_acdc.translate_pd_tep
-
-   Builds pandas summaries from solved TEP model variables.
-
 
 .. _TEP_obj_functions:
 
