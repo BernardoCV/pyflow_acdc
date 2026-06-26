@@ -117,11 +117,24 @@ def test_create_grid_from_turbine_graph_alpha_ventus_bundle():
     assert grid.crossing_groups is not None
 
 
+def _read_stagg5_csv(name):
+    df = pd.read_csv(
+        _STAGG5_DATA / name,
+        delimiter=",",
+        quotechar="'",
+        encoding="utf-8",
+    )
+    for col in ("Node_id", "fromNode", "toNode", "AC_node", "DC_node"):
+        if col in df.columns:
+            df[col] = df[col].astype(str)
+    return df
+
+
 def test_extend_grid_from_data_stagg5_partial_csv():
     """Extend an empty grid with Stagg5MATACDC CSV tables (nodes first, then rest)."""
     grid, _ = pyf.create_grid_from_data(
         100,
-        AC_node_data=str(_STAGG5_DATA / "MATACDC_AC_node_data.csv"),
+        AC_node_data=_read_stagg5_csv("MATACDC_AC_node_data.csv"),
         data_in="pu",
     )
     n_ac_nodes = len(grid.nodes_AC)
@@ -130,10 +143,10 @@ def test_extend_grid_from_data_stagg5_partial_csv():
 
     pyf.extend_grid_from_data(
         grid,
-        AC_line_data=str(_STAGG5_DATA / "MATACDC_AC_line_data.csv"),
-        DC_node_data=str(_STAGG5_DATA / "MATACDC_DC_node_data.csv"),
-        DC_line_data=str(_STAGG5_DATA / "MATACDC_DC_line_data.csv"),
-        Converter_data=str(_STAGG5_DATA / "MATACDC_Converter_data.csv"),
+        AC_line_data=_read_stagg5_csv("MATACDC_AC_line_data.csv"),
+        DC_node_data=_read_stagg5_csv("MATACDC_DC_node_data.csv"),
+        DC_line_data=_read_stagg5_csv("MATACDC_DC_line_data.csv"),
+        Converter_data=_read_stagg5_csv("MATACDC_Converter_data.csv"),
         data_in="pu",
     )
 
