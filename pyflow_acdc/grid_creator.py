@@ -236,7 +236,7 @@ def process_AC_node(S_base,data_in,AC_node_data):
 
 
             AC_nodes[var_name] = Node_AC(element_type, Voltage_0, theta_0,kV_base, Power_Gained,
-                                         Reactive_Gained, Power_load, Reactive_load, name=str(var_name),Umin=Umin,Umax=Umax,Gs=Gs,Bs=Bs,x_coord=x_coord,y_coord=y_coord)
+                                         Reactive_Gained, Power_load, Reactive_load, name=str(var_name),Umin=Umin,Umax=Umax,Gs=Gs,Bs=Bs,x_coord=x_coord,y_coord=y_coord, S_base=S_base)
             if geometry is not None:
                if isinstance(geometry, str):
                     geometry = loads(geometry)
@@ -277,7 +277,7 @@ def process_AC_node(S_base,data_in,AC_node_data):
             Reactive_load   /=S_base
 
             AC_nodes[var_name] = Node_AC(element_type, Voltage_0, theta_0,kV_base, Power_Gained,
-                                         Reactive_Gained, Power_load, Reactive_load, name=str(var_name),Umin=Umin,Umax=Umax,Gs=Gs,Bs=Bs,x_coord=x_coord,y_coord=y_coord)
+                                         Reactive_Gained, Power_load, Reactive_load, name=str(var_name),Umin=Umin,Umax=Umax,Gs=Gs,Bs=Bs,x_coord=x_coord,y_coord=y_coord, S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str):
                      geometry = loads(geometry)
@@ -451,7 +451,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
             geometry      = DC_node_data.at[index, 'geometry']        if 'geometry'    in DC_node_data.columns else None
 
-            DC_nodes[var_name] = Node_DC(node_type,kV_base, Voltage_0, Power_Gained, Power_load, name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
+            DC_nodes[var_name] = Node_DC(node_type,kV_base, Voltage_0, Power_Gained, Power_load, name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord, S_base=S_base)
             if geometry is not None:
                 if isinstance(geometry, str):
                      geometry = loads(geometry)
@@ -480,7 +480,7 @@ def process_DC_node(S_base,data_in,DC_node_data):
 
             geometry      = DC_node_data.at[index, 'geometry']        if 'geometry'    in DC_node_data.columns else None
 
-            DC_nodes[var_name] = Node_DC(node_type,kV_base, Voltage_0, Power_Gained, Power_load, name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
+            DC_nodes[var_name] = Node_DC(node_type,kV_base, Voltage_0, Power_Gained, Power_load, name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord, S_base=S_base)
 
             if geometry is not None:
                 if isinstance(geometry, str):
@@ -765,17 +765,6 @@ def process_ACDC_converters(S_base,data_in,Converter_data,AC_nodes=None,DC_nodes
                 if isinstance(geometry, str):
                      geometry = loads(geometry)
                 Converters[var_name].geometry = geometry
-
-    for strg in Converters:
-        conv = Converters[strg]
-        conv.basekA  = S_base/(SQRT_3*conv.AC_kV_base)
-        conv.a_conv  = conv.a_conv_og/S_base
-        conv.b_conv  = conv.b_conv_og*conv.basekA/S_base
-        conv.c_inver = conv.c_inver_og*conv.basekA**2/S_base
-        conv.c_rect  = conv.c_rect_og*conv.basekA**2/S_base
-
-
-
 
     return    Converters
 
@@ -1198,7 +1187,7 @@ def create_grid_from_mat(matfile):
 
 
             AC_nodes[var_name] = Node_AC(element_type, Voltage_0, theta_0,kV_base, Power_Gained,
-                                         Reactive_Gained, Power_load, Reactive_load, name=str(var_name),Umin=Umin,Umax=Umax,Gs=Gs,Bs=Bs,x_coord=x_coord,y_coord=y_coord)
+                                         Reactive_Gained, Power_load, Reactive_load, name=str(var_name),Umin=Umin,Umax=Umax,Gs=Gs,Bs=Bs,x_coord=x_coord,y_coord=y_coord, S_base=S_base)
         AC_nodes_list = list(AC_nodes.values())
 
 
@@ -1260,7 +1249,7 @@ def create_grid_from_mat(matfile):
 
 
             DC_nodes[var_name] = Node_DC(
-                node_type,kV_base, Voltage_0, Power_Gained, Power_load ,name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord)
+                node_type,kV_base, Voltage_0, Power_Gained, Power_load ,name=str(var_name),Umin=Umin,Umax=Umax,x_coord=x_coord,y_coord=y_coord, S_base=S_base)
         DC_nodes_list = list(DC_nodes.values())
         # DC_line_data = DC_line_data.set_index('Line_id')
         DC_lines = {}
@@ -1553,6 +1542,13 @@ def load_pickle(path, use_dill=False):
     _migrate_legacy_grid_attrs(obj)
     return obj
 
+def _assign_S_base(element, sbase_old, sbase_new):
+    """Assign ``S_base`` on an element, seeding from ``sbase_old`` if never set."""
+    if not hasattr(element, '_S_base'):
+        element._S_base = sbase_old
+    element.S_base = sbase_new
+
+
 def change_S_base(grid, Sbase_new):
     """Change the system power base of a grid (rescales per-unit quantities).
 
@@ -1596,68 +1592,37 @@ def change_S_base(grid, Sbase_new):
     rate = Sbase_old / Sbase_new
 
     for line in (
-        grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec + grid.lines_AC_ct
+        grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
+        + grid.lines_AC_ct + grid.lines_AC_tf
     ):
-        line.S_base = Sbase_new
+        _assign_S_base(line, Sbase_old, Sbase_new)
 
     for line in grid.lines_DC:
-        line.S_base = Sbase_new
-
-    for tf in grid.lines_AC_tf:
-        tf.Ybus_branch /= rate
+        _assign_S_base(line, Sbase_old, Sbase_new)
 
     for node in grid.nodes_AC:
-        node.PGi *= rate
-        node._PLi_base *= rate
-        node._PLi_extgrid *= rate
-        node.update_PLi()
-        node.QGi *= rate
-        node.QLi *= rate
+        _assign_S_base(node, Sbase_old, Sbase_new)
 
     for node in grid.nodes_DC:
-        node.PGi *= rate
-        node._PLi_base *= rate
-        node.update_PLi()
+        _assign_S_base(node, Sbase_old, Sbase_new)
 
     for gen in grid.Generators:
-        gen.S_base = Sbase_new
+        _assign_S_base(gen, Sbase_old, Sbase_new)
 
     for gen in getattr(grid, 'Generators_DC', []):
-        gen.S_base = Sbase_new
+        _assign_S_base(gen, Sbase_old, Sbase_new)
 
     for rs in grid.RenSources:
-        rs.S_base = Sbase_new
+        _assign_S_base(rs, Sbase_old, Sbase_new)
 
     for conv in grid.Converters_ACDC:
-        conv.S_base = Sbase_new
-        conv.basekA = Sbase_new / (SQRT_3 * conv.AC_kV_base)
-        conv.basekA_DC = Sbase_new / conv.DC_kV_base
-        conv.a_conv = conv.a_conv_og / Sbase_new
-        conv.b_conv = conv.b_conv_og * conv.basekA / Sbase_new
-        conv.c_inver = conv.c_inver_og * conv.basekA**2 / Sbase_new
-        conv.c_rect = conv.c_rect_og * conv.basekA**2 / Sbase_new
-        if hasattr(conv, 'ra_og'):
-            conv.ra = conv.ra_og * conv.basekA_DC**2 / Sbase_new
+        _assign_S_base(conv, Sbase_old, Sbase_new)
 
     for conv in grid.Converters_DCDC:
-        conv.Pset *= rate
-        conv.r *= rate
-        p = conv.Pset
-        conv.Powerto = p
-        conv.Powerfrom = -(p + p**2 * conv.r)
-        conv.loss = p**2 * conv.r
+        _assign_S_base(conv, Sbase_old, Sbase_new)
 
     for pz in getattr(grid, 'Price_Zones', []):
-        pz.import_pu_L *= rate
-        pz.export_pu_G *= rate
-        pz.PN *= rate
-        if np.isfinite(pz.PGL_min_base):
-            pz.PGL_min_base *= rate
-        pz.S_base = Sbase_new
-        if getattr(pz, 'expand_import', False):
-            pz.calc_import_expand()
-        else:
-            pz.calc_curvature_effect()
+        _assign_S_base(pz, Sbase_old, Sbase_new)
 
     grid.S_base = Sbase_new
     if grid.nn_AC > 0:

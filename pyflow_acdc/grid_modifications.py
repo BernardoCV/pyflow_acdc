@@ -157,7 +157,7 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
     --------
     >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1', node_type='PQ')
     """
-    node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord)
+    node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord, S_base=grid.S_base)
     if geometry is not None:
        if isinstance(geometry, str):
             geometry = loads(geometry)
@@ -203,7 +203,7 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
     --------
     >>> node = pyf.add_DC_node(grid, kV_base=525, name='dc_bus1')
     """
-    node = Node_DC(node_type, kV_base, Voltage_0, Power_Gained, Power_load, name,Umin, Umax,x_coord,y_coord)
+    node = Node_DC(node_type, kV_base, Voltage_0, Power_Gained, Power_load, name,Umin, Umax,x_coord,y_coord, S_base=grid.S_base)
     grid.nodes_DC.append(node)
     if geometry is not None:
        if isinstance(geometry, str):
@@ -211,7 +211,6 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
        node.geometry = geometry
        node.x_coord = geometry.x
        node.y_coord = geometry.y
-
 
     return node
 
@@ -297,7 +296,7 @@ def add_line_AC(grid, fromNode, toNode,MVA_rating=None, r=0, x=0, b=0, g=0,R_Ohm
 
 
     if tap_changer:
-        line = TF_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,m, shift, name)
+        line = TF_Line_AC(fromNode, toNode, Resistance_pu,Reactance_pu, Conductance_pu, Susceptance_pu, MVA_rating, kV_base,m, shift, name, S_base=grid.S_base)
         grid.lines_AC_tf.append(line)
         if update_grid:
             grid.update_graph_ac()
@@ -506,6 +505,7 @@ def change_line_AC_to_tap_transformer(grid, line_name):
                 l.m,
                 l.shift,
                 l.name,
+                S_base=l.S_base,
             )
             trafo.geometry = l.geometry
             grid.lines_AC_tf.append(trafo)
@@ -732,19 +732,8 @@ def add_ACDC_converter(grid,AC_node , DC_node , AC_type='PV', DC_type=None, P_AC
              geometry = loads(geometry)
         conv.geometry = geometry
 
-    conv.basekA  = grid.S_base/(SQRT_3*conv.AC_kV_base)
-    conv.basekA_DC = grid.S_base/(conv.DC_kV_base)
     if Arm_R is not None:
-        conv.ra  = Arm_R*conv.basekA_DC**2/grid.S_base
-    else:
-        conv.ra = 0.001
-    conv.a_conv  = conv.a_conv_og/grid.S_base
-    conv.b_conv  = conv.b_conv_og*conv.basekA/grid.S_base
-    conv.c_inver = conv.c_inver_og*conv.basekA**2/grid.S_base
-    conv.c_rect  = conv.c_rect_og*conv.basekA**2/grid.S_base
-
-
-
+        conv.ra = Arm_R * conv.basekA_DC**2 / grid.S_base
 
     grid.Converters_ACDC.append(conv)
     return conv
@@ -789,7 +778,7 @@ def add_DCDC_converter(grid,fromNode , toNode ,P_MW=None,Pset=None,R_Ohm=None, r
     if Pset is None:
         Pset = MW_rating/(2*grid.S_base)
 
-    conv = DCDC_converter(fromNode , toNode , Pset, r, MW_rating,name,geometry)
+    conv = DCDC_converter(fromNode , toNode , Pset, r, MW_rating, name, geometry, S_base=grid.S_base)
     grid.Converters_DCDC.append(conv)
     return conv
 
