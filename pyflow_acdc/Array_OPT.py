@@ -40,7 +40,6 @@ from .ACDC_OPF import (
     obj_w_rule,
     export_acdc_nl_model_to_pyflow_acdc,
     calculate_objective,
-    
 )
 from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
 
