@@ -9,10 +9,8 @@ from pyflow_acdc.Array_OPT import _create_master_problem_pyomo
 from pyflow_acdc.constants import MIPBackend
 from pyflow_tests._test_solver_deps import (
     mip_solvers,
-    pyomo_mip_css_solver_available,
     pyomo_missing_for_run_test,
     require_pyomo,
-    require_pyomo_mip_css_solvers,
 )
 
 ARRAY_CASE = "alpha_ventus"
@@ -129,7 +127,6 @@ def _print_result(mip_solver, result):
 
 def test_unified_array_pyomo_alpha_ventus():
     require_pyomo()
-    require_pyomo_mip_css_solvers()
     mip_solver, _ = mip_solvers()
     result = run_case(mip_solver=mip_solver)
     _print_result(mip_solver, result)
@@ -140,10 +137,6 @@ def test_unified_array_pyomo_alpha_ventus():
 
 def run_test():
     if pyomo_missing_for_run_test():
-        return
-    if not pyomo_mip_css_solver_available():
-        from pyflow_tests._test_solver_deps import pyomo_mip_css_solvers_missing_for_run_test
-        pyomo_mip_css_solvers_missing_for_run_test()
         return
     mip_solver, _ = mip_solvers()
     result = run_case(mip_solver=mip_solver)

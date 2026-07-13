@@ -9,6 +9,7 @@ from typing import Any
 
 from pyflow_acdc.pyomo_model_solve import (
     _parse_bonmin_log,
+    _parse_highs_log,
     _parse_ipopt_log,
 )
 
@@ -18,6 +19,7 @@ LOG_TO_STATS: dict[str, tuple[str, dict[str, Any]]] = {
     "ipopt_optimal.log": ("ipopt", {}),
     "bonmin_bb_sample.log": ("bonmin", {"bonmin_algorithm": "B-BB"}),
     "bonmin_hyb_sample.log": ("bonmin", {"bonmin_algorithm": "B-Hyb"}),
+    "highs_mip_sample.log": ("highs", {}),
 }
 
 # Logs with committed JSON used by plot/export tests (parser-only coverage stays elsewhere).
@@ -68,6 +70,8 @@ def solver_stats_from_log(log_path, solver: str, *, bonmin_algorithm: str = "B-B
             log_path,
             bonmin_algorithm=bonmin_algorithm,
         )
+    elif solver == "highs":
+        feasible_solutions, all_solutions, bound_solutions = _parse_highs_log(log_path)
     else:
         raise ValueError(f"Unsupported solver for log parsing: {solver}")
 
