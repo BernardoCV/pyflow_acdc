@@ -6,6 +6,7 @@ DEFAULT_PYOMO_SOLVERS = [
     "cbc",
     "glpk",
     "highs",
+    "appsi_highs",
     "gurobi",
     "cplex",
     "scip",
@@ -103,30 +104,23 @@ def is_pyomo_solver_available(solver_name):
     Uses ``SolverFactory(...).available(False)`` so missing executables are
     detected without raising (unlike ``available()`` with no argument).
     """
-    result = check_pyomo_solvers([solver_name], verbose=False)
     name = _normalize_solver_names([solver_name])[0]
+    result = check_pyomo_solvers([name], verbose=False)
     return name in result["pyomo_available"]
 
 
 def pyomo_solver_factory_name(solver_name):
-    """Map a canonical solver label to the Pyomo ``SolverFactory`` name."""
-    name = _normalize_solver_names([solver_name])[0]
-    if name == 'highs' and is_pyomo_solver_available('appsi_highs'):
-        return 'appsi_highs'
-    return name
+    """Return the Pyomo ``SolverFactory`` name (after alias normalization)."""
+    return _normalize_solver_names([solver_name])[0]
 
 
 def resolve_pyomo_linear_solver(candidates=None):
-    """First available MIP/CSS-L Pyomo solver (canonical name, e.g. ``highs``)."""
+    """First available MIP/CSS-L Pyomo solver from ``candidates``."""
     if candidates is None:
         from .constants import PYOMO_LINEAR_SOLVERS
         candidates = PYOMO_LINEAR_SOLVERS
     for name in candidates:
-        if name == 'highs':
-            for alias in ('highs', 'appsi_highs'):
-                if is_pyomo_solver_available(alias):
-                    return 'highs'
-        elif is_pyomo_solver_available(name):
+        if is_pyomo_solver_available(name):
             return name
     return None
 
