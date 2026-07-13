@@ -1,0 +1,30 @@
+Solver command line: ['/home/bernardo_cv/miniconda3/envs/pyflow_env/bin/bonmin', '/tmp/tmpz3o3cbag.pyomo.nl', '-AMPL', 'bonmin.time_limit=300.0', 'bonmin.nlp_failure_behavior=fathom']
+
+Bonmin 1.8.9 using Cbc 2.10.11 and Ipopt 3.14.16
+bonmin: bonmin.time_limit=300.0
+bonmin.nlp_failure_behavior=fathom
+bonmin.time_limit=300.0
+bonmin.nlp_failure_behavior=fathom
+
+
+******************************************************************************
+This program contains Ipopt, a library for large-scale nonlinear optimization.
+ Ipopt is released as open source code under the Eclipse Public License (EPL).
+         For more information visit https://github.com/coin-or/Ipopt
+******************************************************************************
+
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I             1         OPT -3.188493       15 0.156709
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I             1         OPT -3.188493       13 0.147327
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I             1         OPT -3.188493       17 0.161629
+Cbc0012I Integer solution of -3.188493 found by DiveMIPFractional after 0 iterations and 0 nodes (0.31 seconds)
+Cbc0001I Search completed - best objective -3.18849302297048, took 0 iterations and 0 nodes (0.31 seconds)
+Cbc0035I Maximum depth 0, 0 variables fixed on reduced cost
+
+ 	"Finished"
+
