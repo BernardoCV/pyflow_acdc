@@ -12,12 +12,13 @@ from pyflow_tests._test_solver_deps import (
     pyomo_mip_css_solver_available,
     pyomo_missing_for_run_test,
     require_pyomo,
+    require_pyomo_mip_css_solvers,
 )
 
 ARRAY_CASE = "alpha_ventus"
 CT = 3
 TEE = False
-FS = False
+FS = True
 
 
 def run_case(mip_solver=None, build_only=False):
@@ -128,25 +129,25 @@ def _print_result(mip_solver, result):
 
 def test_unified_array_pyomo_alpha_ventus():
     require_pyomo()
-    if pyomo_mip_css_solver_available():
-        mip_solver, _ = mip_solvers()
-        result = run_case(mip_solver=mip_solver)
-        _print_result(mip_solver, result)
-    else:
-        result = run_case(build_only=True)
-        _print_result("build_only", result)
+    require_pyomo_mip_css_solvers()
+    mip_solver, _ = mip_solvers()
+    result = run_case(mip_solver=mip_solver)
+    _print_result(mip_solver, result)
+    assert result[0] == "solve"
+    assert result[7] is not None
+    assert result[9] >= 0
 
 
 def run_test():
     if pyomo_missing_for_run_test():
         return
-    if pyomo_mip_css_solver_available():
-        mip_solver, _ = mip_solvers()
-        result = run_case(mip_solver=mip_solver)
-        _print_result(mip_solver, result)
-    else:
-        result = run_case(build_only=True)
-        _print_result("build_only", result)
+    if not pyomo_mip_css_solver_available():
+        from pyflow_tests._test_solver_deps import pyomo_mip_css_solvers_missing_for_run_test
+        pyomo_mip_css_solvers_missing_for_run_test()
+        return
+    mip_solver, _ = mip_solvers()
+    result = run_case(mip_solver=mip_solver)
+    _print_result(mip_solver, result)
 
 
 if __name__ == "__main__":

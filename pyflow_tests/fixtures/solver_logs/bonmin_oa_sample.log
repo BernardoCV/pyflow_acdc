@@ -1,0 +1,39 @@
+Solver command line: ['/home/bernardo_cv/miniconda3/envs/pyflow_env/bin/bonmin', '/tmp/tmpnfpyw722.pyomo.nl', '-AMPL', 'bonmin.time_limit=300.0', 'bonmin.nlp_failure_behavior=fathom', 'bonmin.algorithm=B-OA']
+
+Bonmin 1.8.9 using Cbc 2.10.11 and Ipopt 3.14.16
+bonmin: bonmin.time_limit=300.0
+bonmin.nlp_failure_behavior=fathom
+bonmin.algorithm=B-OA
+bonmin.time_limit=300.0
+bonmin.nlp_failure_behavior=fathom
+bonmin.algorithm=B-OA
+
+
+******************************************************************************
+This program contains Ipopt, a library for large-scale nonlinear optimization.
+ Ipopt is released as open source code under the Eclipse Public License (EPL).
+         For more information visit https://github.com/coin-or/Ipopt
+******************************************************************************
+
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I             1         OPT 8.9128342e+09       37 1.070176     build initial OA
+NLP3017W OA on non-convex constraint is very experimental.
+NLP0014I             2         OPT 9.0646922e+09       36 0.805951     OA decomposition
+OA0003I New best feasible of 9.0646922e+09 found after 10.785181 sec and
+OA0009I OA  interrupted after 12.796551 seconds found solution of value 9.0646922e+09 (lower bound 8.91276e+09 ).
+OA0010I Performed 1 iterations, explored 14 branch-and-bound nodes in total
+OA0009I OA  interrupted after 302.1192 seconds found solution of value 1e+50 (lower bound 9.1118718e+09 ).
+OA0010I Performed 0 iterations, explored 133 branch-and-bound nodes in total
+Cbc0031I 2072 added rows had average density of 4.8209459
+Cbc0013I At root node, 2072 cuts changed objective from 8.9127596e+09 to 9.1118718e+09 in 2 passes
+Cbc0014I Cut generator 0 (Outer Approximation decomposition.) - 4988 row cuts average 4.1 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 1 (Outer Approximation feasibility check.) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 2 (Outer Approximation strong branching solution check.) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0020I Exiting on maximum time
+Cbc0005I Partial search - best objective 1e+50 (best possible 9.1118718e+09), took 5104 iterations and 0 nodes (300.73 seconds)
+Cbc0035I Maximum depth 0, 0 variables fixed on reduced cost
+ Outer Approximation decomposition. was tried 2 times and created 4988 cuts of which 0 were active after adding rounds of cuts
+
+ 	"Not finished"
+

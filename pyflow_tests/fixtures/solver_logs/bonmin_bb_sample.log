@@ -1,10 +1,12 @@
-Solver command line: ['/home/bernardo_cv/miniconda3/envs/pyflow_env/bin/bonmin', '/tmp/tmpz3o3cbag.pyomo.nl', '-AMPL', 'bonmin.time_limit=300.0', 'bonmin.nlp_failure_behavior=fathom']
+Solver command line: ['/home/bernardo_cv/miniconda3/envs/pyflow_env/bin/bonmin', '/tmp/tmpo75mguwu.pyomo.nl', '-AMPL', 'bonmin.time_limit=300.0', 'bonmin.nlp_failure_behavior=fathom', 'bonmin.algorithm=B-BB']
 
 Bonmin 1.8.9 using Cbc 2.10.11 and Ipopt 3.14.16
 bonmin: bonmin.time_limit=300.0
 bonmin.nlp_failure_behavior=fathom
+bonmin.algorithm=B-BB
 bonmin.time_limit=300.0
 bonmin.nlp_failure_behavior=fathom
+bonmin.algorithm=B-BB
 
 
 ******************************************************************************
@@ -15,16 +17,249 @@ This program contains Ipopt, a library for large-scale nonlinear optimization.
 
 NLP0012I 
               Num      Status      Obj             It       time                 Location
-NLP0014I             1         OPT -3.188493       15 0.156709
+NLP0014I             1         OPT 8.9128342e+09       37 2.203597
 NLP0012I 
               Num      Status      Obj             It       time                 Location
-NLP0014I             1         OPT -3.188493       13 0.147327
+NLP0014I             1         OPT 8.9128342e+09       25 1.021383
+NLP0014I             2         OPT 8.9128342e+09       25 1.023247
+NLP0014I             3         OPT 8.9128342e+09       25 0.915236
+NLP0014I             4         OPT 8.9128342e+09       25 0.845724
+NLP0014I             5         OPT 8.9128342e+09       24 0.705881
+NLP0014I             6         OPT 8.9128342e+09       25 0.632011
+NLP0014I             7         OPT 8.9128342e+09       24 0.62176
+NLP0014I             8         OPT 8.9128342e+09       27 0.692577
+NLP0014I             9         OPT 8.9128342e+09       24 0.623435
+NLP0014I            10         OPT 8.9128342e+09       24 0.615868
+NLP0014I            11         OPT 8.9128342e+09       24 0.621518
+NLP0014I            12         OPT 8.9128342e+09       24 0.684894
+NLP0014I            13         OPT 8.9128342e+09       24 0.726048
+NLP0014I            14         OPT 8.9128342e+09       24 0.750364
+NLP0014I            15         OPT 8.9128342e+09       23 0.734895
+NLP0014I            16         OPT 8.9128343e+09       22 0.714806
+NLP0014I            17         OPT 8.9128349e+09       24 0.74399
+NLP0014I            18         OPT 8.9128553e+09       24 0.761415
+NLP0014I            19         OPT 8.9128563e+09       25 0.805234
+NLP0014I            20         OPT 8.9128571e+09       25 1.053365
 NLP0012I 
               Num      Status      Obj             It       time                 Location
-NLP0014I             1         OPT -3.188493       17 0.161629
-Cbc0012I Integer solution of -3.188493 found by DiveMIPFractional after 0 iterations and 0 nodes (0.31 seconds)
-Cbc0001I Search completed - best objective -3.18849302297048, took 0 iterations and 0 nodes (0.31 seconds)
-Cbc0035I Maximum depth 0, 0 variables fixed on reduced cost
+NLP0014I            21         OPT 8.9128584e+09       25 0.941657
+NLP0014I            22         OPT 8.9131674e+09       25 0.894217
+NLP0014I            23         OPT 8.9131992e+09       25 0.831445
+NLP0014I            24         OPT 8.9133243e+09       25 0.996786
+NLP0014I            25         OPT 8.9136556e+09       25 0.74805
+NLP0014I            26         OPT 8.9140433e+09       24 0.663365
+NLP0014I            27         OPT 8.9155729e+09       25 0.650009
+NLP0014I            28         OPT 8.9155729e+09       35 0.903416
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I             1         OPT 8.9155729e+09       27 0.689979
+Cbc0012I Integer solution of 8.9155729e+09 found by DiveMIPFractional after 0 iterations and 0 nodes (22.65 seconds)
+NLP0014I             2         OPT 8.914341e+09       25 0.655159
+NLP0014I             3         OPT 8.9137765e+09       30 0.812366
+NLP0014I             4         OPT 8.914341e+09       28 0.781041
+NLP0014I             5         OPT 8.9137765e+09       26 0.700933
+NLP0014I             6         OPT 8.9141384e+09       25 0.635276
+NLP0014I             7         OPT 8.9131899e+09       28 1.043713
+NLP0014I             8         OPT 8.9141384e+09       24 0.641054
+NLP0014I             9         OPT 8.9131899e+09       26 0.742343
+NLP0014I            10         OPT 8.9131414e+09       25 0.68483
+NLP0014I            11         OPT 8.9134126e+09       28 0.776299
+NLP0014I            12         OPT 8.9131414e+09       26 0.67217
+NLP0014I            13         OPT 8.9134126e+09       25 0.646944
+NLP0014I            14         OPT 8.912866e+09       27 0.675281
+NLP0014I            15         OPT 8.9129271e+09       28 0.728605
+NLP0014I            16         OPT 8.912866e+09       26 0.711885
+NLP0014I            17         OPT 8.9129271e+09       25 0.68446
+NLP0014I            18         OPT 8.9129401e+09       26 0.683298
+NLP0014I            19         OPT 8.9133097e+09       29 0.866022
+NLP0014I            20         OPT 8.9129401e+09       25 0.911944
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I            21         OPT 8.9133097e+09       27 1.036315
+NLP0014I            22         OPT 8.9131439e+09       25 0.811993
+NLP0014I            23         OPT 8.9145444e+09       26 0.798892
+NLP0014I            24         OPT 8.9131439e+09       25 0.670512
+NLP0014I            25         OPT 8.9145444e+09       25 0.658415
+NLP0014I            26         OPT 8.9128355e+09       26 0.672674
+NLP0014I            27         OPT 8.9130176e+09       25 0.659539
+NLP0014I            28         OPT 8.9128355e+09       26 0.657857
+NLP0014I            29         OPT 8.9130176e+09       25 0.705717
+NLP0014I            30         OPT 8.912835e+09       28 0.859842
+NLP0014I            31         OPT 8.9129505e+09       25 0.77148
+NLP0014I            32         OPT 8.912835e+09       27 0.852664
+NLP0014I            33         OPT 8.9129505e+09       25 0.893387
+NLP0014I            34         OPT 8.9128352e+09       27 0.987296
+NLP0014I            35         OPT 8.9130819e+09       26 0.810104
+NLP0014I            36         OPT 8.9128352e+09       27 0.840866
+NLP0014I            37         OPT 8.9130819e+09       27 0.746202
+NLP0014I            38         OPT 8.9128546e+09       25 0.665281
+NLP0014I            39         OPT 8.9185311e+09       27 0.723593
+NLP0014I            40         OPT 8.9128546e+09       25 0.900242
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I            41         OPT 8.9185311e+09       29 0.925751
+NLP0014I            42         OPT 8.9128349e+09       27 0.777279
+NLP0014I            43         OPT 8.9130188e+09       26 0.652112
+NLP0014I            44         OPT 8.9128349e+09       27 0.707734
+NLP0014I            45         OPT 8.9130188e+09       26 0.677152
+NLP0014I            46         OPT 8.9128342e+09       27 0.731116
+NLP0014I            47         OPT 8.9129669e+09       25 0.663018
+NLP0014I            48         OPT 8.9128342e+09       33 0.905918
+NLP0014I            49         OPT 8.9129669e+09       24 0.650559
+NLP0014I            50         OPT 8.9128342e+09       26 0.722726
+NLP0014I            51         OPT 8.9128342e+09       25 0.661401
+NLP0014I            52         OPT 8.9128342e+09       26 0.716837
+NLP0014I            53         OPT 8.9128342e+09       25 0.648741
+NLP0014I            54         OPT 8.9128342e+09       28 0.791942
+NLP0014I            55         OPT 8.9130764e+09       26 0.883112
+NLP0014I            56         OPT 8.9128342e+09       27 0.860727
+NLP0014I            57         OPT 8.9130764e+09       31 0.869667
+NLP0014I            58         OPT 8.9128342e+09       30 0.88551
+NLP0014I            59         OPT 8.9130032e+09       26 0.714273
+NLP0014I            60         OPT 8.9128342e+09       27 0.801989
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I            61         OPT 8.9130032e+09       26 0.764859
+NLP0014I            62         OPT 8.9128342e+09       27 0.786847
+NLP0014I            63         OPT 8.9128342e+09       25 0.778914
+NLP0014I            64         OPT 8.9128342e+09       27 0.910241
+NLP0014I            65         OPT 8.9128342e+09       25 0.687574
+NLP0014I            66         OPT 8.9128342e+09       38 1.110919
+NLP0014I            67         OPT 8.9128342e+09       25 0.719248
+NLP0014I            68         OPT 8.9128342e+09       31 1.210503
+NLP0014I            69         OPT 8.9128342e+09       25 1.020282
+NLP0014I            70         OPT 8.9128342e+09       24 1.004871
+NLP0014I            71         OPT 8.9128342e+09       25 0.853044
+NLP0014I            72         OPT 8.9128342e+09       27 0.938032
+NLP0014I            73         OPT 8.9128342e+09       25 0.811721
+NLP0014I            74         OPT 8.9128342e+09       26 0.818939
+NLP0014I            75         OPT 8.9128342e+09       25 0.682639
+NLP0014I            76         OPT 8.9128342e+09       27 0.736716
+NLP0014I            77         OPT 8.9128342e+09       25 0.667242
+NLP0014I            78         OPT 8.9128342e+09       26 0.738929
+NLP0014I            79         OPT 8.9128342e+09       25 0.658913
+NLP0014I            80         OPT 8.9128342e+09       27 0.739466
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I            81         OPT 8.9128342e+09       25 0.648462
+NLP0014I            82         OPT 8.9128342e+09       26 0.733204
+NLP0014I            83         OPT 8.9128342e+09       25 0.648929
+NLP0014I            84         OPT 8.9128342e+09       26 0.727359
+NLP0014I            85         OPT 8.9128342e+09       25 0.626912
+NLP0014I            86         OPT 8.9128342e+09       28 0.76641
+NLP0014I            87         OPT 8.9128342e+09       25 0.692063
+NLP0014I            88         OPT 8.9128342e+09       26 0.691584
+NLP0014I            89         OPT 8.9128342e+09       25 0.63476
+NLP0014I            90         OPT 8.9128342e+09       27 1.309351
+NLP0014I            91         OPT 8.9128342e+09       25 1.163716
+NLP0014I            92         OPT 8.9128342e+09       27 0.940397
+NLP0014I            93         OPT 8.9128342e+09       25 1.080522
+NLP0014I            94         OPT 8.9128342e+09       26 1.051959
+NLP0014I            95         OPT 8.9128342e+09       25 0.718342
+NLP0014I            96         OPT 8.9128342e+09       27 0.78916
+NLP0014I            97         OPT 8.9128342e+09       25 0.879046
+NLP0014I            98         OPT 8.9128342e+09       27 0.798346
+NLP0014I            99         OPT 8.9128342e+09       25 0.661729
+NLP0014I           100         OPT 8.9128342e+09       27 0.766564
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I           101         OPT 8.9128342e+09       25 0.649497
+NLP0014I           102         OPT 8.9128342e+09       31 0.941414
+NLP0014I           103         OPT 8.9128342e+09       25 1.146909
+NLP0014I           104         OPT 8.9128342e+09       26 1.046559
+NLP0014I           105         OPT 8.9128342e+09       25 0.839281
+NLP0014I           106         OPT 8.9128342e+09       29 0.8805
+NLP0014I           107         OPT 8.9128342e+09       25 0.64933
+NLP0014I           108         OPT 8.9128342e+09       27 0.762934
+NLP0014I           109         OPT 8.9128342e+09       25 0.660152
+NLP0014I           110         OPT 8.9128546e+09       30 0.772805
+Cbc0010I After 0 nodes, 1 on tree, 8.9155729e+09 best solution, best possible 8.9128546e+09 (109.09 seconds)
+NLP0014I           111         OPT 8.9137859e+09       25 0.689891
+NLP0014I           112         OPT 8.9143887e+09       25 0.714597
+NLP0014I           113         OPT 8.9140999e+09       25 0.691304
+NLP0014I           114         OPT 8.9154888e+09       25 0.653377
+NLP0014I           115         OPT 8.9144225e+09       26 0.701788
+NLP0014I           116         OPT 8.9155682e+09       25 0.743308
+NLP0014I           117         OPT 8.9160649e+09       26 0.68661
+NLP0014I           118         OPT 8.9195166e+09       26 0.659604
+NLP0014I           119         OPT 8.9160649e+09       26 0.649415
+NLP0014I           120         OPT 8.9195166e+09       27 0.62252
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I           121         OPT 8.9156173e+09       26 0.62022
+NLP0014I           122         OPT 8.9168218e+09       27 0.650198
+NLP0014I           123         OPT 8.9156173e+09       25 0.613867
+NLP0014I           124         OPT 8.9168218e+09       28 0.651811
+NLP0014I           125         OPT 8.9155869e+09       25 0.619016
+NLP0014I           126         OPT 8.9165434e+09       27 0.615169
+NLP0014I           127         OPT 8.9155869e+09       25 0.625805
+NLP0014I           128         OPT 8.9165434e+09       27 0.654329
+NLP0014I           129         OPT 8.9156079e+09       25 0.613786
+NLP0014I           130         OPT 8.9176613e+09       25 0.569149
+NLP0014I           131         OPT 8.9156079e+09       25 0.678464
+NLP0014I           132         OPT 8.9176613e+09       26 0.660844
+NLP0014I           133         OPT 8.914814e+09       27 0.663748
+NLP0014I           134         OPT 8.9149176e+09       26 0.675312
+NLP0014I           135         OPT 8.9149404e+09       26 0.707705
+NLP0014I           136         OPT 8.9152594e+09       25 0.719596
+NLP0014I           137         OPT 8.9149416e+09       26 0.770581
+NLP0014I           138         OPT 8.915186e+09       27 0.789681
+NLP0014I           139         OPT 8.9149416e+09       26 0.784986
+NLP0014I           140         OPT 8.9151837e+09       31 0.872478
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I           141         OPT 8.9149429e+09       26 0.745581
+NLP0014I           142         OPT 8.9151251e+09       27 0.819334
+NLP0014I           143         OPT 8.9149435e+09       27 0.877741
+NLP0014I           144         OPT 8.9151274e+09       26 0.732986
+NLP0014I           145         OPT 8.9149435e+09       26 0.801004
+NLP0014I           146         OPT 8.9151128e+09       26 0.78191
+NLP0014I           147         OPT 8.9149766e+09       27 0.724615
+NLP0014I           148         OPT 8.9150349e+09       26 0.623081
+NLP0014I           149         OPT 8.9149766e+09       26 0.649185
+NLP0014I           150         OPT 8.9151099e+09       26 0.658697
+NLP0014I           151         OPT 8.9149774e+09       28 0.696243
+NLP0014I           152         OPT 8.9150929e+09       27 0.651032
+NLP0014I           153         OPT 8.9149774e+09       26 0.654675
+NLP0014I           154         OPT 8.9149774e+09       26 0.626875
+NLP0014I           155         OPT 8.9149774e+09       27 0.679923
+NLP0014I           156         OPT 8.9149774e+09       28 0.692672
+NLP0014I           157         OPT 8.9149774e+09       27 0.644411
+NLP0014I           158         OPT 8.9149774e+09       27 0.69354
+NLP0014I           159         OPT 8.9149774e+09       27 0.714282
+NLP0014I           160         OPT 8.9149774e+09       27 0.683212
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I           161         OPT 8.9149774e+09       27 0.684644
+NLP0014I           162         OPT 8.9149774e+09       27 0.638518
+NLP0014I           163         OPT 8.9149774e+09       30 0.73064
+NLP0014I           164         OPT 8.9149774e+09       27 0.635358
+NLP0014I           165         OPT 8.9149774e+09       27 0.641831
+NLP0014I           166         OPT 8.9149774e+09       27 0.67025
+NLP0014I           167         OPT 8.9149774e+09       27 0.672904
+NLP0014I           168         OPT 8.9149774e+09       27 0.67281
+NLP0014I           169         OPT 8.9149774e+09       27 0.684883
+NLP0014I           170         OPT 8.9149774e+09       27 0.632161
+NLP0014I           171         OPT 8.9149774e+09       28 0.712122
+NLP0014I           172         OPT 8.9149774e+09       31 0.880579
+NLP0014I           173         OPT 8.9149774e+09       27 0.681318
+NLP0014I           174         OPT 8.9149774e+09       26 0.657743
+NLP0014I           175         OPT 8.9149774e+09       28 0.674011
+NLP0014I           176         OPT 8.9149774e+09       27 0.630314
+NLP0014I           177         OPT 8.9149774e+09       26 0.660622
+NLP0014I             2         OPT 8.9149774e+09       25 0.652743
+Cbc0004I Integer solution of 8.9149774e+09 found after 1394 iterations and 51 nodes (155.90 seconds)
+NLP0014I           178         OPT 8.9146895e+09       25 0.640157
+NLP0014I           179         OPT 8.9161142e+09       26 0.625594
+NLP0014I           180         OPT 8.9150048e+09       26 0.639795
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I           181         OPT 8.9162108e+09       25 0.594511
+NLP0014I           182         OPT 8.9150845e+09       31 0.795132
+NLP0014I           183         OPT 8.915307e+09       26 0.655223
+Cbc0001I Search completed - best objective 8914977376.021101, took 1553 iterations and 57 nodes (159.85 seconds)
+Cbc0032I Strong branching done 62 times (3264 iterations), fathomed 1 nodes and fixed 2 variables
+Cbc0035I Maximum depth 25, 0 variables fixed on reduced cost
 
  	"Finished"
 

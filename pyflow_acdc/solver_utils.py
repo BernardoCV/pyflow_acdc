@@ -108,6 +108,29 @@ def is_pyomo_solver_available(solver_name):
     return name in result["pyomo_available"]
 
 
+def pyomo_solver_factory_name(solver_name):
+    """Map a canonical solver label to the Pyomo ``SolverFactory`` name."""
+    name = _normalize_solver_names([solver_name])[0]
+    if name == 'highs' and is_pyomo_solver_available('appsi_highs'):
+        return 'appsi_highs'
+    return name
+
+
+def resolve_pyomo_linear_solver(candidates=None):
+    """First available MIP/CSS-L Pyomo solver (canonical name, e.g. ``highs``)."""
+    if candidates is None:
+        from .constants import PYOMO_LINEAR_SOLVERS
+        candidates = PYOMO_LINEAR_SOLVERS
+    for name in candidates:
+        if name == 'highs':
+            for alias in ('highs', 'appsi_highs'):
+                if is_pyomo_solver_available(alias):
+                    return 'highs'
+        elif is_pyomo_solver_available(name):
+            return name
+    return None
+
+
 def check_ortools_backends(verbose=True):
     """
     Check availability of OR-Tools linear solver backends.

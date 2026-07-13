@@ -1,14 +1,11 @@
 """Docs: api\\wf_array.rst — Sequential Cable Sizing (CSS)"""
 import pyflow_acdc as pyf
-from pyflow_acdc.constants import PYOMO_LINEAR_SOLVERS
+from pyflow_acdc.solver_utils import resolve_pyomo_linear_solver
 
 grid, res = pyf.cases["alpha_ventus"]()
 print(grid.lines_AC_ct[0].cable_types)
 
-solver = next(
-    (name for name in PYOMO_LINEAR_SOLVERS if pyf.is_pyomo_solver_available(name)),
-    None,
-)
+solver = resolve_pyomo_linear_solver()
 if solver is None:
     print("Skipped: no Pyomo MIP/CSS-L solver available")
 else:

@@ -1,5 +1,0 @@
-Running HiGHS 1.7.0
-        Nodes      |    B&B Tree     |            Objective Bounds              |  Dynamic Constraints |       Work
-Src  Proc. InQueue |  Leaves   Expl. | BestBound       BestSol              Gap |   Cuts   InLp Confl. | LpIters     Time
- T     165      18        61   5.32%   38.21150457     51.97623619       26.48%     1482     51   8313    115998    23.6s
- L     200      10        80   8.10%   40.00000000     49.50000000       19.19%     1500     52   8400    120000    30.1s

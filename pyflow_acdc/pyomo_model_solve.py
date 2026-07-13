@@ -17,6 +17,8 @@ try:
 except ImportError:
     GUROBI_AVAILABLE = False
 
+from .solver_utils import pyomo_solver_factory_name
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -578,7 +580,7 @@ def _solver_progress(
 
     Always writes to log file for parsing. Uses Pyomo's tee parameter to control console output.
     """
-    opt = pyo.SolverFactory(solver_name)
+    opt = pyo.SolverFactory(pyomo_solver_factory_name(solver_name))
 
     # Set time limit based on solver
     if time_limit is not None:
@@ -901,7 +903,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
             executable = f'{executable_path}/{specific_solver}'
             opt = pyo.SolverFactory(specific_solver, executable=executable)
         else:
-            opt = pyo.SolverFactory(solver)
+            opt = pyo.SolverFactory(pyomo_solver_factory_name(solver))
 
         # Set time limit (can be overridden by solver_options)
         if time_limit is not None:

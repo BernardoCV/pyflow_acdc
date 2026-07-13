@@ -2,7 +2,7 @@
 """Plot/export smoke tests for solver progress using committed stats fixtures.
 
 Parser coverage lives in :mod:`pyflow_tests.test_pyomo_model_solve`.
-HiGHS has no plot/export fixtures here (parser-only). Gurobi has no log parser.
+HiGHS is live-tested in CI (no log fixture). Gurobi has no log parser.
 """
 
 from pathlib import Path
@@ -84,14 +84,14 @@ def test_export_solver_progress_ipopt_kkt_columns(tmp_path):
     assert df["kkt_inf_du_feasible"].notna().any()
 
 
-def test_export_solver_progress_bonmin_bound_columns(tmp_path):
+def test_export_solver_progress_bonmin_mip_columns(tmp_path):
     stats = load_solver_stats_fixture("bonmin_bb_sample.stats.json")
     xlsx = export_solver_progress_to_excel(stats, str(tmp_path / "bonmin_progress"))
     df = pd.read_excel(xlsx)
 
-    assert "bound_value" in df.columns
-    assert df["bound_value"].notna().any()
     assert df["time_feasible"].notna().any()
+    assert df["obj_feasible"].notna().any()
+    assert df["is_feasible_all"].notna().any()
 
 
 def run_test():

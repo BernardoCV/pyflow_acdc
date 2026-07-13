@@ -185,6 +185,8 @@ ALL_CASES = [
     "test_matlab_loader.py",
     "test_market_coeff.py",
     "test_solver_utils.py",
+    "test_pyomo_model_solve.py",
+    "test_solver_progress_plot_export.py",
     "test_graph_dash.py",
     "test_folium.py",
     "test_plot.py",
@@ -234,6 +236,8 @@ QUICK_CASES = [
     "test_plot.py",
     "test_OPF_quick_runner.py",
     "test_solver_utils.py",
+    "test_pyomo_model_solve.py",
+    "test_solver_progress_plot_export.py",
     "test_graph_dash.py",
 ]
 

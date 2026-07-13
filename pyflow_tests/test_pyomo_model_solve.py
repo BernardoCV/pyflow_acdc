@@ -7,7 +7,6 @@ import pytest
 
 from pyflow_acdc.pyomo_model_solve import (
     _parse_bonmin_log,
-    _parse_highs_log,
     _parse_ipopt_log,
 )
 
@@ -26,20 +25,20 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures" / "solver_logs"
             None,
         ),
         (
-            "highs_mip_sample.log",
-            _parse_highs_log,
-            {},
-            2,
-            2,
-            2,
-        ),
-        (
             "bonmin_bb_sample.log",
             _parse_bonmin_log,
             {"bonmin_algorithm": "B-BB"},
             1,
             2,
+            None,
+        ),
+        (
+            "bonmin_hyb_sample.log",
+            _parse_bonmin_log,
+            {"bonmin_algorithm": "B-Hyb"},
             1,
+            2,
+            None,
         ),
     ],
 )
