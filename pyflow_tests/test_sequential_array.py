@@ -6,12 +6,13 @@ from pathlib import Path
 import pyflow_acdc as pyf
 import pyomo.environ as pyo
 
-from pyflow_acdc.constants import CssMode, PYOMO_LINEAR_SOLVERS
-from pyflow_acdc.solver_utils import resolve_pyomo_linear_solver
+from pyflow_acdc.constants import CssMode
 from pyflow_tests._test_solver_deps import (
     mip_solvers,
+    pyomo_mip_css_solvers_missing_for_run_test,
     pyomo_missing_for_run_test,
     require_pyomo,
+    require_pyomo_mip_css_solvers,
     tep_solver,
 )
 
@@ -23,14 +24,6 @@ FS = True
 FLH = 8760
 WACC = 0.02
 L_OPEX = True
-
-
-def _require_mip_css_solver():
-    if resolve_pyomo_linear_solver() is None:
-        raise RuntimeError(
-            f"no Pyomo MIP/CSS-L solver available "
-            f"(need one of: {', '.join(PYOMO_LINEAR_SOLVERS)})"
-        )
 
 
 def _feasible_solution_plots(save_path):
@@ -119,7 +112,7 @@ def run_case(mip_solver=None, css_l_solver=None, *, nl=False, save_path=None):
 
 def test_sequential_array_alpha_ventus_linear(tmp_path):
     require_pyomo()
-    _require_mip_css_solver()
+    require_pyomo_mip_css_solvers()
     mip_solver, css_solver = mip_solvers()
     result = run_case(mip_solver, css_solver, nl=False, save_path=tmp_path)
     print(_format_result("linear", result))
@@ -128,7 +121,7 @@ def test_sequential_array_alpha_ventus_linear(tmp_path):
 
 def test_sequential_array_alpha_ventus_pf(tmp_path):
     require_pyomo()
-    _require_mip_css_solver()
+    require_pyomo_mip_css_solvers()
     mip_solver, css_solver = mip_solvers()
     result = run_case(mip_solver, css_solver, nl=CssMode.PF, save_path=tmp_path)
     print(_format_result("PF", result))
@@ -138,7 +131,8 @@ def test_sequential_array_alpha_ventus_pf(tmp_path):
 def run_test():
     if pyomo_missing_for_run_test():
         return
-    _require_mip_css_solver()
+    if pyomo_mip_css_solvers_missing_for_run_test():
+        return
     mip_solver, css_solver = mip_solvers()
     save_path = Path("sequential_CSS_test_output")
     save_path.mkdir(exist_ok=True)

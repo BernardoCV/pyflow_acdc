@@ -7,6 +7,7 @@ import pyomo.environ as pyo
 
 from pyflow_acdc.Array_OPT import _create_master_problem_pyomo
 from pyflow_acdc.constants import MIPBackend
+from pyflow_acdc.solver_utils import is_pyomo_solver_available
 from pyflow_tests._test_solver_deps import (
     pyomo_missing_for_run_test,
     require_pyomo,
@@ -127,17 +128,22 @@ def _print_result(mip_solver, result):
 
 def test_unified_array_pyomo_alpha_ventus():
     require_pyomo()
-    result = run_case()
+    build_only = not is_pyomo_solver_available(MIP_SOLVER)
+    result = run_case(build_only=build_only)
     _print_result(MIP_SOLVER, result)
-    assert result[0] == "solve"
-    assert result[7] is not None
-    assert result[9] >= 0
+    if build_only:
+        assert result[0] == "build_only"
+    else:
+        assert result[0] == "solve"
+        assert result[7] is not None
+        assert result[9] >= 0
 
 
 def run_test():
     if pyomo_missing_for_run_test():
         return
-    result = run_case()
+    build_only = not is_pyomo_solver_available(MIP_SOLVER)
+    result = run_case(build_only=build_only)
     _print_result(MIP_SOLVER, result)
 
 
