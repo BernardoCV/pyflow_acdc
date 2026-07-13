@@ -761,8 +761,8 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
                                          flow_dir_tightening=flow_dir_tightening)
     if build_only:
         results, solver_stats = build_only_solver_stats(solver_name, model)
-        feasible_solutions = []
-        feasible_solution_found = True
+        model._solver_stats = solver_stats
+        return True, None, model, []
     else:
         # Build solver options based on solver and grid attributes
         solver_options = {}

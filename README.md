@@ -9,7 +9,7 @@
 [![codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc/graph/badge.svg)](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
 [![Documentation Status](https://readthedocs.org/projects/pyflow-acdc/badge/?version=latest)](https://pyflow-acdc.readthedocs.io/en/latest/)
 
-A python-based tool for the design and analysis of hybrid AC/DC grids
+A python-based tool for the design and analysis of hybrid AC/DC grids.
 
 
 pyflow-acdc is a program worked on by ADOreD Project by CITCEA-UPC in collaboration with Youwind
@@ -70,8 +70,37 @@ pip install pyflow-acdc
 
 **Requirements:** Python 3.10 or higher
 
+### Quick start
+
+Bundled example grids are registered on ``pyf.cases`` when you import the package:
+
+```python
+import pyflow_acdc as pyf
+
+grid, res = pyf.cases["case24_TEP"]()   # static TEP case with expandable AC lines
+grid, res = pyf.cases["case39_acdc"]()  # hybrid AC/DC OPF case
+```
+
+Factories live under ``pyflow_acdc/example_grids/`` (``PF/``, ``OPF/``, ``TEP/``,
+``Wind_Array/``). See the [usage guide](https://pyflow-acdc.readthedocs.io/en/latest/usage.html)
+for the full case list and keyword arguments (for example ``NS_MTDC_2025``).
+
+To load a MATPOWER / MATACDC case saved as a ``.mat`` file:
+
+```python
+grid, res = pyf.create_grid_from_mat("path/to/case.mat")
+```
+
+TEP-style ``.mat`` files may include expandable elements via keys such as
+``ne_branch`` (AC), ``branchdc_ne`` / ``busdc_ne`` (DC), and ``convdc_ne``
+(converters). Sample files used in tests are under ``pyflow_tests/``.
+
 ### For Users
-To run examples, download the folder to your repository including the csv folders.
+
+Example grids and wind-farm data ship with the installed package. Some cases
+(for example ``NS_MTDC_2025``) also use CSV time series from
+``examples/North_Sea_grid_data/`` in the repository, or from GitHub when
+``online=True``.
 
 ### For Developers
 #### Initial Setup
@@ -254,8 +283,9 @@ pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
 ```
 
 CI uploads coverage to [Codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc) on each
-push/PR to `main` (requires the `CODECOV_TOKEN` repository secret). Per-module
-reports and the coverage badge are maintained there.
+push/PR to `main` (requires the `CODECOV_TOKEN` repository secret). Reports include
+``pyflow_acdc`` package code (including ``example_grids`` factories); ``pyflow_tests/``
+fixtures are excluded. Per-module reports and the coverage badge are maintained there.
 ## Documentation
 Online documentation can be found at:
 
