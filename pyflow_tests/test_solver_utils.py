@@ -83,6 +83,16 @@ def test_is_pyomo_solver_available(monkeypatch):
     assert su.is_pyomo_solver_available("glpk") is False
 
 
+def test_highs_registers_when_highspy_installed():
+    """Codecov installs ``[All]`` (includes highspy); HiGHS must register in Pyomo."""
+    pytest.importorskip("highspy")
+    highs = su.is_pyomo_solver_available("highs")
+    appsi = su.is_pyomo_solver_available("appsi_highs")
+    assert highs or appsi, (
+        "highspy is installed but Pyomo reports neither highs nor appsi_highs available"
+    )
+
+
 def test_check_ortools_backends_import_error(monkeypatch):
     real_import = builtins.__import__
 
