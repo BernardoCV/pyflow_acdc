@@ -7,7 +7,6 @@ import pyomo.environ as pyo
 
 from pyflow_acdc.Array_OPT import _create_master_problem_pyomo
 from pyflow_acdc.constants import MIPBackend
-from pyflow_acdc.solver_utils import is_pyomo_solver_available
 from pyflow_tests._test_solver_deps import (
     pyomo_missing_for_run_test,
     require_pyomo,
@@ -20,15 +19,7 @@ FS = True
 MIP_SOLVER = "highs"
 
 
-def _require_highs_mip_solver():
-    if not is_pyomo_solver_available(MIP_SOLVER):
-        raise RuntimeError(
-            "HiGHS required for unified array Pyomo test "
-            "(pip install highspy / pyflow-acdc[LINEAR_ARRAY])"
-        )
-
-
-def run_case(mip_solver=None, build_only=False):
+def run_case(mip_solver=MIP_SOLVER, build_only=False):
     start_time = time.perf_counter()
     grid, res = pyf.cases[ARRAY_CASE](cab_types_allowed=CT)
     t_mw = grid.RenSources[0].PGi_ren_base * grid.S_base
@@ -64,7 +55,6 @@ def run_case(mip_solver=None, build_only=False):
 
     if mip_solver is None:
         mip_solver = MIP_SOLVER
-        _require_highs_mip_solver()
 
     flag, high_flow, model, feasible_solutions = pyf.MIP_path_graph(
         grid,
@@ -137,8 +127,7 @@ def _print_result(mip_solver, result):
 
 def test_unified_array_pyomo_alpha_ventus():
     require_pyomo()
-    _require_highs_mip_solver()
-    result = run_case(mip_solver=MIP_SOLVER)
+    result = run_case()
     _print_result(MIP_SOLVER, result)
     assert result[0] == "solve"
     assert result[7] is not None
@@ -148,8 +137,7 @@ def test_unified_array_pyomo_alpha_ventus():
 def run_test():
     if pyomo_missing_for_run_test():
         return
-    _require_highs_mip_solver()
-    result = run_case(mip_solver=MIP_SOLVER)
+    result = run_case()
     _print_result(MIP_SOLVER, result)
 
 
