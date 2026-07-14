@@ -75,7 +75,7 @@ OPF = ["pyomo"]
 
 Dash = ["dash"]
 
-LINEAR_ARRAY = ["ortools", "highspy"]
+LINEAR_ARRAY = ["ortools", "highspy==1.14.0"]
 
 TEP_pymoo = ["pymoo",
              "pyomo"]
@@ -92,7 +92,7 @@ All = ["folium",
        "pyomo",
        "dash",
        "ortools",
-       "highspy",
+       "highspy==1.14.0",
        "pymoo",
        "kaleido"]
 
