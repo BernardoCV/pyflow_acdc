@@ -162,6 +162,7 @@ DOCS_CASES = [
     "test_docs_tep_pymoo.py",
     "test_docs_wf_array.py",
     "test_docs_dash.py",
+    "test_docs_L_models.py",
 ]
 
 ALL_CASES = [
@@ -192,8 +193,6 @@ ALL_CASES = [
     "test_plot.py",
     "test_case24_OPF.py",
     "test_case6_TEP_DC.py",
-    "test_case24_TEP.py",
-    "test_case24_REC.py",
     "test_array_sizing.py",
     "test_sequential_array.py",
     "test_sequential_array_ortools.py",
@@ -244,8 +243,6 @@ QUICK_CASES = [
 TEP_CASES = [
     "test_case24_OPF.py",
     "test_case6_TEP_DC.py",
-    "test_case24_TEP.py",
-    "test_case24_REC.py",
     *ARRAY_CASES,
 ]
 
@@ -261,7 +258,5 @@ FULL_OPF_TEP_CASE_MODULES = [
     "pyflow_tests.test_case24_OPF",
     "pyflow_tests.test_case39ac_LOPF",
     "pyflow_tests.test_case6_TEP_DC",
-    "pyflow_tests.test_case24_TEP",
-    "pyflow_tests.test_case24_REC",
     "pyflow_tests.test_array_sizing",
 ]

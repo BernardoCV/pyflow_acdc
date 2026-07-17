@@ -112,14 +112,11 @@ Running multiple scenario based transmission expansion planning
    - Solver statistics
    - TEP time series results
 
-Linear and Sensitivity Utilities
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sensitivity Utilities
+^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: pyflow_acdc.linear_transmission_expansion
-
-   Linearized TEP workflow suitable for faster studies and large sweeps.
-   This is also the Pyomo backend for :func:`~pyflow_acdc.wind_farm_CSS` when
-   ``CSS_L_solver`` is a Pyomo LP/MIP solver (not ``'ortools'``).
+The linear (MILP) TEP driver :func:`~pyflow_acdc.linear_transmission_expansion`
+is documented in :doc:`L_models`.
 
 .. autofunction:: pyflow_acdc.alpha_pareto
 

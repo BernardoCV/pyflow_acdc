@@ -234,6 +234,13 @@ def AC_variables(model,grid,AC_info):
         model.rec_PAC_from = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
         model.rec_PAC_line_loss = pyo.Var(model.lines_AC_rec,initialize=0)
 
+        # Auxiliary (McCormick/big-M) variables carrying the flow of the active
+        # branch state only: rec_z == rec_PAC when that state is active, else 0.
+        # Linearises rec_PAC[state] * indicator(state active) so the node
+        # injection stays linear (same pattern as the CT z_to/z_from vars).
+        model.rec_z_to   = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
+        model.rec_z_from = pyo.Var(model.lines_AC_rec,model.branch_states,bounds=state_based_bounds,initialize=0)
+
     def set_based_bounds(model, line, cab_type):
         # Check if this is a fixed route with no cable selected
         if  grid.lines_AC_ct[line].active_config < 0:
@@ -302,28 +309,104 @@ def AC_constraints(model,grid,AC_info):
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
 
 
-    def toPexp_rule(model,node):
-       nAC = grid.nodes_AC[node]
-       toPexp = sum(model.exp_PAC_to[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_toExpLine)
-       return  model.Pto_Exp[node] ==  toPexp
-    def fromPexp_rule(model,node):
-       nAC = grid.nodes_AC[node]
-       fromPexp = sum(model.exp_PAC_from[l.lineNumber]*model.NumLinesACP[l.lineNumber] for l in nAC.connected_fromExpLine)
-       return  model.Pfrom_Exp[node] ==   fromPexp
-
-
     if grid.TEP_AC:
+        from .ACDC_Static_TEP import get_TEP_variables
+        _tep_vars = get_TEP_variables(grid)
+        NP_lineAC_max = _tep_vars['ac_lines']['NP_lineAC_max']
+
+        # Disjunctive per-circuit big-M linearisation of the integer x continuous
+        # coupling NumLinesACP * exp_PAC_to. Parallel candidates are identical, so
+        # each optional circuit j (beyond the base count) gets a build binary and
+        # its own flow var that is forced to the reference flow exp_PAC_to when
+        # built and to zero otherwise. Base circuits are carried linearly with the
+        # (constant) base count.
+        exp_K = {}
+        exp_circuit_pairs = []
+        for l in model.lines_AC_exp:
+            element = grid.lines_AC_exp[l]
+            K_l = int(round(NP_lineAC_max[l] - NP_lineAC[l])) if element.np_line_opf else 0
+            if K_l < 0:
+                K_l = 0
+            exp_K[l] = K_l
+            for j in range(1, K_l + 1):
+                exp_circuit_pairs.append((l, j))
+
+        model.exp_circuits = pyo.Set(dimen=2, initialize=exp_circuit_pairs)
+        model.exp_build = pyo.Var(model.exp_circuits, domain=pyo.Binary, initialize=0)
+
+        def exp_pcirc_bounds(model, l, j):
+            return (-S_lineACexp_limit[l], S_lineACexp_limit[l])
+        model.exp_p_to   = pyo.Var(model.exp_circuits, bounds=exp_pcirc_bounds, initialize=0)
+        model.exp_p_from = pyo.Var(model.exp_circuits, bounds=exp_pcirc_bounds, initialize=0)
+
+        # Symmetry breaking: build lower-indexed circuits first.
+        def exp_order_rule(model, l, j):
+            if (l, j + 1) in model.exp_circuits:
+                return model.exp_build[l, j] >= model.exp_build[l, j + 1]
+            return pyo.Constraint.Skip
+        model.exp_order_con = pyo.Constraint(model.exp_circuits, rule=exp_order_rule)
+
+        # Tie the build binaries to the integer line count.
+        def exp_count_rule(model, l):
+            return model.NumLinesACP[l] == NP_lineAC[l] + sum(model.exp_build[l, j] for j in range(1, exp_K[l] + 1))
+        model.exp_count_con = pyo.Constraint(model.lines_AC_exp, rule=exp_count_rule)
+
+        def exp_M(l):
+            return 2.0 * S_lineACexp_limit[l]
+
+        # Per-circuit flow: zero unless built (rating), and equal to the reference
+        # flow when built (follow), enforced with big-M.
+        def exp_p_to_rating_ub(model, l, j):
+            return model.exp_p_to[l, j] <= S_lineACexp_limit[l] * model.exp_build[l, j]
+        def exp_p_to_rating_lb(model, l, j):
+            return model.exp_p_to[l, j] >= -S_lineACexp_limit[l] * model.exp_build[l, j]
+        def exp_p_to_follow_ub(model, l, j):
+            return model.exp_p_to[l, j] <= model.exp_PAC_to[l] + exp_M(l) * (1 - model.exp_build[l, j])
+        def exp_p_to_follow_lb(model, l, j):
+            return model.exp_p_to[l, j] >= model.exp_PAC_to[l] - exp_M(l) * (1 - model.exp_build[l, j])
+        def exp_p_from_rating_ub(model, l, j):
+            return model.exp_p_from[l, j] <= S_lineACexp_limit[l] * model.exp_build[l, j]
+        def exp_p_from_rating_lb(model, l, j):
+            return model.exp_p_from[l, j] >= -S_lineACexp_limit[l] * model.exp_build[l, j]
+        def exp_p_from_follow_ub(model, l, j):
+            return model.exp_p_from[l, j] <= model.exp_PAC_from[l] + exp_M(l) * (1 - model.exp_build[l, j])
+        def exp_p_from_follow_lb(model, l, j):
+            return model.exp_p_from[l, j] >= model.exp_PAC_from[l] - exp_M(l) * (1 - model.exp_build[l, j])
+
+        model.exp_p_to_rating_ub_con   = pyo.Constraint(model.exp_circuits, rule=exp_p_to_rating_ub)
+        model.exp_p_to_rating_lb_con   = pyo.Constraint(model.exp_circuits, rule=exp_p_to_rating_lb)
+        model.exp_p_to_follow_ub_con   = pyo.Constraint(model.exp_circuits, rule=exp_p_to_follow_ub)
+        model.exp_p_to_follow_lb_con   = pyo.Constraint(model.exp_circuits, rule=exp_p_to_follow_lb)
+        model.exp_p_from_rating_ub_con = pyo.Constraint(model.exp_circuits, rule=exp_p_from_rating_ub)
+        model.exp_p_from_rating_lb_con = pyo.Constraint(model.exp_circuits, rule=exp_p_from_rating_lb)
+        model.exp_p_from_follow_ub_con = pyo.Constraint(model.exp_circuits, rule=exp_p_from_follow_ub)
+        model.exp_p_from_follow_lb_con = pyo.Constraint(model.exp_circuits, rule=exp_p_from_follow_lb)
+
+        def toPexp_rule(model, node):
+            nAC = grid.nodes_AC[node]
+            return model.Pto_Exp[node] == sum(
+                NP_lineAC[l.lineNumber] * model.exp_PAC_to[l.lineNumber]
+                + sum(model.exp_p_to[l.lineNumber, j] for j in range(1, exp_K[l.lineNumber] + 1))
+                for l in nAC.connected_toExpLine)
+
+        def fromPexp_rule(model, node):
+            nAC = grid.nodes_AC[node]
+            return model.Pfrom_Exp[node] == sum(
+                NP_lineAC[l.lineNumber] * model.exp_PAC_from[l.lineNumber]
+                + sum(model.exp_p_from[l.lineNumber, j] for j in range(1, exp_K[l.lineNumber] + 1))
+                for l in nAC.connected_fromExpLine)
+
         model.exp_Pto_constraint  = pyo.Constraint(model.nodes_AC, rule=toPexp_rule)
         model.exp_Pfrom_constraint= pyo.Constraint(model.nodes_AC, rule=fromPexp_rule)
 
 
     def toPre_rule(model,node):
        nAC = grid.nodes_AC[node]
-       toPre = sum(model.rec_PAC_to[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_to[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_toRepLine)
+       toPre = sum(model.rec_z_to[l.lineNumber,0]+model.rec_z_to[l.lineNumber,1] for l in nAC.connected_toRepLine)
        return  model.Pto_REP[node] ==  toPre
     def fromPre_rule(model,node):
        nAC = grid.nodes_AC[node]
-       fromPre = sum(model.rec_PAC_from[l.lineNumber,0]*(1-model.rec_branch[l.lineNumber])+model.rec_PAC_from[l.lineNumber,1]*model.rec_branch[l.lineNumber] for l in nAC.connected_fromRepLine)
+       fromPre = sum(model.rec_z_from[l.lineNumber,0]+model.rec_z_from[l.lineNumber,1] for l in nAC.connected_fromRepLine)
        return  model.Pfrom_REP[node] ==   fromPre
 
 
@@ -561,11 +644,59 @@ def AC_constraints(model,grid,AC_info):
         else:
             return model.rec_PAC_from[line, 1] >= -S_lineACrec_lim_new[line] - M * (1 - model.rec_branch[line])
 
+    # McCormick/big-M envelopes tying rec_z to the flow of the active state.
+    # State 1 is active when rec_branch == 1, state 0 when rec_branch == 0.
+    def rec_state_active(model, line, state):
+        return model.rec_branch[line] if state == 1 else (1 - model.rec_branch[line])
+
+    def rec_state_rating(line, state):
+        return S_lineACrec_lim_new[line] if state == 1 else S_lineACrec_lim[line]
+
+    def rec_z_to_ub_rule(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        return model.rec_z_to[line, state] <= model.rec_PAC_to[line, state] + (1 - rec_state_active(model, line, state)) * (2*M)
+
+    def rec_z_to_lb_rule(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        return model.rec_z_to[line, state] >= model.rec_PAC_to[line, state] - (1 - rec_state_active(model, line, state)) * (2*M)
+
+    def rec_z_to_branch_ub_rule(model, line, state):
+        return model.rec_z_to[line, state] <= rec_state_rating(line, state) * rec_state_active(model, line, state)
+
+    def rec_z_to_branch_lb_rule(model, line, state):
+        return model.rec_z_to[line, state] >= -rec_state_rating(line, state) * rec_state_active(model, line, state)
+
+    def rec_z_from_ub_rule(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        return model.rec_z_from[line, state] <= model.rec_PAC_from[line, state] + (1 - rec_state_active(model, line, state)) * (2*M)
+
+    def rec_z_from_lb_rule(model, line, state):
+        M = calc_M_rec_linear(model, line)
+        return model.rec_z_from[line, state] >= model.rec_PAC_from[line, state] - (1 - rec_state_active(model, line, state)) * (2*M)
+
+    def rec_z_from_branch_ub_rule(model, line, state):
+        return model.rec_z_from[line, state] <= rec_state_rating(line, state) * rec_state_active(model, line, state)
+
+    def rec_z_from_branch_lb_rule(model, line, state):
+        return model.rec_z_from[line, state] >= -rec_state_rating(line, state) * rec_state_active(model, line, state)
+
     if grid.REC_AC:
         model.rec_S_to_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec_linear)
         model.rec_S_to_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_to_AC_line_rule_rec_linear_neg)
         model.rec_S_from_AC_limit_constraint_upper = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear)
         model.rec_S_from_AC_limit_constraint_lower = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=S_from_AC_limit_rule_rec_linear_neg)
+
+        # McCormick envelopes for rec_z_to
+        model.rec_z_to_ub_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_to_ub_rule)
+        model.rec_z_to_lb_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_to_lb_rule)
+        model.rec_z_to_branch_ub_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_to_branch_ub_rule)
+        model.rec_z_to_branch_lb_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_to_branch_lb_rule)
+
+        # McCormick envelopes for rec_z_from
+        model.rec_z_from_ub_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_from_ub_rule)
+        model.rec_z_from_lb_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_from_lb_rule)
+        model.rec_z_from_branch_ub_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_from_branch_ub_rule)
+        model.rec_z_from_branch_lb_con = pyo.Constraint(model.lines_AC_rec, model.branch_states, rule=rec_z_from_branch_lb_rule)
 
 
 

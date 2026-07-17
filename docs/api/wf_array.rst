@@ -248,7 +248,7 @@ Linear CSS Solver (OR-Tools)
    OR-Tools ``linear_solver`` backend for CSS: one cable type per active CT line,
    Ybus DC balance, optional discounted generator OPEX. Called by ``wind_farm_CSS``
    when ``CSS_L_solver='ortools'``. Route selection is not part of this model.
-   See also :doc:`L_opf` for the Pyomo linear model (which may include TEP/CT
+   See also :doc:`L_models` for the Pyomo linear model (which may include TEP/CT
    network-flow when ``TEP=True``).
 
 **References**
