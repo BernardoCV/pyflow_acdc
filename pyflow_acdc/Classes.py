@@ -40,7 +40,7 @@ __all__ = [
     'Gen_DC',
     'Storage_AC',
     'Storage_DC',
-    'Electrolyzer',
+    'Electrolyser',
     'Ren_Source',
     'Node_AC',
     'Node_DC',
@@ -232,7 +232,7 @@ class Grid:
         self.RenSource_zones_dic={}
         self.RenSources =[]
         self.storage_elements = []
-        self.electrolyzers = []
+        self.electrolysers = []
         self.rs2node = {'DC': {},
                         'AC': {}}
 
@@ -383,8 +383,8 @@ class Grid:
         return len(self.storage_elements) if self.storage_elements is not None else 0
 
     @property
-    def nelectrolyzers(self):
-        return len(self.electrolyzers) if self.electrolyzers is not None else 0
+    def nelectrolysers(self):
+        return len(self.electrolysers) if self.electrolysers is not None else 0
 
     @property
     def tol_scaler(self):
@@ -1763,19 +1763,19 @@ class Storage_DC:
         Storage_DC.names.add(self.name)
 
 
-class Electrolyzer:
-    """Electrolyzer with linear H₂ production and inventory (paper §3.4).
+class Electrolyser:
+    """Electrolyser with linear H₂ production and inventory (paper §3.4).
 
     Single class for AC and DC buses (``connected`` flag, like :class:`Ren_Source`).
-    Active power ``P_electrolyzer`` is a **load**. On AC, optional ``Q_electrolyzer``
+    Active power ``P_electrolyser`` is a **load**. On AC, optional ``Q_electrolyser``
     bounds allow reactive compensation. ``mass_H2`` is in **kg**.
     """
-    electrolyzerNumber = 0
+    electrolyserNumber = 0
     names = set()
 
     @classmethod
     def reset_class(cls):
-        cls.electrolyzerNumber = 0
+        cls.electrolyserNumber = 0
         cls.names = set()
 
     @property
@@ -1796,16 +1796,16 @@ class Electrolyzer:
                 rate = old_S_base / new_S_base
                 self.P_max *= rate
                 self.P_min *= rate
-                self.P_electrolyzer *= rate
+                self.P_electrolyser *= rate
                 if self.connected == AcDcSide.AC:
                     self.Q_min *= rate
                     self.Q_max *= rate
-                    self.Q_electrolyzer *= rate
+                    self.Q_electrolyser *= rate
         self._S_base = new_S_base
 
     @property
     def loading(self):
-        return self.P_electrolyzer / self.P_max * 100 if self.P_max > 0 else 0.0
+        return self.P_electrolyser / self.P_max * 100 if self.P_max > 0 else 0.0
 
     def __init__(
         self,
@@ -1841,8 +1841,8 @@ class Electrolyzer:
         if dt_hours <= 0:
             raise ValueError("dt_hours must be positive")
 
-        self.electrolyzerNumber = Electrolyzer.electrolyzerNumber
-        Electrolyzer.electrolyzerNumber += 1
+        self.electrolyserNumber = Electrolyser.electrolyserNumber
+        Electrolyser.electrolyserNumber += 1
         self.S_base = S_base
         self.connected = connected
 
@@ -1859,12 +1859,12 @@ class Electrolyzer:
             self.Node_AC = node.name
             self.Q_min = Q_min
             self.Q_max = Q_max
-            self.Q_electrolyzer = 0.0
+            self.Q_electrolyser = 0.0
         else:
             self.Node_DC = node.name
             self.Q_min = 0.0
             self.Q_max = 0.0
-            self.Q_electrolyzer = 0.0
+            self.Q_electrolyser = 0.0
 
         self.P_max = P_max
         self.P_min = P_min
@@ -1875,24 +1875,24 @@ class Electrolyzer:
         self.H2_mass_final = H2_mass_final
         self.dt_hours = dt_hours
 
-        self.P_electrolyzer = 0.0
+        self.P_electrolyser = 0.0
         self.mass_H2 = H2_mass_initial
 
-        node.connected_electrolyzer.append(self)
+        node.connected_electrolyser.append(self)
 
-        if name in Electrolyzer.names:
+        if name in Electrolyser.names:
             count = 1
             new_name = f"{name}_{count}"
-            while new_name in Electrolyzer.names:
+            while new_name in Electrolyser.names:
                 count += 1
                 new_name = f"{name}_{count}"
             name = new_name
         if name is None:
-            self._name = f"electrolyzer_{node.name}"
+            self._name = f"electrolyser_{node.name}"
         else:
             self._name = name
 
-        Electrolyzer.names.add(self.name)
+        Electrolyser.names.add(self.name)
 
 
 class Ren_Source:
@@ -2247,7 +2247,7 @@ class Node_AC:
         self.connected_gen=[]
         self.connected_RenSource=[]
         self.connected_storage=[]
-        self.connected_electrolyzer=[]
+        self.connected_electrolyser=[]
 
         self.connected_toExpLine=[]
         self.connected_fromExpLine=[]
@@ -2498,7 +2498,7 @@ class Node_DC:
         self.connected_gen=[]
         self.connected_RenSource=[]
         self.connected_storage=[]
-        self.connected_electrolyzer=[]
+        self.connected_electrolyser=[]
 
         self.PGi_ren = 0
         self.PGi_opt = 0

@@ -183,21 +183,21 @@ DC (`P_DC_node_rule`):
 P_var += PGi_storage_DC[node,t]
 ```
 
-### 2.4 Green hydrogen / electrolyzer (paper §3.4 — **Phase 5**)
+### 2.4 Green hydrogen / electrolyser (paper §3.4 — **Phase 5**)
 
 Reference: paper Eqs. (32)–(36); Mario script lines 608–630, hub nodal balance line 658; Table 1 (PEI parameters).
 
-**Variables (per electrolyzer element `e`, frame `t` when window OPF)**
+**Variables (per electrolyser element `e`, frame `t` when window OPF)**
 
 | Symbol | Pyomo name (proposed) | Unit / base |
 |--------|----------------------|-------------|
-| `P^e_{e,t}` | `P_electrolyzer[e]` | pu on `grid.S_base` (active **load**) |
+| `P^e_{e,t}` | `P_electrolyser[e]` | pu on `grid.S_base` (active **load**) |
 | `M_{e,t}` | `M_H2[e]` | cumulative H₂ inventory **[kg]** (paper `M_t`) |
 | `h_{e,t}` | (auxiliary or inline) | H₂ produced in frame **[kg]** |
 
 **Parameters (class attributes — PEI values from paper Table 1 / Mario)**
 
-| Symbol | `Electrolyzer_AC` attr | Mario / paper |
+| Symbol | `Electrolyser_AC` attr | Mario / paper |
 |--------|------------------------|---------------|
 | `P^e_max` | `P_max` [pu] | 150 MW → pu via `S_base` |
 | `P^e_min` | `P_min` [pu] | 22.5 MW (15 % of nominal) |
@@ -238,10 +238,10 @@ P_min[e] ≤ P_e[e,t] ≤ P_max[e]
 At the connected AC node (Mario node `0` / pyflow `PE_Island`):
 
 ```
-P_var[node] -= P_electrolyzer[e]    # alongside BESS ±P and wind ±P
+P_var[node] -= P_electrolyser[e]    # alongside BESS ±P and wind ±P
 ```
 
-No reactive power term (electrolyzer is active load only).
+No reactive power term (electrolyser is active load only).
 
 **Run modes (mirror BESS)**
 
@@ -505,9 +505,9 @@ def window_opf(
 
 ---
 
-### Phase 5 — Green hydrogen / electrolyzer (NL + `window_nl_opf`)
+### Phase 5 — Green hydrogen / electrolyser (NL + `window_nl_opf`)
 
-**Goal:** Paper-faithful **linear electrolyzer + H₂ inventory** model (§3.4, Eqs. 32–36), co-optimized with BESS and AC/DC OPF on the PEI hub — same element / nodal / window patterns as BESS.
+**Goal:** Paper-faithful **linear electrolyser + H₂ inventory** model (§3.4, Eqs. 32–36), co-optimized with BESS and AC/DC OPF on the PEI hub — same element / nodal / window patterns as BESS.
 
 **References**
 
@@ -518,43 +518,43 @@ def window_opf(
 
 | ID | Topic | Proposal |
 |----|--------|----------|
-| H5-1 | Side | **Single `Electrolyzer` class** (like `Ren_Source`): `connected` AC/DC. AC: optional reactive compensation (`Q_min_MVAR` / `Q_max_MVAR`). DC: `Q` fixed at 0. ✅ Locked |
+| H5-1 | Side | **Single `Electrolyser` class** (like `Ren_Source`): `connected` AC/DC. AC: optional reactive compensation (`Q_min_MVAR` / `Q_max_MVAR`). DC: `Q` fixed at 0. ✅ Locked |
 | H5-2 | State unit | **`mass_H2`** [kg] on element and Pyomo var (not pu). Class caps: `H2_mass_max`, `H2_mass_initial`, `H2_mass_final`. ✅ Locked |
 | H5-3 | `c_h` term | **Locked — paper + reference script:** `h = b_h·P·S_base·dt + c_h` **every frame** (Eqs. 32–33). ✅ |
-| H5-4 | Economics | **Operation only** — no electrolyzer CAPEX (G11). |
+| H5-4 | Economics | **Operation only** — no electrolyser CAPEX (G11). |
 | H5-5 | Horizon | **`window_nl_opf` only** for multi-frame inventory + `H2_mass_final`; snapshot OPF = one frame, no terminal `H2_mass_final`. |
 | H5-6 | `window_block` | Reuse BESS pattern: omit in-block `mass_H2` chain / `H2_mass_final` in snapshot blocks; parent `window_h2_constraints` in `window_nl_opf`. |
-| H5-7 | Grid flag | **`grid.H2`** via `analyse_grid` when `electrolyzers` non-empty. ✅ Locked |
-| H5-8 | API | **`add_electrolyzer(..., H2_mass_max_kg, H2_mass_initial_kg, H2_mass_final_kg, Q_min_MVAR, Q_max_MVAR)`** — AC or DC node. ✅ Locked |
+| H5-7 | Grid flag | **`grid.H2`** via `analyse_grid` when `electrolysers` non-empty. ✅ Locked |
+| H5-8 | API | **`add_electrolyser(..., H2_mass_max_kg, H2_mass_initial_kg, H2_mass_final_kg, Q_min_MVAR, Q_max_MVAR)`** — AC or DC node. ✅ Locked |
 
 #### 5.1 Classes & grid hooks
 
-**New:** `Electrolyzer` in `Classes.py` (AC or DC via ``connected``)
+**New:** `Electrolyser` in `Classes.py` (AC or DC via ``connected``)
 
-- `electrolyzerNumber`, `Node` / `Node_AC` or `Node_DC`, `connected`
+- `electrolyserNumber`, `Node` / `Node_AC` or `Node_DC`, `connected`
 - `P_max`, `P_min` [pu], `b_h` [kg/MWh], `c_h` [kg], `M_max`, `M_initial`, `M_final` [kg], `dt_hours`, `S_base`
-- Post-solve attrs: `P_electrolyzer`, `M_H2`, `h_produced` (optional)
+- Post-solve attrs: `P_electrolyser`, `M_H2`, `h_produced` (optional)
 
 **Grid / nodes**
 
-- `Grid.electrolyzers` (list)
-- `Node_AC.connected_electrolyzer` (list)
-- `analyse_grid`: set `grid.H2 = bool(grid.electrolyzers)` (name TBD at implementation)
+- `Grid.electrolysers` (list)
+- `Node_AC.connected_electrolyser` (list)
+- `analyse_grid`: set `grid.H2 = bool(grid.electrolysers)` (name TBD at implementation)
 
 #### 5.2 Snapshot NL model (`ACDC_OPF_NL_model.py`)
 
 Gate on `grid.H2` (when implemented).
 
 - `hydrogen_variables` / `hydrogen_constraints` (mirror `storage_*`)
-- Vars: `P_electrolyzer`, `M_H2` with bounds
+- Vars: `P_electrolyser`, `M_H2` with bounds
 - Snapshot: one-step inventory from `M_initial` (Param `M_H2_prev` or inline), **no** terminal `M_final`
-- Nodal: `PGi_electrolyzer` or subtract `P_electrolyzer` in `P_AC_node_rule` for connected node
+- Nodal: `PGi_electrolyser` or subtract `P_electrolyser` in `P_AC_node_rule` for connected node
 - Export in `export_acdc_nl_model_to_pyflow_acdc`
 
 #### 5.3 Results
 
-- `Results.ext_electrolyzer()` — snapshot table: Name, Node, P (MW), M_H2 (kg), loading %
-- `Results.hydrogen_window()` — per-frame `M_H2`, `P_electrolyzer` (mirror `storage_window`)
+- `Results.ext_electrolyser()` — snapshot table: Name, Node, P (MW), M_H2 (kg), loading %
+- `Results.hydrogen_window()` — per-frame `M_H2`, `P_electrolyser` (mirror `storage_window`)
 - Wire into `Results.all()` when `window_nl_opf_run` / `grid.H2`
 
 #### 5.4 Coupled window (`window_nl_opf.py`)
@@ -573,7 +573,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 3. Objective unchanged (P4-3) — revenue-only; H₂ quota enforced via `M_final`, not a separate cost term.
 4. Export trajectories → `grid.window_opf_results['hydrogen_M_H2']`, `['hydrogen_P_e']`, etc.
 
-**Exit criteria (Phase 5 v1):** `add_electrolyzer` + NL constraints + `window_nl_opf` parent H₂ links + results tables. **No Mario comparison yet** — that is **Phase 6**. Doc updates → **Concurrent — Documentation** (below). ✅ Done (code + `test_hydrogen_opf.py`).
+**Exit criteria (Phase 5 v1):** `add_electrolyser` + NL constraints + `window_nl_opf` parent H₂ links + results tables. **No Mario comparison yet** — that is **Phase 6**. Doc updates → **Concurrent — Documentation** (below). ✅ Done (code + `test_hydrogen_opf.py`).
 
 ---
 
@@ -581,7 +581,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 **Goal:** One coupled **24 h** `window_nl_opf` on the Princess Elisabeth test system reproducing the Mario paper / reference script — **BESS + hydrogen + exports + revenue** in a single run, not separate BESS-only and H₂-only checks.
 
-**Prerequisites:** Phase 4 (`window_nl_opf`) ✅; **Phase 5** (electrolyzer) for full paper parity. A **BESS-only** subset test may land early while Phase 5 is in progress; **Phase 6 exit** requires the **full** coupled case.
+**Prerequisites:** Phase 4 (`window_nl_opf`) ✅; **Phase 5** (electrolyser) for full paper parity. A **BESS-only** subset test may land early while Phase 5 is in progress; **Phase 6 exit** requires the **full** coupled case.
 
 **Ordering vs Phase 7:** Fixed-window Mario validation (**Phase 6**) **before** rolling horizon (**Phase 7**). Mario is a single 24 h coupled solve; rolling has no paper reference and adds boundary/carry-over complexity — validate the core window first.
 
@@ -603,7 +603,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
    - `P_nom = 0.33` pu, `η_c = 0.85`, `η_d = 0.9`
    - `soc_initial = 0.5`, `soc_final = 0.5` (window terminal @ last frame only)
    - `soc_min = 0.1`, `soc_max = 1.0`
-3. **`add_electrolyzer(grid, 'PE_Island', ...)`** — Mario / Table 1 H₂:
+3. **`add_electrolyser(grid, 'PE_Island', ...)`** — Mario / Table 1 H₂:
    - `P_max = 150` MW, `P_min = 22.5` MW
    - `b_h = 16.0585` kg/MWh, `c_h = 8.2195` kg
    - `M_final` per Mario `MH2_fin = 0.7 · P_h · 24 / ne`, `ne = 58e-3` MWh/kg
@@ -616,7 +616,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 | Quantity | Mario source (script) | Match expectation |
 |----------|----------------------|-------------------|
 | `P_charge[t]`, `P_discharge[t]`, `Q[t]`, `SoC[t]` | `Pb_c`, `Pb_d`, `Qb`, `SoC` (~807–814) | Document Δ; tighten after `S_base` alignment |
-| `P_electrolyzer[t]`, `M_H2[t]` | `Pe_values`, `MH2` (~810–813) | Same |
+| `P_electrolyser[t]`, `M_H2[t]` | `Pe_values`, `MH2` (~810–813) | Same |
 | Export `P` to BE / GB / DK | `P_CA`, `P_CB`, `P_CC` (~817–819) | Qualitative → numeric as grid converges |
 | Total revenue / objective | `benefit_total` (~869–878) | Qualitative first; explain converter / export sign conventions |
 | Terminal SoC / `M_final` | `SoC_fin`, `MH2_fin` constraints | Hard constraints in both models |
@@ -631,7 +631,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 #### 6.4 Exit criteria
 
-- One **24 h coupled** run completes with BESS **and** electrolyzer on `PE_Island`.
+- One **24 h coupled** run completes with BESS **and** electrolyser on `PE_Island`.
 - Validation test committed; all §6.2 rows reported with tolerances or explained deltas.
 - `storage/02_window_nl_opf_pei.py` literalinclude example runs in CI (see **Concurrent — Documentation**).
 
@@ -682,7 +682,7 @@ Out of scope per G2, G11.
 - `.. autofunction:: pyflow_acdc.window_nl_opf`
 - BESS constraint summary (SoC dynamics, S-circle) with cross-ref to usage page
 - Sign convention table (charge / discharge / injection)
-- **Phase 5:** add `docs/api/hydrogen.rst` — `Electrolyzer_AC`, `add_electrolyzer`
+- **Phase 5:** add `docs/api/hydrogen.rst` — `Electrolyser_AC`, `add_electrolyser`
 
 **Update:** `docs/api/grid_mod.rst` — link to `storage.rst` ✅
 
@@ -700,7 +700,7 @@ Sections:
 4. **Results** — `Results.ext_storage`, `Results.storage_window` ✅
 5. **PEI example** — hub bus `PE_Island` (full literalinclude pending **Phase 6**)
 6. **Modelling note** — Useche-Arteaga et al. (2026) §3.3 ✅
-7. **Phase 5:** H₂ usage page or section — §3.4 electrolyzer model
+7. **Phase 5:** H₂ usage page or section — §3.4 electrolyser model
 
 **Literalinclude examples** (under `pyflow_tests/doc_examples/`):
 
@@ -738,11 +738,11 @@ Sections:
 | `grid_analysis.py` | `ESS` flag |
 | `ACDC_OPF_NL_model.py` | Snapshot storage (Phase 2 ✅); `window_block=True` skips in-block SoC boundaries (P4-1a) |
 | `window_opf.py` | **`window_nl_opf`** — frame blocks, parent SoC links ✅; **Phase 5** parent H₂ links ✅ |
-| `Classes.py` (Phase 5) | `Electrolyzer_AC`, `Grid.electrolyzers`, `Node_AC.connected_electrolyzer` ✅ |
-| `grid_modifications.py` (Phase 5) | `add_electrolyzer()` ✅ |
+| `Classes.py` (Phase 5) | `Electrolyser_AC`, `Grid.electrolysers`, `Node_AC.connected_electrolyser` ✅ |
+| `grid_modifications.py` (Phase 5) | `add_electrolyser()` ✅ |
 | `grid_analysis.py` (Phase 5) | `H2` flag ✅ |
 | `ACDC_OPF_NL_model.py` (Phase 5) | `hydrogen_variables` / `hydrogen_constraints`, nodal load hook, export ✅ |
-| `Results_class.py` (Phase 5) | `ext_electrolyzer()`, `hydrogen_window()` ✅ |
+| `Results_class.py` (Phase 5) | `ext_electrolyser()`, `hydrogen_window()` ✅ |
 | `ACDC_OPF.py` | `storage_info` in `translate_pyf_opf`; pass horizon if needed |
 | `Results_class.py` | `ext_storage()`, `storage_window()` |
 | `Time_series.py` | Phase 8 only (deferred myopic TS) |
@@ -792,7 +792,7 @@ If simultaneous charge/discharge appears in results:
 3. Phase 2 — snapshot NL model ✅  
 4. Phase 3 — `Results.ext_storage` + `storage_window` ✅  
 5. Phase 4 — `window_nl_opf` + `window_block` ✅  
-6. **Phase 5 — hydrogen / electrolyzer** ✅  
+6. **Phase 5 — hydrogen / electrolyser** ✅  
 7. **Phase 6 — Mario PEI validation (BESS + H₂ + exports, all together)** ← next  
 8. Phase 7 — rolling window (later)  
 9. Phase 8 — myopic TS (later)  
@@ -809,7 +809,7 @@ If simultaneous charge/discharge appears in results:
 M. Useche-Arteaga, P. Gebraad, V. A. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmunt, *Optimizing the operation of energy islands with predictive nonlinear programming – a case study based on the Princess Elisabeth Energy Island*, Wind Energ. Sci., 11, 349–372, 2026, https://doi.org/10.5194/wes-11-349-2026.
 
 - BESS model: paper §3.3 (Eqs. 24–31) — implemented as `Storage_AC` / `Storage_DC` + NL constraints ✅
-- Hydrogen model: paper §3.4 (Eqs. 32–36) — **Phase 5** (`Electrolyzer_AC`, `add_electrolyzer`)
+- Hydrogen model: paper §3.4 (Eqs. 32–36) — **Phase 5** (`Electrolyser_AC`, `add_electrolyser`)
 - Coupled multi-hour operation: paper §3.5–3.6 — implemented via **`window_nl_opf`** (`window_opf.py`) ✅
 - Local PDF: `mario_implementation/wes-11-349-2026.pdf`
 - Reference implementation: `mario_implementation/18414805/OPF_ACDC_Energy_Islands.py` (BESS ~584–605, H₂ ~608–630, hub balance ~658)

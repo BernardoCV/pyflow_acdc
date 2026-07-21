@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Coupled window NL OPF with BESS and electrolyzer (frame blocks + parent links)."""
+"""Coupled window NL OPF with BESS and electrolyser (frame blocks + parent links)."""
 
 import time
 
@@ -92,10 +92,10 @@ def window_h2_constraints(model, grid, hydrogen_info, frames):
 
     for i, t in enumerate(ordered):
         block = model.frame_model[t]
-        for el in grid.electrolyzers:
-            e = el.electrolyzerNumber
+        for el in grid.electrolysers:
+            e = el.electrolyserNumber
             h_prod = (
-                el.b_h * block.P_electrolyzer[e] * el.S_base * el.dt_hours + el.c_h)
+                el.b_h * block.P_electrolyser[e] * el.S_base * el.dt_hours + el.c_h)
             if i == 0:
                 model.window_h2_constraint.add(
                     block.mass_H2[e] == el.H2_mass_initial + h_prod)
@@ -106,10 +106,10 @@ def window_h2_constraints(model, grid, hydrogen_info, frames):
 
     if ordered:
         t_last = ordered[-1]
-        for el in grid.electrolyzers:
+        for el in grid.electrolysers:
             if el.H2_mass_final is None:
                 continue
-            e = el.electrolyzerNumber
+            e = el.electrolyserNumber
             model.window_h2_constraint.add(
                 model.frame_model[t_last].mass_H2[e] == el.H2_mass_final)
 
@@ -208,17 +208,17 @@ def export_window_opf_results(model, grid, frames):
         'total_objective': np.float64(pyo.value(model.obj)),
     }
 
-    if grid.electrolyzers:
+    if grid.electrolysers:
         rows_m = []
         rows_pe = []
         for t in frames:
             block = model.frame_model[t]
             row_m = {'frame': t}
             row_pe = {'frame': t}
-            for el in grid.electrolyzers:
-                e = el.electrolyzerNumber
+            for el in grid.electrolysers:
+                e = el.electrolyserNumber
                 row_m[el.name] = np.float64(pyo.value(block.mass_H2[e]))
-                row_pe[el.name] = np.float64(pyo.value(block.P_electrolyzer[e])) * grid.S_base
+                row_pe[el.name] = np.float64(pyo.value(block.P_electrolyser[e])) * grid.S_base
             rows_m.append(row_m)
             rows_pe.append(row_pe)
         results['hydrogen_mass_H2'] = pd.DataFrame(rows_m)
@@ -284,7 +284,7 @@ def window_nl_opf(
 
     if not grid.ESS and not grid.H2:
         raise ValueError(
-            "window_nl_opf requires at least one storage or electrolyzer element")
+            "window_nl_opf requires at least one storage or electrolyser element")
 
     if not grid.Time_series:
         raise ValueError("window_nl_opf requires grid.Time_series")

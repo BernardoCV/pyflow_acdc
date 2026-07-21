@@ -1,27 +1,27 @@
-Green hydrogen / electrolyzer
+Green hydrogen / electrolyser
 =============================
 
-Operation-only electrolyzer and H₂ inventory for hybrid AC/DC grids. The
+Operation-only electrolyser and H₂ inventory for hybrid AC/DC grids. The
 formulation follows Useche-Arteaga et al. (2026) [#useche2026]_ (§3.4); see
 :doc:`citing`.
 
-Implemented: :class:`~pyflow_acdc.Electrolyzer`,
-:func:`~pyflow_acdc.add_electrolyzer`, NL OPF when ``grid.H2``,
+Implemented: :class:`~pyflow_acdc.Electrolyser`,
+:func:`~pyflow_acdc.add_electrolyser`, NL OPF when ``grid.H2``,
 :func:`~pyflow_acdc.window_nl_opf` H₂ inventory links, and
-``Results.ext_electrolyzer`` / ``Results.hydrogen_window``.
+``Results.ext_electrolyser`` / ``Results.hydrogen_window``.
 
 Related API: :doc:`api/hydrogen`. BESS (often co-optimized): :doc:`usage_storage`.
 
-Adding an electrolyzer
+Adding an electrolyser
 ----------------------
 
 Elements attach to any **AC** or **DC** bus
-(:attr:`~pyflow_acdc.Node_AC.connected_electrolyzer`,
-:attr:`~pyflow_acdc.Node_DC.connected_electrolyzer`,
-:attr:`~pyflow_acdc.Grid.electrolyzers`). ``analyse_grid`` sets
+(:attr:`~pyflow_acdc.Node_AC.connected_electrolyser`,
+:attr:`~pyflow_acdc.Node_DC.connected_electrolyser`,
+:attr:`~pyflow_acdc.Grid.electrolysers`). ``analyse_grid`` sets
 ``grid.H2`` when the list is non-empty.
 
-- Active power ``P_electrolyzer`` is a **load** (subtracted from nodal injection).
+- Active power ``P_electrolyser`` is a **load** (subtracted from nodal injection).
 - On **AC**, optional reactive compensation via ``Q_min_MVAR`` / ``Q_max_MVAR``
   (generation convention: positive ``Q`` injects vars).
 - On **DC**, ``Q`` is fixed at zero.
@@ -39,7 +39,7 @@ with ``c_h`` applied **every** frame (paper and Mario script).
 The example below is taken from ``pyflow_tests/doc_examples/hydrogen/`` and
 executed by ``test_docs_hydrogen.py``.
 
-.. literalinclude:: ../pyflow_tests/doc_examples/hydrogen/01_add_electrolyzer.py
+.. literalinclude:: ../pyflow_tests/doc_examples/hydrogen/01_add_electrolyser.py
    :language: python
    :lines: 2-
 
@@ -50,7 +50,7 @@ Running OPF
   terminal ``H2_mass_final``.
 - **Coupled** :func:`~pyflow_acdc.window_nl_opf`: parent chain across frames;
   ``H2_mass_final`` enforced on the last frame when set.
-- Results: ``Results.ext_electrolyzer()`` (snapshot) and
+- Results: ``Results.ext_electrolyser()`` (snapshot) and
   ``Results.hydrogen_window()`` after a window solve.
 
 Roadmap
@@ -63,7 +63,7 @@ Roadmap
 +------------------+-----------------------------------------------------------+
 | ``window_nl_opf``| Done — parent H₂ inventory chain                          |
 +------------------+-----------------------------------------------------------+
-| Results          | Done — ``ext_electrolyzer``, ``hydrogen_window``          |
+| Results          | Done — ``ext_electrolyser``, ``hydrogen_window``          |
 +------------------+-----------------------------------------------------------+
 | Coupled case     | Pending — full 24 h BESS + H₂ validation                  |
 +------------------+-----------------------------------------------------------+

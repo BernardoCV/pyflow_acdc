@@ -1516,13 +1516,13 @@ def _migrate_legacy_grid_attrs(grid):
         grid.S_base_ref = grid.S_base
     if not hasattr(grid, 'storage_elements'):
         grid.storage_elements = []
-    if not hasattr(grid, 'electrolyzers'):
-        grid.electrolyzers = []
+    if not hasattr(grid, 'electrolysers'):
+        grid.electrolysers = []
     for node in grid.nodes_AC + grid.nodes_DC:
         if not hasattr(node, 'connected_storage'):
             node.connected_storage = []
-        if not hasattr(node, 'connected_electrolyzer'):
-            node.connected_electrolyzer = []
+        if not hasattr(node, 'connected_electrolyser'):
+            node.connected_electrolyser = []
     for line in (
         grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
         + grid.lines_AC_tf + grid.lines_AC_ct + grid.lines_DC

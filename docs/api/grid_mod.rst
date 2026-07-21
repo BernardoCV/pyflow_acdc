@@ -83,12 +83,12 @@ See :doc:`storage` and :doc:`../usage_storage` for the user guide.
 
 .. autofunction:: pyflow_acdc.add_storage
 
-Add Electrolyzer
+Add Electrolyser
 ^^^^^^^^^^^^^^^^
 
 See :doc:`hydrogen` and :doc:`../usage_hydrogen` for the user guide.
 
-.. autofunction:: pyflow_acdc.add_electrolyzer
+.. autofunction:: pyflow_acdc.add_electrolyser
 
 Bulk Add Generators
 ^^^^^^^^^^^^^^^^^^^

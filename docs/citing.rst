@@ -60,13 +60,13 @@ Castro Valerio, B., Gebraad, P. M. O., Cheah-Mane, M., A. Lacerda, V., and Gomis
 For BESS / hydrogen / energy-island operation:
 
 If you use :class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`,
-:func:`~pyflow_acdc.add_storage`, :class:`~pyflow_acdc.Electrolyzer`,
-:func:`~pyflow_acdc.add_electrolyzer`, or
+:func:`~pyflow_acdc.add_storage`, :class:`~pyflow_acdc.Electrolyser`,
+:func:`~pyflow_acdc.add_electrolyser`, or
 :func:`~pyflow_acdc.window_nl_opf`, please also cite:
 
 M. Useche-Arteaga, P. Gebraad, V. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmunt, *Optimizing the operation of energy islands with predictive nonlinear programming -- a case study based on the Princess Elisabeth Energy Island*, Wind Energy Science, 11(2), 349--372, 2026, https://doi.org/10.5194/wes-11-349-2026.
 
-User guides: :doc:`usage_storage` (BESS, §3.3), :doc:`usage_hydrogen` (electrolyzer, §3.4).
+User guides: :doc:`usage_storage` (BESS, §3.3), :doc:`usage_hydrogen` (electrolyser, §3.4).
 
 .. code-block:: bibtex
 

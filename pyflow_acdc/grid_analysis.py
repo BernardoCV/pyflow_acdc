@@ -299,7 +299,7 @@ def analyse_grid(grid):
     )
     grid.act_gen = any(gen.activate_gen_opf for gen in grid.Generators)
     grid.ESS = bool(grid.storage_elements)
-    grid.H2 = bool(grid.electrolyzers)
+    grid.H2 = bool(grid.electrolysers)
 
     return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
 

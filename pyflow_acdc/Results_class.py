@@ -131,12 +131,12 @@ class Results:
                 self.ext_ren(print_table=print_table)
             if self.Grid.storage_elements:
                 self.ext_storage(print_table=print_table)
-            if self.Grid.electrolyzers:
-                self.ext_electrolyzer(print_table=print_table)
+            if self.Grid.electrolysers:
+                self.ext_electrolyser(print_table=print_table)
             if getattr(self.Grid, "window_opf_run", False):
                 if self.Grid.storage_elements:
                     self.storage_window(print_table=print_table)
-                if self.Grid.electrolyzers:
+                if self.Grid.electrolysers:
                     self.hydrogen_window(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.obj_res(print_table=print_table)
@@ -1446,14 +1446,14 @@ class Results:
 
         return soc_df, summary_df
 
-    def ext_electrolyzer(self, print_table=True):
-        """Report electrolyzer dispatch after snapshot NL OPF."""
+    def ext_electrolyser(self, print_table=True):
+        """Report electrolyser dispatch after snapshot NL OPF."""
         rows = []
         p_tot = 0.0
         m_tot = 0.0
 
-        for el in self.Grid.electrolyzers:
-            p_mw = el.P_electrolyzer * self.Grid.S_base
+        for el in self.Grid.electrolysers:
+            p_mw = el.P_electrolyser * self.Grid.S_base
             m_kg = el.mass_H2
             loading = el.loading
             p_tot += p_mw
@@ -1468,7 +1468,7 @@ class Results:
                 "Loading %": np.round(loading, decimals=self.dec),
             }
             if el.connected == AcDcSide.AC:
-                row["Q (MVAR)"] = np.round(el.Q_electrolyzer * self.Grid.S_base, decimals=self.dec)
+                row["Q (MVAR)"] = np.round(el.Q_electrolyser * self.Grid.S_base, decimals=self.dec)
             else:
                 row["Q (MVAR)"] = "----"
             rows.append(row)
@@ -1486,11 +1486,11 @@ class Results:
 
         columns = ["Name", "Node", "Side", "P (MW)", "Q (MVAR)", "mass_H2 (kg)", "Loading %"]
         df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=columns)
-        self.tables["Ext_electrolyzer"] = df
+        self.tables["Ext_electrolyser"] = df
 
         if print_table:
             print('--------------')
-            print('Electrolyzer / H₂ storage')
+            print('Electrolyser / H₂ storage')
             table = pt()
             table.field_names = columns
             for _, row in df.iterrows():
@@ -1520,7 +1520,7 @@ class Results:
             print('H₂ mass trajectory (kg, by frame)')
             print(m_df.to_string(index=False))
             print('--------------')
-            print('Electrolyzer P (MW, by frame)')
+            print('Electrolyser P (MW, by frame)')
             print(pe_df.to_string(index=False))
 
         return m_df, pe_df

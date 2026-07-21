@@ -1,30 +1,30 @@
-Green hydrogen / electrolyzer
+Green hydrogen / electrolyser
 =============================
 
-:class:`~pyflow_acdc.Electrolyzer` and :func:`~pyflow_acdc.add_electrolyzer`
-attach operation-only electrolyzers to AC or DC buses. Active power is a
+:class:`~pyflow_acdc.Electrolyser` and :func:`~pyflow_acdc.add_electrolyser`
+attach operation-only electrolysers to AC or DC buses. Active power is a
 **load**; inventory ``mass_H2`` is tracked in **kg**. Nonlinear OPF and
 coupled multi-hour H₂ inventory use :func:`~pyflow_acdc.window_nl_opf`.
 
 User guide: :doc:`../usage_hydrogen`.
 
-Electrolyzer class
+Electrolyser class
 ------------------
 
-.. autoclass:: pyflow_acdc.Electrolyzer
+.. autoclass:: pyflow_acdc.Electrolyser
    :members:
    :exclude-members: reset_class
 
-Add electrolyzer
+Add electrolyser
 ----------------
 
-.. autofunction:: pyflow_acdc.add_electrolyzer
+.. autofunction:: pyflow_acdc.add_electrolyser
 
 Modelling note
 --------------
 
 When ``grid.H2`` is true, :mod:`~pyflow_acdc.ACDC_OPF_NL_model` adds
-``P_electrolyzer``, optional AC ``Q_electrolyzer``, and ``mass_H2`` with a
+``P_electrolyser``, optional AC ``Q_electrolyser``, and ``mass_H2`` with a
 one-step inventory balance for snapshot OPF. Multi-hour coupled runs use
 :func:`~pyflow_acdc.window_nl_opf` (parent ``window_h2_constraints``; terminal
 ``H2_mass_final`` when set).

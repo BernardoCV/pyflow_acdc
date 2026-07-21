@@ -359,42 +359,42 @@ def storage_constraints(model, grid, storage_info, window_block=False):
 
 
 def hydrogen_variables(model, grid, hydrogen_info, window_block=False):
-    """Electrolyzer power, optional AC Q, and H₂ mass inventory [kg]."""
+    """Electrolyser power, optional AC Q, and H₂ mass inventory [kg]."""
     if hydrogen_info is None:
         raise ValueError("hydrogen_info is required when grid.H2 is True")
-    lista_electrolyzer, electrolyzer_by_number = hydrogen_info
-    if not lista_electrolyzer:
+    lista_electrolyser, electrolyser_by_number = hydrogen_info
+    if not lista_electrolyser:
         raise ValueError("hydrogen_info is empty but grid.H2 is True")
 
-    model.electrolyzer = pyo.Set(initialize=lista_electrolyzer)
+    model.electrolyser = pyo.Set(initialize=lista_electrolyser)
 
-    def P_electrolyzer_bounds(model, e):
-        el = electrolyzer_by_number[e]
+    def P_electrolyser_bounds(model, e):
+        el = electrolyser_by_number[e]
         return (el.P_min, el.P_max)
 
-    def Q_electrolyzer_bounds(model, e):
-        el = electrolyzer_by_number[e]
+    def Q_electrolyser_bounds(model, e):
+        el = electrolyser_by_number[e]
         if el.connected == AcDcSide.DC:
             return (0, 0)
         return (el.Q_min, el.Q_max)
 
     def mass_H2_bounds(model, e):
-        el = electrolyzer_by_number[e]
+        el = electrolyser_by_number[e]
         return (0, el.H2_mass_max)
 
-    model.P_electrolyzer = pyo.Var(
-        model.electrolyzer, bounds=P_electrolyzer_bounds, initialize=0)
-    model.Q_electrolyzer = pyo.Var(
-        model.electrolyzer, bounds=Q_electrolyzer_bounds, initialize=0)
+    model.P_electrolyser = pyo.Var(
+        model.electrolyser, bounds=P_electrolyser_bounds, initialize=0)
+    model.Q_electrolyser = pyo.Var(
+        model.electrolyser, bounds=Q_electrolyser_bounds, initialize=0)
     model.mass_H2 = pyo.Var(
-        model.electrolyzer,
+        model.electrolyser,
         bounds=mass_H2_bounds,
-        initialize={e: electrolyzer_by_number[e].H2_mass_initial for e in lista_electrolyzer},
+        initialize={e: electrolyser_by_number[e].H2_mass_initial for e in lista_electrolyser},
     )
     if not window_block:
         model.mass_H2_prev = pyo.Param(
-            model.electrolyzer,
-            initialize={e: electrolyzer_by_number[e].H2_mass_initial for e in lista_electrolyzer},
+            model.electrolyser,
+            initialize={e: electrolyser_by_number[e].H2_mass_initial for e in lista_electrolyser},
             mutable=True,
         )
 
@@ -405,17 +405,17 @@ def hydrogen_constraints(model, grid, hydrogen_info, window_block=False):
         return
     if hydrogen_info is None:
         raise ValueError("hydrogen_info is required when grid.H2 is True")
-    lista_electrolyzer, electrolyzer_by_number = hydrogen_info
-    if not lista_electrolyzer:
+    lista_electrolyser, electrolyser_by_number = hydrogen_info
+    if not lista_electrolyser:
         raise ValueError("hydrogen_info is empty but grid.H2 is True")
 
     def mass_h2_balance_rule(model, e):
-        el = electrolyzer_by_number[e]
-        h_prod = el.b_h * model.P_electrolyzer[e] * el.S_base * el.dt_hours + el.c_h
+        el = electrolyser_by_number[e]
+        h_prod = el.b_h * model.P_electrolyser[e] * el.S_base * el.dt_hours + el.c_h
         return model.mass_H2[e] == model.mass_H2_prev[e] + h_prod
 
     model.hydrogen_mass_h2_balance_constraint = pyo.Constraint(
-        model.electrolyzer, rule=mass_h2_balance_rule)
+        model.electrolyser, rule=mass_h2_balance_rule)
 
 
 def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False):
@@ -491,16 +491,16 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False):
         model.QGi_storage = pyo.Var(model.nodes_AC, bounds=Qstorage_bounds, initialize=0)
 
     if grid.H2:
-        def Pelectrolyzer_bounds(model, node):
+        def Pelectrolyser_bounds(model, node):
             nAC = grid.nodes_AC[node]
-            if not nAC.connected_electrolyzer:
+            if not nAC.connected_electrolyser:
                 return (0, 0)
             return (None, None)
 
-        model.PGi_electrolyzer = pyo.Var(
-            model.nodes_AC, bounds=Pelectrolyzer_bounds, initialize=0)
-        model.QGi_electrolyzer = pyo.Var(
-            model.nodes_AC, bounds=Pelectrolyzer_bounds, initialize=0)
+        model.PGi_electrolyser = pyo.Var(
+            model.nodes_AC, bounds=Pelectrolyser_bounds, initialize=0)
+        model.QGi_electrolyser = pyo.Var(
+            model.nodes_AC, bounds=Pelectrolyser_bounds, initialize=0)
 
 
     def PGi_opt_bounds(model, node):
@@ -676,7 +676,7 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
         if grid.ESS:
             P_var += model.PGi_storage[node]
         if grid.H2:
-            P_var -= model.PGi_electrolyzer[node]
+            P_var -= model.PGi_electrolyser[node]
         if grid.DCmode:
             P_var += model.P_conv_AC[node]
         if grid.TEP_AC:
@@ -701,7 +701,7 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
         if grid.ESS:
             Q_var += model.QGi_storage[node]
         if grid.H2:
-            Q_var += model.QGi_electrolyzer[node]
+            Q_var += model.QGi_electrolyser[node]
         if grid.DCmode:
             Q_var += model.Q_conv_AC[node]
         if grid.TEP_AC:
@@ -769,26 +769,26 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
         model.Gen_Qstorage_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_Qstorage_rule)
 
     if grid.H2:
-        def Gen_Pelectrolyzer_rule(model, node):
+        def Gen_Pelectrolyser_rule(model, node):
             nAC = grid.nodes_AC[node]
             p_el = sum(
-                model.P_electrolyzer[e.electrolyzerNumber]
-                for e in nAC.connected_electrolyzer
+                model.P_electrolyser[e.electrolyserNumber]
+                for e in nAC.connected_electrolyser
             )
-            return model.PGi_electrolyzer[node] == p_el
+            return model.PGi_electrolyser[node] == p_el
 
-        def Gen_Qelectrolyzer_rule(model, node):
+        def Gen_Qelectrolyser_rule(model, node):
             nAC = grid.nodes_AC[node]
             q_el = sum(
-                model.Q_electrolyzer[e.electrolyzerNumber]
-                for e in nAC.connected_electrolyzer
+                model.Q_electrolyser[e.electrolyserNumber]
+                for e in nAC.connected_electrolyser
             )
-            return model.QGi_electrolyzer[node] == q_el
+            return model.QGi_electrolyser[node] == q_el
 
-        model.Gen_Pelectrolyzer_constraint = pyo.Constraint(
-            model.nodes_AC, rule=Gen_Pelectrolyzer_rule)
-        model.Gen_Qelectrolyzer_constraint = pyo.Constraint(
-            model.nodes_AC, rule=Gen_Qelectrolyzer_rule)
+        model.Gen_Pelectrolyser_constraint = pyo.Constraint(
+            model.nodes_AC, rule=Gen_Pelectrolyser_rule)
+        model.Gen_Qelectrolyser_constraint = pyo.Constraint(
+            model.nodes_AC, rule=Gen_Qelectrolyser_rule)
 
 
     def toPexp_rule(model,node):
@@ -1388,14 +1388,14 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
             model.nodes_DC, bounds=Pstorage_DC_bounds, initialize=0)
 
     if grid.H2:
-        def Pelectrolyzer_DC_bounds(model, node):
+        def Pelectrolyser_DC_bounds(model, node):
             nDC = grid.nodes_DC[node]
-            if not nDC.connected_electrolyzer:
+            if not nDC.connected_electrolyser:
                 return (0, 0)
             return (None, None)
 
-        model.PGi_electrolyzer_DC = pyo.Var(
-            model.nodes_DC, bounds=Pelectrolyzer_DC_bounds, initialize=0)
+        model.PGi_electrolyser_DC = pyo.Var(
+            model.nodes_DC, bounds=Pelectrolyser_DC_bounds, initialize=0)
 
     def PGi_opt_bounds_DC(model, node):
         nDC = grid.nodes_DC[node]
@@ -1475,7 +1475,7 @@ def DC_constraints(model,grid,TEP=False):
         if grid.ESS:
             P_var += model.PGi_storage_DC[node]
         if grid.H2:
-            P_var -= model.PGi_electrolyzer_DC[node]
+            P_var -= model.PGi_electrolyser_DC[node]
         if grid.ACmode:
             P_var += model.P_conv_DC[node]
         if grid.CDC:
@@ -1496,15 +1496,15 @@ def DC_constraints(model,grid,TEP=False):
         model.Gen_Pstorage_DC_constraint = pyo.Constraint(
             model.nodes_DC, rule=Gen_Pstorage_DC_rule)
     if grid.H2:
-        def Gen_Pelectrolyzer_DC_rule(model, node):
+        def Gen_Pelectrolyser_DC_rule(model, node):
             nDC = grid.nodes_DC[node]
             p_el = sum(
-                model.P_electrolyzer[e.electrolyzerNumber]
-                for e in nDC.connected_electrolyzer
+                model.P_electrolyser[e.electrolyserNumber]
+                for e in nDC.connected_electrolyser
             )
-            return model.PGi_electrolyzer_DC[node] == p_el
-        model.Gen_Pelectrolyzer_DC_constraint = pyo.Constraint(
-            model.nodes_DC, rule=Gen_Pelectrolyzer_DC_rule)
+            return model.PGi_electrolyser_DC[node] == p_el
+        model.Gen_Pelectrolyser_DC_constraint = pyo.Constraint(
+            model.nodes_DC, rule=Gen_Pelectrolyser_DC_rule)
     model.Gen_P_constraint_DC    =pyo.Constraint(model.nodes_DC, rule=Gen_P_rule_DC)
     model.P_DC_node_constraint = pyo.Constraint(model.nodes_DC, rule=P_DC_node_rule)
 
@@ -2560,17 +2560,17 @@ def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
                 storage.P_discharge = P_discharge_dc[s]
                 storage.SoC = soc_dc[s]
 
-    if grid.electrolyzers:
+    if grid.electrolysers:
         P_e_values = {
-            k: np.float64(pyo.value(v)) for k, v in model.P_electrolyzer.items()}
+            k: np.float64(pyo.value(v)) for k, v in model.P_electrolyser.items()}
         Q_e_values = {
-            k: np.float64(pyo.value(v)) for k, v in model.Q_electrolyzer.items()}
+            k: np.float64(pyo.value(v)) for k, v in model.Q_electrolyser.items()}
         mass_h2_values = {
             k: np.float64(pyo.value(v)) for k, v in model.mass_H2.items()}
-        for el in grid.electrolyzers:
-            e = el.electrolyzerNumber
-            el.P_electrolyzer = P_e_values[e]
-            el.Q_electrolyzer = Q_e_values[e]
+        for el in grid.electrolysers:
+            e = el.electrolyserNumber
+            el.P_electrolyser = P_e_values[e]
+            el.Q_electrolyser = Q_e_values[e]
             el.mass_H2 = mass_h2_values[e]
 
     if Price_Zones:

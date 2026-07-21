@@ -21,7 +21,7 @@ from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC,
     Gen_DC, Line_AC, Line_DC, MTDCPrice_Zone, Node_AC, Node_DC,
     OffshorePrice_Zone, Price_Zone, Ren_Source, Ren_source_zone,
-    rec_Line_AC, Size_selection, Storage_AC, Storage_DC, Electrolyzer, TF_Line_AC, TimeSeries,
+    rec_Line_AC, Size_selection, Storage_AC, Storage_DC, Electrolyser, TF_Line_AC, TimeSeries,
 )
 from .constants import (
     SQRT_3,
@@ -68,7 +68,7 @@ __all__ = [
     'add_extgrid',
     'add_RenSource',
     'add_storage',
-    'add_electrolyzer',
+    'add_electrolyser',
     'add_generators',
     'add_cable_option',
     'add_line_sizing',
@@ -1598,7 +1598,7 @@ def add_storage(
     return storage
 
 
-def add_electrolyzer(
+def add_electrolyser(
     grid,
     node,
     *,
@@ -1607,7 +1607,7 @@ def add_electrolyzer(
     b_h,
     c_h,
     H2_mass_max_kg,
-    electrolyzer_name=None,
+    electrolyser_name=None,
     H2_mass_initial_kg=0.0,
     H2_mass_final_kg=None,
     Q_min_MVAR=0.0,
@@ -1615,21 +1615,21 @@ def add_electrolyzer(
     dt_hours=1.0,
     geometry=None,
 ):
-    """Append an electrolyzer to ``grid.electrolyzers``.
+    """Append an electrolyser to ``grid.electrolysers``.
 
     AC nodes: active load plus optional reactive compensation (``Q_min_MVAR`` /
     ``Q_max_MVAR``). DC nodes: active load only.
     """
     node = _look_up_node(grid, node, ac_or_dc="any")
 
-    if electrolyzer_name is None:
-        electrolyzer_name = f"electrolyzer_{node.name}"
+    if electrolyser_name is None:
+        electrolyser_name = f"electrolyser_{node.name}"
 
     s_base = grid.S_base
 
     if node in grid.nodes_AC:
-        electrolyzer = Electrolyzer(
-            electrolyzer_name,
+        electrolyser = Electrolyser(
+            electrolyser_name,
             node,
             AcDcSide.AC,
             P_max=P_max_MW / s_base,
@@ -1645,8 +1645,8 @@ def add_electrolyzer(
             dt_hours=dt_hours,
         )
     else:
-        electrolyzer = Electrolyzer(
-            electrolyzer_name,
+        electrolyser = Electrolyser(
+            electrolyser_name,
             node,
             AcDcSide.DC,
             P_max=P_max_MW / s_base,
@@ -1663,10 +1663,10 @@ def add_electrolyzer(
     if geometry is not None:
         if isinstance(geometry, str):
             geometry = loads(geometry)
-        electrolyzer.geometry = geometry
+        electrolyser.geometry = geometry
 
-    grid.electrolyzers.append(electrolyzer)
-    return electrolyzer
+    grid.electrolysers.append(electrolyser)
+    return electrolyser
 
 
 "Time series data "
