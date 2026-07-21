@@ -72,7 +72,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 
-def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0):
+def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0,build_only=False):
     """Build and solve the linear (DC-style) OPF for ``grid``.
 
     Constructs the linear Pyomo model, minimises the weighted objective, solves
@@ -98,6 +98,10 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
         Enable the solver-progress callback.
     obj_scaling : float, optional
         Divide the objective by this factor for numerical conditioning.
+    build_only : bool, optional
+        Build the Pyomo model, skip the solver, and export initializer values
+        onto ``grid`` so :class:`~pyflow_acdc.Results_class.Results` can run
+        without an LP solver.
 
     Returns
     -------
@@ -148,7 +152,10 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     """
     """
     t3 = time.perf_counter()
-    model_res,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
+    if build_only:
+        model_res, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_res,solver_stats = pyomo_model_solve(model,grid,solver,tee,callback=callback)
 
     t1 = time.perf_counter()
     export_acdc_l_model_to_pyflow_acdc(model, grid)

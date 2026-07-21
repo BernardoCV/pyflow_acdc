@@ -56,7 +56,7 @@ API Documentation
 
    api/pf
    api/opf
-   api/L_opf
+   api/L_models
 
 .. toctree::
    :maxdepth: 3  

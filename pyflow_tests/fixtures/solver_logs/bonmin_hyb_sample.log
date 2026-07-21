@@ -1,0 +1,51 @@
+Solver command line: ['/home/bernardo_cv/miniconda3/envs/pyflow_env/bin/bonmin', '/tmp/tmpx6zxvqy_.pyomo.nl', '-AMPL', 'bonmin.time_limit=300.0', 'bonmin.nlp_failure_behavior=fathom', 'bonmin.algorithm=B-Hyb']
+
+Bonmin 1.8.9 using Cbc 2.10.11 and Ipopt 3.14.16
+bonmin: bonmin.time_limit=300.0
+bonmin.nlp_failure_behavior=fathom
+bonmin.algorithm=B-Hyb
+bonmin.time_limit=300.0
+bonmin.nlp_failure_behavior=fathom
+bonmin.algorithm=B-Hyb
+
+
+******************************************************************************
+This program contains Ipopt, a library for large-scale nonlinear optimization.
+ Ipopt is released as open source code under the Eclipse Public License (EPL).
+         For more information visit https://github.com/coin-or/Ipopt
+******************************************************************************
+
+NLP0012I 
+              Num      Status      Obj             It       time                 Location
+NLP0014I             1         OPT 8.9128342e+09       37 1.184575     build initial OA
+NLP3017W OA on non-convex constraint is very experimental.
+NLP0014I             2         OPT 8.9128342e+09        7 0.224087         FP for MINLP
+Cbc0013I At root node, 0 cuts changed objective from 8.9127596e+09 to 8.9127596e+09 in 1 passes
+Cbc0014I Cut generator 0 (NLP solution based oa cuts) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 1 (Mixed Integer Gomory) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 2 (Mixed Integer Rounding) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 3 (Clique) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 4 (Flow Covers) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 5 (Feasibility Pump for MINLP.) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 6 (Outer Approximation feasibility check.) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0014I Cut generator 7 (Outer Approximation strong branching solution check.) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)
+Cbc0010I After 0 nodes, 1 on tree, 1e+50 best solution, best possible -1.7976931e+308 (8.70 seconds)
+NLP0014I             3         OPT 9.0646922e+09       36 0.936661   check integer sol.
+OA0003I New best feasible of 9.0646922e+09 found after 11.637372 sec and
+Cbc0012I Integer solution of 9.0646922e+09 found by nonlinear program after 11 iterations and 3 nodes (12.00 seconds)
+NLP0014I             4         OPT 8.966962e+09       28 0.720299    NLP relax. for OA
+NLP0014I             5         OPT 8.9935275e+09       28 0.844245    NLP relax. for OA
+NLP0014I             6         OPT 8.9331974e+09       18 0.521008    NLP relax. for OA
+NLP0014I             7         OPT 9.5484786e+09       40 0.948226   check integer sol.
+NLP0014I             8         OPT 9.1061155e+09       38 0.92532    NLP relax. for OA
+NLP0014I             9         OPT 9.5676899e+09       41 0.969168   check integer sol.
+NLP0014I            10         OPT 9.5984677e+09       43 1.074342   check integer sol.
+NLP0014I            11         OPT 9.6126594e+09       41 1.219694   check integer sol.
+Cbc0001I Search completed - best objective 9064692243.083023, took 3398 iterations and 76 nodes (30.26 seconds)
+Cbc0032I Strong branching done 384 times (1348 iterations), fathomed 0 nodes and fixed 0 variables
+Cbc0035I Maximum depth 19, 0 variables fixed on reduced cost
+ NLP solution based oa cuts was tried 5 times and created 19954 cuts of which 0 were active after adding rounds of cuts
+ Outer Approximation feasibility check. was tried 47 times and created 9976 cuts of which 0 were active after adding rounds of cuts
+
+ 	"Finished"
+

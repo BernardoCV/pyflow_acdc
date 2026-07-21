@@ -84,15 +84,18 @@ Included in ``--docs`` (``DOCS_CASES``):
 * ``index/``, ``usage/``, ``tep/`` (static and MS TEP), ``tep_mp/`` (MP TEP and
   MP+MS; **ipopt** full solve, then ``res.all()`` in each example)
 * ``csv_import/``, ``modelling_ac/``, ``modelling_dc/``, ``results/``, ``ts/``,
-  ``clustering/``, ``plotting/``, ``tep_pymoo/``, ``wf_array/``, ``dash/``
+  ``clustering/``, ``plotting/``, ``tep_pymoo/``, ``wf_array/``, ``dash/``,
+  ``L_models/``
 
 ``test_docs_tep.py`` runs ``tep/`` (static :func:`~pyflow_acdc.transmission_expansion`
 and MS :func:`~pyflow_acdc.multi_scenario_TEP` on **ipopt**).
 ``test_docs_tep_mp.py`` runs ``tep_mp/`` (MP and MP+MS examples).
+``test_docs_L_models.py`` runs ``L_models/`` (linear OPF and linear TEP/REC; first
+available LP/MIP solver, else ``build_only``).
 
 Not run by ``--docs`` (no runner, or long / optional solvers):
 
-* ``L_opf/``, ``windfarm_loader/`` — no ``test_docs_*.py`` yet
+* ``windfarm_loader/`` — no ``test_docs_*.py`` yet
 
 Adding a case
 -------------

@@ -145,10 +145,8 @@ def require_ortools():
 
 
 def _first_pyomo_linear_solver():
-    for name in PYOMO_LINEAR_SOLVERS:
-        if pyf.is_pyomo_solver_available(name):
-            return name
-    return None
+    from pyflow_acdc.solver_utils import resolve_pyomo_linear_solver
+    return resolve_pyomo_linear_solver()
 
 
 def pyomo_mip_css_solver_available():

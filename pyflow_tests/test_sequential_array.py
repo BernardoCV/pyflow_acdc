@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Sequential CSS on alpha_ventus (linear and PF loss post-processing)."""
 import time
+from pathlib import Path
 
 import pyflow_acdc as pyf
 import pyomo.environ as pyo
@@ -19,10 +20,22 @@ ARRAY_CASE = "alpha_ventus"
 CT = 3
 TL = 600
 TEE = False
-FS = False
+FS = True
 FLH = 8760
 WACC = 0.02
 L_OPEX = True
+
+
+def _feasible_solution_plots(save_path):
+    plot_dir = Path(save_path) / "sequential_CSS"
+    gap_plots = list(plot_dir.glob("feasible_solutions_*_gap.png"))
+    obj_plots = list(plot_dir.glob("feasible_solutions_*_obj.png"))
+    if len(gap_plots) != 1 or len(obj_plots) != 1:
+        raise AssertionError(
+            f"expected one gap and one obj feasible-solution plot in {plot_dir}, "
+            f"got gap={gap_plots}, obj={obj_plots}"
+        )
+    return gap_plots[0], obj_plots[0]
 
 
 def _format_result(nl_label, result):
@@ -46,7 +59,7 @@ def _format_result(nl_label, result):
     )
 
 
-def run_case(mip_solver=None, css_l_solver=None, *, nl=False):
+def run_case(mip_solver=None, css_l_solver=None, *, nl=False, save_path=None):
     if mip_solver is None or css_l_solver is None:
         mip_solver, css_l_solver = mip_solvers()
 
@@ -68,6 +81,7 @@ def run_case(mip_solver=None, css_l_solver=None, *, nl=False):
         NL=nl,
         tee=TEE,
         fs=FS,
+        save_path=save_path,
     )
     i = len(summary_results["iteration"])
     obj_value = pyo.value(model[1].obj)
@@ -96,20 +110,22 @@ def run_case(mip_solver=None, css_l_solver=None, *, nl=False):
     )
 
 
-def test_sequential_array_alpha_ventus_linear():
+def test_sequential_array_alpha_ventus_linear(tmp_path):
     require_pyomo()
     require_pyomo_mip_css_solvers()
     mip_solver, css_solver = mip_solvers()
-    result = run_case(mip_solver, css_solver, nl=False)
+    result = run_case(mip_solver, css_solver, nl=False, save_path=tmp_path)
     print(_format_result("linear", result))
+    _feasible_solution_plots(tmp_path)
 
 
-def test_sequential_array_alpha_ventus_pf():
+def test_sequential_array_alpha_ventus_pf(tmp_path):
     require_pyomo()
     require_pyomo_mip_css_solvers()
     mip_solver, css_solver = mip_solvers()
-    result = run_case(mip_solver, css_solver, nl=CssMode.PF)
+    result = run_case(mip_solver, css_solver, nl=CssMode.PF, save_path=tmp_path)
     print(_format_result("PF", result))
+    _feasible_solution_plots(tmp_path)
 
 
 def run_test():
@@ -118,9 +134,12 @@ def run_test():
     if pyomo_mip_css_solvers_missing_for_run_test():
         return
     mip_solver, css_solver = mip_solvers()
+    save_path = Path("sequential_CSS_test_output")
+    save_path.mkdir(exist_ok=True)
     for nl, label in ((False, "linear"), (CssMode.PF, "PF")):
-        result = run_case(mip_solver, css_solver, nl=nl)
+        result = run_case(mip_solver, css_solver, nl=nl, save_path=save_path)
         print(_format_result(label, result))
+    _feasible_solution_plots(save_path)
 
 if __name__ == "__main__":
     run_test()

@@ -1,0 +1,28 @@
+{
+  "solver": "bonmin",
+  "feasible_solutions": [],
+  "all_solutions": [
+    [
+      1.070176,
+      8912834200.0,
+      37,
+      1,
+      false
+    ],
+    [
+      1.8761269999999999,
+      9064692200.0,
+      73,
+      2,
+      false
+    ],
+    [
+      300.73,
+      1e+50,
+      5104,
+      2,
+      false
+    ]
+  ],
+  "bound_solutions": []
+}

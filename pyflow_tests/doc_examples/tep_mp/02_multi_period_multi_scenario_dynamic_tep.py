@@ -13,20 +13,12 @@ grid, res = pyf.cases["NS_MTDC_2025"](years_data="23,24", expandable="mp", onlin
 mp_load_series = list(grid.Price_Zones[0].investment_decisions["Load"])
 
 model, model_results, timing_info, solver_stats, ts_results = pyf.multi_period_MS_TEP(
-
     grid,
-
     inv_periods=mp_load_series,
-
     ObjRule={"PZ_cost_of_generation": 1},
-
     clustering_options=north_sea_ms_clustering_options(),
-
     solver="ipopt",
-
     tee=True,
-
     build_only=build_only,
-
 )
 
