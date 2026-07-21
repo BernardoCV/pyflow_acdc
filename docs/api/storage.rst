@@ -1,0 +1,36 @@
+Battery energy storage
+======================
+
+:class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`, and
+:func:`~pyflow_acdc.add_storage` attach operation-only BESS elements to AC or
+DC buses. The nonlinear OPF extension and
+:func:`~pyflow_acdc.window_opf` are described in the
+`integration plan
+<https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
+
+User guide: :doc:`../usage_storage`.
+
+Storage class
+-------------
+
+.. autoclass:: pyflow_acdc.Storage_AC
+   :members:
+   :exclude-members: reset_class
+
+.. autoclass:: pyflow_acdc.Storage_DC
+   :members:
+   :exclude-members: reset_class
+
+Add storage
+-----------
+
+.. autofunction:: pyflow_acdc.add_storage
+
+Modelling note
+--------------
+
+The intended BESS constraints (SoC dynamics and apparent-power circle per
+element) follow Useche-Arteaga et al. (2026) [#useche2026]_. See :doc:`../citing`
+for the BibTeX entry.
+
+.. [#useche2026] M. Useche-Arteaga, P. Gebraad, V. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmunt: *Optimizing the operation of energy islands with predictive nonlinear programming -- a case study based on the Princess Elisabeth Energy Island*, Wind Energy Science, 11(2), 349--372, 2026, https://doi.org/10.5194/wes-11-349-2026

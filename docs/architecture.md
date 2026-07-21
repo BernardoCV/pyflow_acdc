@@ -31,8 +31,8 @@ everything else builds on.
   and shared helpers (`present_value_factor`, `default_obj_weights`).
   Owns: magic-value/string centralisation. Does not own: any grid logic.
 - **`Classes.py`** — The data model: `Grid` plus element classes
-  (`Node_AC/DC`, `Line_AC/DC`, `AC_DC_converter`, `Gen_AC/DC`, `Ren_Source`,
-  `Price_Zone` and subclasses, `TimeSeries`, cable/sizing helpers). Owns
+  (`Node_AC/DC`, `Line_AC/DC`, `AC_DC_converter`, `Gen_AC/DC`, `Storage_AC/DC`,
+  `Ren_Source`, `Price_Zone` and subclasses, `TimeSeries`, cable/sizing helpers). Owns
   per-object state and derived electrical quantities (e.g. `Ybus`).
 - **`grid_creator.py`** — Build a `Grid` from data tables, MATPOWER `.mat`
   files, pickles, or a turbine graph. Owns import/parsing.

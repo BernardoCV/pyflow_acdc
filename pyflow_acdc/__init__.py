@@ -38,10 +38,15 @@ __all__ = [
     'add_line_DC',
     'add_ACDC_converter',
     'add_DCDC_converter',
+    'Gen_AC',
+    'Gen_DC',
+    'Storage_AC',
+    'Storage_DC',
     'add_gen',
     'add_gen_DC',
     'add_extgrid',
     'add_RenSource',
+    'add_storage',
     'add_generators',
 
     # Add Zones

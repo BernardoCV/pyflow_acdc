@@ -120,6 +120,7 @@ Workflow guides
    :maxdepth: 1
 
    usage_opf
+   usage_storage
    usage_tep
    usage_mp_tep
    usage_wf_array

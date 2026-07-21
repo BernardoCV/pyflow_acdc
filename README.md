@@ -125,6 +125,10 @@ This installs the package in "editable" mode, allowing you to modify the code wi
 
 #### Making Changes
 
+**BESS integration:** user guide [docs/usage_storage.rst](docs/usage_storage.rst),
+API [docs/api/storage.rst](docs/api/storage.rst),
+roadmap [docs/plans/bess_integration_plan.md](docs/plans/bess_integration_plan.md).
+
 1. Create a new branch for your changes:
 ```bash
 git checkout -b new-branch-name

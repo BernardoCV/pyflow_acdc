@@ -21,7 +21,7 @@ from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC,
     Gen_DC, Line_AC, Line_DC, MTDCPrice_Zone, Node_AC, Node_DC,
     OffshorePrice_Zone, Price_Zone, Ren_Source, Ren_source_zone,
-    rec_Line_AC, Size_selection, TF_Line_AC, TimeSeries,
+    rec_Line_AC, Size_selection, Storage_AC, Storage_DC, TF_Line_AC, TimeSeries,
 )
 from .constants import (
     SQRT_3,
@@ -67,6 +67,7 @@ __all__ = [
     'add_gen_DC',
     'add_extgrid',
     'add_RenSource',
+    'add_storage',
     'add_generators',
     'add_cable_option',
     'add_line_sizing',
@@ -1476,6 +1477,125 @@ def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=N
             assign_nodeToPrice_Zone(grid, node.name, price_zone, ACDC)
 
     return rensource
+
+
+def add_storage(
+    grid,
+    node,
+    *,
+    E_max_MWh,
+    P_charge_MW,
+    P_discharge_MW,
+    eta_charge,
+    eta_discharge,
+    storage_name=None,
+    S_max_MVA=None,
+    soc_min=0.0,
+    soc_max=1.0,
+    soc_initial=0.5,
+    soc_final=None,
+    dt_hours=1.0,
+    geometry=None,
+):
+    """Append a BESS element to ``grid.storage_elements``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_AC, Node_DC, or str
+        Connection bus.
+    E_max_MWh : float
+        Energy capacity in MWh.
+    P_charge_MW : float
+        Maximum charging power in MW.
+    P_discharge_MW : float
+        Maximum discharging power in MW.
+    eta_charge : float
+        Charging efficiency in (0, 1].
+    eta_discharge : float
+        Discharging efficiency in (0, 1].
+    storage_name : str, optional
+        Element name; defaults to ``'storage_<node>'``.
+    S_max_MVA : float, optional
+        AC: apparent-power rating in MVA (default ``max(P_charge_MW, P_discharge_MW)``).
+        DC: max active-power rating in MW (same default).
+    soc_min, soc_max : float, optional
+        SoC bounds in pu.
+    soc_initial : float, optional
+        Initial SoC in pu.
+    soc_final : float or None, optional
+        Terminal SoC in pu for horizon OPF.
+    dt_hours : float, optional
+        Timestep duration in hours.
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+
+    Returns
+    -------
+    Storage_AC or Storage_DC
+        Created storage element.
+
+    Examples
+    --------
+    >>> storage = pyf.add_storage(
+    ...     grid, 'PE_Island', E_max_MWh=100, P_charge_MW=33, P_discharge_MW=33,
+    ...     eta_charge=0.85, eta_discharge=0.9, soc_initial=0.5, soc_final=0.5)
+    """
+    node = _look_up_node(grid, node, ac_or_dc="any")
+
+    if storage_name is None:
+        storage_name = f"storage_{node.name}"
+
+    p_max_mw = max(P_charge_MW, P_discharge_MW)
+    if S_max_MVA is None:
+        S_max_MVA = p_max_mw
+
+    if node in grid.nodes_AC:
+        storage = Storage_AC(
+            storage_name,
+            node,
+            E_max=E_max_MWh,
+            P_charge_max=P_charge_MW / grid.S_base,
+            P_discharge_max=P_discharge_MW / grid.S_base,
+            S_max=S_max_MVA / grid.S_base,
+            eta_charge=eta_charge,
+            eta_discharge=eta_discharge,
+            soc_min=soc_min,
+            soc_max=soc_max,
+            soc_initial=soc_initial,
+            soc_final=soc_final,
+            S_base=grid.S_base,
+            dt_hours=dt_hours,
+        )
+    elif node in grid.nodes_DC:
+        storage = Storage_DC(
+            storage_name,
+            node,
+            E_max=E_max_MWh,
+            P_charge_max=P_charge_MW / grid.S_base,
+            P_discharge_max=P_discharge_MW / grid.S_base,
+            P_max=S_max_MVA / grid.S_base,
+            eta_charge=eta_charge,
+            eta_discharge=eta_discharge,
+            soc_min=soc_min,
+            soc_max=soc_max,
+            soc_initial=soc_initial,
+            soc_final=soc_final,
+            S_base=grid.S_base,
+            dt_hours=dt_hours,
+        )
+    else:
+        raise ValueError(f"Node {node.name!r} is not in AC or DC nodes")
+
+    if geometry is not None:
+        if isinstance(geometry, str):
+            geometry = loads(geometry)
+        storage.geometry = geometry
+
+    grid.storage_elements.append(storage)
+    return storage
+
 
 "Time series data "
 

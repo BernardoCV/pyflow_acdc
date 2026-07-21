@@ -76,6 +76,15 @@ Add Renewable Source
 
 .. autofunction:: pyflow_acdc.add_RenSource
 
+Add Battery Storage
+^^^^^^^^^^^^^^^^^^^
+
+See :doc:`storage` and :doc:`../usage_storage` for the user guide and
+`integration plan
+<https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
+
+.. autofunction:: pyflow_acdc.add_storage
+
 Bulk Add Generators
 ^^^^^^^^^^^^^^^^^^^
 
