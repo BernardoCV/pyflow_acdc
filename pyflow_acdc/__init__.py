@@ -150,8 +150,13 @@ try:
     __all__.extend([
         'optimal_pf', 'optimal_l_pf', 'pyomo_model_solve', 'opf_obj', 'opf_line_res',
         'opf_price_price_zone', 'translate_pyf_opf',
-        'ts_acdc_opf', 'results_ts_opf'
+        'ts_acdc_opf', 'results_ts_opf',
     ])
+    try:
+        from .window_opf import window_nl_opf
+        __all__.append('window_nl_opf')
+    except ImportError:
+        pass
     HAS_OPF = True
 
     # ACDC_Static_TEP also requires OPF/pyomo

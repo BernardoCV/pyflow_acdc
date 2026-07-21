@@ -61,7 +61,7 @@ For BESS / energy-island operation:
 
 If you use :class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`,
 :func:`~pyflow_acdc.add_storage`, or
-(future) :func:`~pyflow_acdc.window_opf`, please also cite:
+(future) :func:`~pyflow_acdc.window_nl_opf`, please also cite:
 
 M. Useche-Arteaga, P. Gebraad, V. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmunt, *Optimizing the operation of energy islands with predictive nonlinear programming -- a case study based on the Princess Elisabeth Energy Island*, Wind Energy Science, 11(2), 349--372, 2026, https://doi.org/10.5194/wes-11-349-2026.
 

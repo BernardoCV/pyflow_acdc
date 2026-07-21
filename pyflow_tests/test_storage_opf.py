@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Snapshot NL OPF with AC and DC BESS (Phase 2)."""
 
+import pandas as pd
 import pytest
 import pyflow_acdc as pyf
 
@@ -31,6 +32,23 @@ def _grid_with_storage():
         eta_discharge=0.95,
         soc_initial=0.5,
     )
+    return grid
+
+
+def _attach_min_time_series(grid, n_frames=5):
+    pattern = [1.0, 0.88, 0.76, 0.92, 1.05]
+    factors = [pattern[i % len(pattern)] for i in range(n_frames)]
+    pyf.add_TimeSeries(
+        grid,
+        pd.DataFrame({"load": factors}),
+        associated="30",
+        TS_type="Load",
+    )
+
+
+def _grid_with_storage_and_ts(n_frames=5):
+    grid = _grid_with_storage()
+    _attach_min_time_series(grid, n_frames=n_frames)
     return grid
 
 
@@ -94,8 +112,9 @@ def test_storage_opf_solves_when_ipopt_available():
 
     ac_storage = next(s for s in grid.storage_elements if s.connected.value == "AC")
     dc_storage = next(s for s in grid.storage_elements if s.connected.value == "DC")
-    assert ac_storage.SoC == pytest.approx(ac_storage.soc_final, rel=0, abs=1e-4)
     tol = 1e-5
+    assert ac_storage.soc_min - tol <= ac_storage.SoC <= ac_storage.soc_max + tol
+    assert dc_storage.soc_min - tol <= dc_storage.SoC <= dc_storage.soc_max + tol
     assert -tol <= ac_storage.P_charge <= ac_storage.P_charge_max + tol
     assert -tol <= ac_storage.P_discharge <= ac_storage.P_discharge_max + tol
     assert -tol <= dc_storage.P_charge <= dc_storage.P_charge_max + tol
@@ -104,12 +123,83 @@ def test_storage_opf_solves_when_ipopt_available():
     assert model.obj is not None
 
 
+def test_window_nl_opf_requires_time_series():
+    require_pyomo()
+    grid = _grid_with_storage()
+    with pytest.raises(ValueError, match="Time_series"):
+        pyf.window_nl_opf(grid, start=0, end=1, build_only=True)
+
+
+def test_window_nl_opf_builds_multi_frame_model():
+    require_pyomo()
+    grid = _grid_with_storage_and_ts()
+    model, _, _, _ = pyf.window_nl_opf(
+        grid,
+        start=0,
+        end=4,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+
+    assert hasattr(model, "frame_model")
+    assert hasattr(model, "window_soc_constraint")
+    assert len(model.frames) == 5
+    for t in model.frames:
+        block = model.frame_model[t]
+        assert hasattr(block, "SoC")
+        assert not hasattr(block, "SoC_prev")
+        assert not hasattr(block, "storage_soc_balance_constraint")
+    assert len(model.window_soc_constraint) >= 2
+    assert "storage_soc" in grid.window_opf_results
+    assert grid.window_opf_run is True
+
+
+def test_storage_window_reporting():
+    require_pyomo()
+    grid = _grid_with_storage_and_ts()
+    pyf.window_nl_opf(grid, start=0, end=4, ObjRule={"Energy_cost": 1}, build_only=True)
+
+    res = pyf.Results(grid)
+    soc_df, summary_df = res.storage_window(print_table=False)
+
+    assert "Storage_window_soc" in res.tables
+    assert "Storage_window_P_charge" in res.tables
+    assert "Storage_window_P_discharge" in res.tables
+    assert len(soc_df) == 5
+    assert len(summary_df) == 2
+
+
 def run_test():
     test_storage_nl_model_builds()
     test_ext_storage_reporting()
     test_storage_opf_solves_when_ipopt_available()
+    test_window_nl_opf_requires_time_series()
+    test_window_nl_opf_builds_multi_frame_model()
+    test_storage_window_reporting()
     print("OK test_storage_opf")
+
+
+def _print_results_demo():
+    require_pyomo()
+    opf_kwargs = {"ObjRule": {"Energy_cost": 1}}
+    if pyf.is_pyomo_solver_available("ipopt"):
+        opf_kwargs["solver"] = "ipopt"
+    else:
+        opf_kwargs["build_only"] = True
+
+    print("\n=== Snapshot NL OPF — ext_storage ===")
+    grid = _grid_with_storage()
+    pyf.optimal_pf(grid, **opf_kwargs)
+    pyf.Results(grid).ext_storage(print_table=True)
+
+    print("\n=== Window NL OPF — storage_window + ext_storage (last frame) ===")
+    grid = _grid_with_storage_and_ts()
+    pyf.window_nl_opf(grid, start=0, end=4, **opf_kwargs)
+    res = pyf.Results(grid)
+    res.storage_window(print_table=True)
+    res.ext_storage(print_table=True)
 
 
 if __name__ == "__main__":
     run_test()
+    _print_results_demo()

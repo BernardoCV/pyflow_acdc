@@ -131,6 +131,8 @@ class Results:
                 self.ext_ren(print_table=print_table)
             if self.Grid.storage_elements:
                 self.ext_storage(print_table=print_table)
+            if getattr(self.Grid, "window_opf_run", False):
+                self.storage_window(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.obj_res(print_table=print_table)
             if self.Grid.Price_Zones != []:
@@ -1402,6 +1404,42 @@ class Results:
             print(table)
 
         return df
+
+    def storage_window(self, print_table=True):
+        """Report BESS trajectories after coupled ``window_nl_opf``."""
+        if not getattr(self.Grid, "window_opf_run", False):
+            raise RuntimeError("window_nl_opf has not been run on this grid")
+
+        results = self.Grid.window_opf_results
+        soc_df = results['storage_soc'].copy()
+        pc_df = results['storage_P_charge'].copy()
+        pd_df = results['storage_P_discharge'].copy()
+        summary_df = results['storage_summary'].copy()
+
+        for df in (soc_df, pc_df, pd_df, summary_df):
+            numeric_cols = df.select_dtypes(include='number').columns
+            df[numeric_cols] = df[numeric_cols].round(self.dec)
+
+        self.tables["Storage_window_soc"] = soc_df
+        self.tables["Storage_window_P_charge"] = pc_df
+        self.tables["Storage_window_P_discharge"] = pd_df
+        self.tables["Storage_window_summary"] = summary_df
+
+        if print_table:
+            print('--------------')
+            print('BESS window SoC trajectory (pu, by frame)')
+            print(soc_df.to_string(index=False))
+            print('--------------')
+            print('BESS window P charge (MW, by frame)')
+            print(pc_df.to_string(index=False))
+            print('--------------')
+            print('BESS window P discharge (MW, by frame)')
+            print(pd_df.to_string(index=False))
+            print('--------------')
+            print('BESS window energy summary')
+            print(summary_df.to_string(index=False))
+
+        return soc_df, summary_df
 
     def clustering_results(self, print_table=True):
         self.clustering_time_series_statistics()

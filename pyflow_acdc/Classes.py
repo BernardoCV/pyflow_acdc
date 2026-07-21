@@ -291,6 +291,7 @@ class Grid:
         self.MP_MS_TEP_run = False
         self.Seq_STEP_run = False
         self.Seq_MS_STEP_run = False
+        self.window_opf_run = False
 
     @property
     def nodes_AC(self):

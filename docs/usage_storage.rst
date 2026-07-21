@@ -6,7 +6,7 @@ follows Useche-Arteaga et al. (2026) [#useche2026]_ (§3.3); see :doc:`citing`.
 
 **Status:** Phase 1 is implemented (:class:`~pyflow_acdc.Storage_AC`,
 :class:`~pyflow_acdc.Storage_DC`, :func:`~pyflow_acdc.add_storage`). Nonlinear OPF constraints, coupled
-:func:`~pyflow_acdc.window_opf`, and results export are tracked in the
+:func:`~pyflow_acdc.window_nl_opf`, and results export are tracked in the
 `BESS integration plan
 <https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
 
@@ -54,7 +54,7 @@ Roadmap
 | NL OPF model     | SoC dynamics and S-circle per storage element in          |
 |                  | :mod:`pyflow_acdc.ACDC_OPF_NL_model`                      |
 +------------------+-----------------------------------------------------------+
-| ``window_opf``   | Coupled multi-hour nonlinear OPF (paper-faithful horizon)   |
+| ``window_nl_opf``   | Coupled multi-hour nonlinear OPF (paper-faithful horizon)   |
 +------------------+-----------------------------------------------------------+
 | Results          | ``Results.ext_storage`` and window time-series tables     |
 +------------------+-----------------------------------------------------------+

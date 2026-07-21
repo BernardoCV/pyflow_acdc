@@ -18,7 +18,7 @@ __all__ = [
 ]
 
 
-def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None):
+def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_rate=True,n_init_install=None,window_block=False):
     """Populate ``model`` with the non-linear AC/DC OPF formulation.
 
     Adds the variables and constraints for the full non-linear AC/DC OPF (bus
@@ -44,6 +44,11 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
     n_init_install : optional
         Number of pre-installed parallel circuits for TEP, when applicable.
 
+    window_block : bool, optional
+        When ``True``, build a snapshot block for coupled ``window_nl_opf`` hours:
+        omit in-block SoC balance / ``SoC_prev`` (parent ``window_soc_links`` owns
+        boundaries, dynamics, and optional terminal ``soc_final``).
+
     Examples
     --------
     >>> import pyomo.environ as pyo
@@ -67,7 +72,7 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
     Generation_variables(model,grid,gen_info,TEP)
 
     if grid.ESS:
-        storage_variables(model, grid, storage_info)
+        storage_variables(model, grid, storage_info, window_block=window_block)
 
     if grid.ACmode:
         AC_variables(model,grid,AC_info,PV_set,limit_flow_rate,TEP,storage_info)
@@ -77,9 +82,6 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
 
     if grid.DCmode and grid.ACmode:
         Converter_variables(model,grid,Conv_info,TEP)
-
-    if grid.ESS:
-        storage_constraints(model, grid, storage_info)
 
     if TEP:
         TEP_variables(model,grid,n_init_install=n_init_install)
@@ -91,6 +93,9 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
         price_zone_constraints(model,grid,Price_Zone_info)
     else:
         price_zone_parameters(model,grid,AC_info,DC_info,gen_info)
+        
+    if grid.ESS:
+        storage_constraints(model, grid, storage_info, window_block=window_block)
 
     if grid.ACmode:
         AC_constraints(model,grid,AC_info,limit_flow_rate,TEP,storage_info)
@@ -202,7 +207,7 @@ def Generation_variables(model,grid,gen_info,TEP):
             model.PGi_gen_DC = pyo.Var(model.gen_DC,bounds=P_Gen_bounds_DC, initialize=P_gen_ini_DC)
 
 
-def storage_variables(model, grid, storage_info):
+def storage_variables(model, grid, storage_info, window_block=False):
     """BESS element variables (charge, discharge, SoC, Q on AC only)."""
     lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number = storage_info
     storage_ac = storage_ac_by_number
@@ -235,11 +240,12 @@ def storage_variables(model, grid, storage_info):
             bounds=soc_bounds,
             initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
         )
-        model.SoC_prev = pyo.Param(
-            model.storage_AC,
-            initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
-            mutable=True,
-        )
+        if not window_block:
+            model.SoC_prev = pyo.Param(
+                model.storage_AC,
+                initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
+                mutable=True,
+            )
 
     if lista_storage_dc:
         model.storage_DC = pyo.Set(initialize=lista_storage_dc)
@@ -263,42 +269,35 @@ def storage_variables(model, grid, storage_info):
             bounds=soc_DC_bounds,
             initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
         )
-        model.SoC_prev_DC = pyo.Param(
-            model.storage_DC,
-            initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
-            mutable=True,
-        )
+        if not window_block:
+            model.SoC_prev_DC = pyo.Param(
+                model.storage_DC,
+                initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
+                mutable=True,
+            )
 
 
-def storage_constraints(model, grid, storage_info):
-    """BESS SoC balance, terminal SoC, and element-level power limits."""
+def storage_constraints(model, grid, storage_info, window_block=False):
+    """BESS SoC balance (snapshot only), and element-level power limits."""
     _, _, storage_ac_by_number, storage_dc_by_number = storage_info
     storage_ac = storage_ac_by_number
     storage_dc = storage_dc_by_number
 
     if storage_ac:
-        def soc_balance_rule(model, s):
-            st = storage_ac[s]
-            scale = st.dt_hours * st.S_base / st.E_max
-            return model.SoC[s] == (
-                model.SoC_prev[s]
-                + scale * (
-                    st.eta_charge * model.P_storage_charge[s]
-                    - model.P_storage_discharge[s] / st.eta_discharge
+        if not window_block:
+            def soc_balance_rule(model, s):
+                st = storage_ac[s]
+                scale = st.dt_hours * st.S_base / st.E_max
+                return model.SoC[s] == (
+                    model.SoC_prev[s]
+                    + scale * (
+                        st.eta_charge * model.P_storage_charge[s]
+                        - model.P_storage_discharge[s] / st.eta_discharge
+                    )
                 )
-            )
 
-        model.storage_soc_balance_constraint = pyo.Constraint(
-            model.storage_AC, rule=soc_balance_rule)
-
-        def soc_final_rule(model, s):
-            st = storage_ac[s]
-            if st.soc_final is None:
-                return pyo.Constraint.Skip
-            return model.SoC[s] == st.soc_final
-
-        model.storage_soc_final_constraint = pyo.Constraint(
-            model.storage_AC, rule=soc_final_rule)
+            model.storage_soc_balance_constraint = pyo.Constraint(
+                model.storage_AC, rule=soc_balance_rule)
 
         # G6: charge and discharge are separate vars; overlap is allowed for now.
         def S_storage_AC_limit_rule(model, s):
@@ -310,28 +309,20 @@ def storage_constraints(model, grid, storage_info):
             model.storage_AC, rule=S_storage_AC_limit_rule)
 
     if storage_dc:
-        def soc_balance_DC_rule(model, s):
-            st = storage_dc[s]
-            scale = st.dt_hours * st.S_base / st.E_max
-            return model.SoC_DC[s] == (
-                model.SoC_prev_DC[s]
-                + scale * (
-                    st.eta_charge * model.P_storage_charge_DC[s]
-                    - model.P_storage_discharge_DC[s] / st.eta_discharge
+        if not window_block:
+            def soc_balance_DC_rule(model, s):
+                st = storage_dc[s]
+                scale = st.dt_hours * st.S_base / st.E_max
+                return model.SoC_DC[s] == (
+                    model.SoC_prev_DC[s]
+                    + scale * (
+                        st.eta_charge * model.P_storage_charge_DC[s]
+                        - model.P_storage_discharge_DC[s] / st.eta_discharge
+                    )
                 )
-            )
 
-        model.storage_soc_balance_DC_constraint = pyo.Constraint(
-            model.storage_DC, rule=soc_balance_DC_rule)
-
-        def soc_final_DC_rule(model, s):
-            st = storage_dc[s]
-            if st.soc_final is None:
-                return pyo.Constraint.Skip
-            return model.SoC_DC[s] == st.soc_final
-
-        model.storage_soc_final_DC_constraint = pyo.Constraint(
-            model.storage_DC, rule=soc_final_DC_rule)
+            model.storage_soc_balance_DC_constraint = pyo.Constraint(
+                model.storage_DC, rule=soc_balance_DC_rule)
 
         # G6: separate charge/discharge vars; overlap allowed for now.
         def P_storage_DC_net_upper_rule(model, s):

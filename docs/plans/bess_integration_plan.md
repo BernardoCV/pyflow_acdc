@@ -25,14 +25,14 @@ Permanent GitHub links (``main`` branch):
 
 | ID | Topic | Decision |
 |----|--------|----------|
-| G1 | Scope | **BESS only** for now (no hydrogen / electrolyzer) |
+| G1 | Scope | **BESS** implemented (Phases 0–4). **Hydrogen / electrolyzer** → Phase 7. **Mario PEI validation** (BESS + H₂ + exports) → **Phase 9**. TEP / linear OPF → Phase 10. |
 | G2 | OPF modes | **Nonlinear OPF only** (no linear OPF, no TEP sizing) |
 | G3 | Multi-hour optimization | **Coupled horizon** in a new top-level script `window_opf.py`; BESS constraints live **inside the NL model** (not a post-processing layer) |
 | G4 | Time series (`ts_acdc_opf`) | **Deferred** — when added later, use **myopic** SoC propagation only (one hour at a time) |
 | G5 | SoC units | **SoC in pu** in the Pyomo model; physical capacity via class attribute **`E_max` [MWh]** (enables future degradation modelling on `E_max`) |
 | G6 | Simultaneous charge/discharge | Keep Mario/paper formulation (separate `P_charge` / `P_discharge` vars, no exclusivity binary). Optimizer should cancel overlap in practice. **Add code comment: revisit later** if artefacts appear |
 | G7 | Apparent-power limit | **Per element**, side-dependent (mirrors `Ren_Source`): AC — `(P_dis − P_ch)² + Q² ≤ S_max²`; DC — active power only, `|P_dis − P_ch| ≤ P_max` (no `Q`, no S-circle) |
-| G8 | Validation | **Yes** — reproduce Mario 24 h BESS dispatch on PEI case |
+| G8 | Validation | **Phase 9** — single 24 h PEI `window_nl_opf` vs Mario paper/script (BESS + H₂ + exports + revenue) |
 | G9 | PEI hub node | Mario uses index `0` (offshore hub). In `PEI_grid.py` the equivalent bus is **`PE_Island`** (220 kV PV hub). Confirm index mapping during validation setup |
 | G10 | Public API | **`add_storage(grid, node, ...)`** in `grid_modifications.py` |
 | G11 | Economics | **Operation only** — no CAPEX / investment variables |
@@ -48,7 +48,7 @@ Permanent GitHub links (``main`` branch):
 | P4-3 | Objective | **No new objective terms** — `model.obj = sum_t opf_obj(hour_model[t], …)` using existing per-block operational objectives only. |
 | P4-4 | Hour indexing | **Python convention:** block indices `t ∈ {0, …, T−1}` aligned with `Time_series` row indexing (0-based). |
 | P4-5 | Block build | **Clone structure** (cf. `multi_scenario_TEP`: build template once, `clone()` per hour, patch mutable params). |
-| P4-6 | Window scope (v1) | **Single coupled window per call** (e.g. one 24 h solve). **Rolling / sliding window** over a long horizon → **next phase** after Phase 4 v1 + Phase 5. |
+| P4-6 | Window scope (v1) | **Single coupled window per call** (e.g. one 24 h solve). **Rolling / sliding window** → Phase 4.3, after Phase 9 validation. |
 
 ### Architecture principle
 
@@ -65,8 +65,8 @@ Hooks mirror **`Gen_AC` / `Gen_DC` / `Ren_Source`**:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  window_opf.py          Coupled multi-hour NLP (paper-faithful) │
-│  ─────────────────        Parent SoC links across hour blocks     │
-│  hour_model[t] blocks     Primary path for Mario validation       │
+│  window_nl_opf()          Parent SoC (+ Phase 7: H₂) links      │
+│  frame_model[t] blocks    Mario validation in Phase 9 (full PEI)  │
 │  (Phase 4 v1: one window)                                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  ts_acdc_opf (later)      Myopic sequential hours (G4 deferred)   │
@@ -182,6 +182,72 @@ DC (`P_DC_node_rule`):
 ```
 P_var += PGi_storage_DC[node,t]
 ```
+
+### 2.4 Green hydrogen / electrolyzer (paper §3.4 — **Phase 7**)
+
+Reference: paper Eqs. (32)–(36); Mario script lines 608–630, hub nodal balance line 658; Table 1 (PEI parameters).
+
+**Variables (per electrolyzer element `e`, frame `t` when window OPF)**
+
+| Symbol | Pyomo name (proposed) | Unit / base |
+|--------|----------------------|-------------|
+| `P^e_{e,t}` | `P_electrolyzer[e]` | pu on `grid.S_base` (active **load**) |
+| `M_{e,t}` | `M_H2[e]` | cumulative H₂ inventory **[kg]** (paper `M_t`) |
+| `h_{e,t}` | (auxiliary or inline) | H₂ produced in frame **[kg]** |
+
+**Parameters (class attributes — PEI values from paper Table 1 / Mario)**
+
+| Symbol | `Electrolyzer_AC` attr | Mario / paper |
+|--------|------------------------|---------------|
+| `P^e_max` | `P_max` [pu] | 150 MW → pu via `S_base` |
+| `P^e_min` | `P_min` [pu] | 22.5 MW (15 % of nominal) |
+| `b_h` | `b_h` [kg/MWh] | 16.0585 (Mario) / 16.058 (Table 1) |
+| `c_h` | `c_h` [kg] | 8.2195 (Mario) / 8.219 (Table 1) |
+| `M_max` | `M_max` [kg] | 43 448 (Table 1) or `P_max_MW * 24 / eta_MWh_per_kg` with `ne = 58e-3` MWh/kg (Mario) |
+| `M_initial`, `M_final` | `M_initial`, `M_final` [kg] | Mario: `MH2_ini=0`, `MH2_fin=0.7·P_h·24/ne` |
+| `Δt` | `dt_hours` | 1 h (default; same as BESS frames) |
+
+**Dynamics** (paper Eqs. 32–33):
+
+```
+h[e,t] = b_h[e] · P_e[e,t] · S_base · dt_hours  +  (c_h offset — see H7-3)
+M[e,t] = M[e,t−1] + h[e,t]
+```
+
+Paper writes `h_t = b_h P^e_t + c_h` with `P^e` in MW. Mario converts pu → MW via `Pe * (Sbase*1e-6)` and applies **`c_h` only at `t = 0`**:
+
+```python
+# Mario OPF_ACDC_Energy_Islands.py:626-630
+if t == 0:
+    MH[t] == b_h * Pe[t] * (Sbase*1e-6) + c_h
+else:
+    MH[t] == MH[t-1] + b_h * Pe[t] * (Sbase*1e-6)
+```
+
+**Bounds & terminal** (paper Eqs. 34–36):
+
+```
+0 ≤ M[e,t] ≤ M_max[e]
+M[e, t_last] = M_final[e]   (when set — parent link in window_nl_opf only)
+P_min[e] ≤ P_e[e,t] ≤ P_max[e]
+```
+
+**Nodal balance (AC hub — load convention)**
+
+At the connected AC node (Mario node `0` / pyflow `PE_Island`):
+
+```
+P_var[node] -= P_electrolyzer[e]    # alongside BESS ±P and wind ±P
+```
+
+No reactive power term (electrolyzer is active load only).
+
+**Run modes (mirror BESS)**
+
+| Mode | Inventory dynamics | Terminal `M_final` |
+|------|-------------------|---------------------|
+| Snapshot `optimal_pf` (1 frame) | Single-step from `M_initial` | **No** (same policy as snapshot BESS: no terminal SoC) |
+| `window_nl_opf` | Parent `window_h2_links` across `frame_model[t]` | **Yes** @ last frame when set |
 
 ---
 
@@ -434,39 +500,11 @@ def window_opf(
 
 **Exit criteria:** One coupled 24 h window on PEI completes; SoC obeys terminal constraint.
 
-#### 4.3 Rolling window (deferred — after Phase 4 v1 / Phase 5)
+#### 4.3 Rolling window (deferred — after Phase 9)
 
-**Not in Phase 4 v1.** `window_opf` solves **one** contiguous horizon per invocation (P4-6).
+**Not in Phase 4 v1.** `window_nl_opf` solves **one** contiguous horizon per invocation (P4-6).
 
-Later: **rolling / sliding window** over a long `Time_series` — e.g. advance `start/end` by `step` hours, warm-start or carry `soc_initial` from previous window’s terminal SoC. Separate API (e.g. `rolling_window_opf`) or extended kwargs; design after Mario validation.
-
----
-
-### Phase 5 — PEI validation vs Mario (G8)
-
-**Files:** `pyflow_tests/...` or `example_grids/OPF/PEI_window_opf.py`
-
-**Setup**
-
-1. Start from `PEI_grid()` (`S_base` may need alignment with Mario's 3500 MVA — document any base mismatch)
-2. `add_storage(grid, 'PE_Island', ...)` with Mario parameters:
-   - `P_nom = 0.33 pu`, `η_c = 0.85`, `η_d = 0.9`
-   - `soc_initial = soc_final = 0.5`, `soc_min = 0.1`, `soc_max = 1.0`
-3. Attach wind `Time_series` from `power_matrix.csv`
-4. Attach hourly prices (BE, GB, DK)
-5. Run `window_opf(grid, start=0, end=23)`  # 0-based, 24 h window
-
-**Compare**
-
-| Quantity | Tolerance |
-|----------|-----------|
-| `P_charge`, `P_discharge` per hour | Document Δ (expect small if grid/base aligned) |
-| `SoC` trajectory | Same |
-| Export powers / revenue | Qualitative match |
-
-**Note:** Exact numeric match may require harmonizing `S_base`, slack specification, and converter loss coefficients with Mario's script.
-
-**Exit criteria:** Validation notebook or test committed; differences explained in test docstring.
+Later: **rolling / sliding window** over a long `Time_series` — e.g. advance `start/end` by `step` hours, warm-start or carry `soc_initial` from previous window’s terminal SoC. Separate API (e.g. `rolling_window_opf`) or extended kwargs; design after **Phase 9** Mario validation.
 
 ---
 
@@ -474,7 +512,7 @@ Later: **rolling / sliding window** over a long `Time_series` — e.g. advance `
 
 **Goal:** User-facing docs and citations for BESS + `window_opf`, aligned with existing Sphinx layout. Cite Mario’s energy-island paper as the modelling reference.
 
-**When:** After Phase 4–5 (API and PEI example stable enough to literalinclude). Docstrings in Phases 1–4 can be drafted earlier; RST pages land here.
+**When:** After Phase 4 (API stable). PEI validation example literalinclude lands in **Phase 9**; RST pages can start in Phase 6.
 
 #### 6.1 API reference
 
@@ -506,7 +544,7 @@ Sections:
 **Literalinclude examples** (under `pyflow_tests/doc_examples/`):
 
 - `storage/01_add_storage.py` — minimal `add_storage` on a small case ✅
-- `storage/02_window_opf_pei.py` — PEI 24 h window OPF (validation-aligned) (pending Phase 5)
+- `storage/02_window_nl_opf_pei.py` — PEI 24 h window OPF (validation-aligned) (pending **Phase 9**)
 
 **Update:** `docs/index.rst` — add `usage_storage` and `api/storage` to toctree ✅
 
@@ -550,20 +588,156 @@ Also add a short acknowledgement in `usage_window_opf.rst` and in `Storage_AC` /
 
 ---
 
-### Phase 7 — Deferred: myopic time series (G4)
+### Phase 7 — Green hydrogen / electrolyzer (NL + `window_nl_opf`)
+
+**Goal:** Paper-faithful **linear electrolyzer + H₂ inventory** model (§3.4, Eqs. 32–36), co-optimized with BESS and AC/DC OPF on the PEI hub — same element / nodal / window patterns as BESS.
+
+**References**
+
+- Paper: `mario_implementation/wes-11-349-2026.pdf` — §3.4, Table 1, §4.2–4.3 (parameter identification)
+- Code: `mario_implementation/18414805/OPF_ACDC_Energy_Islands.py` — lines 608–630 (constraints), 658 (hub `P` balance: `-Pe`)
+
+#### 7.0 Decisions (to lock before coding)
+
+| ID | Topic | Proposal |
+|----|--------|----------|
+| H7-1 | Side | **AC only** v1 (`Electrolyzer_AC` on hub bus). No DC electrolyzer. |
+| H7-2 | State unit | **kg inventory** `M_H2` (paper `M_t`), not pu — unlike BESS SoC. |
+| H7-3 | `c_h` term | **Reconcile paper Eq. (33) vs Mario:** paper adds `c_h` every frame; Mario adds `c_h` **once at `t = 0`**. Lock one rule for **Phase 9** parity (recommend **Mario script**). |
+| H7-4 | Economics | **Operation only** — no electrolyzer CAPEX (G11). |
+| H7-5 | Horizon | **`window_nl_opf` only** for multi-frame inventory + `M_final`; snapshot OPF = one frame, no terminal `M_final`. |
+| H7-6 | `window_block` | Reuse BESS pattern: omit in-block `M_H2` chain / `M_final` in snapshot blocks; parent `window_h2_links` in `window_nl_opf`. |
+| H7-7 | Grid flag | `grid.H2` or `grid.ELECTROLYSIS` via `analyse_grid` when `hydrogen_elements` non-empty (parallel to `grid.ESS`). |
+| H7-8 | API | **`add_electrolyzer(grid, node, P_max_MW, P_min_MW, b_h, c_h, M_max_kg, ...)`** in `grid_modifications.py`. |
+
+#### 7.1 Classes & grid hooks
+
+**New:** `Electrolyzer_AC` in `Classes.py`
+
+- `electrolyzerNumber`, `Node_AC`, `connected = AcDcSide.AC`
+- `P_max`, `P_min` [pu], `b_h` [kg/MWh], `c_h` [kg], `M_max`, `M_initial`, `M_final` [kg], `dt_hours`, `S_base`
+- Post-solve attrs: `P_electrolyzer`, `M_H2`, `h_produced` (optional)
+
+**Grid / nodes**
+
+- `Grid.hydrogen_elements` (list)
+- `Node_AC.connected_electrolyzer` (list)
+- `analyse_grid`: set `grid.H2 = bool(grid.hydrogen_elements)` (name TBD at implementation)
+
+#### 7.2 Snapshot NL model (`ACDC_OPF_NL_model.py`)
+
+Gate on `grid.H2` (when implemented).
+
+- `hydrogen_variables` / `hydrogen_constraints` (mirror `storage_*`)
+- Vars: `P_electrolyzer`, `M_H2` with bounds
+- Snapshot: one-step inventory from `M_initial` (Param `M_H2_prev` or inline), **no** terminal `M_final`
+- Nodal: `PGi_electrolyzer` or subtract `P_electrolyzer` in `P_AC_node_rule` for connected node
+- Export in `export_acdc_nl_model_to_pyflow_acdc`
+
+#### 7.3 Results
+
+- `Results.ext_electrolyzer()` — snapshot table: Name, Node, P (MW), M_H2 (kg), loading %
+- `Results.hydrogen_window()` — per-frame `M_H2`, `P_electrolyzer` (mirror `storage_window`)
+- Wire into `Results.all()` when `window_nl_opf_run` / `grid.H2`
+
+#### 7.4 Coupled window (`window_nl_opf.py`)
+
+Extend existing frame-block assembly:
+
+1. `opf_create_nl_model_acdc(..., window_block=True)` also skips in-block H₂ balance / `M_final` (extend P4-1a or add `H7-6` flag).
+2. Parent **`window_h2_constraints`** — same pattern as `window_soc_constraints`:
+
+```
+t = 0:     M[t] = M_initial + h(P_e[t])          (+ c_h per H7-3)
+t > 0:     M[t] = M[t−1] + h(P_e[t])
+t = T−1:   M[t] = M_final   (when set)
+```
+
+3. Objective unchanged (P4-3) — revenue-only; H₂ quota enforced via `M_final`, not a separate cost term.
+4. Export trajectories → `grid.window_opf_results['hydrogen_M_H2']`, `['hydrogen_P_e']`, etc.
+
+#### 7.5 Documentation
+
+- Extend `docs/usage_storage.rst` → or new `docs/usage_hydrogen.rst` + API `docs/api/hydrogen.rst`
+- `add_electrolyzer`, `Electrolyzer_AC`, `window_nl_opf` with H₂
+- Citing: same Useche-Arteaga (2026) paper §3.4
+
+**Exit criteria (Phase 7 v1):** `add_electrolyzer` + NL constraints + `window_nl_opf` parent H₂ links + results tables. **No Mario comparison yet** — that is **Phase 9**.
+
+---
+
+### Phase 8 — Deferred: myopic time series (G4)
 
 **Not in v1.** When implemented in `Time_series.py`:
 
 - Reuse **snapshot** NL model (Phase 2.1) with `SoC_prev` param
 - Each hour in `ts_acdc_opf`: set `SoC_prev` from previous solution → solve → record
 - No terminal `soc_final` except optionally on last hour of run
-- Document that this is **not** equivalent to `window_opf` global optimum
+- Document that this is **not** equivalent to `window_nl_opf` global optimum
+- When `grid.H2` is present: myopic `M_H2_prev` propagation (Phase 7 snapshot model) — design after Phase 7 v1
 
 ---
 
-### Phase 8 — Deferred: hydrogen, TEP, linear OPF
+### Phase 9 — PEI validation vs Mario paper (G8) — **all together**
 
-Out of scope per G1, G2, G11.
+**Goal:** One coupled **24 h** `window_nl_opf` on the Princess Elisabeth test system reproducing the Mario paper / reference script — **BESS + hydrogen + exports + revenue** in a single run, not separate BESS-only and H₂-only checks.
+
+**Prerequisites:** Phase 4 (`window_nl_opf`) ✅; Phase 7 (electrolyzer) for full paper parity. A **BESS-only** subset test may land early while Phase 7 is in progress; **Phase 9 exit** requires the **full** coupled case.
+
+**References**
+
+- Paper: `mario_implementation/wes-11-349-2026.pdf` — §3.3–3.5, §4.1, Table 1, case study §5.2
+- Script: `mario_implementation/18414805/OPF_ACDC_Energy_Islands.py`
+- Data: `power_matrix.csv`, `BE_Price.csv`, `GB_Price.csv`, `DK_Price.csv`
+- pyflow grid: `PEI_grid()` — hub **`PE_Island`** (G9; Mario node `0`)
+
+**Files:** `pyflow_tests/test_pei_window_nl_opf_mario.py` and/or `pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py`
+
+#### 9.1 Grid & asset setup
+
+1. `PEI_grid()` — harmonize **`S_base = 3500` MVA** with Mario (`Sbase = 3500e6`); document any remaining base / per-unit mismatch.
+2. **`add_storage(grid, 'PE_Island', ...)`** — Mario / Table 1 BESS:
+   - `P_nom = 0.33` pu, `η_c = 0.85`, `η_d = 0.9`
+   - `soc_initial = 0.5`, `soc_final = 0.5` (window terminal @ last frame only)
+   - `soc_min = 0.1`, `soc_max = 1.0`
+3. **`add_electrolyzer(grid, 'PE_Island', ...)`** — Mario / Table 1 H₂:
+   - `P_max = 150` MW, `P_min = 22.5` MW
+   - `b_h = 16.0585` kg/MWh, `c_h = 8.2195` kg
+   - `M_final` per Mario `MH2_fin = 0.7 · P_h · 24 / ne`, `ne = 58e-3` MWh/kg
+4. Attach wind **`Time_series`** from `power_matrix.csv` (turbine-level → pyflow mapping per PEI layout).
+5. Attach hourly **export prices** (BE, GB, DK) from Mario CSVs.
+6. **`window_nl_opf(grid, start=0, end=23)`** — 0-based, 24 frames; revenue objective (paper Eq. 37 / Mario `obj_rule`).
+
+#### 9.2 Quantities to compare (single checklist)
+
+| Quantity | Mario source (script) | Match expectation |
+|----------|----------------------|-------------------|
+| `P_charge[t]`, `P_discharge[t]`, `Q[t]`, `SoC[t]` | `Pb_c`, `Pb_d`, `Qb`, `SoC` (~807–814) | Document Δ; tighten after `S_base` alignment |
+| `P_electrolyzer[t]`, `M_H2[t]` | `Pe_values`, `MH2` (~810–813) | Same |
+| Export `P` to BE / GB / DK | `P_CA`, `P_CB`, `P_CC` (~817–819) | Qualitative → numeric as grid converges |
+| Total revenue / objective | `benefit_total` (~869–878) | Qualitative first; explain converter / export sign conventions |
+| Terminal SoC / `M_final` | `SoC_fin`, `MH2_fin` constraints | Hard constraints in both models |
+
+#### 9.3 Known alignment items (document in test docstring)
+
+- `S_base` (3500 MVA vs pyflow PEI default)
+- Slack / PV hub specification (`PE_Island`)
+- HVDC converter loss coefficients (`a`, `b`, `c` in Mario)
+- Export power sign convention (Mario objective uses exported power formulation)
+- `c_h` at `t = 0` only vs every frame (H7-3 — lock for parity)
+- Hybrid pyflow PEI topology vs Mario’s aggregated node numbering
+
+#### 9.4 Exit criteria
+
+- One **24 h coupled** run completes with BESS **and** electrolyzer on `PE_Island`.
+- Validation test committed; all §9.2 rows reported with tolerances or explained deltas.
+- `storage/02_window_nl_opf_pei.py` literalinclude example runs in CI (after Phase 6 doc scaffold).
+
+---
+
+### Phase 10 — Deferred: TEP sizing & linear OPF
+
+Out of scope per G2, G11.
 
 ---
 
@@ -575,12 +749,17 @@ Out of scope per G1, G2, G11.
 | `grid_modifications.py` | `add_storage()` |
 | `grid_analysis.py` | `ESS` flag |
 | `ACDC_OPF_NL_model.py` | Snapshot storage (Phase 2 ✅); `window_block=True` skips in-block SoC boundaries (P4-1a) |
-| `window_opf.py` | **New** — clone hour blocks, parent SoC links, single-window runner (Phase 4.2) |
+| `window_opf.py` | **`window_nl_opf`** — frame blocks, parent SoC links ✅; Phase 7 adds parent H₂ links |
+| `Classes.py` (Phase 7) | `Electrolyzer_AC`, `Grid.hydrogen_elements`, `Node_AC.connected_electrolyzer` |
+| `grid_modifications.py` (Phase 7) | `add_electrolyzer()` |
+| `grid_analysis.py` (Phase 7) | `H2` flag |
+| `ACDC_OPF_NL_model.py` (Phase 7) | `hydrogen_variables` / `hydrogen_constraints`, nodal load hook, export |
+| `Results_class.py` (Phase 7) | `ext_electrolyzer()`, `hydrogen_window()` |
 | `ACDC_OPF.py` | `storage_info` in `translate_pyf_opf`; pass horizon if needed |
 | `Results_class.py` | `ext_storage()`, `storage_window()` |
-| `Time_series.py` | Phase 7 only (deferred) |
+| `Time_series.py` | Phase 8 only (deferred myopic TS) |
 | `__init__.py` | Export new symbols |
-| `pyflow_tests/...` | PEI validation test |
+| `pyflow_tests/...` | **Phase 9** — full PEI Mario validation test |
 | `docs/api/storage.rst` | **New** — `Storage_AC`, `add_storage`, `window_opf` API |
 | `docs/usage_storage.rst` | **New** — usage guide + Mario modelling note + plan link |
 | `docs/citing.rst` | BibTeX + citation for Useche-Arteaga et al. (2026) |
@@ -623,12 +802,14 @@ If simultaneous charge/discharge appears in results:
 1. Phase 0 — design freeze  
 2. Phase 1 — class + `add_storage`  
 3. Phase 2 — snapshot NL model ✅  
-4. Phase 3 — `Results.ext_storage` ✅ (3.1); `storage_window` with Phase 4  
-5. Phase 4 — single-window `window_opf` + `window_block` (4.1–4.2)  
-6. Phase 5 — Mario validation  
-7. Phase 6 — documentation + citations  
-8. Phase 4.3 — rolling window (later)  
-9. Phase 7 — myopic TS (later)
+4. Phase 3 — `Results.ext_storage` ✅ (3.1); `storage_window` ✅ (3.2)  
+5. Phase 4 — `window_nl_opf` + `window_block` ✅ (4.1–4.2)  
+6. Phase 6 — documentation + citations  
+7. **Phase 7 — hydrogen / electrolyzer** (implementation)  
+8. **Phase 9 — Mario PEI validation (BESS + H₂ + exports, all together)**  
+9. Phase 4.3 — rolling window (later)  
+10. Phase 8 — myopic TS (later)  
+11. Phase 10 — TEP / linear OPF (later)
 
 ---
 
@@ -638,10 +819,11 @@ If simultaneous charge/discharge appears in results:
 
 M. Useche-Arteaga, P. Gebraad, V. A. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmunt, *Optimizing the operation of energy islands with predictive nonlinear programming – a case study based on the Princess Elisabeth Energy Island*, Wind Energ. Sci., 11, 349–372, 2026, https://doi.org/10.5194/wes-11-349-2026.
 
-- BESS model: paper §3.3 (Eqs. 24–31) — implemented as `Storage_AC` + NL constraints
-- Coupled multi-hour operation: paper §3.5–3.6 — implemented via `window_opf.py`
+- BESS model: paper §3.3 (Eqs. 24–31) — implemented as `Storage_AC` / `Storage_DC` + NL constraints ✅
+- Hydrogen model: paper §3.4 (Eqs. 32–36) — **Phase 7** (`Electrolyzer_AC`, `add_electrolyzer`)
+- Coupled multi-hour operation: paper §3.5–3.6 — implemented via **`window_nl_opf`** (`window_opf.py`) ✅
 - Local PDF: `mario_implementation/wes-11-349-2026.pdf`
-- Reference implementation: `mario_implementation/18414805/OPF_ACDC_Energy_Islands.py`
+- Reference implementation: `mario_implementation/18414805/OPF_ACDC_Energy_Islands.py` (BESS ~584–605, H₂ ~608–630, hub balance ~658)
 
 ### pyflow_acdc assets
 
