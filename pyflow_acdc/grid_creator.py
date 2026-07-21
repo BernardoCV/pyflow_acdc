@@ -18,7 +18,7 @@ from .Results_class import Results
 from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC, Gen_DC,
     Grid, Line_AC, Line_DC, Node_AC, Node_DC, Price_Zone, Ren_Source,
-    Ren_source_zone, Size_selection, Storage_AC, Storage_DC, TF_Line_AC, TimeSeries,
+    Ren_source_zone, Size_selection, Storage_AC, Storage_DC, Electrolyser, TF_Line_AC, TimeSeries,
 )
 from .grid_analysis import cable_parameters, converter_parameters
 from .grid_modifications import add_gen
@@ -73,6 +73,7 @@ def initialize_pyflowacdc():
     Ren_Source.reset_class()
     Storage_AC.reset_class()
     Storage_DC.reset_class()
+    Electrolyser.reset_class()
 
 
 def create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
