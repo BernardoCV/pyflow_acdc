@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy
+from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy, AcDcSide
 
 
 __all__ = [
@@ -62,17 +62,24 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
     Conv_info = opf_data['Conv_info']
     Price_Zone_info = opf_data['Price_Zone_info']
     gen_info = opf_data['gen_info']
+    storage_info = opf_data['storage_info']
 
     Generation_variables(model,grid,gen_info,TEP)
 
+    if grid.ESS:
+        storage_variables(model, grid, storage_info)
+
     if grid.ACmode:
-        AC_variables(model,grid,AC_info,PV_set,limit_flow_rate,TEP)
+        AC_variables(model,grid,AC_info,PV_set,limit_flow_rate,TEP,storage_info)
 
     if grid.DCmode:
-        DC_variables(model,grid,DC_info,TEP,limit_flow_rate)
+        DC_variables(model,grid,DC_info,TEP,limit_flow_rate,storage_info)
 
     if grid.DCmode and grid.ACmode:
         Converter_variables(model,grid,Conv_info,TEP)
+
+    if grid.ESS:
+        storage_constraints(model, grid, storage_info)
 
     if TEP:
         TEP_variables(model,grid,n_init_install=n_init_install)
@@ -86,10 +93,10 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
         price_zone_parameters(model,grid,AC_info,DC_info,gen_info)
 
     if grid.ACmode:
-        AC_constraints(model,grid,AC_info,limit_flow_rate,TEP)
+        AC_constraints(model,grid,AC_info,limit_flow_rate,TEP,storage_info)
 
     if grid.DCmode:
-        DC_constraints(model,grid,TEP)
+        DC_constraints(model,grid,TEP,storage_info)
 
     if grid.DCmode and grid.ACmode:
         Converter_constraints(model,grid,Conv_info,TEP)
@@ -194,8 +201,161 @@ def Generation_variables(model,grid,gen_info,TEP):
         else:
             model.PGi_gen_DC = pyo.Var(model.gen_DC,bounds=P_Gen_bounds_DC, initialize=P_gen_ini_DC)
 
-    s=1
-def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False):
+
+def storage_variables(model, grid, storage_info):
+    """BESS element variables (charge, discharge, SoC, Q on AC only)."""
+    lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number = storage_info
+    storage_ac = storage_ac_by_number
+    storage_dc = storage_dc_by_number
+
+    if lista_storage_ac:
+        model.storage_AC = pyo.Set(initialize=lista_storage_ac)
+
+        def P_storage_charge_bounds(model, s):
+            return (0, storage_ac[s].P_charge_max)
+
+        def P_storage_discharge_bounds(model, s):
+            return (0, storage_ac[s].P_discharge_max)
+
+        def soc_bounds(model, s):
+            st = storage_ac[s]
+            return (st.soc_min, st.soc_max)
+
+        def Q_storage_bounds(model, s):
+            st = storage_ac[s]
+            return (-st.S_max, st.S_max)
+
+        model.P_storage_charge = pyo.Var(
+            model.storage_AC, bounds=P_storage_charge_bounds, initialize=0)
+        model.P_storage_discharge = pyo.Var(
+            model.storage_AC, bounds=P_storage_discharge_bounds, initialize=0)
+        model.Q_storage = pyo.Var(model.storage_AC, bounds=Q_storage_bounds, initialize=0)
+        model.SoC = pyo.Var(
+            model.storage_AC,
+            bounds=soc_bounds,
+            initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
+        )
+        model.SoC_prev = pyo.Param(
+            model.storage_AC,
+            initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
+            mutable=True,
+        )
+
+    if lista_storage_dc:
+        model.storage_DC = pyo.Set(initialize=lista_storage_dc)
+
+        def P_storage_charge_DC_bounds(model, s):
+            return (0, storage_dc[s].P_charge_max)
+
+        def P_storage_discharge_DC_bounds(model, s):
+            return (0, storage_dc[s].P_discharge_max)
+
+        def soc_DC_bounds(model, s):
+            st = storage_dc[s]
+            return (st.soc_min, st.soc_max)
+
+        model.P_storage_charge_DC = pyo.Var(
+            model.storage_DC, bounds=P_storage_charge_DC_bounds, initialize=0)
+        model.P_storage_discharge_DC = pyo.Var(
+            model.storage_DC, bounds=P_storage_discharge_DC_bounds, initialize=0)
+        model.SoC_DC = pyo.Var(
+            model.storage_DC,
+            bounds=soc_DC_bounds,
+            initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
+        )
+        model.SoC_prev_DC = pyo.Param(
+            model.storage_DC,
+            initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
+            mutable=True,
+        )
+
+
+def storage_constraints(model, grid, storage_info):
+    """BESS SoC balance, terminal SoC, and element-level power limits."""
+    _, _, storage_ac_by_number, storage_dc_by_number = storage_info
+    storage_ac = storage_ac_by_number
+    storage_dc = storage_dc_by_number
+
+    if storage_ac:
+        def soc_balance_rule(model, s):
+            st = storage_ac[s]
+            scale = st.dt_hours * st.S_base / st.E_max
+            return model.SoC[s] == (
+                model.SoC_prev[s]
+                + scale * (
+                    st.eta_charge * model.P_storage_charge[s]
+                    - model.P_storage_discharge[s] / st.eta_discharge
+                )
+            )
+
+        model.storage_soc_balance_constraint = pyo.Constraint(
+            model.storage_AC, rule=soc_balance_rule)
+
+        def soc_final_rule(model, s):
+            st = storage_ac[s]
+            if st.soc_final is None:
+                return pyo.Constraint.Skip
+            return model.SoC[s] == st.soc_final
+
+        model.storage_soc_final_constraint = pyo.Constraint(
+            model.storage_AC, rule=soc_final_rule)
+
+        # G6: charge and discharge are separate vars; overlap is allowed for now.
+        def S_storage_AC_limit_rule(model, s):
+            st = storage_ac[s]
+            p_net = model.P_storage_discharge[s] - model.P_storage_charge[s]
+            return p_net ** 2 + model.Q_storage[s] ** 2 <= st.S_max ** 2
+
+        model.S_storage_AC_limit_constraint = pyo.Constraint(
+            model.storage_AC, rule=S_storage_AC_limit_rule)
+
+    if storage_dc:
+        def soc_balance_DC_rule(model, s):
+            st = storage_dc[s]
+            scale = st.dt_hours * st.S_base / st.E_max
+            return model.SoC_DC[s] == (
+                model.SoC_prev_DC[s]
+                + scale * (
+                    st.eta_charge * model.P_storage_charge_DC[s]
+                    - model.P_storage_discharge_DC[s] / st.eta_discharge
+                )
+            )
+
+        model.storage_soc_balance_DC_constraint = pyo.Constraint(
+            model.storage_DC, rule=soc_balance_DC_rule)
+
+        def soc_final_DC_rule(model, s):
+            st = storage_dc[s]
+            if st.soc_final is None:
+                return pyo.Constraint.Skip
+            return model.SoC_DC[s] == st.soc_final
+
+        model.storage_soc_final_DC_constraint = pyo.Constraint(
+            model.storage_DC, rule=soc_final_DC_rule)
+
+        # G6: separate charge/discharge vars; overlap allowed for now.
+        def P_storage_DC_net_upper_rule(model, s):
+            st = storage_dc[s]
+            return (
+                model.P_storage_discharge_DC[s] - model.P_storage_charge_DC[s]
+                <= st.P_max
+            )
+
+        def P_storage_DC_net_lower_rule(model, s):
+            st = storage_dc[s]
+            return (
+                model.P_storage_charge_DC[s] - model.P_storage_discharge_DC[s]
+                <= st.P_max
+            )
+
+        model.P_storage_DC_net_upper_constraint = pyo.Constraint(
+            model.storage_DC, rule=P_storage_DC_net_upper_rule)
+        model.P_storage_DC_net_lower_constraint = pyo.Constraint(
+            model.storage_DC, rule=P_storage_DC_net_lower_rule)
+
+
+def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False,storage_info=None):
+    lista_storage_ac, _, _, _ = storage_info or ([], [], {}, {})
 
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
 
@@ -251,6 +411,22 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False):
 
     model.PGi_ren = pyo.Var(model.nodes_AC, bounds=Pren_bounds,initialize=0)
     model.QGi_ren = pyo.Var(model.nodes_AC, bounds=Qren_bounds,initialize=0)
+
+    if lista_storage_ac:
+        def Pstorage_bounds(model, node):
+            nAC = grid.nodes_AC[node]
+            if not nAC.connected_storage:
+                return (0, 0)
+            return (None, None)
+
+        def Qstorage_bounds(model, node):
+            nAC = grid.nodes_AC[node]
+            if not nAC.connected_storage:
+                return (0, 0)
+            return (None, None)
+
+        model.PGi_storage = pyo.Var(model.nodes_AC, bounds=Pstorage_bounds, initialize=0)
+        model.QGi_storage = pyo.Var(model.nodes_AC, bounds=Qstorage_bounds, initialize=0)
 
 
     def PGi_opt_bounds(model, node):
@@ -406,7 +582,8 @@ def AC_variables(model,grid,AC_info,PV_set,limit_flow_rate=1,TEP=False):
         model.ct_PAC_line_loss = pyo.Var(model.lines_AC_ct,initialize=0)
 
 
-def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
+def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False,storage_info=None):
+    lista_storage_ac, _, _, _ = storage_info or ([], [], {}, {})
 
 
     AC_Lists,AC_nodes_info,AC_lines_info,EXP_info,REC_info,CT_info = AC_info
@@ -425,6 +602,8 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
                  np.imag(grid.Ybus_AC[node, k]) * pyo.sin(model.theta_AC[node] - model.theta_AC[k]))
                 for k in model.nodes_AC if grid.Ybus_AC[node, k] != 0   )
         P_var = model.P_known_AC[node] + model.PGi_ren[node] + model.PGi_opt[node]
+        if lista_storage_ac:
+            P_var += model.PGi_storage[node]
         if grid.DCmode:
             P_var += model.P_conv_AC[node]
         if grid.TEP_AC:
@@ -446,6 +625,8 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
              np.imag(grid.Ybus_AC[node, k]) * pyo.cos(model.theta_AC[node] - model.theta_AC[k]))
             for k in model.nodes_AC if grid.Ybus_AC[node, k] != 0)
         Q_var = model.Q_known_AC[node] + model.QGi_ren[node] + model.QGi_opt[node]
+        if lista_storage_ac:
+            Q_var += model.QGi_storage[node]
         if grid.DCmode:
             Q_var += model.Q_conv_AC[node]
         if grid.TEP_AC:
@@ -494,6 +675,23 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
 
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
     model.Gen_QREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_QREN_rule)
+
+    if lista_storage_ac:
+        def Gen_Pstorage_rule(model, node):
+            nAC = grid.nodes_AC[node]
+            p_stor = sum(
+                model.P_storage_discharge[s.storageNumber] - model.P_storage_charge[s.storageNumber]
+                for s in nAC.connected_storage
+            )
+            return model.PGi_storage[node] == p_stor
+
+        def Gen_Qstorage_rule(model, node):
+            nAC = grid.nodes_AC[node]
+            q_stor = sum(model.Q_storage[s.storageNumber] for s in nAC.connected_storage)
+            return model.QGi_storage[node] == q_stor
+
+        model.Gen_Pstorage_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_Pstorage_rule)
+        model.Gen_Qstorage_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_Qstorage_rule)
 
 
     def toPexp_rule(model,node):
@@ -1039,7 +1237,8 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
     s=1
 
 
-def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
+def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1,storage_info=None):
+    _, lista_storage_dc, _, _ = storage_info or ([], [], {}, {})
 
 
     DC_Lists,DC_nodes_info,DC_lines_info,DCDC_info = DC_info
@@ -1083,6 +1282,16 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
     model.V_DC = pyo.Var(model.nodes_DC, bounds=lambda model, node: (u_min_dc[node], u_max_dc[node]), initialize=V_ini_DC)
     model.P_known_DC = pyo.Param(model.nodes_DC, initialize=P_known_DC,mutable=True)
     model.PGi_ren_DC = pyo.Var(model.nodes_DC, bounds=Pren_bounds_DC,initialize=0)
+
+    if lista_storage_dc:
+        def Pstorage_DC_bounds(model, node):
+            nDC = grid.nodes_DC[node]
+            if not nDC.connected_storage:
+                return (0, 0)
+            return (None, None)
+
+        model.PGi_storage_DC = pyo.Var(
+            model.nodes_DC, bounds=Pstorage_DC_bounds, initialize=0)
 
     def PGi_opt_bounds_DC(model, node):
         nDC = grid.nodes_DC[node]
@@ -1130,7 +1339,8 @@ def DC_variables(model,grid,DC_info,TEP=False,limit_flow_rate=1):
         model.cn_DCDC_to = pyo.Var(model.DCDC_conv, bounds=DCDC_opt_bounds,initialize=0)
         model.CDC_loss= pyo.Var(model.DCDC_conv, initialize=0)
 
-def DC_constraints(model,grid,TEP=False):
+def DC_constraints(model,grid,TEP=False,storage_info=None):
+    _, lista_storage_dc, _, _ = storage_info or ([], [], {}, {})
 
 
 
@@ -1142,6 +1352,16 @@ def DC_constraints(model,grid,TEP=False):
        nDC = grid.nodes_DC[node]
        P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nDC.connected_RenSource)
        return  model.PGi_ren_DC[node] ==   P_gen
+
+    if lista_storage_dc:
+        def Gen_Pstorage_DC_rule(model, node):
+            nDC = grid.nodes_DC[node]
+            p_stor = sum(
+                model.P_storage_discharge_DC[s.storageNumber_DC]
+                - model.P_storage_charge_DC[s.storageNumber_DC]
+                for s in nDC.connected_storage
+            )
+            return model.PGi_storage_DC[node] == p_stor
 
     def Gen_P_rule_DC(model,node):
         nDC = grid.nodes_DC[node]
@@ -1163,6 +1383,8 @@ def DC_constraints(model,grid,TEP=False):
                     P_sum += pol*model.V_DC[i] * (model.V_DC[i]-model.V_DC[k])*(G)*model.NumLinesDCP[line.lineNumber]
 
         P_var = model.P_known_DC[node]+ model.PGi_ren_DC[node]+model.PGi_opt_DC[node]
+        if lista_storage_dc:
+            P_var += model.PGi_storage_DC[node]
         if grid.ACmode:
             P_var += model.P_conv_DC[node]
         if grid.CDC:
@@ -1170,6 +1392,9 @@ def DC_constraints(model,grid,TEP=False):
         return P_sum ==  P_var
 
     model.Gen_PREN_constraint_DC =pyo.Constraint(model.nodes_DC, rule=Gen_PREN_rule_DC)
+    if lista_storage_dc:
+        model.Gen_Pstorage_DC_constraint = pyo.Constraint(
+            model.nodes_DC, rule=Gen_Pstorage_DC_rule)
     model.Gen_P_constraint_DC    =pyo.Constraint(model.nodes_DC, rule=Gen_P_rule_DC)
     model.P_DC_node_constraint = pyo.Constraint(model.nodes_DC, rule=P_DC_node_rule)
 
@@ -2195,6 +2420,35 @@ def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
     # Parallelize processing
     with ThreadPoolExecutor() as executor:
         executor.map(process_element, elements)
+
+    if grid.storage_elements:
+        if hasattr(model, 'P_storage_charge'):
+            P_charge_ac = {
+                k: np.float64(pyo.value(v)) for k, v in model.P_storage_charge.items()}
+            P_discharge_ac = {
+                k: np.float64(pyo.value(v)) for k, v in model.P_storage_discharge.items()}
+            Q_storage_ac = {
+                k: np.float64(pyo.value(v)) for k, v in model.Q_storage.items()}
+            soc_ac = {k: np.float64(pyo.value(v)) for k, v in model.SoC.items()}
+        if hasattr(model, 'P_storage_charge_DC'):
+            P_charge_dc = {
+                k: np.float64(pyo.value(v)) for k, v in model.P_storage_charge_DC.items()}
+            P_discharge_dc = {
+                k: np.float64(pyo.value(v)) for k, v in model.P_storage_discharge_DC.items()}
+            soc_dc = {k: np.float64(pyo.value(v)) for k, v in model.SoC_DC.items()}
+
+        for storage in grid.storage_elements:
+            if storage.connected == AcDcSide.AC:
+                s = storage.storageNumber
+                storage.P_charge = P_charge_ac[s]
+                storage.P_discharge = P_discharge_ac[s]
+                storage.Q = Q_storage_ac[s]
+                storage.SoC = soc_ac[s]
+            else:
+                s = storage.storageNumber_DC
+                storage.P_charge = P_charge_dc[s]
+                storage.P_discharge = P_discharge_dc[s]
+                storage.SoC = soc_dc[s]
 
     if Price_Zones:
         # Parallelize price zone processing

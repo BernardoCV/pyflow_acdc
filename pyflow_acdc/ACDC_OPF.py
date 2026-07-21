@@ -13,7 +13,7 @@ import warnings
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
 from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
 from .grid_analysis import analyse_grid
-from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights
+from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights, AcDcSide
 from .pyomo_model_solve import (
     build_only_solver_stats,
     export_solver_progress_to_excel,
@@ -582,6 +582,17 @@ def translate_pyf_opf(grid,Price_Zones=False):
     gen_DC_info = pack_variables(lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC)
     gen_info = pack_variables(gen_AC_info,gen_DC_info,gen_rs_info)
 
+    lista_storage_ac = [
+        s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.AC]
+    lista_storage_dc = [
+        s.storageNumber_DC for s in grid.storage_elements if s.connected == AcDcSide.DC]
+    storage_ac_by_number = {
+        s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.AC}
+    storage_dc_by_number = {
+        s.storageNumber_DC: s for s in grid.storage_elements if s.connected == AcDcSide.DC}
+    storage_info = pack_variables(
+        lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number)
+
     "Price zone info"
 
     price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max =  {}, {}, {}, {}, {}
@@ -750,7 +761,8 @@ def translate_pyf_opf(grid,Price_Zones=False):
         'DC_info': DC_info,
         'Conv_info': Conv_info,
         'Price_Zone_info': Price_Zone_info,
-        'gen_info': gen_info
+        'gen_info': gen_info,
+        'storage_info': storage_info,
     }
 
 

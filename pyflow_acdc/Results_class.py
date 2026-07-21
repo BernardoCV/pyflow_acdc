@@ -129,6 +129,8 @@ class Results:
                 self.ext_gen(print_table=print_table)
             if self.Grid.RenSources:
                 self.ext_ren(print_table=print_table)
+            if self.Grid.storage_elements:
+                self.ext_storage(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.obj_res(print_table=print_table)
             if self.Grid.Price_Zones != []:
@@ -1328,6 +1330,79 @@ class Results:
             print(table)
 
         return df
+
+    def ext_storage(self, print_table=True):
+        """Report BESS dispatch after snapshot NL OPF."""
+        rows = []
+        p_charge_tot = 0.0
+        p_discharge_tot = 0.0
+        q_tot = 0.0
+        energy_tot = 0.0
+
+        for storage in self.Grid.storage_elements:
+            p_charge_mw = storage.P_charge * self.Grid.S_base
+            p_discharge_mw = storage.P_discharge * self.Grid.S_base
+            soc_pu = storage.SoC
+            energy_mwh = storage.energy_MWh
+            loading = storage.loading
+
+            if storage.connected == AcDcSide.AC:
+                node = storage.Node_AC
+                side = AcDcSide.AC.value
+                q_mvar = storage.Q * self.Grid.S_base
+                q_tot += q_mvar
+            else:
+                node = storage.Node_DC
+                side = AcDcSide.DC.value
+                q_mvar = "----"
+
+            p_charge_tot += p_charge_mw
+            p_discharge_tot += p_discharge_mw
+            energy_tot += energy_mwh
+
+            rows.append({
+                "Name": storage.name,
+                "Node": node,
+                "Side": side,
+                "P charge (MW)": np.round(p_charge_mw, decimals=self.dec),
+                "P discharge (MW)": np.round(p_discharge_mw, decimals=self.dec),
+                "Q (MVAR)": np.round(q_mvar, decimals=self.dec) if q_mvar != "----" else q_mvar,
+                "SoC (pu)": np.round(soc_pu, decimals=self.dec),
+                "Energy (MWh)": np.round(energy_mwh, decimals=self.dec),
+                "Loading %": np.round(loading, decimals=self.dec),
+            })
+
+        if rows:
+            rows.append({
+                "Name": "Total",
+                "Node": "",
+                "Side": "",
+                "P charge (MW)": np.round(p_charge_tot, decimals=self.dec),
+                "P discharge (MW)": np.round(p_discharge_tot, decimals=self.dec),
+                "Q (MVAR)": np.round(q_tot, decimals=self.dec) if q_tot else "",
+                "SoC (pu)": "",
+                "Energy (MWh)": np.round(energy_tot, decimals=self.dec),
+                "Loading %": "",
+            })
+
+        columns = [
+            "Name", "Node", "Side", "P charge (MW)", "P discharge (MW)",
+            "Q (MVAR)", "SoC (pu)", "Energy (MWh)", "Loading %",
+        ]
+        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=columns)
+        self.tables["Ext_storage"] = df
+
+        if print_table:
+            print('--------------')
+            print('Battery energy storage (BESS)')
+            table = pt()
+            table.field_names = columns
+            for _, row in df.iterrows():
+                table.add_row([row[col] for col in columns])
+            print(table)
+
+        return df
+
     def clustering_results(self, print_table=True):
         self.clustering_time_series_statistics()
         for key in self.Grid.Clustering_information:

@@ -256,7 +256,7 @@ def analyse_grid(grid):
     """Detect enabled grid features and store boolean flags on ``grid``.
 
     Sets ``ACmode``, ``DCmode``, ``TEP_AC``, ``REC_AC``, ``TAP_tf``, ``CT_AC``,
-    ``CFC``, ``CDC``, ``GPR``, ``rs_GPR``, and ``act_gen``. Called at the start
+    ``CFC``, ``CDC``, ``GPR``, ``rs_GPR``, ``act_gen``, and ``ESS``. Called at the start
     of power-flow, OPF, and TEP entry points.
 
     Parameters
@@ -298,7 +298,7 @@ def analyse_grid(grid):
         for rs in grid.RenSources
     )
     grid.act_gen = any(gen.activate_gen_opf for gen in grid.Generators)
-    grid.Storage_mode = bool(grid.storage_elements)
+    grid.ESS = bool(grid.storage_elements)
 
     return grid.ACmode, grid.DCmode, [grid.TEP_AC, grid.TAP_tf, grid.REC_AC, grid.CT_AC], [grid.CFC, grid.CDC], grid.GPR
 
