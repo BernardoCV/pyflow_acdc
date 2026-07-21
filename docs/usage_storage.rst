@@ -4,11 +4,10 @@ Battery energy storage (BESS)
 Operation-only battery energy storage for hybrid AC/DC grids. The formulation
 follows Useche-Arteaga et al. (2026) [#useche2026]_ (§3.3); see :doc:`citing`.
 
-**Status:** Phase 1 is implemented (:class:`~pyflow_acdc.Storage_AC`,
-:class:`~pyflow_acdc.Storage_DC`, :func:`~pyflow_acdc.add_storage`). Nonlinear OPF constraints, coupled
-:func:`~pyflow_acdc.window_nl_opf`, and results export are tracked in the
-`BESS integration plan
-<https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
+Implemented: :class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`,
+:func:`~pyflow_acdc.add_storage`, NL OPF when ``grid.ESS``,
+:func:`~pyflow_acdc.window_nl_opf`, and ``Results.ext_storage`` /
+``Results.storage_window``.
 
 Related API: :doc:`api/storage`.
 
@@ -49,21 +48,23 @@ Roadmap
 -------
 
 +------------------+-----------------------------------------------------------+
-| Planned          | Description                                               |
+| Item             | Status                                                    |
 +==================+===========================================================+
-| NL OPF model     | SoC dynamics and S-circle per storage element in          |
+| NL OPF model     | Done — SoC dynamics and S-circle in                       |
 |                  | :mod:`pyflow_acdc.ACDC_OPF_NL_model`                      |
 +------------------+-----------------------------------------------------------+
-| ``window_nl_opf``   | Coupled multi-hour nonlinear OPF (paper-faithful horizon)   |
+| ``window_nl_opf``| Done — coupled multi-hour nonlinear OPF                   |
 +------------------+-----------------------------------------------------------+
-| Results          | ``Results.ext_storage`` and window time-series tables     |
+| Results          | Done — ``ext_storage``, ``storage_window``                |
++------------------+-----------------------------------------------------------+
+| PEI vs Mario     | Pending — full 24 h coupled validation                    |
 +------------------+-----------------------------------------------------------+
 | ``ts_acdc_opf``  | Myopic sequential SoC (deferred)                          |
 +------------------+-----------------------------------------------------------+
 
 Full phase list and design decisions:
-`docs/plans/bess_integration_plan.md
-<https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
+`plans/bess_integration_plan.md
+<https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md>`_.
 
 **References**
 

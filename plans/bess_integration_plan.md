@@ -11,13 +11,13 @@ Implementation plan for adding Battery Energy Storage Systems (BESS) to the nonl
 |----------|------|---------------|
 | User guide | [docs/usage_storage.rst](../usage_storage.rst) | [usage_storage](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html) |
 | API reference | [docs/api/storage.rst](../api/storage.rst) | [api/storage](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html) |
-| This plan | [docs/plans/bess_integration_plan.md](bess_integration_plan.md) | — |
+| This plan | [plans/bess_integration_plan.md](bess_integration_plan.md) | — |
 
 Permanent GitHub links (``main`` branch):
 
 - User guide: https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/usage_storage.rst
 - API: https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/api/storage.rst
-- Plan: https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md
+- Plan: https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md
 
 ---
 
@@ -819,4 +819,4 @@ M. Useche-Arteaga, P. Gebraad, V. A. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmu
 - PEI grid — `pyflow_acdc/example_grids/PF/PEI_grid.py` (hub: **`PE_Island`**)
 - User guide — [docs/usage_storage.rst](../usage_storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html)
 - API — [docs/api/storage.rst](../api/storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html)
-- Integration plan — [docs/plans/bess_integration_plan.md](bess_integration_plan.md)
+- Integration plan — [plans/bess_integration_plan.md](bess_integration_plan.md)

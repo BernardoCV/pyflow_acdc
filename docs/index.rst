@@ -47,6 +47,7 @@ API Documentation
    api/csv_import
    api/grid_mod
    api/storage
+   api/hydrogen
    api/cable_database
    api/grid_analysis
    api/results

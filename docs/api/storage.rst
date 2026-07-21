@@ -3,10 +3,8 @@ Battery energy storage
 
 :class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`, and
 :func:`~pyflow_acdc.add_storage` attach operation-only BESS elements to AC or
-DC buses. The nonlinear OPF extension and
-:func:`~pyflow_acdc.window_nl_opf` are described in the
-`integration plan
-<https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
+DC buses. Nonlinear OPF constraints and coupled multi-hour runs use
+:func:`~pyflow_acdc.window_nl_opf`.
 
 User guide: :doc:`../usage_storage`.
 

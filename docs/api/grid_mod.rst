@@ -79,11 +79,16 @@ Add Renewable Source
 Add Battery Storage
 ^^^^^^^^^^^^^^^^^^^
 
-See :doc:`storage` and :doc:`../usage_storage` for the user guide and
-`integration plan
-<https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/plans/bess_integration_plan.md>`_.
+See :doc:`storage` and :doc:`../usage_storage` for the user guide.
 
 .. autofunction:: pyflow_acdc.add_storage
+
+Add Electrolyzer
+^^^^^^^^^^^^^^^^
+
+See :doc:`hydrogen` and :doc:`../usage_hydrogen` for the user guide.
+
+.. autofunction:: pyflow_acdc.add_electrolyzer
 
 Bulk Add Generators
 ^^^^^^^^^^^^^^^^^^^
