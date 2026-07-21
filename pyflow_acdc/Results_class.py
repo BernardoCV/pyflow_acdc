@@ -131,8 +131,13 @@ class Results:
                 self.ext_ren(print_table=print_table)
             if self.Grid.storage_elements:
                 self.ext_storage(print_table=print_table)
+            if self.Grid.electrolyzers:
+                self.ext_electrolyzer(print_table=print_table)
             if getattr(self.Grid, "window_opf_run", False):
-                self.storage_window(print_table=print_table)
+                if self.Grid.storage_elements:
+                    self.storage_window(print_table=print_table)
+                if self.Grid.electrolyzers:
+                    self.hydrogen_window(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.obj_res(print_table=print_table)
             if self.Grid.Price_Zones != []:
@@ -1440,6 +1445,85 @@ class Results:
             print(summary_df.to_string(index=False))
 
         return soc_df, summary_df
+
+    def ext_electrolyzer(self, print_table=True):
+        """Report electrolyzer dispatch after snapshot NL OPF."""
+        rows = []
+        p_tot = 0.0
+        m_tot = 0.0
+
+        for el in self.Grid.electrolyzers:
+            p_mw = el.P_electrolyzer * self.Grid.S_base
+            m_kg = el.mass_H2
+            loading = el.loading
+            p_tot += p_mw
+            m_tot += m_kg
+
+            row = {
+                "Name": el.name,
+                "Node": el.Node_AC if el.connected == AcDcSide.AC else el.Node_DC,
+                "Side": el.connected.value,
+                "P (MW)": np.round(p_mw, decimals=self.dec),
+                "mass_H2 (kg)": np.round(m_kg, decimals=self.dec),
+                "Loading %": np.round(loading, decimals=self.dec),
+            }
+            if el.connected == AcDcSide.AC:
+                row["Q (MVAR)"] = np.round(el.Q_electrolyzer * self.Grid.S_base, decimals=self.dec)
+            else:
+                row["Q (MVAR)"] = "----"
+            rows.append(row)
+
+        if rows:
+            rows.append({
+                "Name": "Total",
+                "Node": "",
+                "Side": "",
+                "P (MW)": np.round(p_tot, decimals=self.dec),
+                "mass_H2 (kg)": np.round(m_tot, decimals=self.dec),
+                "Loading %": "",
+                "Q (MVAR)": "",
+            })
+
+        columns = ["Name", "Node", "Side", "P (MW)", "Q (MVAR)", "mass_H2 (kg)", "Loading %"]
+        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=columns)
+        self.tables["Ext_electrolyzer"] = df
+
+        if print_table:
+            print('--------------')
+            print('Electrolyzer / H₂ storage')
+            table = pt()
+            table.field_names = columns
+            for _, row in df.iterrows():
+                table.add_row([row[col] for col in columns])
+            print(table)
+
+        return df
+
+    def hydrogen_window(self, print_table=True):
+        """Report H₂ trajectories after coupled ``window_nl_opf``."""
+        if not getattr(self.Grid, "window_opf_run", False):
+            raise RuntimeError("window_nl_opf has not been run on this grid")
+
+        results = self.Grid.window_opf_results
+        m_df = results['hydrogen_mass_H2'].copy()
+        pe_df = results['hydrogen_P_e'].copy()
+
+        for df in (m_df, pe_df):
+            numeric_cols = df.select_dtypes(include='number').columns
+            df[numeric_cols] = df[numeric_cols].round(self.dec)
+
+        self.tables["Hydrogen_window_mass_H2"] = m_df
+        self.tables["Hydrogen_window_P_e"] = pe_df
+
+        if print_table:
+            print('--------------')
+            print('H₂ mass trajectory (kg, by frame)')
+            print(m_df.to_string(index=False))
+            print('--------------')
+            print('Electrolyzer P (MW, by frame)')
+            print(pe_df.to_string(index=False))
+
+        return m_df, pe_df
 
     def clustering_results(self, print_table=True):
         self.clustering_time_series_statistics()

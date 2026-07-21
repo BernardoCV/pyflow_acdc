@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Coupled window NL OPF with BESS (frame blocks + parent SoC links)."""
+"""Coupled window NL OPF with BESS and electrolyzer (frame blocks + parent links)."""
 
 import time
 
@@ -84,6 +84,36 @@ def window_soc_constraints(model, grid, storage_info, frames):
                     model.frame_model[t_last].SoC_DC[s] == st.soc_final)
 
 
+def window_h2_constraints(model, grid, hydrogen_info, frames):
+    """Parent-level H₂ mass chain across ``frame_model`` blocks."""
+    ordered = list(frames)
+
+    model.window_h2_constraint = pyo.ConstraintList()
+
+    for i, t in enumerate(ordered):
+        block = model.frame_model[t]
+        for el in grid.electrolyzers:
+            e = el.electrolyzerNumber
+            h_prod = (
+                el.b_h * block.P_electrolyzer[e] * el.S_base * el.dt_hours + el.c_h)
+            if i == 0:
+                model.window_h2_constraint.add(
+                    block.mass_H2[e] == el.H2_mass_initial + h_prod)
+            else:
+                t_prev = ordered[i - 1]
+                model.window_h2_constraint.add(
+                    block.mass_H2[e] == model.frame_model[t_prev].mass_H2[e] + h_prod)
+
+    if ordered:
+        t_last = ordered[-1]
+        for el in grid.electrolyzers:
+            if el.H2_mass_final is None:
+                continue
+            e = el.electrolyzerNumber
+            model.window_h2_constraint.add(
+                model.frame_model[t_last].mass_H2[e] == el.H2_mass_final)
+
+
 def _create_frame_blocks(
     model,
     grid,
@@ -106,6 +136,7 @@ def _create_frame_blocks(
 
     opf_data = translate_pyf_opf(grid, Price_Zones=price_zones)
     storage_info = opf_data['storage_info']
+    hydrogen_info = opf_data['hydrogen_info']
 
     for t in frames:
         base_copy = base_model.clone()
@@ -118,7 +149,7 @@ def _create_frame_blocks(
         if grid.nn_DC != 0 and any(conv.OPF_fx for conv in grid.Converters_ACDC):
             fx_conv(model.frame_model[t], grid)
 
-    return storage_info
+    return storage_info, hydrogen_info
 
 
 def export_window_opf_results(model, grid, frames):
@@ -168,7 +199,7 @@ def export_window_opf_results(model, grid, frames):
             'Round-trip efficiency': rt_eff,
         })
 
-    return {
+    results = {
         'storage_soc': pd.DataFrame(rows_soc),
         'storage_P_charge': pd.DataFrame(rows_pc),
         'storage_P_discharge': pd.DataFrame(rows_pd),
@@ -176,6 +207,24 @@ def export_window_opf_results(model, grid, frames):
         'storage_summary': pd.DataFrame(summary_rows),
         'total_objective': np.float64(pyo.value(model.obj)),
     }
+
+    if grid.electrolyzers:
+        rows_m = []
+        rows_pe = []
+        for t in frames:
+            block = model.frame_model[t]
+            row_m = {'frame': t}
+            row_pe = {'frame': t}
+            for el in grid.electrolyzers:
+                e = el.electrolyzerNumber
+                row_m[el.name] = np.float64(pyo.value(block.mass_H2[e]))
+                row_pe[el.name] = np.float64(pyo.value(block.P_electrolyzer[e])) * grid.S_base
+            rows_m.append(row_m)
+            rows_pe.append(row_pe)
+        results['hydrogen_mass_H2'] = pd.DataFrame(rows_m)
+        results['hydrogen_P_e'] = pd.DataFrame(rows_pe)
+
+    return results
 
 
 def window_nl_opf(
@@ -195,8 +244,9 @@ def window_nl_opf(
     """Build and solve a coupled NL OPF over frames ``start…end`` (0-based, inclusive).
 
     Each frame is a snapshot NL block (``window_block=True``); parent
-    ``window_soc_constraint`` links SoC across frames. Requires ``grid.ESS`` and
-    ``grid.Time_series``. Step duration is ``Storage_* .dt_hours`` (default 1 h);
+    ``window_soc_constraint`` links SoC across frames; ``window_h2_constraint`` links
+    H₂ inventory when ``grid.H2``. Requires ``grid.ESS`` or ``grid.H2`` and
+    ``grid.Time_series``. Step duration is element ``dt_hours`` (default 1 h);
     frame indices index ``Time_series.data[t]``.
 
     Parameters
@@ -232,8 +282,9 @@ def window_nl_opf(
     grid.reset_run_flags()
     analyse_grid(grid)
 
-    if not grid.ESS:
-        raise ValueError("window_nl_opf requires at least one storage element (grid.ESS)")
+    if not grid.ESS and not grid.H2:
+        raise ValueError(
+            "window_nl_opf requires at least one storage or electrolyzer element")
 
     if not grid.Time_series:
         raise ValueError("window_nl_opf requires grid.Time_series")
@@ -257,7 +308,7 @@ def window_nl_opf(
     model.frame_model = pyo.Block(model.frames)
 
     t1 = time.perf_counter()
-    storage_info = _create_frame_blocks(
+    storage_info, hydrogen_info = _create_frame_blocks(
         model,
         grid,
         frames,
@@ -267,7 +318,10 @@ def window_nl_opf(
         weights_def,
         OnlyGen,
     )
-    window_soc_constraints(model, grid, storage_info, frames)
+    if grid.ESS:
+        window_soc_constraints(model, grid, storage_info, frames)
+    if grid.H2:
+        window_h2_constraints(model, grid, hydrogen_info, frames)
 
     obj_total = _sum_frame_objectives(model, frames)
     if obj_scaling != 1.0:

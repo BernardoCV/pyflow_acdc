@@ -593,6 +593,10 @@ def translate_pyf_opf(grid,Price_Zones=False):
     storage_info = pack_variables(
         lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number)
 
+    lista_electrolyzer = [e.electrolyzerNumber for e in grid.electrolyzers]
+    electrolyzer_by_number = {e.electrolyzerNumber: e for e in grid.electrolyzers}
+    hydrogen_info = pack_variables(lista_electrolyzer, electrolyzer_by_number)
+
     "Price zone info"
 
     price_zone_prices, price_zone_as, price_zone_bs, PGL_min, PGL_max =  {}, {}, {}, {}, {}
@@ -763,6 +767,7 @@ def translate_pyf_opf(grid,Price_Zones=False):
         'Price_Zone_info': Price_Zone_info,
         'gen_info': gen_info,
         'storage_info': storage_info,
+        'hydrogen_info': hydrogen_info,
     }
 
 

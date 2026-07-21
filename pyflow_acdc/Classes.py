@@ -40,6 +40,7 @@ __all__ = [
     'Gen_DC',
     'Storage_AC',
     'Storage_DC',
+    'Electrolyzer',
     'Ren_Source',
     'Node_AC',
     'Node_DC',
@@ -231,6 +232,7 @@ class Grid:
         self.RenSource_zones_dic={}
         self.RenSources =[]
         self.storage_elements = []
+        self.electrolyzers = []
         self.rs2node = {'DC': {},
                         'AC': {}}
 
@@ -379,6 +381,10 @@ class Grid:
     @property
     def nstorage(self):
         return len(self.storage_elements) if self.storage_elements is not None else 0
+
+    @property
+    def nelectrolyzers(self):
+        return len(self.electrolyzers) if self.electrolyzers is not None else 0
 
     @property
     def tol_scaler(self):
@@ -1209,6 +1215,17 @@ class Gen_AC:
 
 
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type=DEFAULT_GEN_TYPE,installation_cost:float=0,S_base:float=100,np_gen: int = 1):
+        if S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if Min_pow_gen > Max_pow_gen:
+            raise ValueError("Min_pow_gen must be <= Max_pow_gen")
+        if Min_pow_genR > Max_pow_genR:
+            raise ValueError("Min_pow_genR must be <= Max_pow_genR")
+        if np_gen < 0:
+            raise ValueError("np_gen must be >= 0")
+        if S_rated is not None and S_rated <= 0:
+            raise ValueError("S_rated must be positive when provided")
+
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
         self.S_base = S_base
@@ -1362,6 +1379,13 @@ class Gen_DC:
 
 
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type=DEFAULT_GEN_TYPE,installation_cost:float=0,S_base:float=100,np_gen: int = 1):
+        if S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if Min_pow_gen > Max_pow_gen:
+            raise ValueError("Min_pow_gen must be <= Max_pow_gen")
+        if np_gen < 0:
+            raise ValueError("np_gen must be >= 0")
+
         self.genNumber_DC = Gen_DC.genNumber_DC
         Gen_DC.genNumber_DC += 1
 
@@ -1739,6 +1763,138 @@ class Storage_DC:
         Storage_DC.names.add(self.name)
 
 
+class Electrolyzer:
+    """Electrolyzer with linear H₂ production and inventory (paper §3.4).
+
+    Single class for AC and DC buses (``connected`` flag, like :class:`Ren_Source`).
+    Active power ``P_electrolyzer`` is a **load**. On AC, optional ``Q_electrolyzer``
+    bounds allow reactive compensation. ``mass_H2`` is in **kg**.
+    """
+    electrolyzerNumber = 0
+    names = set()
+
+    @classmethod
+    def reset_class(cls):
+        cls.electrolyzerNumber = 0
+        cls.names = set()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.P_max *= rate
+                self.P_min *= rate
+                self.P_electrolyzer *= rate
+                if self.connected == AcDcSide.AC:
+                    self.Q_min *= rate
+                    self.Q_max *= rate
+                    self.Q_electrolyzer *= rate
+        self._S_base = new_S_base
+
+    @property
+    def loading(self):
+        return self.P_electrolyzer / self.P_max * 100 if self.P_max > 0 else 0.0
+
+    def __init__(
+        self,
+        name,
+        node,
+        connected,
+        P_max: float,
+        P_min: float,
+        b_h: float,
+        c_h: float,
+        H2_mass_max: float,
+        H2_mass_initial: float = 0.0,
+        H2_mass_final=None,
+        Q_min: float = 0.0,
+        Q_max: float = 0.0,
+        S_base: float = 100,
+        dt_hours: float = 1.0,
+    ):
+        if connected not in (AcDcSide.AC, AcDcSide.DC):
+            raise ValueError("connected must be AcDcSide.AC or AcDcSide.DC")
+        if P_max <= 0:
+            raise ValueError("P_max must be positive")
+        if P_min < 0 or P_min > P_max:
+            raise ValueError("P_min must satisfy 0 <= P_min <= P_max")
+        if H2_mass_max <= 0:
+            raise ValueError("H2_mass_max must be positive")
+        if not (0 <= H2_mass_initial <= H2_mass_max):
+            raise ValueError("H2_mass_initial must lie within [0, H2_mass_max]")
+        if H2_mass_final is not None and not (0 <= H2_mass_final <= H2_mass_max):
+            raise ValueError("H2_mass_final must lie within [0, H2_mass_max]")
+        if connected == AcDcSide.AC and Q_min > Q_max:
+            raise ValueError("Q_min must be <= Q_max")
+        if dt_hours <= 0:
+            raise ValueError("dt_hours must be positive")
+
+        self.electrolyzerNumber = Electrolyzer.electrolyzerNumber
+        Electrolyzer.electrolyzerNumber += 1
+        self.S_base = S_base
+        self.connected = connected
+
+        self.Node = node.name
+        self._node = node
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
+        self.geometry = node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+
+        if connected == AcDcSide.AC:
+            self.Node_AC = node.name
+            self.Q_min = Q_min
+            self.Q_max = Q_max
+            self.Q_electrolyzer = 0.0
+        else:
+            self.Node_DC = node.name
+            self.Q_min = 0.0
+            self.Q_max = 0.0
+            self.Q_electrolyzer = 0.0
+
+        self.P_max = P_max
+        self.P_min = P_min
+        self.b_h = b_h
+        self.c_h = c_h
+        self.H2_mass_max = float(H2_mass_max)
+        self.H2_mass_initial = float(H2_mass_initial)
+        self.H2_mass_final = H2_mass_final
+        self.dt_hours = dt_hours
+
+        self.P_electrolyzer = 0.0
+        self.mass_H2 = H2_mass_initial
+
+        node.connected_electrolyzer.append(self)
+
+        if name in Electrolyzer.names:
+            count = 1
+            new_name = f"{name}_{count}"
+            while new_name in Electrolyzer.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
+        if name is None:
+            self._name = f"electrolyzer_{node.name}"
+        else:
+            self._name = name
+
+        Electrolyzer.names.add(self.name)
+
+
 class Ren_Source:
     """Renewable generation source attached to a node.
 
@@ -1839,6 +1995,15 @@ class Ren_Source:
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
 
     def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100,installation_cost:float=0,Max_S_factor:float=1,np_rsgen: int = 1):
+        if S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if PGi_ren_base < 0:
+            raise ValueError("PGi_ren_base must be >= 0")
+        if np_rsgen < 0:
+            raise ValueError("np_rsgen must be >= 0")
+        if Max_S_factor <= 0:
+            raise ValueError("Max_S_factor must be positive")
+
         self.rsNumber = Ren_Source.rsNumber
         Ren_Source.rsNumber += 1
 
@@ -2082,6 +2247,7 @@ class Node_AC:
         self.connected_gen=[]
         self.connected_RenSource=[]
         self.connected_storage=[]
+        self.connected_electrolyzer=[]
 
         self.connected_toExpLine=[]
         self.connected_fromExpLine=[]
@@ -2332,6 +2498,7 @@ class Node_DC:
         self.connected_gen=[]
         self.connected_RenSource=[]
         self.connected_storage=[]
+        self.connected_electrolyzer=[]
 
         self.PGi_ren = 0
         self.PGi_opt = 0
