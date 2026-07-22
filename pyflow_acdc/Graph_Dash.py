@@ -17,10 +17,39 @@ from plotly.subplots import make_subplots
 __all__ = [
     'run_dash',
     'run_ts_dash',
+    'run_window_dash',
     'run_mp_ts_dash',
     'create_mp_ts_dash',
+    'create_dash_app',
+    'create_window_dash_app',
     'plot_TS_res_from_ts',
     'plot_TS_res_dash',
+    'plot_window_res_dash',
+]
+
+_TS_PLOT_CHOICES = [
+    'Power Generation by price zone',
+    'Power Generation by generator',
+    'Power Generation by price zone area chart',
+    'Power Generation by generator area chart',
+    'Market Prices',
+    'AC line loading',
+    'DC line loading',
+    'AC/DC Converters',
+    'Curtailment',
+]
+
+_WINDOW_PLOT_CHOICES = [
+    'Storage SoC',
+    'Storage charge',
+    'Storage discharge',
+    'Storage Q',
+    'Hydrogen mass',
+    'Hydrogen power',
+    'Generator power',
+    'Generator price',
+    'Renewable power',
+    'Renewable price',
 ]
 
 _MP_PLOT_CHOICES = [
@@ -87,8 +116,61 @@ def _get_df_and_label_from_ts(time_series_results, S_base, plotting_choice):
     return None, ''
 
 
+def _frame_column_to_index(df):
+    """Turn window result tables (``frame`` column) into TS-style indexed frames."""
+    if df is None:
+        return None
+    if 'frame' not in getattr(df, 'columns', []):
+        return df
+    out = df.set_index('frame')
+    out.index.name = None
+    return out
+
+
+def _get_df_and_label_from_window(window_opf_results, plotting_choice):
+    """Resolve (dataframe, y-axis label) from ``grid.window_opf_results``."""
+    key_map = {
+        'Storage SoC': ('storage_soc', 'SoC'),
+        'Storage charge': ('storage_P_charge', 'Charge (MW)'),
+        'Storage discharge': ('storage_P_discharge', 'Discharge (MW)'),
+        'Storage Q': ('storage_Q', 'Q (MVAr)'),
+        'Hydrogen mass': ('hydrogen_mass_H2', 'H₂ mass (kg)'),
+        'Hydrogen power': ('hydrogen_P_e', 'Electrolyser P (MW)'),
+        'Generator power': ('gen_power', 'Generator P (MW)'),
+        'Generator price': ('gen_price', 'Generator price (EUR/MWh)'),
+        'Renewable power': ('ren_power', 'Renewable P (MW)'),
+        'Renewable price': ('ren_price', 'Renewable price (EUR/MWh)'),
+    }
+    entry = key_map.get(plotting_choice)
+    if entry is None:
+        return None, ''
+    key, label = entry
+    df = window_opf_results.get(key)
+    return _frame_column_to_index(df), label if df is not None else ''
+
+
 def _get_df_and_label(grid, plotting_choice):
+    if getattr(grid, 'window_opf_run', False) and getattr(grid, 'window_opf_results', None):
+        return _get_df_and_label_from_window(grid.window_opf_results, plotting_choice)
     return _get_df_and_label_from_ts(grid.time_series_results, grid.S_base, plotting_choice)
+
+
+def _window_opf_usable(grid):
+    return (
+        getattr(grid, 'window_opf_run', False)
+        and isinstance(getattr(grid, 'window_opf_results', None), dict)
+        and bool(grid.window_opf_results)
+    )
+
+
+def _available_window_plot_choices(grid):
+    res = grid.window_opf_results
+    choices = []
+    for choice in _WINDOW_PLOT_CHOICES:
+        df, _ = _get_df_and_label_from_window(res, choice)
+        if df is not None and not df.empty:
+            choices.append(choice)
+    return choices
 
 
 def plot_TS_res_from_ts(
@@ -215,10 +297,55 @@ def plot_TS_res_dash(grid, plotting_choice, selected_rows, x_limits=None, y_limi
     )
 
 
-def create_dash_app(grid):
-    app = dash.Dash(__name__)
+def plot_window_res_dash(grid, plotting_choice, selected_rows, x_limits=None, y_limits=None):
+    """Build one Plotly figure from ``grid.window_opf_results`` (Dash callback helper)."""
+    df, y_label = _get_df_and_label_from_window(grid.window_opf_results, plotting_choice)
+    if df is None or df.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            title=f"Window OPF: {plotting_choice}",
+            xaxis_title="Frame",
+            yaxis_title=y_label if y_label else "Value",
+        )
+        return fig
 
-    # Custom CSS for better styling
+    # Reuse the TS figure builder by stuffing a one-key mapping with already-scaled df.
+    # plot_TS_res_from_ts multiplies some TS keys by S_base; window data is already in
+    # engineering units, so we pass through a fake TS key path via direct figure build.
+    time = df.index
+    fig = go.Figure()
+    cols = selected_rows if selected_rows else list(df.columns)
+    for col in cols:
+        if col not in df.columns:
+            continue
+        fig.add_trace(go.Scatter(x=time, y=df[col], mode='lines', name=str(col)))
+    fig.update_layout(
+        title=f"Window OPF: {plotting_choice}",
+        xaxis_title="Frame",
+        yaxis_title=y_label,
+        legend_title="Elements",
+    )
+    if x_limits is not None and x_limits[0] is not None and x_limits[1] is not None:
+        fig.update_xaxes(range=list(x_limits))
+    if y_limits is not None and y_limits[0] is not None and y_limits[1] is not None:
+        fig.update_yaxes(range=list(y_limits))
+    return fig
+
+
+def _build_dual_plot_dash_app(
+    grid,
+    *,
+    title,
+    plot_choices,
+    default_choice_1,
+    default_choice_2,
+    plot_fn,
+    x_axis_label='Time',
+):
+    """Shared dual-plot Dash layout used by TS and window apps."""
+    app = dash.Dash(__name__)
+    dd_options = [{'label': c, 'value': c} for c in plot_choices]
+
     app.layout = html.Div(style={
         'maxWidth': '1200px',
         'margin': '0 auto',
@@ -226,30 +353,18 @@ def create_dash_app(grid):
         'fontFamily': 'Arial, sans-serif',
         'backgroundColor': '#f5f6fa'
     }, children=[
-        html.H1(f"{grid.name} Time Series Dashboard",
+        html.H1(title,
                 style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '30px'}),
 
-        # First Plot Controls
         html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
             html.H3("Plot 1", style={'color': '#2c3e50', 'marginBottom': '15px'}),
             html.Label("Select Plot Type:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
             dcc.Dropdown(
                 id='plotting-choice-1',
-                options=[
-                    {'label': 'Power Generation by price zone', 'value': 'Power Generation by price zone'},
-                    {'label': 'Power Generation by generator', 'value': 'Power Generation by generator'},
-                    {'label': 'Power Generation by price zone area chart', 'value': 'Power Generation by price zone area chart'},
-                    {'label': 'Power Generation by generator area chart', 'value': 'Power Generation by generator area chart'},
-                    {'label': 'Market Prices', 'value': 'Market Prices'},
-                    {'label': 'AC line loading', 'value': 'AC line loading'},
-                    {'label': 'DC line loading', 'value': 'DC line loading'},
-                    {'label': 'AC/DC Converters', 'value': 'AC/DC Converters'},
-                    {'label': 'Curtailment', 'value': 'Curtailment'}
-                ],
-                value='Power Generation by price zone',
+                options=dd_options,
+                value=default_choice_1,
                 style={'marginBottom': '20px'}
             ),
-
             html.Label("Select Components:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
             dcc.Checklist(
                 id='subplot-selection-1',
@@ -258,7 +373,6 @@ def create_dash_app(grid):
                 inline=True,
                 style={'marginBottom': '20px'}
             ),
-
             html.Div(style={'display': 'flex', 'gap': '20px', 'marginBottom': '20px'}, children=[
                 html.Div(style={'flex': 1}, children=[
                     html.Label('Y-axis limits:', style={'fontWeight': 'bold'}),
@@ -270,7 +384,6 @@ def create_dash_app(grid):
             ])
         ]),
 
-        # Toggle for second plot
         html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
             html.Label("Show Second Plot:", style={'fontWeight': 'bold', 'marginRight': '10px'}),
             dcc.RadioItems(
@@ -284,28 +397,16 @@ def create_dash_app(grid):
             )
         ]),
 
-        # Second Plot Controls (hidden by default)
         html.Div(id='plot-2-controls', style={'display': 'none'}, children=[
             html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
                 html.H3("Plot 2", style={'color': '#2c3e50', 'marginBottom': '15px'}),
                 html.Label("Select Plot Type:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
                 dcc.Dropdown(
                     id='plotting-choice-2',
-                    options=[
-                        {'label': 'Power Generation by price zone', 'value': 'Power Generation by price zone'},
-                        {'label': 'Power Generation by generator', 'value': 'Power Generation by generator'},
-                        {'label': 'Power Generation by price zone area chart', 'value': 'Power Generation by price zone area chart'},
-                        {'label': 'Power Generation by generator area chart', 'value': 'Power Generation by generator area chart'},
-                        {'label': 'Market Prices', 'value': 'Market Prices'},
-                        {'label': 'AC line loading', 'value': 'AC line loading'},
-                        {'label': 'DC line loading', 'value': 'DC line loading'},
-                        {'label': 'AC/DC Converters', 'value': 'AC/DC Converters'},
-                        {'label': 'Curtailment', 'value': 'Curtailment'}
-                    ],
-                    value='Market Prices',
+                    options=dd_options,
+                    value=default_choice_2,
                     style={'marginBottom': '20px'}
                 ),
-
                 html.Label("Select Components:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
                 dcc.Checklist(
                     id='subplot-selection-2',
@@ -314,7 +415,6 @@ def create_dash_app(grid):
                     inline=True,
                     style={'marginBottom': '20px'}
                 ),
-
                 html.Div(style={'display': 'flex', 'gap': '20px', 'marginBottom': '20px'}, children=[
                     html.Div(style={'flex': 1}, children=[
                         html.Label('Y-axis limits:', style={'fontWeight': 'bold'}),
@@ -327,16 +427,14 @@ def create_dash_app(grid):
             ])
         ]),
 
-        # Common X-axis controls
         html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
-            html.Label('X-axis limits:', style={'fontWeight': 'bold'}),
+            html.Label(f'X-axis limits ({x_axis_label}):', style={'fontWeight': 'bold'}),
             html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
                 dcc.Input(id='x-min', type='number', placeholder='Min', style={'flex': 1, 'padding': '5px'}),
                 dcc.Input(id='x-max', type='number', placeholder='Max', style={'flex': 1, 'padding': '5px'})
             ])
         ]),
 
-        # Plots
         html.Div(style={
             'backgroundColor': 'white',
             'padding': '20px',
@@ -378,10 +476,8 @@ def create_dash_app(grid):
 
         cols_1 = get_columns(plotting_choice_1)
         cols_2 = get_columns(plotting_choice_2)
-
         options_1 = [{'label': col, 'value': col} for col in cols_1]
         options_2 = [{'label': col, 'value': col} for col in cols_2]
-
         return options_1, cols_1, options_2, cols_2
 
     @app.callback(
@@ -395,24 +491,21 @@ def create_dash_app(grid):
     def update_limits(plotting_choice_1, plotting_choice_2):
         def get_limits(plotting_choice):
             data, _ = _get_df_and_label(grid, plotting_choice)
-            if data is None:
+            if data is None or data.empty:
                 return 0, 1
-
-            if not data.empty:
-                y_min = int(min(0, data.min().min() - 5))
-                if plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']:
-                    cumulative_sum = data.sum(axis=1)
-                    y_max = int(cumulative_sum.max() + 10)
-                elif plotting_choice in ['AC line loading', 'DC line loading', 'Curtailment']:
-                    y_max = int(min(data.max().max() + 10, 100))
-                else:
-                    y_max = int(data.max().max() + 10)
-                return y_min, y_max
-            return 0, 1
+            y_min = int(min(0, data.min().min() - 5))
+            if plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']:
+                y_max = int(data.sum(axis=1).max() + 10)
+            elif plotting_choice in ['AC line loading', 'DC line loading', 'Curtailment']:
+                y_max = int(min(data.max().max() + 10, 100))
+            elif plotting_choice == 'Storage SoC':
+                y_min, y_max = 0, 1
+            else:
+                y_max = int(data.max().max() + 10)
+            return y_min, y_max
 
         y_min_1, y_max_1 = get_limits(plotting_choice_1)
         y_min_2, y_max_2 = get_limits(plotting_choice_2)
-
         return y_min_1, y_max_1, y_min_2, y_max_2
 
     @app.callback(
@@ -436,17 +529,49 @@ def create_dash_app(grid):
         y_limits_1 = (y_min_1, y_max_1) if y_min_1 is not None and y_max_1 is not None else None
         y_limits_2 = (y_min_2, y_max_2) if y_min_2 is not None and y_max_2 is not None else None
 
-        fig1 = plot_TS_res_dash(grid, plotting_choice_1, selected_rows_1, x_limits=x_limits, y_limits=y_limits_1)
-
-        # Only create second plot if it's enabled
+        fig1 = plot_fn(grid, plotting_choice_1, selected_rows_1, x_limits=x_limits, y_limits=y_limits_1)
         if show_plot_2:
-            fig2 = plot_TS_res_dash(grid, plotting_choice_2, selected_rows_2, x_limits=x_limits, y_limits=y_limits_2)
+            fig2 = plot_fn(grid, plotting_choice_2, selected_rows_2, x_limits=x_limits, y_limits=y_limits_2)
         else:
-            fig2 = go.Figure()  # Empty figure when plot 2 is disabled
-
+            fig2 = go.Figure()
         return fig1, fig2
 
     return app
+
+
+def create_dash_app(grid):
+    """Dash app for sequential TS OPF results (``grid.time_series_results``)."""
+    return _build_dual_plot_dash_app(
+        grid,
+        title=f"{grid.name} Time Series Dashboard",
+        plot_choices=_TS_PLOT_CHOICES,
+        default_choice_1='Power Generation by price zone',
+        default_choice_2='Market Prices',
+        plot_fn=plot_TS_res_dash,
+        x_axis_label='Time',
+    )
+
+
+def create_window_dash_app(grid):
+    """Dash app for coupled window NL OPF results (``grid.window_opf_results``)."""
+    if not _window_opf_usable(grid):
+        raise ValueError(
+            "create_window_dash_app requires grid.window_opf_run and grid.window_opf_results"
+        )
+    choices = _available_window_plot_choices(grid)
+    if not choices:
+        raise ValueError("window_opf_results has no plottable storage/hydrogen series")
+    default_1 = choices[0]
+    default_2 = choices[1] if len(choices) > 1 else choices[0]
+    return _build_dual_plot_dash_app(
+        grid,
+        title=f"{getattr(grid, 'name', 'grid')} Window OPF Dashboard",
+        plot_choices=choices,
+        default_choice_1=default_1,
+        default_choice_2=default_2,
+        plot_fn=plot_window_res_dash,
+        x_axis_label='Frame',
+    )
 
 
 def _ts_inv_usable(grid):
@@ -460,23 +585,37 @@ def run_ts_dash(grid, debug=True, use_reloader=False):
     app.run(debug=debug, use_reloader=use_reloader)
 
 
+def run_window_dash(grid, debug=True, use_reloader=False):
+    """Run the window NL OPF Dash app (requires ``grid.window_opf_run``)."""
+    app = create_window_dash_app(grid)
+    app.run(debug=debug, use_reloader=use_reloader)
+
+
 def run_dash(grid, debug=True, use_reloader=False):
     """
     Start the appropriate Dash app from grid run flags (same family as ``Grid.reset_run_flags``).
 
-    * ``grid.dash_mode`` optional: ``'auto'`` (default), ``'mp_ts'``, or ``'single_ts'``.
+    * ``grid.dash_mode`` optional: ``'auto'`` (default), ``'mp_ts'``, ``'single_ts'``,
+      or ``'window'``.
 
     **auto** (precedence):
 
-    1. ``MP_TEP_run`` or ``MP_MS_TEP_run`` and ``grid.ts_inv`` populated (MS TS-OPF post-processing)
+    1. ``window_opf_run`` with ``grid.window_opf_results`` → window OPF dashboard.
+    2. ``MP_TEP_run`` or ``MP_MS_TEP_run`` and ``grid.ts_inv`` populated (MS TS-OPF post-processing)
        → multi-period TS dashboard.
-    2. Else ``Time_series_ran`` → single-grid TS dashboard.
-    3. Else raise ``ValueError``.
+    3. Else ``Time_series_ran`` → single-grid TS dashboard.
+    4. Else raise ``ValueError``.
     """
     mode = getattr(grid, 'dash_mode', 'auto')
-    if mode not in ('auto', 'mp_ts', 'single_ts'):
+    if mode not in ('auto', 'mp_ts', 'single_ts', 'window'):
         mode = 'auto'
 
+    if mode == 'window':
+        if not _window_opf_usable(grid):
+            raise ValueError(
+                'run_dash: dash_mode=window requires grid.window_opf_run and grid.window_opf_results'
+            )
+        return run_window_dash(grid, debug=debug, use_reloader=use_reloader)
     if mode == 'mp_ts':
         if not _ts_inv_usable(grid):
             raise ValueError('run_dash: dash_mode=mp_ts requires grid.ts_inv from MS TS-OPF (run_opf_for_all_investment_periods MS=True).')
@@ -490,6 +629,8 @@ def run_dash(grid, debug=True, use_reloader=False):
         return run_ts_dash(grid, debug=debug, use_reloader=use_reloader)
 
     # auto
+    if _window_opf_usable(grid):
+        return run_window_dash(grid, debug=debug, use_reloader=use_reloader)
     if (getattr(grid, 'MP_TEP_run', False) or getattr(grid, 'MP_MS_TEP_run', False)) and _ts_inv_usable(grid):
         return run_mp_ts_dash(
             grid.ts_inv,
@@ -501,8 +642,10 @@ def run_dash(grid, debug=True, use_reloader=False):
         return run_ts_dash(grid, debug=debug, use_reloader=use_reloader)
 
     raise ValueError(
-        'run_dash (auto): need either (MP_TEP_run or MP_MS_TEP_run) with grid.ts_inv, '
-        'or Time_series_ran after TS_ACDC_OPF. Override with grid.dash_mode=\'mp_ts\' or \'single_ts\'.'
+        'run_dash (auto): need window_opf_run with window_opf_results, '
+        'or (MP_TEP_run or MP_MS_TEP_run) with grid.ts_inv, '
+        'or Time_series_ran after TS_ACDC_OPF. '
+        "Override with grid.dash_mode='window', 'mp_ts', or 'single_ts'."
     )
 
 

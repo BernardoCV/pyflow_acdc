@@ -38,8 +38,7 @@ __all__ = [
     'Grid',
     'Gen_AC',
     'Gen_DC',
-    'Storage_AC',
-    'Storage_DC',
+    'Storage',
     'Electrolyser',
     'Ren_Source',
     'Node_AC',
@@ -1143,8 +1142,8 @@ class Gen_AC:
     ----------
     PGen, QGen : float
         Total dispatched active/reactive power (setpoint × ``np_gen``; OPF result after solve).
-    price_zone_link : bool
-        If ``True``, ``lf``/``qf`` track the host price zone.
+    price_link : bool
+        If ``True``, ``lf`` tracks the host bus ``node.price``.
     is_ext_grid : bool
         External-grid (slack) generator flag.
     """
@@ -1293,7 +1292,7 @@ class Gen_AC:
             self.cost_perMVA = installation_cost
 
 
-        self.price_zone_link = False
+        self.price_link = False
         self.is_ext_grid = False
         self.allow_sell = True
         self.p_load_base = 0.0
@@ -1427,7 +1426,7 @@ class Gen_DC:
         self.life_time = 50
         self.base_cost = installation_cost
 
-        self.price_zone_link = False
+        self.price_link = False
 
         node.connected_gen.append(self)
 
@@ -1454,51 +1453,17 @@ class Gen_DC:
         Gen_DC.names.add(self.name)
 
 
-class Storage_AC:
-    """AC battery energy storage (BESS) connected to a bus.
+class Storage:
+    """Battery energy storage (BESS) on an AC or DC bus.
 
-    Operation-only storage element for nonlinear OPF. The formulation follows
-    Useche-Arteaga et al. (2026), *Wind Energ. Sci.* 11, 349–372 (§3.3).
+    Single class for AC and DC (``connected`` flag, like :class:`Electrolyser`).
+    Operation-only element for nonlinear OPF (Useche-Arteaga et al. 2026 §3.3).
 
     Sign convention: net active power **injected into the bus** is
     ``P_discharge - P_charge`` (discharge counts as generation).
 
-    SoC is tracked in **pu** (fraction of ``E_max``). ``E_max`` is the physical
-    energy capacity in MWh (reserved for future degradation modelling).
-
-    Parameters
-    ----------
-    name : str
-        Storage identifier.
-    node : Node_AC
-        Host bus.
-    E_max : float
-        Energy capacity in MWh.
-    P_charge_max : float
-        Maximum charging power in pu on ``S_base``.
-    P_discharge_max : float
-        Maximum discharging power in pu on ``S_base``.
-    S_max : float
-        Apparent-power rating in pu on ``S_base``.
-    eta_charge : float
-        Charging efficiency in (0, 1].
-    eta_discharge : float
-        Discharging efficiency in (0, 1].
-    soc_min, soc_max : float
-        State-of-charge bounds in pu.
-    soc_initial : float
-        Initial SoC in pu.
-    soc_final : float or None
-        Terminal SoC in pu for horizon OPF; ``None`` skips the constraint.
-    S_base : float
-        Per-unit power base in MVA.
-    dt_hours : float
-        Timestep duration in hours (default 1).
-
-    Attributes
-    ----------
-    P_charge, P_discharge, Q, SoC : float
-        Last solved dispatch in pu (``SoC`` in pu of ``E_max``).
+    SoC is in **pu** (fraction of ``E_max``). ``E_max`` is physical capacity in MWh.
+    On AC: ``S_max`` and optional ``Q``. On DC: ``P_max`` net active limit.
     """
     storageNumber = 0
     names = set()
@@ -1526,147 +1491,13 @@ class Storage_AC:
                 rate = old_S_base / new_S_base
                 self.P_charge_max *= rate
                 self.P_discharge_max *= rate
-                self.S_max *= rate
                 self.P_charge *= rate
                 self.P_discharge *= rate
-                self.Q *= rate
-        self._S_base = new_S_base
-
-    @property
-    def energy_MWh(self):
-        return self.SoC * self.E_max
-
-    @property
-    def apparent_pu(self):
-        p_net = self.P_discharge - self.P_charge
-        return (p_net ** 2 + self.Q ** 2) ** 0.5
-
-    @property
-    def loading(self):
-        return self.apparent_pu / self.S_max * 100 if self.S_max > 0 else 0.0
-
-    def __init__(
-        self,
-        name,
-        node,
-        E_max: float,
-        P_charge_max: float,
-        P_discharge_max: float,
-        S_max: float,
-        eta_charge: float,
-        eta_discharge: float,
-        soc_min: float = 0.0,
-        soc_max: float = 1.0,
-        soc_initial: float = 0.5,
-        soc_final=None,
-        S_base: float = 100,
-        dt_hours: float = 1.0,
-    ):
-        if E_max <= 0:
-            raise ValueError("E_max must be positive")
-        if not (0 < eta_charge <= 1):
-            raise ValueError("eta_charge must be in (0, 1]")
-        if not (0 < eta_discharge <= 1):
-            raise ValueError("eta_discharge must be in (0, 1]")
-        if soc_min >= soc_max:
-            raise ValueError("soc_min must be less than soc_max")
-        if not (soc_min <= soc_initial <= soc_max):
-            raise ValueError("soc_initial must lie within [soc_min, soc_max]")
-        if soc_final is not None and not (soc_min <= soc_final <= soc_max):
-            raise ValueError("soc_final must lie within [soc_min, soc_max]")
-        if P_charge_max < 0 or P_discharge_max < 0 or S_max <= 0:
-            raise ValueError("P_charge_max, P_discharge_max must be >= 0 and S_max must be positive")
-        if dt_hours <= 0:
-            raise ValueError("dt_hours must be positive")
-
-        self.storageNumber = Storage_AC.storageNumber
-        Storage_AC.storageNumber += 1
-        self.S_base = S_base
-
-        self.Node_AC = node.name
-        self.Node = node.name
-        self._node = node
-        self.x_coord = node.x_coord
-        self.y_coord = node.y_coord
-        self.geometry = node.geometry
-        self.kV_base = node.kV_base
-        self.PZ = node.PZ
-        self.hover_text = None
-        self.connected = AcDcSide.AC
-
-        self.E_max = float(E_max)
-        self.P_charge_max = P_charge_max
-        self.P_discharge_max = P_discharge_max
-        self.S_max = S_max
-        self.eta_charge = eta_charge
-        self.eta_discharge = eta_discharge
-        self.soc_min = soc_min
-        self.soc_max = soc_max
-        self.soc_initial = soc_initial
-        self.soc_final = soc_final
-        self.dt_hours = dt_hours
-
-        self.P_charge = 0.0
-        self.P_discharge = 0.0
-        self.Q = 0.0
-        self.SoC = soc_initial
-
-        node.connected_storage.append(self)
-
-        if name in Storage_AC.names:
-            count = 1
-            new_name = f"{name}_{count}"
-            while new_name in Storage_AC.names:
-                count += 1
-                new_name = f"{name}_{count}"
-            name = new_name
-        if name is None:
-            self._name = f"storage_{node.name}"
-        else:
-            self._name = name
-
-        Storage_AC.names.add(self.name)
-
-
-class Storage_DC:
-    """DC battery energy storage connected to a DC bus.
-
-    Same energy and active-power semantics as :class:`Storage_AC`, without
-    reactive power (``Q``). The active-power rating ``P_max`` limits net
-    injection ``|P_discharge - P_charge|`` in the future OPF model.
-
-    Sign convention: net active power **injected into the bus** is
-    ``P_discharge - P_charge``.
-    """
-    storageNumber_DC = 0
-    names = set()
-
-    @classmethod
-    def reset_class(cls):
-        cls.storageNumber_DC = 0
-        cls.names = set()
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def S_base(self):
-        return self._S_base
-
-    @S_base.setter
-    def S_base(self, new_S_base):
-        if new_S_base <= 0:
-            raise ValueError("S_base must be positive")
-        if hasattr(self, '_S_base'):
-            old_S_base = self._S_base
-            if old_S_base != new_S_base:
-                rate = old_S_base / new_S_base
-                self.P_charge_max *= rate
-                self.P_discharge_max *= rate
-                self.P_max *= rate
-                self.P_charge *= rate
-                self.P_discharge *= rate
+                if self.connected == AcDcSide.AC:
+                    self.S_max *= rate
+                    self.Q *= rate
+                else:
+                    self.P_max *= rate
         self._S_base = new_S_base
 
     @property
@@ -1678,19 +1509,29 @@ class Storage_DC:
         return self.P_discharge - self.P_charge
 
     @property
+    def apparent_pu(self):
+        if self.connected == AcDcSide.DC:
+            return abs(self.net_P_pu)
+        return (self.net_P_pu ** 2 + self.Q ** 2) ** 0.5
+
+    @property
     def loading(self):
+        if self.connected == AcDcSide.AC:
+            return self.apparent_pu / self.S_max * 100 if self.S_max > 0 else 0.0
         return abs(self.net_P_pu) / self.P_max * 100 if self.P_max > 0 else 0.0
 
     def __init__(
         self,
         name,
         node,
+        connected,
         E_max: float,
         P_charge_max: float,
         P_discharge_max: float,
-        P_max: float,
         eta_charge: float,
         eta_discharge: float,
+        S_max: float = None,
+        P_max: float = None,
         soc_min: float = 0.0,
         soc_max: float = 1.0,
         soc_initial: float = 0.5,
@@ -1698,6 +1539,8 @@ class Storage_DC:
         S_base: float = 100,
         dt_hours: float = 1.0,
     ):
+        if connected not in (AcDcSide.AC, AcDcSide.DC):
+            raise ValueError("connected must be AcDcSide.AC or AcDcSide.DC")
         if E_max <= 0:
             raise ValueError("E_max must be positive")
         if not (0 < eta_charge <= 1):
@@ -1710,16 +1553,22 @@ class Storage_DC:
             raise ValueError("soc_initial must lie within [soc_min, soc_max]")
         if soc_final is not None and not (soc_min <= soc_final <= soc_max):
             raise ValueError("soc_final must lie within [soc_min, soc_max]")
-        if P_charge_max < 0 or P_discharge_max < 0 or P_max <= 0:
-            raise ValueError("P_charge_max, P_discharge_max must be >= 0 and P_max must be positive")
+        if P_charge_max < 0 or P_discharge_max < 0:
+            raise ValueError("P_charge_max and P_discharge_max must be >= 0")
+        if connected == AcDcSide.AC:
+            if S_max is None or S_max <= 0:
+                raise ValueError("S_max must be positive for AC storage")
+        else:
+            if P_max is None or P_max <= 0:
+                raise ValueError("P_max must be positive for DC storage")
         if dt_hours <= 0:
             raise ValueError("dt_hours must be positive")
 
-        self.storageNumber_DC = Storage_DC.storageNumber_DC
-        Storage_DC.storageNumber_DC += 1
+        self.storageNumber = Storage.storageNumber
+        Storage.storageNumber += 1
         self.S_base = S_base
+        self.connected = connected
 
-        self.Node_DC = node.name
         self.Node = node.name
         self._node = node
         self.x_coord = node.x_coord
@@ -1728,12 +1577,19 @@ class Storage_DC:
         self.kV_base = node.kV_base
         self.PZ = node.PZ
         self.hover_text = None
-        self.connected = AcDcSide.DC
+
+        if connected == AcDcSide.AC:
+            self.Node_AC = node.name
+            self.S_max = S_max
+            self.Q = 0.0
+        else:
+            self.Node_DC = node.name
+            self.P_max = P_max
+            self.Q = 0.0
 
         self.E_max = float(E_max)
         self.P_charge_max = P_charge_max
         self.P_discharge_max = P_discharge_max
-        self.P_max = P_max
         self.eta_charge = eta_charge
         self.eta_discharge = eta_discharge
         self.soc_min = soc_min
@@ -1748,10 +1604,10 @@ class Storage_DC:
 
         node.connected_storage.append(self)
 
-        if name in Storage_DC.names:
+        if name in Storage.names:
             count = 1
             new_name = f"{name}_{count}"
-            while new_name in Storage_DC.names:
+            while new_name in Storage.names:
                 count += 1
                 new_name = f"{name}_{count}"
             name = new_name
@@ -1760,7 +1616,7 @@ class Storage_DC:
         else:
             self._name = name
 
-        Storage_DC.names.add(self.name)
+        Storage.names.add(self.name)
 
 
 class Electrolyser:
@@ -4194,7 +4050,7 @@ class Price_Zone:
         for node in self.nodes_AC:
             node.price=value
             for gen in node.connected_gen:
-                if gen.price_zone_link:
+                if gen.price_link:
                     gen.lf=value
                     gen.qf=0
         # Notify all linked MTDC price_zones about the price change

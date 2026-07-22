@@ -383,7 +383,13 @@ def hydrogen_variables(model, grid, hydrogen_info, window_block=False):
         return (0, el.H2_mass_max)
 
     model.P_electrolyser = pyo.Var(
-        model.electrolyser, bounds=P_electrolyser_bounds, initialize=0)
+        model.electrolyser,
+        bounds=P_electrolyser_bounds,
+        initialize={
+            e: 0.5 * (electrolyser_by_number[e].P_min + electrolyser_by_number[e].P_max)
+            for e in lista_electrolyser
+        },
+    )
     model.Q_electrolyser = pyo.Var(
         model.electrolyser, bounds=Q_electrolyser_bounds, initialize=0)
     model.mass_H2 = pyo.Var(
@@ -1488,8 +1494,8 @@ def DC_constraints(model,grid,TEP=False):
         def Gen_Pstorage_DC_rule(model, node):
             nDC = grid.nodes_DC[node]
             p_stor = sum(
-                model.P_storage_discharge_DC[s.storageNumber_DC]
-                - model.P_storage_charge_DC[s.storageNumber_DC]
+                model.P_storage_discharge_DC[s.storageNumber]
+                - model.P_storage_charge_DC[s.storageNumber]
                 for s in nDC.connected_storage
             )
             return model.PGi_storage_DC[node] == p_stor
@@ -2033,13 +2039,13 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
 
     def lf_bounds(model, g):
         gen = grid.Generators[g]
-        if gen.price_zone_link:
+        if gen.price_link:
             return (None,None)
         else:
             return (lf[g],lf[g])
     def lf_bounds_DC(model, g):
         gen = grid.Generators_DC[g]
-        if gen.price_zone_link:
+        if gen.price_link:
             return (None,None)
         else:
             return (lf_DC[g],lf_DC[g])
@@ -2139,7 +2145,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     for node in grid.nodes_AC:  # Loop through all nodes
         nAC = node.nodeNumber
         for g in node.connected_gen:  # Loop through all generators in the node
-            if g.price_zone_link:
+            if g.price_link:
                 model.price_zone_gen_link.add(model.price[nAC] == model.lf[g.genNumber])
 
 
@@ -2548,14 +2554,13 @@ def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
             soc_dc = {k: np.float64(pyo.value(v)) for k, v in model.SoC_DC.items()}
 
         for storage in grid.storage_elements:
+            s = storage.storageNumber
             if storage.connected == AcDcSide.AC:
-                s = storage.storageNumber
                 storage.P_charge = P_charge_ac[s]
                 storage.P_discharge = P_discharge_ac[s]
                 storage.Q = Q_storage_ac[s]
                 storage.SoC = soc_ac[s]
             else:
-                s = storage.storageNumber_DC
                 storage.P_charge = P_charge_dc[s]
                 storage.P_discharge = P_discharge_dc[s]
                 storage.SoC = soc_dc[s]

@@ -40,8 +40,7 @@ __all__ = [
     'add_DCDC_converter',
     'Gen_AC',
     'Gen_DC',
-    'Storage_AC',
-    'Storage_DC',
+    'Storage',
     'Electrolyser',
     'add_gen',
     'add_gen_DC',
@@ -215,10 +214,14 @@ try:
     __all__.extend([
         'run_dash',
         'run_ts_dash',
+        'run_window_dash',
         'run_mp_ts_dash',
         'create_mp_ts_dash',
+        'create_dash_app',
+        'create_window_dash_app',
         'plot_TS_res_from_ts',
         'plot_TS_res_dash',
+        'plot_window_res_dash',
     ])
     HAS_DASH = True
 except ImportError:

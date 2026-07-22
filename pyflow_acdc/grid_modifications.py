@@ -21,7 +21,7 @@ from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC,
     Gen_DC, Line_AC, Line_DC, MTDCPrice_Zone, Node_AC, Node_DC,
     OffshorePrice_Zone, Price_Zone, Ren_Source, Ren_source_zone,
-    rec_Line_AC, Size_selection, Storage_AC, Storage_DC, Electrolyser, TF_Line_AC, TimeSeries,
+    rec_Line_AC, Size_selection, Storage, Electrolyser, TF_Line_AC, TimeSeries,
 )
 from .constants import (
     SQRT_3,
@@ -29,6 +29,7 @@ from .constants import (
     DEFAULT_V_MIN_DC,
     DEFAULT_V_MAX_DC,
     NodeType,
+    ConverterDCType,
     DEFAULT_GEN_TYPE,
     CableType,
     DataInput,
@@ -120,7 +121,7 @@ __all__ = [
 
 "Add main components"
 
-def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1,Gs= 0,Bs=0,x_coord=None,y_coord=None,geometry=None):
+def add_AC_node(grid, kV_base, node_type=NodeType.PQ, Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1, Gs=0, Bs=0, x_coord=None, y_coord=None, geometry=None):
     """Append an AC bus to ``grid.nodes_AC``.
 
     Parameters
@@ -129,8 +130,8 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
         Grid to modify (mutated in place).
     kV_base : float
         Base voltage in kV.
-    node_type : str, optional
-        ``'PQ'``, ``'PV'``, or ``'Slack'``.
+    node_type : str or NodeType, optional
+        :attr:`~pyflow_acdc.constants.NodeType.PQ`, ``PV``, or ``SLACK``.
     Voltage_0 : float, optional
         Initial voltage magnitude in p.u.
     theta_0 : float, optional
@@ -157,7 +158,7 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
 
     Examples
     --------
-    >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1', node_type='PQ')
+    >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1')
     """
     node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord, S_base=grid.S_base)
     if geometry is not None:
@@ -171,7 +172,7 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
 
     return node
 
-def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None,Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC,x_coord=None,y_coord=None,geometry=None):
+def add_DC_node(grid, kV_base, node_type=ConverterDCType.P, Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None, Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC, x_coord=None, y_coord=None, geometry=None):
     """Append a DC bus to ``grid.nodes_DC``.
 
     Parameters
@@ -180,8 +181,9 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
         Grid to modify.
     kV_base : float
         Base voltage in kV.
-    node_type : str, optional
-        ``'P'``, ``'Slack'``, or ``'Droop'``.
+    node_type : str or ConverterDCType, optional
+        :attr:`~pyflow_acdc.constants.ConverterDCType.P`, ``PAC``, ``SLACK``,
+        or ``DROOP``.
     Voltage_0 : float, optional
         Initial voltage in p.u.
     Power_Gained, Power_load : float, optional
@@ -1010,7 +1012,7 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
         fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
         Ren_zone = Gen_data.at[index, 'Ren_zone'] if 'Ren_zone' in Gen_data.columns else None
-        price_zone_link = False
+        price_link = False
 
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
         np_value = Gen_data.at[index, 'np'] if 'np' in Gen_data.columns else 1
@@ -1025,7 +1027,7 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
                 MVArmax = 9999
             if MVArmin is None:
                 MVArmin = -9999
-            add_gen(grid, node_name,var_name, price_zone_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
+            add_gen(grid, node_name,var_name, price_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
 
 def _look_up_node(grid, node, ac_or_dc="AC"):
 
@@ -1105,7 +1107,7 @@ def _look_up_converter(grid, conv):
         raise ValueError(f"Converter {conv_name} not found.")
     return conv_obj
 
-def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+def add_gen(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
     """Append an AC generator to ``grid.Generators``.
 
     Parameters
@@ -1116,8 +1118,8 @@ def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax
         Connection bus (name or object).
     gen_name : str, optional
         Generator name; defaults to ``'gen_<node>'``.
-    price_zone_link : bool, optional
-        If True, use node price zone marginal cost (``lf=node.price``).
+    price_link : bool, optional
+        If True, use bus energy price (``lf=node.price``).
     lf, qf, fc : float, optional
         Linear, quadratic, and fixed OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1181,9 +1183,9 @@ def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.price_zone_link=price_zone_link
+    gen.price_link=price_link
 
-    if price_zone_link:
+    if price_link:
 
         gen.qf= 0
         gen.lf= node.price
@@ -1191,7 +1193,7 @@ def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax
 
     return gen
 
-def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+def add_gen_DC(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
     """Append a DC generator to ``grid.Generators_DC``.
 
     Parameters
@@ -1202,8 +1204,8 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
         Connection bus.
     gen_name : str, optional
         Generator name.
-    price_zone_link : bool, optional
-        Link marginal cost to node price zone.
+    price_link : bool, optional
+        Link marginal cost to bus price (``lf=node.price``).
     lf, qf, fc : float, optional
         OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1247,9 +1249,9 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.price_zone_link=price_zone_link
+    gen.price_link=price_link
 
-    if price_zone_link:
+    if price_link:
 
         gen.qf= 0
         gen.lf= node.price
@@ -1258,7 +1260,7 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
     return gen
 
 
-def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
+def add_extgrid(grid, node, gen_name=None,price_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
     """Add an external-grid equivalent generator at an AC bus.
 
     Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
@@ -1272,8 +1274,8 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
         Connection bus.
     gen_name : str, optional
         Generator name; defaults to ``'extgrid_<node>'``.
-    price_zone_link : bool, optional
-        Link marginal cost to price zone.
+    price_link : bool, optional
+        Link marginal cost to bus price (``lf=node.price``).
     lf, qf : float, optional
         OPF cost coefficients.
     MVAmax : float, optional
@@ -1315,7 +1317,7 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
     node.PGi = 0
     node.QGi = 0
     node.recalc_extgrid_load()
-    if price_zone_link:
+    if price_link:
         # Keep aggregated price-zone load consistent after extgrid load is introduced.
         pz_name = getattr(node, "PZ", None)
         if pz_name:
@@ -1323,8 +1325,8 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
             if hasattr(pz, "recalc_PLi_base_and_total"):
                 pz.recalc_PLi_base_and_total()
 
-    gen.price_zone_link=price_zone_link
-    if price_zone_link:
+    gen.price_link=price_link
+    if price_link:
         gen.qf= 0
         gen.lf= node.price
 
@@ -1534,7 +1536,7 @@ def add_storage(
 
     Returns
     -------
-    Storage_AC or Storage_DC
+    Storage
         Created storage element.
 
     Examples
@@ -1552,38 +1554,44 @@ def add_storage(
     if S_max_MVA is None:
         S_max_MVA = p_max_mw
 
+    s_base = grid.S_base
+    p_charge_pu = P_charge_MW / s_base
+    p_discharge_pu = P_discharge_MW / s_base
+
     if node in grid.nodes_AC:
-        storage = Storage_AC(
+        storage = Storage(
             storage_name,
             node,
+            AcDcSide.AC,
             E_max=E_max_MWh,
-            P_charge_max=P_charge_MW / grid.S_base,
-            P_discharge_max=P_discharge_MW / grid.S_base,
-            S_max=S_max_MVA / grid.S_base,
+            P_charge_max=p_charge_pu,
+            P_discharge_max=p_discharge_pu,
+            S_max=S_max_MVA / s_base,
             eta_charge=eta_charge,
             eta_discharge=eta_discharge,
             soc_min=soc_min,
             soc_max=soc_max,
             soc_initial=soc_initial,
             soc_final=soc_final,
-            S_base=grid.S_base,
+            S_base=s_base,
             dt_hours=dt_hours,
         )
     elif node in grid.nodes_DC:
-        storage = Storage_DC(
+        storage = Storage(
             storage_name,
             node,
+            AcDcSide.DC,
             E_max=E_max_MWh,
-            P_charge_max=P_charge_MW / grid.S_base,
-            P_discharge_max=P_discharge_MW / grid.S_base,
-            P_max=S_max_MVA / grid.S_base,
+            P_charge_max=p_charge_pu,
+            P_discharge_max=p_discharge_pu,
+            P_max=S_max_MVA / s_base,
             eta_charge=eta_charge,
             eta_discharge=eta_discharge,
             soc_min=soc_min,
             soc_max=soc_max,
             soc_initial=soc_initial,
             soc_final=soc_final,
-            S_base=grid.S_base,
+            S_base=s_base,
             dt_hours=dt_hours,
         )
     else:

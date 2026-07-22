@@ -153,13 +153,25 @@ def _create_frame_blocks(
 
 
 def export_window_opf_results(model, grid, frames):
-    """Build per-frame storage trajectories from solved frame blocks."""
+    """Build per-frame storage trajectories from solved frame blocks.
+
+    ``storage_soc`` includes a leading row at ``frame = start - 1`` with each
+    element's ``soc_initial`` (SoC before the first hour's dispatch). Frames
+    ``start…end`` are end-of-hour SoC after charge/discharge.
+    """
+    ordered = list(frames)
     rows_soc = []
     rows_pc = []
     rows_pd = []
     rows_q = []
 
-    for t in frames:
+    if ordered and grid.storage_elements:
+        row0 = {'frame': ordered[0] - 1}
+        for storage in grid.storage_elements:
+            row0[storage.name] = np.float64(storage.soc_initial)
+        rows_soc.append(row0)
+
+    for t in ordered:
         block = model.frame_model[t]
         row_soc = {'frame': t}
         row_pc = {'frame': t}
@@ -167,14 +179,13 @@ def export_window_opf_results(model, grid, frames):
         row_q = {'frame': t}
         for storage in grid.storage_elements:
             name = storage.name
+            s = storage.storageNumber
             if storage.connected == AcDcSide.AC:
-                s = storage.storageNumber
                 row_soc[name] = np.float64(pyo.value(block.SoC[s]))
                 row_pc[name] = np.float64(pyo.value(block.P_storage_charge[s])) * grid.S_base
                 row_pd[name] = np.float64(pyo.value(block.P_storage_discharge[s])) * grid.S_base
                 row_q[name] = np.float64(pyo.value(block.Q_storage[s])) * grid.S_base
             else:
-                s = storage.storageNumber_DC
                 row_soc[name] = np.float64(pyo.value(block.SoC_DC[s]))
                 row_pc[name] = np.float64(pyo.value(block.P_storage_charge_DC[s])) * grid.S_base
                 row_pd[name] = np.float64(pyo.value(block.P_storage_discharge_DC[s])) * grid.S_base
@@ -211,7 +222,12 @@ def export_window_opf_results(model, grid, frames):
     if grid.electrolysers:
         rows_m = []
         rows_pe = []
-        for t in frames:
+        if ordered:
+            row_m0 = {'frame': ordered[0] - 1}
+            for el in grid.electrolysers:
+                row_m0[el.name] = np.float64(el.H2_mass_initial)
+            rows_m.append(row_m0)
+        for t in ordered:
             block = model.frame_model[t]
             row_m = {'frame': t}
             row_pe = {'frame': t}
@@ -223,6 +239,75 @@ def export_window_opf_results(model, grid, frames):
             rows_pe.append(row_pe)
         results['hydrogen_mass_H2'] = pd.DataFrame(rows_m)
         results['hydrogen_P_e'] = pd.DataFrame(rows_pe)
+
+    if ordered and (grid.Generators or grid.Generators_DC):
+        rows_gp = []
+        rows_gprice = []
+        for t in ordered:
+            block = model.frame_model[t]
+            row_gp = {'frame': t}
+            row_gprice = {'frame': t}
+            for gen in grid.Generators:
+                g = gen.genNumber
+                p = np.float64(pyo.value(block.PGi_gen[g]))
+                if grid.act_gen:
+                    p *= np.float64(pyo.value(block.gen_active[g]))
+                row_gp[gen.name] = p * grid.S_base
+                if hasattr(block, 'lf'):
+                    row_gprice[gen.name] = np.float64(pyo.value(block.lf[g]))
+                else:
+                    row_gprice[gen.name] = np.nan
+            for gen in grid.Generators_DC:
+                g = gen.genNumber_DC
+                row_gp[gen.name] = (
+                    np.float64(pyo.value(block.PGi_gen_DC[g])) * grid.S_base
+                )
+                if hasattr(block, 'lf_dc'):
+                    row_gprice[gen.name] = np.float64(pyo.value(block.lf_dc[g]))
+                else:
+                    row_gprice[gen.name] = np.nan
+            rows_gp.append(row_gp)
+            rows_gprice.append(row_gprice)
+        results['gen_power'] = pd.DataFrame(rows_gp)
+        results['gen_price'] = pd.DataFrame(rows_gprice)
+
+    if ordered and grid.RenSources:
+        nodes_ac = {n.name: n for n in grid.nodes_AC}
+        nodes_dc = {n.name: n for n in grid.nodes_DC}
+        rows_rp = []
+        rows_rprice = []
+        for t in ordered:
+            block = model.frame_model[t]
+            row_rp = {'frame': t}
+            row_rprice = {'frame': t}
+            for rs in grid.RenSources:
+                r = rs.rsNumber
+                p = (
+                    np.float64(pyo.value(block.P_renSource[r]))
+                    * np.float64(pyo.value(block.gamma[r]))
+                    * np.float64(pyo.value(block.np_rsgen[r]))
+                )
+                row_rp[rs.name] = p * grid.S_base
+                if rs.connected in (AcDcSide.AC, 'AC'):
+                    node = nodes_ac.get(rs.Node)
+                    if node is not None and hasattr(block, 'price'):
+                        row_rprice[rs.name] = np.float64(
+                            pyo.value(block.price[node.nodeNumber])
+                        )
+                    else:
+                        row_rprice[rs.name] = np.nan
+                else:
+                    node = nodes_dc.get(rs.Node)
+                    if node is not None and hasattr(block, 'price_dc'):
+                        row_rprice[rs.name] = np.float64(
+                            pyo.value(block.price_dc[node.nodeNumber])
+                        )
+                    else:
+                        row_rprice[rs.name] = np.nan
+            rows_rp.append(row_rp)
+            rows_rprice.append(row_rprice)
+        results['ren_power'] = pd.DataFrame(rows_rp)
+        results['ren_price'] = pd.DataFrame(rows_rprice)
 
     return results
 

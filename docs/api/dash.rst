@@ -6,12 +6,16 @@ For the use of this module, you need to have the optional dependendency pyflow_a
 Interactive Dashboard
 ^^^^^^^^^^^^^^^^^^^^^^
 
-For now you have to run the time series to have results to plot. Then run the dashboard. Once the dashboard is running, you can see the plots by selecting the desired plot type. And choose axis limits to zoom in or out.
+For now you have to run the time series **or** a window NL OPF to have results
+to plot. Then run the dashboard. Once the dashboard is running, you can see the
+plots by selecting the desired plot type. And choose axis limits to zoom in or out.
 
 
 .. autofunction:: pyflow_acdc.run_dash
 
 .. autofunction:: pyflow_acdc.run_ts_dash
+
+.. autofunction:: pyflow_acdc.run_window_dash
 
 .. autofunction:: pyflow_acdc.run_mp_ts_dash
 
@@ -23,6 +27,8 @@ Low-level Plotly figure builders used by the Dash apps (also usable standalone).
 .. autofunction:: pyflow_acdc.plot_TS_res_from_ts
 
 .. autofunction:: pyflow_acdc.plot_TS_res_dash
+
+.. autofunction:: pyflow_acdc.plot_window_res_dash
 
 Multi-Period Dash Builder
 ^^^^^^^^^^^^^^^^^^^^^^^^^

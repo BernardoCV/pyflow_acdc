@@ -4,7 +4,7 @@ Battery energy storage (BESS)
 Operation-only battery energy storage for hybrid AC/DC grids. The formulation
 follows Useche-Arteaga et al. (2026) [#useche2026]_ (§3.3); see :doc:`citing`.
 
-Implemented: :class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`,
+Implemented: :class:`~pyflow_acdc.Storage`,
 :func:`~pyflow_acdc.add_storage`, NL OPF when ``grid.ESS``,
 :func:`~pyflow_acdc.window_nl_opf`, and ``Results.ext_storage`` /
 ``Results.storage_window``.
@@ -23,7 +23,7 @@ pattern as generators and renewable sources
 AC storage supports reactive power (``Q``) and an apparent-power rating
 (``S_max``). DC storage has active power only (``P_max``).
 
-SoC is stored in **pu** (fraction of :attr:`~pyflow_acdc.Storage_AC.E_max`).
+SoC is stored in **pu** (fraction of :attr:`~pyflow_acdc.Storage.E_max`).
 Physical energy capacity ``E_max`` is in **MWh** (reserved for future degradation
 modelling).
 

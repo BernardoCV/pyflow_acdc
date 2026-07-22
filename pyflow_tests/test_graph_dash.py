@@ -27,8 +27,10 @@ if _dash_installed():
         _MP_PLOT_CHOICES,
         create_dash_app,
         create_mp_ts_dash,
+        create_window_dash_app,
         plot_TS_res_dash,
         plot_TS_res_from_ts,
+        plot_window_res_dash,
         run_dash,
     )
 else:
@@ -176,6 +178,62 @@ def test_run_dash_routing_errors():
     with pytest.raises(ValueError, match="dash_mode=mp_ts"):
         run_dash(grid)
 
+    grid.dash_mode = "window"
+    with pytest.raises(ValueError, match="dash_mode=window"):
+        run_dash(grid)
+
+
+def _grid_with_window_results():
+    grid = pyf.Grid(S_base=100)
+    grid.name = "window_dash_test"
+    grid.window_opf_run = True
+    grid.window_opf_results = {
+        "storage_soc": pd.DataFrame(
+            {"frame": [-1, 0, 1, 2], "st1": [0.5, 0.45, 0.5, 0.55]}
+        ),
+        "storage_P_charge": pd.DataFrame(
+            {"frame": [0, 1, 2], "st1": [0.0, 10.0, 0.0]}
+        ),
+        "storage_P_discharge": pd.DataFrame(
+            {"frame": [0, 1, 2], "st1": [5.0, 0.0, 0.0]}
+        ),
+        "hydrogen_mass_H2": pd.DataFrame(
+            {"frame": [-1, 0, 1, 2], "el1": [0.0, 10.0, 20.0, 30.0]}
+        ),
+        "hydrogen_P_e": pd.DataFrame(
+            {"frame": [0, 1, 2], "el1": [22.5, 22.5, 22.5]}
+        ),
+        "gen_power": pd.DataFrame(
+            {"frame": [0, 1, 2], "g1": [10.0, 20.0, 15.0]}
+        ),
+        "gen_price": pd.DataFrame(
+            {"frame": [0, 1, 2], "g1": [40.0, 50.0, 45.0]}
+        ),
+        "ren_power": pd.DataFrame(
+            {"frame": [0, 1, 2], "rs1": [5.0, 8.0, 6.0]}
+        ),
+        "ren_price": pd.DataFrame(
+            {"frame": [0, 1, 2], "rs1": [0.0, 0.0, 0.0]}
+        ),
+        "total_objective": 0.0,
+    }
+    return grid
+
+
+def test_create_window_dash_app_layout_and_plot():
+    grid = _grid_with_window_results()
+    app = create_window_dash_app(grid)
+    assert app.layout is not None
+
+    fig = plot_window_res_dash(grid, "Storage SoC", ["st1"])
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 1
+    assert list(fig.data[0].x) == [-1, 0, 1, 2]
+    assert list(fig.data[0].y) == [0.5, 0.45, 0.5, 0.55]
+
+    with pytest.raises(ValueError, match="window_opf"):
+        create_window_dash_app(pyf.Grid(S_base=100))
+
 
 def _callback_fn(app, key):
     """Return the undecorated Dash callback (Dash 3 wraps with context)."""
@@ -307,6 +365,7 @@ def run_test():
     test_create_dash_app_layout()
     test_create_mp_ts_dash_layout_and_errors()
     test_run_dash_routing_errors()
+    test_create_window_dash_app_layout_and_plot()
     test_create_dash_app_callbacks_fire()
     test_create_mp_ts_dash_callbacks_fire()
     print("✓ graph_dash tests passed")

@@ -2,10 +2,43 @@
 
 import pyflow_acdc as pyf
 import pandas as pd
+from shapely.geometry import Point, LineString
+
+from pyflow_acdc.constants import ConverterDCType, NodeType, Polarity
 
 
-def PEI_grid():    
-    
+def PEI_grid(include_countries: list[str] = None):    
+    "Inlcude country can be either UK for nautilus link and/or DK for triton Link"
+    if include_countries is None:
+        include_countries = []
+    # Converter parameters (OPF_ACDC_Energy_Islands.py, pu on grid S_base)
+    _CONV_T_R = 0.0015
+    _CONV_T_X = 0.1121
+    _CONV_PR_R = 1.0e-4
+    _CONV_PR_X = 0.1643
+    _CONV_FILTER_B = 0.0887
+    _CONV_LOSS_A = 1.103
+    _CONV_LOSS_B = 0.887
+    _CONV_LOSS_C_RECT = 2.885
+    _CONV_LOSS_C_INV = 4.371
+    _CONV_POL = 2
+    _CONV_UC_MIN = 0.85
+    _CONV_UC_MAX = 1.2
+    _CONV_KWARGS = dict(
+        Transformer_resistance=_CONV_T_R,
+        Transformer_reactance=_CONV_T_X,
+        Phase_Reactor_R=_CONV_PR_R,
+        Phase_Reactor_X=_CONV_PR_X,
+        Filter=_CONV_FILTER_B,
+        lossa=_CONV_LOSS_A,
+        lossb=_CONV_LOSS_B,
+        losscrect=_CONV_LOSS_C_RECT,
+        losscinv=_CONV_LOSS_C_INV,
+        polarity=_CONV_POL,
+        Ucmin=_CONV_UC_MIN,
+        Ucmax=_CONV_UC_MAX,
+    )
+
     S_base=100
     
     # DataFrame Code:
@@ -355,13 +388,13 @@ def PEI_grid():
     nodes_DC = pd.DataFrame(nodes_DC_data)
 
     lines_DC_data = [
-        {'fromNode': 'PEI_DC', 'toNode': 'ON_DC', 'r': 0.001, 'MW_rating': 1400, 'kV_base': 525, 'Length_km': 1, 'Mono_Bi_polar': 'm', 'Line_id': '0', 'geometry': 'LINESTRING (2.502952 51.528717, 2.572517 51.496147, 2.709503 51.421573, 2.706757 51.233698, 2.771301 51.126938)'}
+        {'Line_id': '0', 'fromNode': 'PEI_DC', 'toNode': 'ON_DC', 'R_Ohm_km': 0.0095, 'A_rating': 1904.761905, 'kV_base': 525, 'Length_km': 45, 'Mono_Bi_polar': 'b', 'geometry': 'LINESTRING (2.502952 51.528717, 2.572517 51.496147, 2.709503 51.421573, 2.706757 51.233698, 2.771301 51.126938)'}
     ]
     lines_DC = pd.DataFrame(lines_DC_data)
 
     Converters_ACDC_data = [
-        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': 'PE_Island', 'DC_node': 'PEI_DC', 'P_AC': -15.23256842600699, 'Q_AC': -30.50016621804582, 'P_DC': 14.0, 'T_r': 0.0, 'T_x': 0.0, 'PR_r': 0.0, 'PR_x': 0.0, 'Filter_b': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '0', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.500677 51.528584, 2.502952 51.528717)'},
-        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': 'BE_ON', 'DC_node': 'ON_DC', 'P_AC': 12.834001291959405, 'Q_AC': 21.10058400394354, 'P_DC': -13.812961565331412, 'T_r': 0.0, 'T_x': 0.0, 'PR_r': 0.0, 'PR_x': 0.0, 'Filter_b': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.770443 51.125775, 2.771301 51.126938)'}
+        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': 'PE_Island', 'DC_node': 'PEI_DC', 'P_AC': -15.23256842600699, 'Q_AC': -30.50016621804582, 'P_DC': 14.0, 'T_r': _CONV_T_R, 'T_x': _CONV_T_X, 'PR_r': _CONV_PR_R, 'PR_x': _CONV_PR_X, 'Filter_b': _CONV_FILTER_B, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 1000.0, 'Nconverter': 1, 'pol': _CONV_POL, 'Conv_id': '0', 'lossa': _CONV_LOSS_A, 'lossb': _CONV_LOSS_B, 'losscrect': _CONV_LOSS_C_RECT, 'losscinv': _CONV_LOSS_C_INV, 'Ucmin': _CONV_UC_MIN, 'Ucmax': _CONV_UC_MAX, 'geometry': 'LINESTRING (2.500677 51.528584, 2.502952 51.528717)'},
+        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': 'BE_ON', 'DC_node': 'ON_DC', 'P_AC': 12.834001291959405, 'Q_AC': 21.10058400394354, 'P_DC': -13.812961565331412, 'T_r': _CONV_T_R, 'T_x': _CONV_T_X, 'PR_r': _CONV_PR_R, 'PR_x': _CONV_PR_X, 'Filter_b': _CONV_FILTER_B, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 1000.0, 'Nconverter': 1, 'pol': _CONV_POL, 'Conv_id': '1', 'lossa': _CONV_LOSS_A, 'lossb': _CONV_LOSS_B, 'losscrect': _CONV_LOSS_C_RECT, 'losscinv': _CONV_LOSS_C_INV, 'Ucmin': _CONV_UC_MIN, 'Ucmax': _CONV_UC_MAX, 'geometry': 'LINESTRING (2.770443 51.125775, 2.771301 51.126938)'}
     ]
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 
@@ -553,7 +586,57 @@ def PEI_grid():
     pyf.add_RenSource(grid, 'PE_III_T63', 22.0, ren_source_name='PE_III_T63', available=1, Offshore=False, MTDC=None)
     pyf.add_RenSource(grid, 'PE_III_T64', 22.0, ren_source_name='PE_III_T64', available=1, Offshore=False, MTDC=None)
 
-    
+    pyf.add_extgrid(grid, 'BE_ON', price_link=True)
+
+    if "UK" in include_countries:
+        pyf.add_DC_node(
+            grid, 525, node_type=ConverterDCType.P, name='Na_DC_UK',
+            geometry=Point(0.717716, 51.445235),
+        )
+        pyf.add_AC_node(
+            grid, 220, node_type=NodeType.SLACK, name='Na_AC_UK',
+            geometry=Point(0.715474718, 51.44475984),
+        )
+        pyf.add_line_DC(
+            grid, 'PEI_DC', 'Na_DC_UK', name='Nautilus_uk',
+            R_Ohm_km=0.0095, A_rating=1904.761905, Length_km=120,
+            polarity=Polarity.BIPOLAR,
+        )
+        pyf.add_ACDC_converter(
+            grid, 'Na_AC_UK', 'Na_DC_UK',
+            AC_type=NodeType.SLACK, DC_type=ConverterDCType.P,
+            kV_base=220, MVA_max=1000.0,
+            name='Nautilus_conv', **_CONV_KWARGS,
+        )
+        pyf.add_extgrid(grid, 'Na_AC_UK', price_link=True)
+        
+       
+    if "DK" in include_countries:
+        pyf.add_DC_node(
+            grid, 525, node_type=ConverterDCType.P, name='Tr_DC_DK',
+            geometry=Point(8.519897, 56.353078),
+        )
+        pyf.add_AC_node(
+            grid, 220, node_type=NodeType.SLACK, name='Tr_AC_DK',
+            geometry=Point(8.552944588, 56.35138683),
+        )
+        pyf.add_line_DC(
+            grid, 'PEI_DC', 'Tr_DC_DK', name='Triton_Link',
+            R_Ohm_km=0.0095, A_rating=1904.761905, Length_km=675,
+            polarity=Polarity.BIPOLAR,
+            geometry=LineString([
+                (2.502952, 51.528717), (2.539215, 51.56062), (2.596207, 51.591336),
+                (3.290405, 52.426269), (3.208008, 54.898965), (5.141602, 56.240152),
+                (7.322388, 56.468349), (8.519897, 56.353078),
+            ]),
+        )
+        pyf.add_ACDC_converter(
+            grid, 'Tr_AC_DK', 'Tr_DC_DK',
+            AC_type=NodeType.SLACK, DC_type=ConverterDCType.P,
+            kV_base=220, MVA_max=1000.0,
+            name='Triton_conv', **_CONV_KWARGS,
+        )
+        pyf.add_extgrid(grid, 'Tr_AC_DK', price_link=True)
     # Return the grid
     return grid,res
 

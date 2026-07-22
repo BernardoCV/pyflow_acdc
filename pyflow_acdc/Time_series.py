@@ -212,10 +212,18 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
             node.price = ts_data[idx]
+            for gen in node.connected_gen:
+                if gen.price_link:
+                    gen.lf = ts_data[idx]
+                    gen.qf = 0
 
         node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
         if node_dc:
             node_dc.price = ts_data[idx]
+            for gen in node_dc.connected_gen:
+                if gen.price_link:
+                    gen.lf = ts_data[idx]
+                    gen.qf = 0
 
     elif typ == TSType.LOAD:
         # Directly access price zone and nodes using dictionaries

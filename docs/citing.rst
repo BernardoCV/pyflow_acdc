@@ -59,7 +59,7 @@ Castro Valerio, B., Gebraad, P. M. O., Cheah-Mane, M., A. Lacerda, V., and Gomis
 
 For BESS / hydrogen / energy-island operation:
 
-If you use :class:`~pyflow_acdc.Storage_AC`, :class:`~pyflow_acdc.Storage_DC`,
+If you use :class:`~pyflow_acdc.Storage`,
 :func:`~pyflow_acdc.add_storage`, :class:`~pyflow_acdc.Electrolyser`,
 :func:`~pyflow_acdc.add_electrolyser`, or
 :func:`~pyflow_acdc.window_nl_opf`, please also cite:

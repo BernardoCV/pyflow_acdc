@@ -585,11 +585,11 @@ def translate_pyf_opf(grid,Price_Zones=False):
     lista_storage_ac = [
         s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.AC]
     lista_storage_dc = [
-        s.storageNumber_DC for s in grid.storage_elements if s.connected == AcDcSide.DC]
+        s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.DC]
     storage_ac_by_number = {
         s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.AC}
     storage_dc_by_number = {
-        s.storageNumber_DC: s for s in grid.storage_elements if s.connected == AcDcSide.DC}
+        s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.DC}
     storage_info = pack_variables(
         lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number)
 

@@ -18,7 +18,7 @@ from .Results_class import Results
 from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC, Gen_DC,
     Grid, Line_AC, Line_DC, Node_AC, Node_DC, Price_Zone, Ren_Source,
-    Ren_source_zone, Size_selection, Storage_AC, Storage_DC, Electrolyser, TF_Line_AC, TimeSeries,
+    Ren_source_zone, Size_selection, Storage, Electrolyser, TF_Line_AC, TimeSeries,
 )
 from .grid_analysis import cable_parameters, converter_parameters
 from .grid_modifications import add_gen
@@ -71,8 +71,7 @@ def initialize_pyflowacdc():
     Gen_AC.reset_class()
     Gen_DC.reset_class()
     Ren_Source.reset_class()
-    Storage_AC.reset_class()
-    Storage_DC.reset_class()
+    Storage.reset_class()
     Electrolyser.reset_class()
 
 
@@ -1446,14 +1445,14 @@ def create_grid_from_mat(matfile):
                 lf = Gen_data_cost.at[index, 'c(n-2)']
                 cf = Gen_data_cost.at[index, 'c0']
 
-            price_zone_link = False
+            price_link = False
 
             if Gen_data.at[index, 'status'] == 0:
                 np_gen = 0
             else:
                 np_gen = 1
 
-            gen = add_gen(G, node_name,var_name, price_zone_link,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA)
+            gen = add_gen(G, node_name,var_name, price_link,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA)
             gen.np_gen = np_gen
 
     return [G, res]
@@ -1804,7 +1803,7 @@ def create_sub_grid(grid,Area=None, Area_name = None,polygon_coords=None):
                     Max_pow_genR= line.MVA_rating/grid.S_base
                     gen = Gen_AC(line.name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,S_rated=Max_pow_gen/grid.S_base)
 
-                    gen.price_zone_link=True
+                    gen.price_link=True
                     gen.lf= node.price
 
                     node.PLi_base += line.MVA_rating/grid.S_base
