@@ -10,9 +10,9 @@ Layout::
     PEI_BESS/
       Spring|Summer|Autumn|Winter/
         power_matrix.csv   # 160 turbines × 24 h, MW
-        BE_Price.csv       # BE_ON, EUR/MWh
-        GB_Price.csv       # Na_AC_UK, EUR/MWh
-        DK_Price.csv       # Tr_AC_DK, EUR/MWh
+        BE_Price.csv       # Belgium PZ b_CG → node.lf → gen.lf (quadratic link)
+        GB_Price.csv       # Great Britain PZ b_CG
+        DK_Price.csv       # Denmark PZ b_CG
 
 Usage (via ``pyflow_tests._bess_h2_pei_data``)::
 
@@ -23,3 +23,8 @@ Usage (via ``pyflow_tests._bess_h2_pei_data``)::
 
     # All four seasons concatenated (96 h)
     grid = build_pei_bess_h2_grid(seasons=PEI_SEASONS)
+
+Season compare (separate 24 h solves, Dash overlay)::
+
+    python my_tests/pei_window_nl_opf_bess_h2.py --compare-seasons --dash
+    python my_tests/pei_window_nl_opf_bess_h2.py --compare-seasons --seasons Summer Winter --dash

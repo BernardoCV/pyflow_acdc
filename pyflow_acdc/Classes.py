@@ -26,6 +26,7 @@ from .constants import (
     CableType,
     ConverterOpfFxType,
     PricingStrategy,
+    LinkCost,
     default_obj_weights,
     DEFAULT_GENERATION_TYPES,
     DEFAULT_RENEWABLE_TYPES,
@@ -1143,7 +1144,10 @@ class Gen_AC:
     PGen, QGen : float
         Total dispatched active/reactive power (setpoint × ``np_gen``; OPF result after solve).
     price_link : bool
-        If ``True``, ``lf`` tracks the host bus ``node.price``.
+        Deprecated alias: ``True`` means ``link_cost='linear'``.
+    link_cost : LinkCost or str
+        ``'none'`` (default), ``'quadratic'`` (``qf``/``lf`` from node), or
+        ``'linear'`` (``lf`` from ``node.price``).
     is_ext_grid : bool
         External-grid (slack) generator flag.
     """
@@ -1212,6 +1216,14 @@ class Gen_AC:
     def apparent_MVA(self):
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
 
+    @property
+    def price_link(self):
+        """Deprecated: ``True`` iff ``link_cost == LinkCost.LINEAR``."""
+        return self.link_cost == LinkCost.LINEAR
+
+    @price_link.setter
+    def price_link(self, value):
+        self.link_cost = LinkCost.LINEAR if value else LinkCost.NONE
 
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type=DEFAULT_GEN_TYPE,installation_cost:float=0,S_base:float=100,np_gen: int = 1):
         if S_base <= 0:
@@ -1292,7 +1304,7 @@ class Gen_AC:
             self.cost_perMVA = installation_cost
 
 
-        self.price_link = False
+        self.link_cost = LinkCost.NONE
         self.is_ext_grid = False
         self.allow_sell = True
         self.p_load_base = 0.0
@@ -1339,6 +1351,15 @@ class Gen_DC:
     @property
     def name(self):
         return self._name
+
+    @property
+    def price_link(self):
+        """Deprecated: ``True`` iff ``link_cost == LinkCost.LINEAR``."""
+        return self.link_cost == LinkCost.LINEAR
+
+    @price_link.setter
+    def price_link(self, value):
+        self.link_cost = LinkCost.LINEAR if value else LinkCost.NONE
 
     @property
     def base_cost(self):
@@ -1426,7 +1447,7 @@ class Gen_DC:
         self.life_time = 50
         self.base_cost = installation_cost
 
-        self.price_link = False
+        self.link_cost = LinkCost.NONE
 
         node.connected_gen.append(self)
 
@@ -2090,7 +2111,9 @@ class Node_AC:
         self.P_INJ = 0
         self.Q_INJ = 0
 
-        self.price = 0.0
+        self._price = 0.0
+        self._qf = 0.0
+        self._lf = 0.0
         self.Num_conv_connected=0
         self.connected_conv=set()
 
@@ -2139,6 +2162,39 @@ class Node_AC:
         Node_AC.names.add(self.name)
 
         self.S_base = S_base
+
+    @property
+    def price(self):
+        return self._price
+
+    @price.setter
+    def price(self, value):
+        self._price = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.LINEAR:
+                gen.lf = value
+
+    @property
+    def qf(self):
+        return self._qf
+
+    @qf.setter
+    def qf(self, value):
+        self._qf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.qf = value
+
+    @property
+    def lf(self):
+        return self._lf
+
+    @lf.setter
+    def lf(self, value):
+        self._lf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.lf = value
 
     @property
     def S_base(self):
@@ -2333,7 +2389,9 @@ class Node_DC:
         self.connected_DCDC_to=set()
         self.connected_DCDC_from=set()
 
-        self.price = 0.0
+        self._price = 0.0
+        self._qf = 0.0
+        self._lf = 0.0
 
         self.Nconv= None
         self.Nconv_i=None
@@ -2371,6 +2429,39 @@ class Node_DC:
         Node_DC.names.add(self.name)
 
         self.S_base = S_base
+
+    @property
+    def price(self):
+        return self._price
+
+    @price.setter
+    def price(self, value):
+        self._price = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.LINEAR:
+                gen.lf = value
+
+    @property
+    def qf(self):
+        return self._qf
+
+    @qf.setter
+    def qf(self, value):
+        self._qf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.qf = value
+
+    @property
+    def lf(self):
+        return self._lf
+
+    @lf.setter
+    def lf(self, value):
+        self._lf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.lf = value
 
     @property
     def S_base(self):
@@ -4047,20 +4138,36 @@ class Price_Zone:
 
     @price.setter
     def price(self, value):
+        """Zone ``price`` → member ``node.price`` only (gens via node ``link_cost``)."""
         self._price = value
         for node in self.nodes_AC:
-            node.price=value
-            for gen in node.connected_gen:
-                if gen.price_link:
-                    gen.lf=value
-                    gen.qf=0
+            node.price = value
+        for node in self.nodes_DC:
+            node.price = value
         # Notify all linked MTDC price_zones about the price change
         for mtdc_price_zone in self.mtdc_price_zones:
-            mtdc_price_zone.update_price()  # Automatically update MTDC price_zone's price
+            mtdc_price_zone.update_price()
 
         # If this price_zone has a linked price_zone, update the linked price_zone's price
         if self.linked_price_zone is not None:
-            self.linked_price_zone.price = value  # This will trigger the price setter of the offshore price_zone
+            self.linked_price_zone.price = value
+
+    def _push_a_to_nodes(self):
+        """Zone ``a`` → member ``node.qf``."""
+        a = self.a
+        for node in self.nodes_AC:
+            node.qf = a
+        for node in self.nodes_DC:
+            node.qf = a
+
+    def _push_b_to_nodes(self):
+        """Zone ``b`` → member ``node.lf``."""
+        b = self._b
+        for node in self.nodes_AC:
+            node.lf = b
+        for node in self.nodes_DC:
+            node.lf = b
+
     @property
     def a_base(self):
         return self._a_base
@@ -4088,8 +4195,10 @@ class Price_Zone:
         self._b = value
         if self.expand_import:
             self.calc_import_expand()
+            self._push_a_to_nodes()
         else:
             self.calc_curvature_effect()
+        self._push_b_to_nodes()
 
     @property
     def PGL_min_base(self):
@@ -4100,6 +4209,7 @@ class Price_Zone:
         self._PGL_min_base = value
         if self.expand_import:
             self.calc_import_expand()
+            self._push_a_to_nodes()
         else:
             self.calc_curvature_effect()
 
@@ -4108,6 +4218,7 @@ class Price_Zone:
             self.calc_import_expand()
         else:
             self.calc_curvature_effect()
+        self._push_a_to_nodes()
 
     @property
     def import_expand(self):

@@ -4,6 +4,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 import pyflow_acdc as pyf
 from pyflow_acdc.Classes import Cable_options, Line_AC, Line_DC
 
@@ -125,8 +126,8 @@ def test_empty_grid_add_elements_price_zones_and_line_types():
     pyf.add_MTDC_price_zone(grid, "mtdc_agg", linked_price_zones=["Z_on"])
 
     pyf.assign_nodeToPrice_Zone(grid, "n2", "Z_on", ACDC="AC")
-    pyf.assign_nodeToPrice_Zone(grid, "d2", "Z_on", ACDC="DC")
-    pyf.assign_ConvToPrice_Zone(grid, conv, "Z_on")
+    pyf.assign_nodeToPrice_Zone(grid, "d2", onshore, ACDC="DC")
+    pyf.assign_ConvToPrice_Zone(grid, conv, onshore)
 
     pyf.Line_AC.load_cable_database()
     cable_types = ["NREL_66kV_185mm2", "NREL_66kV_630mm2"]
@@ -178,6 +179,25 @@ def test_empty_grid_add_elements_price_zones_and_line_types():
     assert any(n.PZ == "Z_on" for n in grid.nodes_AC)
     assert conv in onshore.ConvACDC
     assert grid.Graph_AC is not None
+
+    # link_cost cascade: a→qf, b→lf (quadratic); price→lf (linear); default none
+    n2 = next(n for n in grid.nodes_AC if n.name == "n2")
+    pyf.add_extgrid(grid, "n2", link_cost="quadratic")
+    ext = next(g for g in grid.Generators if getattr(g, "is_ext_grid", False))
+    assert n2.qf == pytest.approx(0.0)
+    assert ext.qf == pytest.approx(0.0)
+    assert ext.link_cost == "quadratic"
+    onshore.b = 55.0
+    assert n2.lf == pytest.approx(55.0)
+    assert ext.lf == pytest.approx(55.0)
+    assert ext.qf == pytest.approx(0.0)
+    onshore.a_base = 0.02
+    assert n2.qf == pytest.approx(0.02)
+    assert ext.qf == pytest.approx(0.02)
+    assert ext.lf == pytest.approx(55.0)
+    onshore.price = 99.0
+    assert n2.price == pytest.approx(99.0)
+    assert ext.lf == pytest.approx(55.0)  # quadratic ignores node.price
 
 
 def test_case24_mp_csv_templates(tmp_path):

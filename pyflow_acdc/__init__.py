@@ -215,13 +215,18 @@ try:
         'run_dash',
         'run_ts_dash',
         'run_window_dash',
+        'run_season_compare_dash',
         'run_mp_ts_dash',
         'create_mp_ts_dash',
         'create_dash_app',
         'create_window_dash_app',
+        'create_season_compare_dash_app',
+        'build_season_window_compare',
+        'attach_season_window_compare',
         'plot_TS_res_from_ts',
         'plot_TS_res_dash',
         'plot_window_res_dash',
+        'plot_season_compare_dash',
     ])
     HAS_DASH = True
 except ImportError:

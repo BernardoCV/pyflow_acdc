@@ -19,13 +19,18 @@ __all__ = [
     'run_dash',
     'run_ts_dash',
     'run_window_dash',
+    'run_season_compare_dash',
     'run_mp_ts_dash',
     'create_mp_ts_dash',
     'create_dash_app',
     'create_window_dash_app',
+    'create_season_compare_dash_app',
+    'build_season_window_compare',
+    'attach_season_window_compare',
     'plot_TS_res_from_ts',
     'plot_TS_res_dash',
     'plot_window_res_dash',
+    'plot_season_compare_dash',
 ]
 
 # Docs Furo "SCADA panel" light palette (docs/conf.py light_css_variables).
@@ -93,6 +98,8 @@ _WINDOW_TOTAL_POWER_SERIES = (
     ('Total H2', 'hydrogen_P_e'),
     ('Total BESS', 'storage_power'),
 )
+
+_SEASON_COMPARE_PLOT_CHOICES = [label for label, _ in _WINDOW_TOTAL_POWER_SERIES]
 
 _MP_PLOT_CHOICES = [
     'Power Generation by price zone',
@@ -413,6 +420,73 @@ def _window_total_power_df(window_opf_results):
     return pd.DataFrame(series)
 
 
+def build_season_window_compare(season_to_window_results):
+    """Build compare tables: metric → DataFrame (index=hour, columns=season).
+
+    Parameters
+    ----------
+    season_to_window_results : dict
+        Mapping ``season_name -> window_opf_results`` (as on ``grid.window_opf_results``).
+    """
+    if not season_to_window_results:
+        raise ValueError("season_to_window_results is empty")
+
+    per_season_totals = {}
+    for season, res in season_to_window_results.items():
+        totals = _window_total_power_df(res)
+        if totals is None or totals.empty:
+            raise ValueError(
+                f"Season {season!r} has no total-power series in window_opf_results"
+            )
+        # Align to hour-of-day for overlay (drop leading SoC-only frames if present).
+        totals = totals.copy()
+        totals.index = range(len(totals))
+        per_season_totals[season] = totals
+
+    compare = {}
+    for metric, _ in _WINDOW_TOTAL_POWER_SERIES:
+        cols = {}
+        for season, totals in per_season_totals.items():
+            if metric in totals.columns:
+                cols[season] = totals[metric]
+        if cols:
+            compare[metric] = pd.DataFrame(cols)
+    if not compare:
+        raise ValueError("No overlapping total-power metrics across seasons")
+    return compare
+
+
+def attach_season_window_compare(grid, season_to_window_results):
+    """Store season-compare tables on ``grid`` for Dash (``run_dash`` auto)."""
+    grid.season_window_compare = build_season_window_compare(season_to_window_results)
+    grid.season_window_compare_run = True
+    return grid
+
+
+def _season_compare_usable(grid):
+    return (
+        getattr(grid, 'season_window_compare_run', False)
+        and isinstance(getattr(grid, 'season_window_compare', None), dict)
+        and bool(grid.season_window_compare)
+    )
+
+
+def _available_season_compare_plot_choices(grid):
+    choices = []
+    for choice in _SEASON_COMPARE_PLOT_CHOICES:
+        df = grid.season_window_compare.get(choice)
+        if df is not None and not df.empty:
+            choices.append(choice)
+    return choices
+
+
+def _get_df_and_label_from_season_compare(season_window_compare, plotting_choice):
+    df = season_window_compare.get(plotting_choice)
+    if df is None:
+        return None, ''
+    return df, f'{plotting_choice} (MW)'
+
+
 def _get_df_and_label_from_window(window_opf_results, plotting_choice):
     """Resolve (dataframe, y-axis label) from ``grid.window_opf_results``."""
     if plotting_choice == 'Total power':
@@ -459,6 +533,10 @@ def _get_df_and_label_from_window(window_opf_results, plotting_choice):
 
 
 def _get_df_and_label(grid, plotting_choice):
+    if _season_compare_usable(grid):
+        return _get_df_and_label_from_season_compare(
+            grid.season_window_compare, plotting_choice
+        )
     if getattr(grid, 'window_opf_run', False) and getattr(grid, 'window_opf_results', None):
         return _get_df_and_label_from_window(grid.window_opf_results, plotting_choice)
     return _get_df_and_label_from_ts(grid.time_series_results, grid.S_base, plotting_choice)
@@ -647,6 +725,53 @@ def plot_window_res_dash(grid, plotting_choice, selected_rows, x_limits=None, y_
         xaxis_title="Frame",
         yaxis_title=y_label,
         legend_title="Elements",
+        showlegend=True,
+    )
+    _apply_fig_theme(fig)
+    if x_limits is not None and x_limits[0] is not None and x_limits[1] is not None:
+        fig.update_xaxes(range=list(x_limits))
+    if y_limits is not None and y_limits[0] is not None and y_limits[1] is not None:
+        fig.update_yaxes(range=list(y_limits))
+    return fig
+
+
+def plot_season_compare_dash(grid, plotting_choice, selected_rows, x_limits=None, y_limits=None):
+    """Build one Plotly figure comparing seasons (one line per window)."""
+    df, y_label = _get_df_and_label_from_season_compare(
+        grid.season_window_compare, plotting_choice
+    )
+    if df is None or df.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            title=f"Season compare: {plotting_choice}",
+            xaxis_title="Hour",
+            yaxis_title=y_label if y_label else "Value",
+        )
+        return _apply_fig_theme(fig)
+
+    time = df.index
+    fig = go.Figure()
+    cols = selected_rows if selected_rows else list(df.columns)
+    for i, col in enumerate(cols):
+        if col not in df.columns:
+            continue
+        color = _SERIES_COLORS[i % len(_SERIES_COLORS)]
+        fig.add_trace(
+            go.Scatter(
+                x=time, y=df[col], mode='lines', name=str(col),
+                line=dict(color=color, width=2),
+            )
+        )
+    fig.update_layout(
+        title=dict(
+            text=f"Season compare: {plotting_choice}",
+            font=dict(size=24, color=_THEME['text_primary']),
+            x=0.5,
+            xanchor='center',
+        ),
+        xaxis_title="Hour",
+        yaxis_title=y_label,
+        legend_title="Season",
         showlegend=True,
     )
     _apply_fig_theme(fig)
@@ -931,6 +1056,29 @@ def create_window_dash_app(grid):
     )
 
 
+def create_season_compare_dash_app(grid):
+    """Dash app comparing seasonal window totals (one line per season)."""
+    if not _season_compare_usable(grid):
+        raise ValueError(
+            "create_season_compare_dash_app requires grid.season_window_compare_run "
+            "and grid.season_window_compare"
+        )
+    choices = _available_season_compare_plot_choices(grid)
+    if not choices:
+        raise ValueError("season_window_compare has no plottable metrics")
+    default_1 = choices[0]
+    default_2 = choices[1] if len(choices) > 1 else choices[0]
+    return _build_dual_plot_dash_app(
+        grid,
+        title=f"{getattr(grid, 'name', 'grid')} Season Window Compare",
+        plot_choices=choices,
+        default_choice_1=default_1,
+        default_choice_2=default_2,
+        plot_fn=plot_season_compare_dash,
+        x_axis_label='Hour',
+    )
+
+
 def _ts_inv_usable(grid):
     ts_inv = getattr(grid, 'ts_inv', None)
     return isinstance(ts_inv, dict) and bool(ts_inv)
@@ -948,25 +1096,39 @@ def run_window_dash(grid, debug=True, use_reloader=False):
     app.run(debug=debug, use_reloader=use_reloader)
 
 
+def run_season_compare_dash(grid, debug=True, use_reloader=False):
+    """Run the season-compare Dash app (requires ``grid.season_window_compare_run``)."""
+    app = create_season_compare_dash_app(grid)
+    app.run(debug=debug, use_reloader=use_reloader)
+
+
 def run_dash(grid, debug=True, use_reloader=False):
     """
     Start the appropriate Dash app from grid run flags (same family as ``Grid.reset_run_flags``).
 
     * ``grid.dash_mode`` optional: ``'auto'`` (default), ``'mp_ts'``, ``'single_ts'``,
-      or ``'window'``.
+      ``'window'``, or ``'season_compare'``.
 
     **auto** (precedence):
 
-    1. ``window_opf_run`` with ``grid.window_opf_results`` → window OPF dashboard.
-    2. ``MP_TEP_run`` or ``MP_MS_TEP_run`` and ``grid.ts_inv`` populated (MS TS-OPF post-processing)
+    1. ``season_window_compare_run`` with ``grid.season_window_compare`` → season compare.
+    2. ``window_opf_run`` with ``grid.window_opf_results`` → window OPF dashboard.
+    3. ``MP_TEP_run`` or ``MP_MS_TEP_run`` and ``grid.ts_inv`` populated (MS TS-OPF post-processing)
        → multi-period TS dashboard.
-    3. Else ``Time_series_ran`` → single-grid TS dashboard.
-    4. Else raise ``ValueError``.
+    4. Else ``Time_series_ran`` → single-grid TS dashboard.
+    5. Else raise ``ValueError``.
     """
     mode = getattr(grid, 'dash_mode', 'auto')
-    if mode not in ('auto', 'mp_ts', 'single_ts', 'window'):
+    if mode not in ('auto', 'mp_ts', 'single_ts', 'window', 'season_compare'):
         mode = 'auto'
 
+    if mode == 'season_compare':
+        if not _season_compare_usable(grid):
+            raise ValueError(
+                'run_dash: dash_mode=season_compare requires '
+                'grid.season_window_compare_run and grid.season_window_compare'
+            )
+        return run_season_compare_dash(grid, debug=debug, use_reloader=use_reloader)
     if mode == 'window':
         if not _window_opf_usable(grid):
             raise ValueError(
@@ -986,6 +1148,8 @@ def run_dash(grid, debug=True, use_reloader=False):
         return run_ts_dash(grid, debug=debug, use_reloader=use_reloader)
 
     # auto
+    if _season_compare_usable(grid):
+        return run_season_compare_dash(grid, debug=debug, use_reloader=use_reloader)
     if _window_opf_usable(grid):
         return run_window_dash(grid, debug=debug, use_reloader=use_reloader)
     if (getattr(grid, 'MP_TEP_run', False) or getattr(grid, 'MP_MS_TEP_run', False)) and _ts_inv_usable(grid):
@@ -999,10 +1163,11 @@ def run_dash(grid, debug=True, use_reloader=False):
         return run_ts_dash(grid, debug=debug, use_reloader=use_reloader)
 
     raise ValueError(
-        'run_dash (auto): need window_opf_run with window_opf_results, '
+        'run_dash (auto): need season_window_compare_run, '
+        'window_opf_run with window_opf_results, '
         'or (MP_TEP_run or MP_MS_TEP_run) with grid.ts_inv, '
         'or Time_series_ran after TS_ACDC_OPF. '
-        "Override with grid.dash_mode='window', 'mp_ts', or 'single_ts'."
+        "Override with grid.dash_mode='season_compare', 'window', 'mp_ts', or 'single_ts'."
     )
 
 

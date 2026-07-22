@@ -8,7 +8,7 @@ from pyflow_acdc.constants import ConverterDCType, NodeType, Polarity
 
 
 def PEI_grid(include_countries: list[str] = None):    
-    "Inlcude country can be either UK for nautilus link and/or DK for triton Link"
+    "Inlcude country can be either GB for nautilus link and/or DK for triton Link"
     if include_countries is None:
         include_countries = []
     # Converter parameters (OPF_ACDC_Energy_Islands.py, pu on grid S_base)
@@ -599,33 +599,36 @@ def PEI_grid(include_countries: list[str] = None):
         elif ren_source.name.startswith("PE_I_"):
             pyf.assign_RenToZone(
                 grid, ren_source, PE_I_zone, link_availability=False)
+    BE = pyf.add_price_zone(grid,'Belgium',100)
+    pyf.add_extgrid(grid, 'BE_ON', link_cost='quadratic')
+    pyf.assign_nodeToPrice_Zone(grid,'BE_ON',BE)
 
-    pyf.add_extgrid(grid, 'BE_ON', price_link=True)
-
-    if "UK" in include_countries:
+    if "GB" in include_countries:
+        GB = pyf.add_price_zone(grid,'Great Britain',100)
         pyf.add_DC_node(
-            grid, 525, node_type=ConverterDCType.P, name='Na_DC_UK',
+            grid, 525, node_type=ConverterDCType.P, name='Na_DC_GB',
             geometry=Point(0.717716, 51.445235),
         )
         pyf.add_AC_node(
-            grid, 220, node_type=NodeType.SLACK, name='Na_AC_UK',
+            grid, 220, node_type=NodeType.SLACK, name='Na_AC_GB',
             geometry=Point(0.715474718, 51.44475984),
         )
         pyf.add_line_DC(
-            grid, 'PEI_DC', 'Na_DC_UK', name='Nautilus_uk',
+            grid, 'PEI_DC', 'Na_DC_GB', name='Nautilus_uk',
             R_Ohm_km=0.0095, A_rating=DC_BIPOLAR_A_RATING, Length_km=120,
             polarity=Polarity.BIPOLAR,
         )
         pyf.add_ACDC_converter(
-            grid, 'Na_AC_UK', 'Na_DC_UK',
+            grid, 'Na_AC_GB', 'Na_DC_GB',
             AC_type=NodeType.SLACK, DC_type=ConverterDCType.P,
             kV_base=220, MVA_max=1000.0,
             name='Nautilus_conv', **_CONV_KWARGS,
         )
-        pyf.add_extgrid(grid, 'Na_AC_UK', price_link=True)
-        
+        pyf.add_extgrid(grid, 'Na_AC_GB', link_cost='quadratic')
+        pyf.assign_nodeToPrice_Zone(grid,'Na_AC_GB',GB)
        
     if "DK" in include_countries:
+        DK = pyf.add_price_zone(grid,'Denmark',100)
         pyf.add_DC_node(
             grid, 525, node_type=ConverterDCType.P, name='Tr_DC_DK',
             geometry=Point(8.519897, 56.353078),
@@ -650,9 +653,9 @@ def PEI_grid(include_countries: list[str] = None):
             kV_base=220, MVA_max=1000.0,
             name='Triton_conv', **_CONV_KWARGS,
         )
-        pyf.add_extgrid(grid, 'Tr_AC_DK', price_link=True)
-
-    # UK/DK nodes are added after create_grid_from_data; refresh graphs and Ybus.
+        pyf.add_extgrid(grid, 'Tr_AC_DK', link_cost='quadratic')
+        pyf.assign_nodeToPrice_Zone(grid,'Tr_AC_DK',DK)
+    # GB/DK nodes are added after create_grid_from_data; refresh graphs and Ybus.
     if grid.nn_AC > 0:
         grid.update_graph_ac()
         grid.update_pq_ac()

@@ -12,7 +12,9 @@ from pyflow_tests._bess_h2_pei_data import (
     BESS_E_MAX_MWH,
     BESS_P_NOM_MW,
     DEFAULT_SEASONS,
+    EXPORT_NODE_TO_ZONE,
     EXPORT_PRICE_NODES,
+    EXPORT_PRICE_ZONES,
     HUB_NODE,
     PEI_OBJ_RULE,
     PEI_SEASONS,
@@ -34,13 +36,16 @@ def test_pei_power_matrix_available():
 
 def test_pei_export_prices_available():
     prices = load_pei_export_prices()
-    assert set(prices) == set(EXPORT_PRICE_NODES)
-    for node, series in prices.items():
-        assert series.shape == (24,), node
+    assert set(prices) == set(EXPORT_PRICE_ZONES)
+    for zone, series in prices.items():
+        assert series.shape == (24,), zone
 
     prices_all = load_pei_export_prices(seasons=PEI_SEASONS)
-    for node, series in prices_all.items():
-        assert series.shape == (96,), node
+    for zone, series in prices_all.items():
+        assert series.shape == (96,), zone
+
+    by_node = load_pei_export_prices(by_zone=False)
+    assert set(by_node) == set(EXPORT_PRICE_NODES)
 
 
 def test_pei_bess_h2_grid_assets():
@@ -51,18 +56,24 @@ def test_pei_bess_h2_grid_assets():
     assert grid.H2 is True
     assert len(grid.storage_elements) == 1
     assert len(grid.electrolysers) == 1
+    assert {pz.name for pz in grid.Price_Zones} >= set(EXPORT_PRICE_ZONES)
     price_ts = {
         ts.element_name
         for ts in grid.Time_series
-        if ts.type == "price"
+        if ts.type == "b_CG"
     }
-    for node_name in EXPORT_PRICE_NODES:
-        assert node_name in price_ts
+    for zone_name in EXPORT_PRICE_ZONES:
+        assert zone_name in price_ts
+    for node_name, zone_name in EXPORT_NODE_TO_ZONE.items():
+        node = next(n for n in grid.nodes_AC if n.name == node_name)
+        assert node.PZ == zone_name
+        assert node.qf == 0
         ext = next(
             g for g in grid.Generators
             if getattr(g, "is_ext_grid", False) and g._node.name == node_name
         )
-        assert ext.price_link is True
+        assert ext.link_cost == "quadratic"
+        assert ext.qf == 0
     bess = grid.storage_elements[0]
     assert bess.Node == HUB_NODE
     assert bess.E_max == pytest.approx(BESS_E_MAX_MWH)

@@ -36,11 +36,21 @@ WINDOW_START = 0
 PEI_SEASONS = ("Spring", "Summer", "Autumn", "Winter")
 DEFAULT_SEASONS = ("Autumn",)
 
-# Export buses (hourly market prices, EUR/MWh)
+# Export buses ↔ price zones (hourly market prices, EUR/MWh CSVs).
+EXPORT_NODE_TO_ZONE = {
+    "BE_ON": "Belgium",
+    "Na_AC_GB": "Great Britain",
+    "Tr_AC_DK": "Denmark",
+}
+EXPORT_PRICE_ZONES = {
+    "Belgium": "BE_Price.csv",
+    "Great Britain": "GB_Price.csv",
+    "Denmark": "DK_Price.csv",
+}
+# Back-compat alias: export bus → CSV (same files as zones).
 EXPORT_PRICE_NODES = {
-    "BE_ON": "BE_Price.csv",
-    "Na_AC_UK": "GB_Price.csv",
-    "Tr_AC_DK": "DK_Price.csv",
+    node: EXPORT_PRICE_ZONES[zone]
+    for node, zone in EXPORT_NODE_TO_ZONE.items()
 }
 
 PEI_OBJ_RULE = {"Energy_cost": 1}
@@ -114,12 +124,21 @@ def load_pei_power_matrix(seasons=None):
     return np.hstack(blocks)
 
 
-def load_pei_export_prices(seasons=None):
-    """Return dict of export prices [EUR/MWh] keyed by export bus name."""
+def load_pei_export_prices(seasons=None, *, by_zone=True):
+    """Return dict of export prices [EUR/MWh].
+
+    Parameters
+    ----------
+    seasons : str or sequence of str, optional
+        Seasonal windows to concatenate.
+    by_zone : bool, optional
+        If True (default), keys are price-zone names (``Belgium``, ``Great Britain``,
+        ``Denmark``). If False, keys are export bus names (``BE_ON``, …).
+    """
     seasons = normalize_pei_seasons(seasons)
     n_hours = pei_hours(seasons)
     prices = {}
-    for node_name, csv_name in EXPORT_PRICE_NODES.items():
+    for zone_name, csv_name in EXPORT_PRICE_ZONES.items():
         parts = []
         for season in seasons:
             series = pd.read_csv(_pei_season_path(season, csv_name))[
@@ -131,13 +150,19 @@ def load_pei_export_prices(seasons=None):
                     f"hourly prices (got {series.shape})"
                 )
             parts.append(series)
-        prices[node_name] = np.concatenate(parts)
-        if prices[node_name].shape != (n_hours,):
+        prices[zone_name] = np.concatenate(parts)
+        if prices[zone_name].shape != (n_hours,):
             raise ValueError(
                 f"Concatenated {csv_name} length mismatch "
-                f"(got {prices[node_name].shape}, expected {(n_hours,)})"
+                f"(got {prices[zone_name].shape}, expected {(n_hours,)})"
             )
-    return prices
+    if by_zone:
+        return prices
+    return {
+        node: prices[zone]
+        for node, zone in EXPORT_NODE_TO_ZONE.items()
+        if zone in prices
+    }
 
 
 def _add_named_time_series(grid, hour_data, ts_type):
@@ -151,17 +176,24 @@ def _add_named_time_series(grid, hour_data, ts_type):
 
 
 def attach_pei_export_prices(grid, seasons=None):
-    """Attach hourly ``price`` time series at BE_ON, Na_AC_UK, and Tr_AC_DK."""
-    ac_names = {node.name for node in grid.nodes_AC}
-    export_nodes = [name for name in EXPORT_PRICE_NODES if name in ac_names]
-    if not export_nodes:
-        raise ValueError("No PEI export buses found on grid; expected at least BE_ON")
+    """Attach hourly ``b_CG`` time series to PEI price zones (Belgium / Great Britain / Denmark).
 
-    prices = load_pei_export_prices(seasons=seasons)
+    Zone ``b`` propagates to member ``node.lf``; extgrids with
+    ``link_cost='quadratic'`` take ``gen.lf`` from ``node.lf``.
+    ``a`` / ``qf`` stay 0 unless an ``a_CG`` series is added.
+    """
+    zone_names = {pz.name for pz in grid.Price_Zones}
+    export_zones = [name for name in EXPORT_PRICE_ZONES if name in zone_names]
+    if not export_zones:
+        raise ValueError(
+            "No PEI price zones found on grid; expected at least Belgium"
+        )
+
+    prices = load_pei_export_prices(seasons=seasons, by_zone=True)
     _add_named_time_series(
         grid,
-        pd.DataFrame({node: prices[node] for node in export_nodes}),
-        "price",
+        pd.DataFrame({zone: prices[zone] for zone in export_zones}),
+        "b_CG",
     )
 
 
@@ -194,7 +226,7 @@ def build_pei_bess_h2_grid(
     """
     seasons = normalize_pei_seasons(seasons)
     if include_countries is None:
-        include_countries = ["UK", "DK"]
+        include_countries = ["GB", "DK"]
     grid, _ = pyf.cases["PEI_grid"](include_countries=include_countries)
 
     pyf.add_storage(

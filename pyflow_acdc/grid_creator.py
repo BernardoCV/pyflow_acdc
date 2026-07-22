@@ -1805,6 +1805,7 @@ def create_sub_grid(grid,Area=None, Area_name = None,polygon_coords=None):
 
                     gen.price_link=True
                     gen.lf= node.price
+                    gen.qf = getattr(node, 'qf', 0)
 
                     node.PLi_base += line.MVA_rating/grid.S_base
                     node.update_PLi()

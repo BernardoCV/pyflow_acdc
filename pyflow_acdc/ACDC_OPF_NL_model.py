@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy, AcDcSide
+from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy, AcDcSide, LinkCost
 
 
 __all__ = [
@@ -2145,7 +2145,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     for node in grid.nodes_AC:  # Loop through all nodes
         nAC = node.nodeNumber
         for g in node.connected_gen:  # Loop through all generators in the node
-            if g.price_link:
+            if g.link_cost == LinkCost.LINEAR:
                 model.price_zone_gen_link.add(model.price[nAC] == model.lf[g.genNumber])
 
 

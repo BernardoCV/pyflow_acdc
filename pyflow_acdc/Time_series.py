@@ -202,6 +202,14 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
                 price_zone.PGL_min_base = ts_data[idx]
             elif typ == TSType.PGL_MAX:
                 price_zone.PGL_max = ts_data[idx]
+    elif typ in (TSType.A_CG, TSType.B_CG):
+        # Cost-curve coeffs update zones (→ nodes → linked gens) without PZ-cost mode.
+        price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
+        if price_zone:
+            if typ == TSType.A_CG:
+                price_zone.a_base = ts_data[idx]
+            else:
+                price_zone.b = ts_data[idx]
 
     if typ == TSType.PRICE:
         # Directly access price zone and nodes using dictionaries
@@ -212,18 +220,10 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
         node = grid.nodes_AC_dict.get(ts.element_name, None)
         if node:
             node.price = ts_data[idx]
-            for gen in node.connected_gen:
-                if gen.price_link:
-                    gen.lf = ts_data[idx]
-                    gen.qf = 0
 
         node_dc = grid.nodes_DC_dict.get(ts.element_name, None)
         if node_dc:
             node_dc.price = ts_data[idx]
-            for gen in node_dc.connected_gen:
-                if gen.price_link:
-                    gen.lf = ts_data[idx]
-                    gen.qf = 0
 
     elif typ == TSType.LOAD:
         # Directly access price zone and nodes using dictionaries

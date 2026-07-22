@@ -25,11 +25,15 @@ pytestmark = pytest.mark.skipif(
 if _dash_installed():
     from pyflow_acdc.Graph_Dash import (
         _MP_PLOT_CHOICES,
+        attach_season_window_compare,
+        build_season_window_compare,
         create_dash_app,
         create_mp_ts_dash,
+        create_season_compare_dash_app,
         create_window_dash_app,
         plot_TS_res_dash,
         plot_TS_res_from_ts,
+        plot_season_compare_dash,
         plot_window_res_dash,
         run_dash,
     )
@@ -281,6 +285,74 @@ def test_create_window_dash_app_layout_and_plot():
 
     with pytest.raises(ValueError, match="window_opf"):
         create_window_dash_app(pyf.Grid(S_base=100))
+
+
+def _synthetic_window_opf_results(*, ren, gen, h2, bess):
+    """Minimal window_opf_results for season-compare totals (3 frames)."""
+    frames = [0, 1, 2]
+    return {
+        "ren_power": pd.DataFrame({"frame": frames, "rs1": ren}),
+        "gen_power": pd.DataFrame({"frame": frames, "g1": gen}),
+        "hydrogen_P_e": pd.DataFrame({"frame": frames, "el1": h2}),
+        "storage_power": pd.DataFrame({"frame": frames, "st1": bess}),
+    }
+
+
+def _grid_with_season_compare():
+    season_map = {
+        "Autumn": _synthetic_window_opf_results(
+            ren=[5.0, 8.0, 6.0],
+            gen=[10.0, 20.0, 15.0],
+            h2=[22.5, 22.5, 22.5],
+            bess=[5.0, 10.0, 0.0],
+        ),
+        "Winter": _synthetic_window_opf_results(
+            ren=[7.0, 9.0, 4.0],
+            gen=[12.0, 18.0, 14.0],
+            h2=[20.0, 21.0, 19.0],
+            bess=[-5.0, 0.0, 8.0],
+        ),
+    }
+    grid = pyf.Grid(S_base=100)
+    grid.name = "season_compare_test"
+    attach_season_window_compare(grid, season_map)
+    return grid
+
+
+def test_build_season_window_compare_totals():
+    autumn = _synthetic_window_opf_results(
+        ren=[5.0, 8.0, 6.0],
+        gen=[10.0, 20.0, 15.0],
+        h2=[22.5, 22.5, 22.5],
+        bess=[5.0, 10.0, 0.0],
+    )
+    winter = _synthetic_window_opf_results(
+        ren=[7.0, 9.0, 4.0],
+        gen=[12.0, 18.0, 14.0],
+        h2=[20.0, 21.0, 19.0],
+        bess=[-5.0, 0.0, 8.0],
+    )
+    compare = build_season_window_compare({"Autumn": autumn, "Winter": winter})
+    assert set(compare) == {"Total ren", "Total gen", "Total H2", "Total BESS"}
+    assert list(compare["Total ren"].columns) == ["Autumn", "Winter"]
+    assert list(compare["Total ren"]["Autumn"]) == [5.0, 8.0, 6.0]
+    assert list(compare["Total ren"]["Winter"]) == [7.0, 9.0, 4.0]
+    assert list(compare["Total BESS"]["Winter"]) == [-5.0, 0.0, 8.0]
+
+
+def test_create_season_compare_dash_app_layout_and_plot():
+    grid = _grid_with_season_compare()
+    app = create_season_compare_dash_app(grid)
+    assert app.layout is not None
+
+    fig = plot_season_compare_dash(grid, "Total ren", ["Autumn", "Winter"])
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2
+    assert {t.name for t in fig.data} == {"Autumn", "Winter"}
+    assert list(fig.data[0].x) == [0, 1, 2]
+
+    with pytest.raises(ValueError, match="season_window_compare"):
+        create_season_compare_dash_app(pyf.Grid(S_base=100))
 
 
 def _callback_fn(app, key):

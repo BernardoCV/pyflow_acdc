@@ -114,6 +114,23 @@ class PricingStrategy(str, Enum):
     AVG = 'avg'
 
 
+class LinkCost(str, Enum):
+    """How a generator links its OPF cost coeffs to the host bus.
+
+    ``NONE``
+        Gen keeps its own ``qf`` / ``lf`` (default). Used by ``Energy_cost``
+        when costs are independent of nodal / zonal prices.
+    ``QUADRATIC``
+        ``gen.qf`` / ``gen.lf`` track ``node.qf`` / ``node.lf`` (from zone
+        ``a`` / ``b`` when the bus is in a price zone).
+    ``LINEAR``
+        ``gen.lf`` tracks ``node.price`` (from zone ``price`` when linked).
+    """
+    NONE = 'none'
+    QUADRATIC = 'quadratic'
+    LINEAR = 'linear'
+
+
 class TSType(str, Enum):
     """`TimeSeries.type` labels recognised by the TS dispatch logic.
 

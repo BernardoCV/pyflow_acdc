@@ -36,6 +36,7 @@ from .constants import (
     Polarity,
     AcDcSide,
     PricingStrategy,
+    LinkCost,
     TSType,
     TS_RENEWABLE_TYPES,
 )
@@ -1136,7 +1137,26 @@ def _look_up_ren_source_zone(grid, zone):
     return found
 
 
-def add_gen(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+def _resolve_link_cost(link_cost=None, price_link=None):
+    """Resolve gen cost-link mode; ``price_link=True`` is legacy for ``linear``."""
+    if link_cost is not None:
+        return link_cost if isinstance(link_cost, LinkCost) else LinkCost(link_cost)
+    if price_link:
+        return LinkCost.LINEAR
+    return LinkCost.NONE
+
+
+def _sync_gen_cost_from_node(gen):
+    """Apply ``gen.link_cost`` from the host bus (call after setting ``link_cost``)."""
+    node = gen._node
+    if gen.link_cost == LinkCost.LINEAR:
+        gen.lf = node.price
+    elif gen.link_cost == LinkCost.QUADRATIC:
+        gen.qf = node.qf
+        gen.lf = node.lf
+
+
+def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append an AC generator to ``grid.Generators``.
 
     Parameters
@@ -1147,8 +1167,12 @@ def add_gen(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_
         Connection bus (name or object).
     gen_name : str, optional
         Generator name; defaults to ``'gen_<node>'``.
+    link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
+        How OPF costs track the bus (default ``'none'``). ``quadratic``:
+        ``qf``/``lf`` from ``node.qf``/``node.lf``; ``linear``: ``lf`` from
+        ``node.price``.
     price_link : bool, optional
-        If True, use bus energy price (``lf=node.price``).
+        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         Linear, quadratic, and fixed OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1212,17 +1236,13 @@ def add_gen(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.price_link=price_link
-
-    if price_link:
-
-        gen.qf= 0
-        gen.lf= node.price
+    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    _sync_gen_cost_from_node(gen)
     grid.Generators.append(gen)
 
     return gen
 
-def add_gen_DC(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append a DC generator to ``grid.Generators_DC``.
 
     Parameters
@@ -1233,8 +1253,10 @@ def add_gen_DC(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=M
         Connection bus.
     gen_name : str, optional
         Generator name.
+    link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
+        See :func:`add_gen`.
     price_link : bool, optional
-        Link marginal cost to bus price (``lf=node.price``).
+        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1278,18 +1300,14 @@ def add_gen_DC(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=M
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.price_link=price_link
-
-    if price_link:
-
-        gen.qf= 0
-        gen.lf= node.price
+    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    _sync_gen_cost_from_node(gen)
     grid.Generators_DC.append(gen)
 
     return gen
 
 
-def add_extgrid(grid, node, gen_name=None,price_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
+def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0, link_cost=None):
     """Add an external-grid equivalent generator at an AC bus.
 
     Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
@@ -1304,7 +1322,9 @@ def add_extgrid(grid, node, gen_name=None,price_link=False,lf=0,qf=0,MVAmax=MAX_
     gen_name : str, optional
         Generator name; defaults to ``'extgrid_<node>'``.
     price_link : bool, optional
-        Link marginal cost to bus price (``lf=node.price``).
+        Deprecated: ``True`` means ``link_cost='linear'``.
+    link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
+        See :func:`add_gen`.
     lf, qf : float, optional
         OPF cost coefficients.
     MVAmax : float, optional
@@ -1346,18 +1366,15 @@ def add_extgrid(grid, node, gen_name=None,price_link=False,lf=0,qf=0,MVAmax=MAX_
     node.PGi = 0
     node.QGi = 0
     node.recalc_extgrid_load()
-    if price_link:
+    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    _sync_gen_cost_from_node(gen)
+    if gen.link_cost != LinkCost.NONE:
         # Keep aggregated price-zone load consistent after extgrid load is introduced.
         pz_name = getattr(node, "PZ", None)
         if pz_name:
             pz = _look_up_price_zone(grid, pz_name)
             if hasattr(pz, "recalc_PLi_base_and_total"):
                 pz.recalc_PLi_base_and_total()
-
-    gen.price_link=price_link
-    if price_link:
-        gen.qf= 0
-        gen.lf= node.price
 
     # Iterate over all AC nodes to see if any is already 'Slack'
     has_slack = any(n.type == NodeType.SLACK for n in grid.nodes_AC)
@@ -2385,7 +2402,7 @@ def assign_RenToZone(grid, ren_source, zone, link_availability=True):
 
 "Assigning components to zones"
 
-def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_load=True):
+def assign_nodeToPrice_Zone(grid, node, price_zone, ACDC='AC', link_load=True):
     """Assign a bus to a price zone (removes it from the previous zone).
 
     Parameters
@@ -2394,8 +2411,8 @@ def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_loa
         Grid to modify.
     node : Node_AC, Node_DC, or str
         Bus to assign.
-    new_price_zone_name : str
-        Target :class:`~pyflow_acdc.Classes.Price_Zone` name.
+    price_zone : Price_Zone or str
+        Target :class:`~pyflow_acdc.Classes.Price_Zone` object or name.
     ACDC : str, optional
         ``'AC'``, ``'DC'``, or ``'any'`` for name lookup side.
     link_load : bool, optional
@@ -2405,21 +2422,27 @@ def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_loa
     -------
     None
 
+    Raises
+    ------
+    ValueError
+        If the node or price zone is not found.
+
     Examples
     --------
     >>> pyf.assign_nodeToPrice_Zone(grid, 'bus1', 'Zone1', ACDC='AC')
+    >>> pyf.assign_nodeToPrice_Zone(grid, bus_obj, zone_obj, ACDC='AC')
     """
     acdc_norm = ACDC if ACDC in ('AC', 'DC') else 'any'
     nodes_attr = 'nodes_DC' if acdc_norm == 'DC' else 'nodes_AC'
     node = _look_up_node(grid, node, ac_or_dc=acdc_norm)
-    new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+    new_price_zone = _look_up_price_zone(grid, price_zone)
 
     # Remove node from its old price_zone
     old_price_zone = None
-    for price_zone in grid.Price_Zones:
-        nodes = getattr(price_zone, nodes_attr)
+    for pz in grid.Price_Zones:
+        nodes = getattr(pz, nodes_attr)
         if node in nodes:
-            old_price_zone = price_zone
+            old_price_zone = pz
             break
     if old_price_zone is not None:
         old_nodes = getattr(old_price_zone, nodes_attr)
@@ -2432,12 +2455,15 @@ def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_loa
     if node not in new_price_zone_nodes:
         new_price_zone_nodes.append(node)
         node.PZ = new_price_zone.name
-        node.price = new_price_zone.price
         node.PLi_linked = link_load
+        # PZ → node only; gens follow via node setters + gen.link_cost.
+        node.price = new_price_zone.price
+        node.qf = new_price_zone.a
+        node.lf = new_price_zone.b
         if hasattr(new_price_zone, "recalc_PLi_base_and_total"):
             new_price_zone.recalc_PLi_base_and_total()
 
-def assign_ConvToPrice_Zone(grid, conv, new_price_zone_name):
+def assign_ConvToPrice_Zone(grid, conv, price_zone):
     """Assign an AC/DC converter to a price zone.
 
     Parameters
@@ -2446,20 +2472,20 @@ def assign_ConvToPrice_Zone(grid, conv, new_price_zone_name):
         Grid to modify.
     conv : AC_DC_converter or str
         Converter object or name.
-    new_price_zone_name : str
-        Target price zone name.
+    price_zone : Price_Zone or str
+        Target price zone object or name.
 
     Returns
     -------
     None
     """
-    new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+    new_price_zone = _look_up_price_zone(grid, price_zone)
     conv_obj = _look_up_converter(grid, conv)
 
     # Remove converter from its old price_zone, if any
-    for price_zone in grid.Price_Zones:
-        if conv_obj in price_zone.ConvACDC:
-            price_zone.ConvACDC = [c for c in price_zone.ConvACDC if c is not conv_obj]
+    for pz in grid.Price_Zones:
+        if conv_obj in pz.ConvACDC:
+            pz.ConvACDC = [c for c in pz.ConvACDC if c is not conv_obj]
             break
 
     # Add converter to the new price_zone
