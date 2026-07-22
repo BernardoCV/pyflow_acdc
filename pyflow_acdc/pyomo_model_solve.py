@@ -17,6 +17,8 @@ try:
 except ImportError:
     GUROBI_AVAILABLE = False
 
+from .solver_utils import pyomo_solver_factory_name
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -578,7 +580,7 @@ def _solver_progress(
 
     Always writes to log file for parsing. Uses Pyomo's tee parameter to control console output.
     """
-    opt = pyo.SolverFactory(solver_name)
+    opt = pyo.SolverFactory(pyomo_solver_factory_name(solver_name))
 
     # Set time limit based on solver
     if time_limit is not None:
@@ -586,12 +588,12 @@ def _solver_progress(
             opt.options['max_cpu_time'] = time_limit
         elif solver_name == 'bonmin':
             opt.options['bonmin.time_limit'] = time_limit
-        elif solver_name == 'highs':
+        elif solver_name in ('highs', 'appsi_highs'):
             opt.options['time_limit'] = time_limit
 
     # Always configure solver to write to log file (for callback parsing)
     # Then use Pyomo's tee parameter to control console output
-    if solver_name == 'highs':
+    if solver_name in ('highs', 'appsi_highs'):
         # HiGHS supports direct log file output
         opt.options['log_file'] = log_path
         # Set log_to_console based on tee_console: when tee=True, allow HiGHS to write to console
@@ -620,14 +622,14 @@ def _solver_progress(
     # For Bonmin/HiGHS, disable autoload so Pyomo does not raise when no
     # solution is available to load. We then load manually if a solution exists.
     solve_kwargs = {'tee': tee_console}
-    if solver_name in ('bonmin', 'highs'):
+    if solver_name in ('bonmin', 'highs', 'appsi_highs'):
         solve_kwargs['load_solutions'] = False
     if solver_name == 'bonmin':
         solve_kwargs['logfile'] = log_path
     results = opt.solve(model, **solve_kwargs)
 
     # Manual incumbent recovery when autoload is disabled.
-    if solver_name in ('bonmin', 'highs'):
+    if solver_name in ('bonmin', 'highs', 'appsi_highs'):
         try:
             solution_list = getattr(results, 'solution', None)
             if solution_list is not None and len(solution_list) > 0:
@@ -665,7 +667,7 @@ def _solver_progress(
         feasible_solutions.extend(parsed_feasible)
         all_solutions.extend(parsed_all)
         bound_solutions.extend(parsed_bounds)
-    elif solver_name == 'highs':
+    elif solver_name in ('highs', 'appsi_highs'):
         parsed_feasible, parsed_all, parsed_bounds = _parse_highs_log(log_path)
         feasible_solutions.extend(parsed_feasible)
         all_solutions.extend(parsed_all)
@@ -885,8 +887,11 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
             results, feasible_solutions, all_solutions, bound_solutions = _solver_progress(model, feasible_solutions, 'bonmin', time_limit, 'bonmin.log', tee_console=tee, solver_options=solver_options)
         elif solver == 'ipopt':
             results, feasible_solutions, all_solutions, bound_solutions = _solver_progress(model, feasible_solutions, 'ipopt', time_limit, 'ipopt.log', tee_console=tee, solver_options=solver_options)
-        elif solver == 'highs':
-            results, feasible_solutions, all_solutions, bound_solutions = _solver_progress(model, feasible_solutions, 'highs', time_limit, 'highs.log', tee_console=tee, solver_options=solver_options)
+        elif solver in ('highs', 'appsi_highs'):
+            results, feasible_solutions, all_solutions, bound_solutions = _solver_progress(
+                model, feasible_solutions, solver, time_limit, f'{solver}.log',
+                tee_console=tee, solver_options=solver_options,
+            )
         else:
             warnings.warn(f"No callback available for {solver}")
             callback = False
@@ -901,7 +906,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
             executable = f'{executable_path}/{specific_solver}'
             opt = pyo.SolverFactory(specific_solver, executable=executable)
         else:
-            opt = pyo.SolverFactory(solver)
+            opt = pyo.SolverFactory(pyomo_solver_factory_name(solver))
 
         # Set time limit (can be overridden by solver_options)
         if time_limit is not None:
@@ -915,7 +920,7 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
                 opt.options['bonmin.time_limit'] = time_limit
             elif solver == 'glpk':
                 opt.options['tmlim'] = time_limit
-            elif solver == 'highs':
+            elif solver in ('highs', 'appsi_highs'):
                 opt.options['time_limit'] = time_limit
             elif solver == 'minotaur':
                 opt.options['--time_limit'] = time_limit

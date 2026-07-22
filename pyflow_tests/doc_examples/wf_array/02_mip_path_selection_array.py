@@ -1,12 +1,10 @@
 """Docs: api\\wf_array.rst — MIP Path Selection (Array)"""
 import pyflow_acdc as pyf
-from pyflow_acdc.constants import MIPBackend , PYOMO_LINEAR_SOLVERS
+from pyflow_acdc.constants import MIPBackend
+from pyflow_acdc.solver_utils import resolve_pyomo_linear_solver
 
 grid, res = pyf.cases["alpha_ventus"]()
-solver = next(
-    (name for name in PYOMO_LINEAR_SOLVERS if pyf.is_pyomo_solver_available(name)),
-    None,
-)
+solver = resolve_pyomo_linear_solver()
 build_only = solver is None
 flag, high_flow, model_MIP, feasible_solutions_MIP = pyf.MIP_path_graph(
     grid,

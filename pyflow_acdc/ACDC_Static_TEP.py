@@ -1124,7 +1124,7 @@ def transmission_expansion(
     }
     return model, model_results, timing_info, solver_stats
 
-def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0):
+def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0,build_only=False):
     """Build and solve the linear (MILP) static transmission-expansion problem.
 
     Linear counterpart of :func:`transmission_expansion`: combines TEP
@@ -1158,6 +1158,10 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
         Enable the solver-progress callback.
     obj_scaling : float, optional
         Divide the objective by this factor for numerical conditioning.
+    build_only : bool, optional
+        Build the Pyomo model, skip the solver, and export initializer values
+        onto ``grid`` so :class:`~pyflow_acdc.Results_class.Results` can run
+        without a MILP solver.
 
     Returns
     -------
@@ -1178,6 +1182,8 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
     model.name = "TEP MTDC linear AC OPF"
 
     opf_create_l_model_ac(model,grid,TEP=True)
+    _TEP_install_variables(model, grid)
+    _TEP_install_constraints(model, grid)
 
 
     obj_TEP = tep_obj(model,grid,NPV)
@@ -1200,10 +1206,12 @@ def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,dis
 
     # model.obj.pprint()
     t3 = time.perf_counter()
-    model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=fs)
-
-    if model_results is None:
-        return None, None, None, None
+    if build_only:
+        model_results, solver_stats = build_only_solver_stats(solver, model)
+    else:
+        model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=fs)
+        if model_results is None:
+            return None, None, None, None
 
 
     t1 = time.perf_counter()

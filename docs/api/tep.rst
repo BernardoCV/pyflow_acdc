@@ -17,6 +17,14 @@ Running one state transmission expansion planning
 
 .. autofunction:: pyflow_acdc.transmission_expansion
 
+   Example on ``case118_TEP`` (model build with **ipopt**; use **bonmin** and omit
+   ``build_only`` for a full MINLP solve). See :doc:`../usage_tep` for grid setup
+   and workflow details.
+
+   .. literalinclude:: ../../pyflow_tests/doc_examples/tep/01_running_one_state_transmission_expansion_planning.py
+      :language: python
+      :lines: 2-
+
    **Returns**
 
    Returns a tuple containing:
@@ -32,6 +40,14 @@ Running multiple scenario based transmission expansion planning
 .. autofunction:: pyflow_acdc.multi_scenario_TEP
 
    Performs a multiple scenario based transmission expansion planning analysis. It utilizes the clustering module to cluster the time series data into different states. See :doc:`clustering` and :doc:`../usage_tep`.
+
+   Example on ``NS_MTDC_2025`` (model build with **ipopt** and ``build_only=True``; use
+   **bonmin** and omit ``build_only`` for a full MINLP solve). See :doc:`../usage_tep`
+   for grid setup, time series, and clustering workflow.
+
+   .. literalinclude:: ../../pyflow_tests/doc_examples/tep/02_multi_scenario_tep.py
+      :language: python
+      :lines: 2-
 
    .. list-table::
       :widths: 20 10 50 10
@@ -96,14 +112,11 @@ Running multiple scenario based transmission expansion planning
    - Solver statistics
    - TEP time series results
 
-Linear and Sensitivity Utilities
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sensitivity Utilities
+^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: pyflow_acdc.linear_transmission_expansion
-
-   Linearized TEP workflow suitable for faster studies and large sweeps.
-   This is also the Pyomo backend for :func:`~pyflow_acdc.wind_farm_CSS` when
-   ``CSS_L_solver`` is a Pyomo LP/MIP solver (not ``'ortools'``).
+The linear (MILP) TEP driver :func:`~pyflow_acdc.linear_transmission_expansion`
+is documented in :doc:`L_models`.
 
 .. autofunction:: pyflow_acdc.alpha_pareto
 

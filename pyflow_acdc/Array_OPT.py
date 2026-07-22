@@ -781,7 +781,7 @@ def MIP_path_graph(grid, max_flow=None, solver_name='glpk', crossings=False, tee
         elif solver_name == 'cbc':
             if MIP_gap is not None:
                 solver_options['ratioGap'] = MIP_gap
-        elif solver_name == 'highs':
+        elif solver_name in ('highs', 'appsi_highs'):
             if MIP_gap is not None:
                 solver_options['mip_rel_gap'] = MIP_gap
 

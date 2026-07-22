@@ -64,6 +64,77 @@ The MS TEP example also uses ``solver="ipopt"`` and ``build_only=True`` in doc
 tests; prefer ``solver="bonmin"`` for production solves with binary expansion
 decisions, and omit ``build_only`` for a full solve.
 
+**Inspecting TEP results** — after a static solve, read the expansion table
+(:meth:`~pyflow_acdc.Results_class.Results.tep_n`) and the normalised objective
+breakdown (:meth:`~pyflow_acdc.Results_class.Results.tep_norm`):
+
+.. literalinclude:: ../pyflow_tests/doc_examples/tep/03_inspecting_tep_results.py
+   :language: python
+   :lines: 2-
+
+**Reconductoring (REC)** — instead of building new parallel
+circuits, an existing AC line can be *reconductored*: its conductor is replaced by
+a higher-capacity one on the same right-of-way. Candidates must be marked **before**
+calling the TEP driver.
+
+Mark a batch of candidates from a table with
+:func:`~pyflow_acdc.repurpose_element_from_pd`. The first column is the existing
+line's ``Line_id``; the remaining columns describe the upgraded conductor and are
+case-insensitive and optional (``r_new``, ``x_new``, ``g_new``, ``b_new``,
+``MVA_rating_new``, ``Life_time``, ``base_cost``):
+
+.. code-block:: python
+
+   import pandas as pd
+   import pyflow_acdc as pyf
+
+   upgradable = pd.DataFrame([
+       {'Line_id': '1-2', 'r_new': 0.00173, 'x_new': 0.00927, 'b_new': 0.3074,
+        'MVA_rating_new': 300.0, 'base_cost': 0.9},
+       # ... one row per reconductoring candidate ...
+   ])
+   pyf.repurpose_element_from_pd(grid, upgradable)
+
+To convert a single line, call
+``pyf.change_line_AC_to_reconducting(grid, line_name, r_new, x_new, g_new, b_new,
+MVA_rating_new, Life_time, base_cost)``.
+
+**Two admittances per element.** Each candidate is stored as a ``rec_Line_AC`` that
+keeps **two** branch-admittance matrices for the same corridor:
+
+- ``Ybus_branch`` — the *existing* conductor, built from the line's ``r, x, g, b``;
+- ``Ybus_branch_new`` — the *reconductored* conductor, built once at setup from the
+  ``*_new`` parameters.
+
+A per-candidate binary flag ``rec_branch`` selects between them: ``create_Ybus_AC``
+stamps ``Ybus_branch_new`` into the system matrix ``Ybus_AC_full`` when
+``rec_branch`` is ``True`` and ``Ybus_branch`` otherwise, and the line's thermal
+limit switches between ``MVA_rating`` and ``MVA_rating_new`` accordingly. In TEP
+``rec_branch`` is a binary decision variable the solver optimises, and the objective
+adds the reconductoring cost term (:math:`\Psi_{rec}`, see :doc:`api/tep`). Because
+of these binaries the problem is a MINLP, so the example below uses ``bonmin``:
+
+.. literalinclude:: ../pyflow_tests/doc_examples/tep/04_reconductoring_tep.py
+   :language: python
+   :lines: 2-
+
+Linear TEP
+----------
+
+For faster studies and large sweeps, :func:`~pyflow_acdc.linear_transmission_expansion`
+solves the MILP counterpart of static TEP (including reconductoring). It falls back
+to ``build_only`` when no MIP solver is available. See :doc:`api/L_models` for the
+full linear API (linear TEP and the linear OPF counterpart
+:func:`~pyflow_acdc.optimal_l_pf`).
+
+.. literalinclude:: ../pyflow_tests/doc_examples/L_models/01_linear_transmission_expansion.py
+   :language: python
+   :lines: 2-
+
+.. literalinclude:: ../pyflow_tests/doc_examples/L_models/02_linear_reconductoring.py
+   :language: python
+   :lines: 2-
+
 Example cases
 -------------
 
