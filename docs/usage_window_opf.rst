@@ -31,6 +31,12 @@ Interactively prefer ``pyf.run_dash(grid)`` over ``create_season_compare_dash_ap
 
 Once running, open http://127.0.0.1:8050/ .
 
+.. themed-figure:: pei_season_compare_dash
+   :width: 100%
+   :alt: PEI BESS H2 season-compare Dash
+
+   Season-compare Dash: Power (source) and SoC across Spring–Winter (split layout).
+
 Single-window solve
 -------------------
 

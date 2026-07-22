@@ -156,6 +156,11 @@ themed_figure_map = {
     "3d_plot": _themed_figure("3d_plot", _F_PLOTTING),
     # UI screenshots
     "dash_example": _themed_figure("dash_example", _F_EXAMPLES),
+    "pei_season_compare_dash": {
+        "folder": _F_EXAMPLES,
+        "dark": f"{_F_EXAMPLES}/pei_season_compare_dash.png",
+        "light": f"{_F_EXAMPLES}/pei_season_compare_dash.png",
+    },
     "north_sea_folium": _themed_figure("north_sea_folium", _F_EXAMPLES),
 }
 
