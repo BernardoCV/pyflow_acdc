@@ -1412,6 +1412,7 @@ class Gen_DC:
         self.S_base = S_base
 
         self.Node_DC=node.name
+        self._node = node
         self.x_coord = node.x_coord
         self.y_coord = node.y_coord
         self.geometry= node.geometry

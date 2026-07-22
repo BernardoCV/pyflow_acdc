@@ -223,10 +223,15 @@ try:
         'create_season_compare_dash_app',
         'build_season_window_compare',
         'attach_season_window_compare',
+        'resolve_family_df',
+        'resolve_season_family_df',
+        'available_dash_families',
+        'available_family_aggregations',
         'plot_TS_res_from_ts',
         'plot_TS_res_dash',
         'plot_window_res_dash',
-        'plot_season_compare_dash',
+        'plot_window_family_dash',
+        'plot_season_family_dash',
     ])
     HAS_DASH = True
 except ImportError:

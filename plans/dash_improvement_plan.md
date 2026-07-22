@@ -1,522 +1,278 @@
 # Dash visual improvement plan for pyflow_acdc
 
-Redesign plan for the interactive Dash apps in
+Living plan for the interactive Dash apps in
 [`pyflow_acdc/Graph_Dash.py`](../pyflow_acdc/Graph_Dash.py).
-
-Goal: keep current functionality, but make the apps look good and more capable:
-
-1. **Left options menu** — move all controls into a collapsible / pop-up sidebar on the left.
-2. **Better colors** — one shared theme, derived from the docs (Furo "SCADA panel" scheme).
-3. **More than 2 graphs** — unlimited add/remove plot panels instead of the hard-coded 2.
 
 Related tests: [`pyflow_tests/test_graph_dash.py`](../pyflow_tests/test_graph_dash.py).
 Docs API page: [`docs/api/dash.rst`](../docs/api/dash.rst).
 
+Original goal (3 items) is **done** (§A). Phases 5–8 below have now **mostly shipped**; the one
+remaining item is **MP family panels** (§1.5).
+
 ---
 
-## 1. Decisions (resolved)
+## A. Shipped (done — do not re-plan)
 
+All green: `pytest pyflow_tests/test_graph_dash.py` (26 passed).
+
+| Area | What shipped | Key symbols |
+|------|--------------|-------------|
+| Theme | Docs Furo "SCADA panel" palette + series colors; every figure restyled. | `_THEME`, `_SERIES_COLORS`, `_apply_fig_theme` |
+| Left sidebar | Fixed navy sidebar + content area + open/close store. | `_sidebar_style`, `_content_style`, `dcc.Store('sidebar-open')` |
+| Collapse / hide | `☰ Hide/Show options` in content + `Hide ✕` in sidebar. | `_register_sidebar_toggle` (shared) |
+| Unlimited plots | Add/remove panels via pattern-matching IDs. | `dcc.Store('plot-panels')`, `_register_panel_manager`, `_render_panels`, `_panel_control_card`, `_panel_graph_card` |
+| Sidebar width | `420px`. | `_SIDEBAR_WIDTH_PX` |
+| Plot height | Global input, validated. | `plot-height`, `_normalize_plot_height`, `_apply_plot_height`, `_graph_style` |
+| **Family / aggregation — TS, window, season** | Generalized via a source adapter; TS exposes **Generators** (`real_power_opf × S_base`), plus Classic mode; window/season unchanged. | `_family_result_df`, `resolve_family_df`, `available_dash_families`, `available_family_aggregations`, `family_element_options`, `_build_family_dash_app(source=...)`, `plot_window_family_dash(results, source, x_axis_label, s_base)` |
+| **Branding** | pyflow logo at top of every sidebar + SVG favicon; fail-fast if asset missing. | `pyflow_acdc/assets/pyflow_logo.svg`, `_LOGO_FILENAME`, `_sidebar_header`, `_attach_app_css` |
+| **CSS → assets** | Dropdown readability + button hover/active + sidebar scrollbar in an auto-loaded stylesheet. | `pyflow_acdc/assets/dashboard.css` |
+| **Polish** | `dcc.Loading(type='dot')` per graph, accent left-border cards, `responsive=True` + `displaylogo:False`, sticky `☰` toolbar. | `_panel_graph_card`, `_content_shell` |
+| **Dedup (R1)** | Shared header, content shell, sidebar-toggle and panel-manager registrars; `_build_dual_plot_dash_app` deleted (TS now uses the family builder). | `_sidebar_header`, `_content_shell`, `_register_sidebar_toggle`, `_register_panel_manager` |
+| Packaging | `assets/*.svg` + `assets/*.css` added to `package-data`. | `pyproject.toml` |
+
+---
+
+## 0. Remaining work
+
+Only **MP family panels** (§1.5) and the **optional** refactors R3/R4 (§4) are left.
+
+---
+
+## 1. Generalize family options to ALL dashboards (Phase 5 — MOSTLY SHIPPED)
+
+**Status:** steps 1.3.1–1.3.4 shipped (source adapter + TS migration + logo + polish + dedup).
+**Only 1.5 (MP family panels) remains.** The feasibility analysis (1.1) and decisions (1.2) below
+are kept for reference and still hold.
+
+**Requirement (user):** the Family / Aggregation control set should be available in *every*
+Dash app "if possible", not just the window and season-compare apps.
+
+### 1.1 Feasibility (evaluation of current code)
+
+Families are resolved by `resolve_family_df(results_dict, grid, family, aggregation)`, which
+reads `results_dict[_FAMILY_SPECS[family]['key']]` (columns = element names) and groups them
+using topology from `grid` (`RenSources` / `Generators(+_DC)` / `storage_elements` /
+`electrolysers`). The window app passes `grid.window_opf_results`; the season app passes each
+season's raw dict.
+
+The blocker for TS/MP is that the **result key names and column semantics differ** between
+`window_opf_results` and `time_series_results`:
+
+| Family | `_FAMILY_SPECS` key (window) | TS equivalent (`time_series_results`) | Maps to TS? |
+|--------|------------------------------|----------------------------------------|-------------|
+| Generators | `gen_power` (per-gen, MW) | `real_power_opf` (per-gen, **pu → ×S_base**) | ✅ (entity/node/pz) |
+| Ren Sources | `ren_power` (per-ren) | *(none per-element)* | ❌ |
+| Prices | `gen_price` (per-gen) | `prices_by_zone` (**per-zone**, already aggregated) | ❌ (no per-entity data) |
+| Storage / SoC | `storage_power` / `storage_soc` | *(none — window-only)* | ❌ |
+| H2 / H2 mass | `hydrogen_P_e` / `hydrogen_mass_H2` | *(none — window-only)* | ❌ |
+
+**Conclusion / decision:** "generalize families everywhere" is done by making **one universal
+builder** and exposing, per dashboard, **only the families that actually resolve for that
+data source**. In practice TS/MP will expose the **Generators** family; the rest stay
+window/season-only. Everything a family can't express stays in the existing **Classic** mode
+(loading %, curtailment, market prices, loads, MP-specific choices). This is why `_build_family_dash_app`
+already has `allow_classic` — we reuse it.
+
+### 1.2 Decisions
 | ID | Topic | Decision |
 |----|-------|----------|
-| D1 | Scope | **All three apps**: dual-plot (`_build_dual_plot_dash_app` → TS + window) **and** multi-period (`create_mp_ts_dash`). |
-| D2 | Plot count | **Unlimited** add/remove plot panels. Remove the boolean `show-plot-2` pattern. |
-| D3 | Dependencies | **Core Dash only** (`dash`, `dcc`, `html`, `plotly`). No `dash-bootstrap-components` / `dash-mantine-components`. Inline styles + one shared theme dict. |
-| D4 | Palette source | **Reuse the docs palette** (`docs/conf.py` Furo `light_css_variables`, "SCADA panel"). |
-| D5 | Series colors | Keep the existing 10-color Plotly trace cycle for data series (already in `plot_TS_res_from_ts`). Theme only restyles chrome + figure frame (paper/plot bg, gridlines, fonts). |
-| D6 | Public API | **No signature changes** to `run_dash` / `run_ts_dash` / `run_window_dash` / `run_mp_ts_dash` / `create_*`. Purely internal layout/callback refactor. |
-| D7 | Behavior parity | Existing plot logic (`_get_df_and_label*`, limit auto-calc, stacked area, MP compare-3-columns) is preserved. |
+| F1 | One builder | Route **all** apps through `_build_family_dash_app` (TS, window, MP; season already uses it). Delete `_build_dual_plot_dash_app` after TS is migrated (its behavior = family app with `allow_classic=True`, no families). |
+| F2 | Source adapter | Add a `source` concept so family resolution knows which keys/scaling to use for a given results dict. TS uses per-gen power `real_power_opf × S_base`. |
+| F3 | Availability | Per app, `families = families_for_source(grid, results, source)`; if empty, the app still runs in Classic-only mode (no regression). |
+| F4 | MP interaction | MP keeps its period selector + 3-column compare. Family panels resolve against the **selected period's** snapshot; compare mode aggregates the family per period column. (Larger; see 1.4 step 4.) |
+| F5 | No API break | `create_dash_app` / `create_mp_ts_dash` / `run_*` signatures unchanged; only internals swap to the family builder. `__all__` unchanged (may add new helpers). |
+
+### 1.3 Detailed code changes
+
+1. **Extend `_FAMILY_SPECS` with per-source keys + scale.** For each family add optional
+   `ts_key` and `ts_scale` (callable or `'S_base'` sentinel). Only `Generators` gets a TS
+   mapping now:
+
+   ```python
+   'Generators': {
+       'key': 'gen_power', 'ts_key': 'real_power_opf', 'ts_scale': 'S_base',
+       'ylabel': 'Power (MW)', 'entity_agg': 'gen', 'node_agg': 'nodes',
+       'zone_agg': 'pz', 'reduce': 'sum', 'kind': 'gen',
+   },
+   ```
+
+2. **Add a source resolver** used by all family functions:
+
+   ```python
+   def _family_result_df(results, grid, family, source):
+       """Return the raw per-element df for a family from a results dict, by source."""
+       spec = _FAMILY_SPECS[family]
+       if source == 'window':
+           return _frame_column_to_index(results.get(spec['key']))
+       if source == 'ts':
+           ts_key = spec.get('ts_key')
+           if ts_key is None:
+               return None
+           df = results.get(ts_key)
+           if df is None:
+               return None
+           scale = grid.S_base if spec.get('ts_scale') == 'S_base' else 1.0
+           return df * scale
+       raise ValueError(f"Unknown family source {source!r}")
+   ```
+
+   Thread a `source='window'` kwarg (default preserves current behavior) through
+   `available_family_aggregations`, `available_dash_families`, `resolve_family_df`,
+   `family_element_options`, and `resolve_season_family_df` — each replaces its inline
+   `_frame_column_to_index(results.get(spec['key']))` with `_family_result_df(...)`.
+
+3. **`_build_family_dash_app` gains `source` + accepts a `snapshot_provider`.** Instead of a
+   single `sample_results`, pass:
+   - `source` (`'window'` | `'ts'`),
+   - `sample_results` (for building family/aggregation options at layout time),
+   - the existing `allow_classic` / `classic_choices` / `classic_plot_fn`.
+   The family draw/`series` callbacks call `resolve_family_df(results, grid, family, agg, source=source)`.
+
+4. **Migrate `create_dash_app` (TS)** to the family builder:
+
+   ```python
+   def create_dash_app(grid):
+       results = grid.time_series_results
+       return _build_family_dash_app(
+           grid,
+           title=f"{grid.name} Time Series Dashboard",
+           compare=False,
+           source='ts',
+           sample_results=results,
+           x_axis_label='Time',
+           allow_classic=True,
+           classic_choices=_TS_PLOT_CHOICES,
+           classic_plot_fn=plot_TS_res_dash,
+       )
+   ```
+   Delete `_build_dual_plot_dash_app` and its now-unused callbacks once tests pass.
+
+### 1.5 Migrate `create_mp_ts_dash` (MP) — **REMAINING**
+
+The source adapter is ready: `resolve_family_df(..., source='ts', s_base=<snap S_base>)` and
+`plot_window_family_dash(..., results=snap['time_series_results'], source='ts', s_base=..., x_axis_label='Time')`
+work with `grid=None` (topology records fall back to entity/total). What's left is the **MP UI**:
+
+- Add a **View** radio (`Classic` / `Family`), shown only in single-period mode.
+- When View=Family & single: `_render_panels` emits `_family_panel_control_card`s; add the
+  `_family_aggs` (MATCH) + `_window_family_series` (MATCH) callbacks; `_draw` gains family
+  `ALL` inputs and a family branch that calls `plot_window_family_dash(...)` against the
+  selected period snapshot with its `S_base`.
+- Compare mode stays Classic (per-period columns). Family-across-compare is a **future** idea.
+
+**Why deferred:** MP is a bespoke 3-column compare builder; adding a second (Classic/Family)
+mode dimension changes `_draw`'s signature and needs visual verification. It's isolated from the
+TS/window/season apps, so shipping it separately carries no regression risk to them.
+
+### 1.4 Tests
+- Unit: `_family_result_df` returns scaled `real_power_opf` for `source='ts'`, `None` for
+  window-only families under `source='ts'`.
+- `available_dash_families(grid, ts_results, source='ts')` == `['Generators']` for the
+  synthetic TS fixture; `resolve_family_df(..., 'Generators', 'gen', source='ts')` columns ==
+  generator names, values == `real_power_opf × S_base`.
+- Layout: `create_dash_app` sidebar has a `plot-family` dropdown (family mode) **and** Classic
+  mode toggle; classic path still renders all `_TS_PLOT_CHOICES`.
+- MP: family panel in single mode draws; compare mode returns 3-column subplot.
 
 ---
 
-## 2. Shared theme (Phase 0)
+## 2. Branding — pyflow logo + favicon (Phase 6 — SHIPPED)
 
-Add a module-level `_THEME` dict near the top of `Graph_Dash.py`, sourced from
-`docs/conf.py` `light_css_variables`:
+Goal: logo at the top of every sidebar + a favicon, reusing the docs asset. **Done** exactly as
+below: `_sidebar_header(app, title)` shared by all builders; favicon `<link>` added in
+`_attach_app_css`; asset copied to `pyflow_acdc/assets/pyflow_logo.svg` (fail-fast on missing).
 
-```python
-_THEME = {
-    # chrome
-    'sidebar_bg':        '#142033',
-    'sidebar_border':    '#253a57',
-    'sidebar_text':      '#d0dbe7',
-    'sidebar_text_top':  '#60a5fa',
-    'sidebar_caption':   '#8da2bb',
-    'bg_primary':        '#f7f9fc',
-    'bg_secondary':      '#eef3f8',   # cards
-    'bg_hover':          '#e1e8f0',
-    'border':            '#d6dee8',
-    'text_primary':      '#172033',
-    'text_secondary':    '#3f4f63',
-    'text_muted':        '#6b7788',
-    'accent':            '#2563eb',   # brand primary
-    'accent_hover':      '#1d4ed8',   # brand content
-    'accent_visited':    '#6d28d9',
-    'header_tint':       '#dde6f1',
-    # figure frame (mapped from the same palette)
-    'fig_paper':         '#f7f9fc',
-    'fig_plot':          'white',
-    'fig_grid':          '#d6dee8',
-    'fig_zero':          '#172033',
-    'fig_font':          '#172033',
-}
+### Decisions
+| ID | Topic | Decision |
+|----|-------|----------|
+| B1 | Asset | Reuse [`docs/_static/logo_dark.svg`](../docs/_static/logo_dark.svg) (light-ink logo for dark backgrounds — matches the navy sidebar). |
+| B2 | Serving | Copy to `pyflow_acdc/assets/pyflow_logo.svg`; Dash auto-serves `assets/` next to the app module (`dash.Dash(__name__)` root = `pyflow_acdc/`). |
+| B3 | Placement | Left of the sidebar title, in the existing header flex row; `Hide ✕` stays right. |
+| B4 | Fail-fast | Startup check raises `FileNotFoundError` if the asset is missing (no silently broken `<img>`). |
 
-# data-series color cycle (unchanged)
-_SERIES_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-```
+### Detailed code changes
+1. Copy `docs/_static/logo_dark.svg` → `pyflow_acdc/assets/pyflow_logo.svg`.
+2. `import os` at top of `Graph_Dash.py`.
+3. Add a single shared header helper (also removes the header duplicated in the builders):
 
-Small style-builder helpers (kept minimal per repo style) to avoid repeating dicts:
+   ```python
+   _LOGO_FILENAME = 'pyflow_logo.svg'
 
-- `_card_style()` — card container (bg_secondary, border, radius, padding, shadow).
-- `_label_style()` — bold labels using `text_secondary`.
-- `_sidebar_style(open)` — sidebar container + open/closed transform.
-- `_apply_fig_theme(fig)` — apply paper/plot bg, gridlines, zeroline, font to any figure.
+   def _sidebar_header(app, title):
+       logo_path = os.path.join(os.path.dirname(__file__), 'assets', _LOGO_FILENAME)
+       if not os.path.isfile(logo_path):
+           raise FileNotFoundError(f'Dash logo asset missing: {logo_path}')
+       return html.Div(
+           style={'display': 'flex', 'alignItems': 'center', 'gap': '10px',
+                  'marginBottom': '14px'},
+           children=[
+               html.Img(src=app.get_asset_url(_LOGO_FILENAME),
+                        style={'height': '28px', 'flex': '0 0 auto'}),
+               html.H2(title, style={'color': _THEME['sidebar_text_top'],
+                                     'fontSize': '16px', 'margin': 0, 'flex': 1}),
+               html.Button('Hide ✕', id='hide-sidebar', n_clicks=0,
+                           style=_remove_btn_style()),
+           ],
+       )
+   ```
+4. Replace the inline header `html.Div(...)` in `_build_family_dash_app` (and, until it's
+   deleted, `_build_dual_plot_dash_app`) and in `create_mp_ts_dash` with
+   `_sidebar_header(app, title)`.
+5. Favicon: add `<link rel="icon" href="/assets/pyflow_logo.svg">` to the `index_string`
+   (in `_attach_app_css`), or drop `pyflow_acdc/assets/favicon.ico` (Dash convention).
 
-Then replace the scattered `#f5f6fa` / `#2c3e50` / `#e1e1e1` literals in
-`plot_TS_res_from_ts`, `plot_window_res_dash`, and the MP figure layouts with
-`_apply_fig_theme` + `_THEME` values.
-
-**Acceptance:** no visual regression in figures; all hardcoded chrome hexes replaced by `_THEME`.
-
----
-
-## 3. Left sidebar layout (Phase 1)
-
-Replace the single centered stacked `html.Div` layout with a two-region shell:
-
-```
-html.Div(app-shell, flex row)
-├── html.Div(sidebar)        # fixed left, scrollable, dark navy
-│    ├── header (title)
-│    ├── global controls (x-limits, add-plot button, mode toggles)
-│    └── per-plot control cards (stacked)
-└── html.Div(content)        # graphs, flex-grow
-     └── plot panels
-```
-
-Details:
-
-- **Sidebar container**: `position: fixed; top:0; left:0; height:100vh; width:320px; overflowY:auto;`
-  background `sidebar_bg`, text `sidebar_text`, right border `sidebar_border`.
-- **Pop-up / collapse**: a `☰ Options` toggle button (top-left of content) drives a
-  `dcc.Store(id='sidebar-open')`; a callback returns the sidebar style with
-  `transform: translateX(0)` (open) or `translateX(-100%)` (hidden), plus a
-  content `marginLeft` of `320px`/`0`. `transition: transform .25s ease` for the slide.
-- **Controls restyled for dark sidebar**: labels use `sidebar_caption`; dropdowns/inputs
-  keep light backgrounds for readability; section cards use a slightly lighter navy panel.
-- **Content area**: background `bg_primary`, graphs in `_card_style()` cards.
-
-**Acceptance:** all controls that were previously stacked in the body now live in the
-left sidebar; toggle button shows/hides it with a slide; graphs occupy the main area.
+### Tests
+- `_sidebar_header` returns a tree with one `html.Img` whose `src` ends with `pyflow_logo.svg`
+  and contains `hide-sidebar`.
+- Each `create_*` layout has exactly one sidebar `Img`.
 
 ---
 
-## 4. Unlimited plots — dual-plot app (Phase 2)
+## 3. Visual polish (Phase 7 — MOSTLY SHIPPED)
 
-Rework `_build_dual_plot_dash_app` from fixed `plot 1 / optional plot 2` to a dynamic list.
-
-State:
-
-- `dcc.Store(id='plot-panels')` holding a list of integer panel ids (start `[0]`).
-- `➕ Add plot` button in the sidebar appends a new id; each panel card has a `✕ Remove`.
-
-Dynamic components use **pattern-matching IDs** (`dash.dependencies.ALL` / `MATCH`):
-
-```python
-from dash.dependencies import Input, Output, State, ALL, MATCH
-from dash import ctx
-
-# per-panel control ids
-{'type': 'plot-choice',    'index': i}
-{'type': 'plot-series',    'index': i}
-{'type': 'plot-ymin',      'index': i}
-{'type': 'plot-ymax',      'index': i}
-{'type': 'plot-remove',    'index': i}
-{'type': 'plot-graph',     'index': i}
-```
-
-Callbacks:
-
-1. **Manage panel list** — `Add plot` / `{'plot-remove', ALL}` → update `plot-panels`
-   store (append / drop id). `ctx.triggered_id` identifies the source.
-2. **Render control cards + graph containers** — `plot-panels` store → build one control
-   card (in sidebar) and one graph container (in content) per id. New panels default to
-   the first plot choice; guard against empty choice list (fail fast with clear message if
-   `plot_choices` is empty).
-3. **Populate series options + auto limits per panel** — `{'plot-choice', MATCH}` →
-   `{'plot-series', MATCH}` options/value and `{'plot-ymin/ymax', MATCH}` using the
-   existing `_get_df_and_label` + limit-calc logic (extracted into a small helper reused
-   by all apps).
-4. **Draw figures** — `Input({'plot-graph'... via choice/series/limits ALL}` + global
-   x-limits → one figure per panel via `plot_fn`.
-
-Remove: `show-plot-2` radio, `plot-2-controls`, `plot-2-container`, `toggle_plot_2`, and the
-fixed `y-min-2/y-max-2` block.
-
-**Acceptance:** can add ≥3 plots, each independently configurable; removing a middle panel
-keeps the rest working; TS and window apps both work (they share this builder).
+| ID | Idea | Status |
+|----|------|--------|
+| V1 | Button hover/active | ✅ in `dashboard.css` (`#add-plot`, `#toggle-sidebar`, `#hide-sidebar`). |
+| V2 | Collapsible sections (`html.Details`) | ⬜ not done (optional). |
+| V3 | Loading feedback | ✅ `dcc.Loading(type='dot', color=accent)` around every graph. |
+| V4 | Empty-state cards | ⬜ not done (optional; empty figures still render themed). |
+| V5 | Scrollbar + rhythm | ✅ themed `::-webkit-scrollbar` in `dashboard.css`. |
+| V6 | Panel accent border | ✅ `3px solid accent` left border on graph cards. |
+| V7 | Cleaner charts | ✅ `responsive=True`, `config={'displaylogo': False}`. |
+| V8 | Sticky toolbar | ✅ `☰` toolbar `position: sticky; top: 0` in `_content_shell`. |
 
 ---
 
-## 5. Unlimited plots — MP app (Phase 3)
+## 4. Code-quality refactor (Phase 8)
 
-Apply the same dynamic-panel model to `create_mp_ts_dash`, preserving its two modes:
+`Graph_Dash.py` is ~2.6k lines with three app builders duplicating large blocks. Reduce
+duplication **without changing behavior or the public API**. (§1 F1 already deletes one builder.)
 
-- **Single period**: N independent panels (same pattern as Phase 2), each with its own
-  plot type + series + y-limits; shared period selector + x-limits stay global in sidebar.
-- **Compare (3 columns)**: keep the `make_subplots(rows=1, cols=3)` per-period comparison,
-  but allow **N such comparison rows** (one per added plot), each a `dcc.Graph`. The
-  column period selectors (`mp-p1/p2/p3`) remain global.
+### Findings
+| # | Issue | Status |
+|---|-------|--------|
+| Q1 | `_toggle_sidebar` copy-pasted 3×. | ✅ `_register_sidebar_toggle`. |
+| Q2 | `_manage_panels` duplicated 3×. | ✅ `_register_panel_manager`. |
+| Q3 | Sidebar header + content shell duplicated 3×. | ✅ `_sidebar_header` + `_content_shell`. |
+| Q4 | Global controls (x-limits + plot-height) duplicated. | ⬜ not extracted (minor). |
+| Q5 | Near-duplicate y-limit helpers (`_auto_ylimits` / `_auto_ylimits_snap` / `_family_auto_ylimits`). | ⬜ R3 (optional). |
+| Q6 | CSS in a Python f-string + manual `index_string`. | ✅ moved to `assets/dashboard.css`. |
+| Q7 | 2.6k-line module mixes concerns. | ⬜ R4 (optional). |
+| Q8 | Confirm `colorsys` / `pandas` used. | ✅ both used (`_hex_from_hls`, dataframes). |
 
-Move `mp-mode`, period selectors, plot-type, series, and x/y-limit controls into the
-sidebar; graphs into the content area. Reuse `_apply_fig_theme` for both single and
-subplot figures.
+### Remaining (optional) steps
+- **R3 — unify y-limits:** one `_auto_ylimits(df, choice_or_family)` taking a dataframe; collapse
+  the three variants.
+- **R4 — split module** into `pyflow_acdc/dash/` (`theme.py`, `data.py`, `figures.py`, `apps.py`)
+  with `Graph_Dash.py` re-exporting for back-compat. Only if the file keeps growing.
 
-**Acceptance:** single mode supports >2 stacked plots; compare mode still renders the
-3-column period comparison and supports multiple comparison rows; legends de-duplicated as
-today.
-
----
-
-## 6. Manual test checklist (Phase 4)
-
-Run each app and verify (extends `pyflow_tests/test_graph_dash.py`, which currently checks
-layout/callbacks construct without error):
-
-- [ ] TS dashboard (`run_ts_dash`): sidebar toggles; add/remove ≥3 plots; series + limits per plot.
-- [ ] Window dashboard (`run_window_dash`): same, with `Frame` x-axis label.
-- [ ] MP dashboard (`run_mp_ts_dash`): single mode N plots; compare mode 3-column rows.
-- [ ] Colors match docs palette (dark navy sidebar, light content, blue accents).
-- [ ] Figures readable (gridlines, fonts, backgrounds themed).
-- [ ] Existing tests in `test_graph_dash.py` still pass; add cases for dynamic-panel callbacks.
+### Guardrails
+- `__all__` and all `create_*` / `run_*` signatures stay identical.
+- `pytest pyflow_tests/test_graph_dash.py` green after every step.
 
 ---
 
-## 7. File-by-file impact
+## 5. Remaining order
 
-| File | Change |
-|------|--------|
-| `pyflow_acdc/Graph_Dash.py` | Add `_THEME`, `_SERIES_COLORS`, style helpers, `_apply_fig_theme`; rewrite `_build_dual_plot_dash_app` and `create_mp_ts_dash` layouts + callbacks; restyle figure builders. Public functions unchanged. |
-| `pyflow_tests/test_graph_dash.py` | Add tests for dynamic add/remove panels and sidebar toggle callback. |
-| `docs/api/dash.rst` | Optional: refresh screenshot / note new sidebar UI. |
-
-## 8. Risks / notes
-
-- Pattern-matching callbacks (`ALL`/`MATCH`) are the main new concept; the `getattr`-on-model
-  rule does **not** apply here (no Pyomo model involved), but keep dict-based component id
-  maps explicit.
-- Fail fast: if a plot choice list is empty or a df is missing, render a figure with a clear
-  message (as today) rather than silently blank chrome.
-- Keep the refactor internal — no changes to `run_dash` auto-detection precedence.
-
----
-
-## 9. Detailed implementation
-
-This section describes, step by step, how each phase is built in
-[`pyflow_acdc/Graph_Dash.py`](../pyflow_acdc/Graph_Dash.py). It references the current
-line ranges so the diff scope is clear.
-
-### 9.0 Theme + helpers (Phase 0)
-
-**Where:** new module-level block after the imports (current lines 11–15) and before
-`__all__` (line 17). No change to `__all__` (helpers are private, `_`-prefixed).
-
-**Add constants** `_THEME` and `_SERIES_COLORS` exactly as in §2.
-
-**Add five private helpers** (kept tiny, plain dicts — no class layer):
-
-```python
-def _card_style(**overrides):
-    style = {
-        'backgroundColor': _THEME['bg_secondary'],
-        'border': f"1px solid {_THEME['border']}",
-        'borderRadius': '10px',
-        'padding': '16px',
-        'marginBottom': '16px',
-        'boxShadow': '0 1px 3px rgba(23,32,51,0.08)',
-    }
-    style.update(overrides)
-    return style
-
-
-def _label_style(on_dark=False):
-    return {
-        'fontWeight': '600',
-        'display': 'block',
-        'marginBottom': '6px',
-        'color': _THEME['sidebar_caption'] if on_dark else _THEME['text_secondary'],
-    }
-
-
-def _sidebar_style(is_open):
-    return {
-        'position': 'fixed', 'top': 0, 'left': 0, 'height': '100vh', 'width': '320px',
-        'overflowY': 'auto', 'padding': '18px', 'boxSizing': 'border-box', 'zIndex': 1000,
-        'backgroundColor': _THEME['sidebar_bg'],
-        'color': _THEME['sidebar_text'],
-        'borderRight': f"1px solid {_THEME['sidebar_border']}",
-        'transition': 'transform .25s ease',
-        'transform': 'translateX(0)' if is_open else 'translateX(-100%)',
-    }
-
-
-def _content_style(is_open):
-    return {
-        'marginLeft': '320px' if is_open else '0',
-        'transition': 'margin-left .25s ease',
-        'padding': '24px',
-        'backgroundColor': _THEME['bg_primary'],
-        'minHeight': '100vh',
-    }
-
-
-def _apply_fig_theme(fig, *, show_title=True):
-    fig.update_layout(
-        paper_bgcolor=_THEME['fig_paper'],
-        plot_bgcolor=_THEME['fig_plot'],
-        font=dict(family='Arial, sans-serif', color=_THEME['fig_font']),
-        hovermode='x unified',
-        legend=dict(bgcolor='rgba(255,255,255,0.9)',
-                    bordercolor=_THEME['border'], borderwidth=1),
-        margin=dict(l=60, r=30, t=80 if show_title else 40, b=60),
-    )
-    axis = dict(showgrid=True, gridwidth=1, gridcolor=_THEME['fig_grid'],
-                zeroline=True, zerolinewidth=1, zerolinecolor=_THEME['fig_zero'])
-    fig.update_xaxes(**axis)
-    fig.update_yaxes(**axis)
-    return fig
-```
-
-**Refactor figure builders to use them:**
-
-- `plot_TS_res_from_ts` (lines 176–283): swap the local `colors` list for `_SERIES_COLORS`;
-  replace the `fig.update_layout(...)` + `update_xaxes/update_yaxes` chrome block
-  (lines 241–274) with a single `_apply_fig_theme(fig, show_title=show_title)` call, keeping
-  the title/axis-title/range logic. Title font color → `_THEME['text_primary']`.
-- `plot_window_res_dash` (lines 300–332): after building traces, call `_apply_fig_theme(fig)`
-  and set trace colors from `_SERIES_COLORS` by index.
-- MP figures in `create_mp_ts_dash` (the two `fig.update_layout(...)` blocks at lines
-  947–954 and 1002–1009): replace the inline `plot_bgcolor='white'` etc. with
-  `_apply_fig_theme(fig)`.
-
-**Result:** every hardcoded chrome hex (`#f5f6fa`, `#2c3e50`, `#e1e1e1`) is gone; series
-colors unchanged.
-
-### 9.1 Sidebar shell (Phase 1)
-
-**Where:** the `app.layout = html.Div(...)` in `_build_dual_plot_dash_app` (lines 349–450)
-and in `create_mp_ts_dash` (lines 707–797).
-
-**New layout skeleton** (shared shape for all three apps):
-
-```python
-app.layout = html.Div([
-    dcc.Store(id='sidebar-open', data=True),
-    dcc.Store(id='plot-panels', data=[0]),          # Phase 2/3
-    html.Div(id='sidebar', style=_sidebar_style(True), children=[
-        html.H2(title, style={'color': _THEME['sidebar_text_top'], 'fontSize': '18px'}),
-        html.Div(id='global-controls', children=[ ... x-limits, mode toggles ... ]),
-        html.Button('➕ Add plot', id='add-plot', n_clicks=0, style=_btn_style()),
-        html.Div(id='panel-controls'),               # per-panel cards injected here
-    ]),
-    html.Div(id='content', style=_content_style(True), children=[
-        html.Button('☰ Options', id='toggle-sidebar', n_clicks=0, style=_toggle_btn_style()),
-        html.Div(id='panel-graphs'),                 # per-panel graphs injected here
-    ]),
-])
-```
-
-`_btn_style()` / `_toggle_btn_style()` are two more tiny helpers using `_THEME['accent']`
-background, white text, rounded corners, `accent_hover` on `:hover` is not possible inline,
-so hover is skipped (acceptable for core-Dash-only).
-
-**Toggle callback:**
-
-```python
-@app.callback(
-    [Output('sidebar', 'style'),
-     Output('content', 'style'),
-     Output('sidebar-open', 'data')],
-    [Input('toggle-sidebar', 'n_clicks')],
-    [State('sidebar-open', 'data')],
-)
-def _toggle_sidebar(n, is_open):
-    new_open = not is_open if n else is_open
-    return _sidebar_style(new_open), _content_style(new_open), new_open
-```
-
-The `x-min`/`x-max` inputs (dual-plot lines 430–436; MP lines 783–792) move verbatim into
-`global-controls`. Mode radio in the MP app (`mp-mode`, lines 715–724) also moves there.
-
-### 9.2 Dynamic panels — dual-plot app (Phase 2)
-
-**Where:** rewrite the body of `_build_dual_plot_dash_app` (lines 335–539). The signature
-(`grid, *, title, plot_choices, default_choice_1, default_choice_2, plot_fn, x_axis_label`)
-is kept for API compatibility; `default_choice_2` simply becomes the default for the 2nd
-added panel (or ignored if unused).
-
-**Imports:** extend line 13 to
-`from dash.dependencies import Input, Output, State, ALL, MATCH` and add `from dash import ctx`.
-
-**Panel id component map** (explicit dicts, per §4). A helper builds one control card and one
-graph card for a given index `i`:
-
-```python
-def _panel_control_card(i, default_choice):
-    return html.Div(style=_card_style(), children=[
-        html.Div([html.Span(f'Plot {i+1}', style={'fontWeight': '700'}),
-                  html.Button('✕', id={'type': 'plot-remove', 'index': i}, n_clicks=0,
-                              style=_remove_btn_style())],
-                 style={'display': 'flex', 'justifyContent': 'space-between'}),
-        html.Label('Plot type', style=_label_style(on_dark=True)),
-        dcc.Dropdown(id={'type': 'plot-choice', 'index': i}, options=dd_options,
-                     value=default_choice, clearable=False),
-        html.Label('Components', style=_label_style(on_dark=True)),
-        dcc.Checklist(id={'type': 'plot-series', 'index': i}, options=[], value=[]),
-        html.Label('Y-axis limits', style=_label_style(on_dark=True)),
-        dcc.Input(id={'type': 'plot-ymin', 'index': i}, type='number', placeholder='Min'),
-        dcc.Input(id={'type': 'plot-ymax', 'index': i}, type='number', placeholder='Max'),
-    ])
-
-def _panel_graph_card(i):
-    return html.Div(style=_card_style(backgroundColor='white'),
-                    children=[dcc.Graph(id={'type': 'plot-graph', 'index': i})])
-```
-
-**Callback 1 — manage the panel list** (append / remove ids in the `plot-panels` store):
-
-```python
-@app.callback(
-    Output('plot-panels', 'data'),
-    [Input('add-plot', 'n_clicks'),
-     Input({'type': 'plot-remove', 'index': ALL}, 'n_clicks')],
-    [State('plot-panels', 'data')],
-)
-def _manage_panels(add_clicks, remove_clicks, panels):
-    trig = ctx.triggered_id
-    if trig == 'add-plot':
-        next_id = (max(panels) + 1) if panels else 0
-        return panels + [next_id]
-    if isinstance(trig, dict) and trig.get('type') == 'plot-remove':
-        # only drop if this remove button was actually clicked (n_clicks > 0)
-        rid = trig['index']
-        remaining = [p for p in panels if p != rid]
-        return remaining or panels   # never allow zero panels
-    return panels
-```
-
-Guard: keep at least one panel (fail-soft on the last remove).
-
-**Callback 2 — render control cards + graph cards** from the store:
-
-```python
-@app.callback(
-    [Output('panel-controls', 'children'),
-     Output('panel-graphs', 'children')],
-    [Input('plot-panels', 'data')],
-)
-def _render_panels(panels):
-    if not dd_options:
-        raise PreventUpdate  # or render a clear "no plot choices" message
-    defaults = [default_choice_1, default_choice_2]
-    ctrls, graphs = [], []
-    for pos, i in enumerate(panels):
-        dc = defaults[pos] if pos < len(defaults) else plot_choices[0]
-        ctrls.append(_panel_control_card(i, dc))
-        graphs.append(_panel_graph_card(i))
-    return ctrls, graphs
-```
-
-**Callback 3 — per-panel series options + auto y-limits** (`MATCH`), reusing the existing
-column + limit logic (extract the current `get_columns` at 471–475 and `get_limits` at
-492–505 into module-level `_columns_for_choice(grid, choice)` and
-`_auto_ylimits(grid, choice)` so all apps share them):
-
-```python
-@app.callback(
-    [Output({'type': 'plot-series', 'index': MATCH}, 'options'),
-     Output({'type': 'plot-series', 'index': MATCH}, 'value'),
-     Output({'type': 'plot-ymin', 'index': MATCH}, 'value'),
-     Output({'type': 'plot-ymax', 'index': MATCH}, 'value')],
-    [Input({'type': 'plot-choice', 'index': MATCH}, 'value')],
-)
-def _panel_series(choice):
-    cols = _columns_for_choice(grid, choice)
-    ymin, ymax = _auto_ylimits(grid, choice)
-    return [{'label': c, 'value': c} for c in cols], cols, ymin, ymax
-```
-
-**Callback 4 — draw every figure** (`ALL`), one output figure per graph:
-
-```python
-@app.callback(
-    Output({'type': 'plot-graph', 'index': ALL}, 'figure'),
-    [Input({'type': 'plot-choice', 'index': ALL}, 'value'),
-     Input({'type': 'plot-series', 'index': ALL}, 'value'),
-     Input({'type': 'plot-ymin', 'index': ALL}, 'value'),
-     Input({'type': 'plot-ymax', 'index': ALL}, 'value'),
-     Input('x-min', 'value'),
-     Input('x-max', 'value')],
-)
-def _draw(choices, series, ymins, ymaxs, xmin, xmax):
-    x_limits = (xmin, xmax) if xmin is not None and xmax is not None else None
-    figs = []
-    for choice, sel, ymin, ymax in zip(choices, series, ymins, ymaxs):
-        y_limits = (ymin, ymax) if ymin is not None and ymax is not None else None
-        figs.append(plot_fn(grid, choice, sel or [], x_limits=x_limits, y_limits=y_limits))
-    return figs
-```
-
-**Delete:** `show-plot-2` radio + card (388–398), `plot-2-controls` block (400–428),
-`plot-2-container` (446–448), `toggle_plot_2` (452–460), and the old fixed
-`update_subplot_options` / `update_limits` / `update_graphs` callbacks (462–537) — their
-logic is now in callbacks 2–4.
-
-Both `create_dash_app` (542–552) and `create_window_dash_app` (555–574) are unchanged since
-they just call `_build_dual_plot_dash_app`.
-
-### 9.3 Dynamic panels — MP app (Phase 3)
-
-**Where:** `create_mp_ts_dash` (lines 652–1018). Reuse the same `plot-panels` store +
-`add-plot` + pattern-matching ids, but the draw callback branches on `mp-mode`:
-
-- **Global controls in sidebar:** `mp-mode` radio, single-period dropdown (`mp-period-single`),
-  the three compare dropdowns (`mp-p1/p2/p3`), and x/y-limits. Keep the existing
-  `_toggle_mode` callback (804–807) but retarget its outputs to sidebar sub-divs.
-- **Per-panel controls** (`plot-choice`, `plot-series` via `MATCH`) identical to Phase 2,
-  built with `_MP_PLOT_CHOICES`. Reuse `_columns_for` (681–688) via the shared
-  `_columns_for_choice` helper.
-- **Draw callback** (replaces `_update_mp_fig`, 847–1016): for each panel id, if
-  `mode == 'single'` build one `plot_TS_res_from_ts` figure from the selected snapshot; if
-  `mode == 'compare'` build a `make_subplots(rows=1, cols=3)` comparison **for that panel's
-  plot type** across `p1/p2/p3`, preserving the legend de-duplication logic (931–936) and
-  per-column x-range / shared y-range handling (955–959). Output is
-  `Output({'type': 'plot-graph', 'index': ALL}, 'figure')` — a list of N figures, each either
-  single or a 3-column subplot.
-- Apply `_apply_fig_theme` to every produced figure.
-
-**Delete:** `mp-show-plot-2` + `mp-plot-2-controls` + `mp-graph-2-container` and
-`_toggle_plot_2` (809–817), plus the second-plot half of `_update_mp_fig` (963–1016), since
-"second plot" is now just "add another panel".
-
-### 9.4 Shared helpers extracted (used by all phases)
-
-To avoid duplicating logic across the two builders, promote these to module level:
-
-- `_columns_for_choice(grid_or_snap, choice)` — wraps `_get_df_and_label` / the MP
-  `_columns_for`; returns a column-name list.
-- `_auto_ylimits(grid, choice)` — the current `get_limits` body (492–505) verbatim.
-- `_apply_fig_theme(fig)` — from §9.0.
-
-These keep the per-app callbacks thin and behavior identical to today.
-
-### 9.5 Tests (Phase 4)
-
-In [`pyflow_tests/test_graph_dash.py`](../pyflow_tests/test_graph_dash.py):
-
-- Assert `app.layout` contains `sidebar`, `content`, `plot-panels`, `add-plot`,
-  `toggle-sidebar`.
-- Unit-test `_manage_panels` logic (add appends unique id; remove drops id; never empty).
-- Unit-test `_render_panels` returns matching counts of control + graph cards.
-- Keep existing construction/no-error tests for all three `create_*` factories.
+1. **§1.5 MP family panels** — the only functional gap.
+2. **R3 / R4** — optional cleanups, only if desired.

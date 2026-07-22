@@ -118,6 +118,10 @@ def test_empty_grid_add_elements_price_zones_and_line_types():
     pyf.add_DCDC_converter(grid, "d1", "d2", MW_rating=200, name="dcdc_12")
 
     pyf.add_gen(grid, "n1", gen_name="g1", MWmax=100, np_gen=1)
+    gdc = pyf.add_gen_DC(grid, "d1", gen_name="gdc1", MWmax=80, np_gen=1)
+    assert gdc._node.name == "d1"
+    assert gdc in grid.Generators_DC
+    assert gdc.name == "gdc1"
     pyf.add_RenSource(grid, "n3", base_MW=50, ren_source_name="wind1", np_rsgen=1)
     pyf.add_RenSource_zone(grid, "offshore_wind")
 

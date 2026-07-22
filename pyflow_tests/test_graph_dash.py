@@ -26,6 +26,8 @@ if _dash_installed():
     from pyflow_acdc.Graph_Dash import (
         _MP_PLOT_CHOICES,
         attach_season_window_compare,
+        available_dash_families,
+        available_family_aggregations,
         build_season_window_compare,
         create_dash_app,
         create_mp_ts_dash,
@@ -33,8 +35,9 @@ if _dash_installed():
         create_window_dash_app,
         plot_TS_res_dash,
         plot_TS_res_from_ts,
-        plot_season_compare_dash,
+        plot_season_family_dash,
         plot_window_res_dash,
+        resolve_family_df,
         run_dash,
     )
 else:
@@ -157,6 +160,22 @@ def test_plot_TS_res_dash_wraps_grid():
     assert len(fig.data) == 1
 
 
+def _all_components(component, out=None):
+    """Yield every component object in a Dash layout tree."""
+    if out is None:
+        out = []
+    if component is None:
+        return out
+    out.append(component)
+    children = getattr(component, "children", None)
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            _all_components(child, out)
+    elif children is not None:
+        _all_components(children, out)
+    return out
+
+
 def _layout_ids(component, found=None):
     """Collect component ids (str or dict) from a Dash layout tree."""
     if found is None:
@@ -180,12 +199,69 @@ def _layout_ids(component, found=None):
     return found
 
 
+def test_family_source_ts_generators():
+    """Families generalized to TS: only Generators maps (real_power_opf × S_base)."""
+    grid = _grid_with_ts_results()
+    ts = grid.time_series_results
+    assert available_dash_families(grid, ts, source="ts") == ["Generators"]
+
+    # No topology generators on the synthetic grid → entity/total fallback.
+    df, ylabel = resolve_family_df(ts, grid, "Generators", "total", source="ts")
+    assert df is not None and not df.empty
+    assert list(df.columns) == ["total"]
+    # total == sum over gen columns × S_base (single col g1 here)
+    assert list(df["total"]) == list(ts["real_power_opf"]["g1"] * grid.S_base)
+
+    ent, _ = resolve_family_df(ts, grid, "Generators", "gen", source="ts")
+    assert list(ent.columns) == ["g1"]
+    # Window-only families do not resolve for ts.
+    assert "Storage" not in available_dash_families(grid, ts, source="ts")
+
+
+def test_power_family_overview():
+    """Power family: one series per input class; gens split AC/DC."""
+    grid = _grid_with_window_results()
+    res = grid.window_opf_results
+    families = available_dash_families(grid, res, source="window")
+    assert families[0] == "Power"
+    assert available_family_aggregations(grid, "Power", res) == ["source"]
+
+    df, ylabel = resolve_family_df(res, grid, "Power", "source", source="window")
+    assert ylabel == "Power (MW)"
+    assert set(df.columns) == {
+        "Total ren", "Total gen_AC", "Total gen_DC", "Total H2", "Total BESS",
+    }
+    assert list(df["Total ren"]) == [5.0, 8.0, 6.0]
+    assert list(df["Total gen_AC"]) == [10.0, 20.0, 15.0]
+    assert list(df["Total gen_DC"]) == [3.0, 4.0, 5.0]
+    assert list(df["Total H2"]) == [22.5, 22.5, 22.5]
+    assert list(df["Total BESS"]) == [5.0, 10.0, 0.0]
+
+    # Hard error when gen_power exists but topology names do not match.
+    bare = pyf.Grid(S_base=100)
+    bare.window_opf_results = {
+        "gen_power": pd.DataFrame({"frame": [0, 1], "orphan": [1.0, 2.0]}),
+    }
+    with pytest.raises(ValueError, match="none match"):
+        resolve_family_df(bare.window_opf_results, bare, "Power", "source", source="window")
+
+    # TS source has no Power overview (window-only composite).
+    assert "Power" not in available_dash_families(
+        _grid_with_ts_results(), _synthetic_ts_results(), source="ts"
+    )
+
+
 def test_create_dash_app_layout():
     app = create_dash_app(_grid_with_ts_results())
     assert app.layout is not None
     ids = _layout_ids(app.layout)
-    for required in ("sidebar", "content", "plot-panels", "add-plot", "toggle-sidebar"):
+    for required in ("sidebar", "content", "plot-panels", "add-plot", "toggle-sidebar", "view-mode"):
         assert required in ids
+    # full-width logo image present in sidebar
+    imgs = [c for c in _all_components(app.layout) if getattr(c, "src", None)]
+    assert imgs
+    assert imgs[0].style.get("width") == "100%"
+
 
 
 def test_create_mp_ts_dash_layout_and_errors():
@@ -193,7 +269,8 @@ def test_create_mp_ts_dash_layout_and_errors():
     app = create_mp_ts_dash(ts_inv, grid_name="MP test")
     assert app.layout is not None
     ids = _layout_ids(app.layout)
-    for required in ("sidebar", "content", "plot-panels", "add-plot", "toggle-sidebar", "mp-mode"):
+    for required in ("sidebar", "content", "plot-panels", "add-plot", "toggle-sidebar",
+                     "mp-mode", "mp-compare-layout"):
         assert required in ids
 
     with pytest.raises(ValueError, match="ts_inv is empty"):
@@ -219,6 +296,10 @@ def test_run_dash_routing_errors():
 def _grid_with_window_results():
     grid = pyf.Grid(S_base=100)
     grid.name = "window_dash_test"
+    pyf.add_AC_node(grid, 220, name="n1")
+    pyf.add_DC_node(grid, 320, name="ndc1")
+    pyf.add_extgrid(grid, "n1", gen_name="g1")
+    pyf.add_gen_DC(grid, "ndc1", gen_name="gdc1")
     grid.window_opf_run = True
     grid.window_opf_results = {
         "storage_soc": pd.DataFrame(
@@ -234,7 +315,7 @@ def _grid_with_window_results():
             {"frame": [0, 1, 2], "el1": [22.5, 22.5, 22.5]}
         ),
         "gen_power": pd.DataFrame(
-            {"frame": [0, 1, 2], "g1": [10.0, 20.0, 15.0]}
+            {"frame": [0, 1, 2], "g1": [10.0, 20.0, 15.0], "gdc1": [3.0, 4.0, 5.0]}
         ),
         "gen_price": pd.DataFrame(
             {"frame": [0, 1, 2], "g1": [40.0, 50.0, 45.0]}
@@ -287,15 +368,26 @@ def test_create_window_dash_app_layout_and_plot():
         create_window_dash_app(pyf.Grid(S_base=100))
 
 
-def _synthetic_window_opf_results(*, ren, gen, h2, bess):
+def _synthetic_window_opf_results(*, ren, gen, h2, bess, soc=None, h2_mass=None, gen_price=None):
     """Minimal window_opf_results for season-compare totals (3 frames)."""
     frames = [0, 1, 2]
-    return {
+    out = {
         "ren_power": pd.DataFrame({"frame": frames, "rs1": ren}),
         "gen_power": pd.DataFrame({"frame": frames, "g1": gen}),
         "hydrogen_P_e": pd.DataFrame({"frame": frames, "el1": h2}),
         "storage_power": pd.DataFrame({"frame": frames, "st1": bess}),
     }
+    if soc is not None:
+        out["storage_soc"] = pd.DataFrame(
+            {"frame": [-1, 0, 1, 2], "st1": soc}
+        )
+    if h2_mass is not None:
+        out["hydrogen_mass_H2"] = pd.DataFrame(
+            {"frame": [-1, 0, 1, 2], "el1": h2_mass}
+        )
+    if gen_price is not None:
+        out["gen_price"] = pd.DataFrame({"frame": frames, "g1": gen_price})
+    return out
 
 
 def _grid_with_season_compare():
@@ -305,16 +397,24 @@ def _grid_with_season_compare():
             gen=[10.0, 20.0, 15.0],
             h2=[22.5, 22.5, 22.5],
             bess=[5.0, 10.0, 0.0],
+            soc=[0.5, 0.45, 0.5, 0.55],
+            h2_mass=[0.0, 10.0, 20.0, 30.0],
+            gen_price=[40.0, 50.0, 45.0],
         ),
         "Winter": _synthetic_window_opf_results(
             ren=[7.0, 9.0, 4.0],
             gen=[12.0, 18.0, 14.0],
             h2=[20.0, 21.0, 19.0],
             bess=[-5.0, 0.0, 8.0],
+            soc=[0.5, 0.4, 0.35, 0.4],
+            h2_mass=[0.0, 8.0, 16.0, 24.0],
+            gen_price=[60.0, 55.0, 50.0],
         ),
     }
     grid = pyf.Grid(S_base=100)
     grid.name = "season_compare_test"
+    pyf.add_AC_node(grid, 220, name="n1")
+    pyf.add_extgrid(grid, "n1", gen_name="g1")
     attach_season_window_compare(grid, season_map)
     return grid
 
@@ -325,34 +425,65 @@ def test_build_season_window_compare_totals():
         gen=[10.0, 20.0, 15.0],
         h2=[22.5, 22.5, 22.5],
         bess=[5.0, 10.0, 0.0],
+        soc=[0.5, 0.45, 0.5, 0.55],
+        h2_mass=[0.0, 10.0, 20.0, 30.0],
     )
     winter = _synthetic_window_opf_results(
         ren=[7.0, 9.0, 4.0],
         gen=[12.0, 18.0, 14.0],
         h2=[20.0, 21.0, 19.0],
         bess=[-5.0, 0.0, 8.0],
+        soc=[0.5, 0.4, 0.35, 0.4],
+        h2_mass=[0.0, 8.0, 16.0, 24.0],
     )
-    compare = build_season_window_compare({"Autumn": autumn, "Winter": winter})
-    assert set(compare) == {"Total ren", "Total gen", "Total H2", "Total BESS"}
+    compare, ylabels = build_season_window_compare(
+        {"Autumn": autumn, "Winter": winter}
+    )
+    assert set(compare) >= {"Total ren", "Total gen", "Total H2", "Total BESS", "SoC", "H2 mass"}
     assert list(compare["Total ren"].columns) == ["Autumn", "Winter"]
     assert list(compare["Total ren"]["Autumn"]) == [5.0, 8.0, 6.0]
     assert list(compare["Total ren"]["Winter"]) == [7.0, 9.0, 4.0]
     assert list(compare["Total BESS"]["Winter"]) == [-5.0, 0.0, 8.0]
+    assert list(compare["SoC"]["Autumn"]) == [0.5, 0.45, 0.5, 0.55]
+    assert ylabels["SoC"] == "SoC"
+    assert ylabels["H2 mass"] == "H₂ mass (kg)"
 
 
 def test_create_season_compare_dash_app_layout_and_plot():
     grid = _grid_with_season_compare()
     app = create_season_compare_dash_app(grid)
     assert app.layout is not None
-
-    fig = plot_season_compare_dash(grid, "Total ren", ["Autumn", "Winter"])
-    assert isinstance(fig, go.Figure)
-    assert len(fig.data) == 2
-    assert {t.name for t in fig.data} == {"Autumn", "Winter"}
-    assert list(fig.data[0].x) == [0, 1, 2]
+    assert "compare-layout" in _layout_ids(app.layout)
+    assert "SoC" in grid.season_window_compare
+    assert "H2 mass" in grid.season_window_compare
+    assert "Price: g1" in grid.season_window_compare
 
     with pytest.raises(ValueError, match="season_window_compare"):
         create_season_compare_dash_app(pyf.Grid(S_base=100))
+
+
+def test_plot_season_family_overlay_vs_split():
+    """Season compare supports Overlay (one axes) and Split (subplot per season)."""
+    grid = _grid_with_season_compare()
+    seasons = ["Autumn", "Winter"]
+
+    overlay = plot_season_family_dash(
+        grid, "Generators", "total", seasons, [], layout="overlay"
+    )
+    assert isinstance(overlay, go.Figure)
+    assert len(overlay.data) == 2
+    # Single axes → no second x-axis.
+    assert "xaxis2" not in overlay.layout.to_plotly_json()
+
+    split = plot_season_family_dash(
+        grid, "Generators", "total", seasons, [], layout="split"
+    )
+    assert len(split.data) == 2
+    # One subplot column per season → a second x-axis exists.
+    assert "xaxis2" in split.layout.to_plotly_json()
+    # Split colors align by variable: the (single) total series is the same
+    # color in every season subplot.
+    assert len({t.line.color for t in split.data}) == 1
 
 
 def _callback_fn(app, key):
@@ -369,7 +500,7 @@ def _find_callback_key(app, *needles):
 
 
 def test_create_dash_app_callbacks_fire():
-    """Invoke registered callbacks without starting a server."""
+    """Invoke registered callbacks without starting a server (family builder, source='ts')."""
     grid = _grid_with_ts_results()
     app = create_dash_app(grid)
 
@@ -383,12 +514,15 @@ def test_create_dash_app_callbacks_fire():
     assert opened is False
 
     render = _callback_fn(app, _find_callback_key(app, "panel-controls.children", "panel-graphs.children"))
-    ctrls, graphs = render([0, 1])
+    ctrls, graphs = render([0, 1], "classic")
     assert len(ctrls) == 2
     assert len(graphs) == 2
 
     draw = _callback_fn(app, _find_callback_key(app, "plot-graph", "figure"))
+    # Classic mode: use the flat TS plot-type list.
     figs, styles = draw(
+        "classic",
+        [], [], [],
         ["Power Generation by generator", "Market Prices"],
         [["g1"], ["pz1"]],
         [0, 0],
@@ -402,6 +536,23 @@ def test_create_dash_app_callbacks_fire():
     assert len(figs[1].data) >= 1
     assert figs[0].layout.height == 360
     assert styles[0]["height"] == "360px"
+
+    # Family mode: the Generators family resolves for TS (real_power_opf × S_base).
+    fam_figs, _ = draw(
+        "family",
+        ["Generators"],
+        ["total"],
+        [[]],
+        [], [],
+        [None],
+        [None],
+        0,
+        5,
+        420,
+    )
+    assert len(fam_figs) == 1
+    assert len(fam_figs[0].data) >= 1
+    assert fam_figs[0].layout.height == 420
 
 
 def test_create_mp_ts_dash_callbacks_fire():
@@ -437,12 +588,14 @@ def test_create_mp_ts_dash_callbacks_fire():
         None,
         None,
         400,
+        "split",
     )
     assert len(figs) == 1
     assert len(figs[0].data) >= 1
     assert figs[0].layout.height == 400
     assert styles[0]["height"] == "400px"
 
+    # Compare, split (subplots): 3-column layout.
     figs_cmp, _ = draw(
         "compare",
         "base",
@@ -458,9 +611,40 @@ def test_create_mp_ts_dash_callbacks_fire():
         None,
         None,
         480,
+        "split",
     )
     assert len(figs_cmp) == 1
     assert len(figs_cmp[0].data) >= 1
+    # make_subplots creates multiple x-axes (xaxis, xaxis2, xaxis3).
+    assert "xaxis3" in figs_cmp[0].layout.to_plotly_json()
+
+    # Compare, overlay: single axes, all period columns' traces overlaid.
+    figs_ovl, _ = draw(
+        "compare",
+        "base",
+        "base",
+        1,
+        2,
+        ["Power Generation by generator"],
+        [["g1"]],
+        [None],
+        [None],
+        None,
+        None,
+        None,
+        None,
+        480,
+        "overlay",
+    )
+    assert len(figs_ovl) == 1
+    assert len(figs_ovl[0].data) >= 1
+    # Overlay is a single subplot: no third x-axis.
+    assert "xaxis3" not in figs_ovl[0].layout.to_plotly_json()
+    # Trace names carry the period prefix so periods stay distinguishable.
+    assert any("|" in (t.name or "") for t in figs_ovl[0].data)
+    # Overlay colors encode the period: base/1/2 each get a distinct color.
+    ovl_colors = [t.line.color for t in figs_ovl[0].data]
+    assert len(set(ovl_colors)) == len(ovl_colors)
 
     figs_multi, _ = draw(
         "single",
@@ -477,6 +661,7 @@ def test_create_mp_ts_dash_callbacks_fire():
         None,
         None,
         480,
+        "split",
     )
     assert len(figs_multi) == 2
     assert len(figs_multi[0].data) >= 1

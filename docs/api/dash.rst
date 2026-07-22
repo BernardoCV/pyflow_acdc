@@ -17,6 +17,14 @@ plots by selecting the desired plot type. And choose axis limits to zoom in or o
 
 .. autofunction:: pyflow_acdc.run_window_dash
 
+.. autofunction:: pyflow_acdc.run_season_compare_dash
+
+.. autofunction:: pyflow_acdc.create_season_compare_dash_app
+
+.. autofunction:: pyflow_acdc.attach_season_window_compare
+
+Season-compare PEI walkthrough: :doc:`../usage_window_opf`.
+
 .. autofunction:: pyflow_acdc.run_mp_ts_dash
 
 Plot Helpers

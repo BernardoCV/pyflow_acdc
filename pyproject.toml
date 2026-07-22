@@ -106,6 +106,8 @@ packages = ["pyflow_acdc","pyflow_tests"]
 
 [tool.setuptools.package-data]
 "pyflow_acdc" = [
+    "assets/*.svg",
+    "assets/*.css",
     "folium_images/*.png",
     "Cable_database/*.yaml",
     "example_grids/*.py",

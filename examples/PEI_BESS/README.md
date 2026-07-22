@@ -14,7 +14,14 @@ Layout::
         GB_Price.csv       # Great Britain PZ b_CG
         DK_Price.csv       # Denmark PZ b_CG
 
-Usage (via ``pyflow_tests._bess_h2_pei_data``)::
+GitHub raw base (``main``)::
+
+    https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/
+
+``pyflow_tests._bess_h2_pei_data`` uses a local ``examples/PEI_BESS`` checkout when
+present, otherwise downloads from that URL.
+
+Usage::
 
     from pyflow_tests._bess_h2_pei_data import build_pei_bess_h2_grid, PEI_SEASONS
 
@@ -24,7 +31,5 @@ Usage (via ``pyflow_tests._bess_h2_pei_data``)::
     # All four seasons concatenated (96 h)
     grid = build_pei_bess_h2_grid(seasons=PEI_SEASONS)
 
-Season compare (separate 24 h solves, Dash overlay)::
-
-    python my_tests/pei_window_nl_opf_bess_h2.py --compare-seasons --dash
-    python my_tests/pei_window_nl_opf_bess_h2.py --compare-seasons --seasons Summer Winter --dash
+Season-compare + Dash: see docs page ``usage_window_opf`` and
+``pyflow_tests/doc_examples/window_opf/01_pei_season_compare_dash.py``.

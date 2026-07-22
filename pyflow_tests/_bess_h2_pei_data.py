@@ -58,6 +58,9 @@ PEI_OBJ_RULE = {"Energy_cost": 1}
 PEI_DATA_DIR = (
     Path(__file__).resolve().parents[1] / "examples" / "PEI_BESS"
 )
+PEI_BESS_GITHUB_BASE = (
+    "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/"
+)
 
 
 def normalize_pei_seasons(seasons=None):
@@ -92,11 +95,12 @@ WINDOW_END = window_end(DEFAULT_SEASONS)
 H2_HOURS = pei_hours(DEFAULT_SEASONS)
 
 
-def _pei_season_path(season, filename):
+def _pei_season_source(season, filename):
+    """Local path under ``examples/PEI_BESS`` if present, else GitHub ``main`` raw URL."""
     path = PEI_DATA_DIR / season / filename
-    if not path.is_file():
-        raise FileNotFoundError(f"PEI data not found at {path}.")
-    return path
+    if path.is_file():
+        return path
+    return f"{PEI_BESS_GITHUB_BASE}{season}/{filename}"
 
 
 def h2_mass_max_kg(seasons=None):
@@ -113,7 +117,7 @@ def load_pei_power_matrix(seasons=None):
     blocks = []
     for season in seasons:
         matrix = pd.read_csv(
-            _pei_season_path(season, "power_matrix.csv"), header=None
+            _pei_season_source(season, "power_matrix.csv"), header=None
         ).to_numpy(dtype=float)
         if matrix.shape != (160, HOURS_PER_SEASON):
             raise ValueError(
@@ -141,7 +145,7 @@ def load_pei_export_prices(seasons=None, *, by_zone=True):
     for zone_name, csv_name in EXPORT_PRICE_ZONES.items():
         parts = []
         for season in seasons:
-            series = pd.read_csv(_pei_season_path(season, csv_name))[
+            series = pd.read_csv(_pei_season_source(season, csv_name))[
                 "Price"
             ].to_numpy(dtype=float)
             if series.shape != (HOURS_PER_SEASON,):

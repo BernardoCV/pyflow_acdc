@@ -120,6 +120,7 @@ Workflow guides
    :maxdepth: 1
 
    usage_opf
+   usage_window_opf
    usage_storage
    usage_hydrogen
    usage_tep

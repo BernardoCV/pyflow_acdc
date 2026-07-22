@@ -43,6 +43,16 @@ Tests that require an unavailable optional dependency are reported as
 **Skipped**, not failed. Please make sure `--quick` passes before opening a
 PR, and run the relevant `--opf` / `--tep` subset if you touched those areas.
 
+### Do not weaken tests to hide bugs
+
+If a test fails because product code is wrong, **fix the product code**. Do
+**not** change, stub around, skip, or delete the test just to make the suite
+pass. Tests are the contract; green must mean the behaviour is correct.
+
+Updating a test is only appropriate when the **intended behaviour** itself
+changed (API redesign, new requirement) and the PR documents that change.
+Adapting fixtures or assertions to paper over a bug is not allowed.
+
 When adding a new test case, add the file to the appropriate list
 (`ALL_CASES`, `QUICK_CASES`, `OPF_CASES`, `TEP_CASES`, `DOCS_CASES`) in
 `pyflow_tests/test_constants.py`, and expose a top-level `run_test()` function in
@@ -100,5 +110,7 @@ Output is written to `docs/_build/html/index.html`.
 
 1. Create a feature branch off `main`.
 2. Keep PRs focused; describe the motivation ("why") in the description.
-3. Ensure tests pass and add/adjust tests for behavioural changes.
+3. Ensure tests pass and add/adjust tests for behavioural changes. If a test
+   fails due to a bug, fix the bug — never weaken the test to get green (see
+   **Do not weaken tests to hide bugs** above).
 4. To merge into `main`, contact the repository owner.
