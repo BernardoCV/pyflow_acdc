@@ -153,15 +153,44 @@ def test_plot_TS_res_dash_wraps_grid():
     assert len(fig.data) == 1
 
 
+def _layout_ids(component, found=None):
+    """Collect component ids (str or dict) from a Dash layout tree."""
+    if found is None:
+        found = set()
+    if component is None:
+        return found
+    cid = getattr(component, "id", None)
+    if cid is not None:
+        if isinstance(cid, dict):
+            found.add((cid.get("type"), cid.get("index")))
+        else:
+            found.add(cid)
+    children = getattr(component, "children", None)
+    if children is None:
+        return found
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            _layout_ids(child, found)
+    else:
+        _layout_ids(children, found)
+    return found
+
+
 def test_create_dash_app_layout():
     app = create_dash_app(_grid_with_ts_results())
     assert app.layout is not None
+    ids = _layout_ids(app.layout)
+    for required in ("sidebar", "content", "plot-panels", "add-plot", "toggle-sidebar"):
+        assert required in ids
 
 
 def test_create_mp_ts_dash_layout_and_errors():
     ts_inv = {"base": _ts_inv_snapshot(), 1: _ts_inv_snapshot()}
     app = create_mp_ts_dash(ts_inv, grid_name="MP test")
     assert app.layout is not None
+    ids = _layout_ids(app.layout)
+    for required in ("sidebar", "content", "plot-panels", "add-plot", "toggle-sidebar", "mp-mode"):
+        assert required in ids
 
     with pytest.raises(ValueError, match="ts_inv is empty"):
         create_mp_ts_dash({})
@@ -191,11 +220,8 @@ def _grid_with_window_results():
         "storage_soc": pd.DataFrame(
             {"frame": [-1, 0, 1, 2], "st1": [0.5, 0.45, 0.5, 0.55]}
         ),
-        "storage_P_charge": pd.DataFrame(
-            {"frame": [0, 1, 2], "st1": [0.0, 10.0, 0.0]}
-        ),
-        "storage_P_discharge": pd.DataFrame(
-            {"frame": [0, 1, 2], "st1": [5.0, 0.0, 0.0]}
+        "storage_power": pd.DataFrame(
+            {"frame": [0, 1, 2], "st1": [5.0, 10.0, 0.0]}
         ),
         "hydrogen_mass_H2": pd.DataFrame(
             {"frame": [-1, 0, 1, 2], "el1": [0.0, 10.0, 20.0, 30.0]}
@@ -215,6 +241,18 @@ def _grid_with_window_results():
         "ren_price": pd.DataFrame(
             {"frame": [0, 1, 2], "rs1": [0.0, 0.0, 0.0]}
         ),
+        "curtailment": pd.DataFrame(
+            {"frame": [0, 1, 2], "rs1": [0.0, 0.1, 0.05]}
+        ),
+        "ac_loading": pd.DataFrame(
+            {"frame": [0, 1, 2], "l1": [0.2, 0.3, 0.25]}
+        ),
+        "dc_loading": pd.DataFrame(
+            {"frame": [0, 1, 2], "ldc1": [0.1, 0.15, 0.12]}
+        ),
+        "converter_loading": pd.DataFrame(
+            {"frame": [0, 1, 2], "c1": [0.4, 0.5, 0.45]}
+        ),
         "total_objective": 0.0,
     }
     return grid
@@ -231,6 +269,16 @@ def test_create_window_dash_app_layout_and_plot():
     assert list(fig.data[0].x) == [-1, 0, 1, 2]
     assert list(fig.data[0].y) == [0.5, 0.45, 0.5, 0.55]
 
+    overview = plot_window_res_dash(
+        grid,
+        "Total power",
+        ["Total ren", "Total gen", "Total H2", "Total BESS"],
+    )
+    assert len(overview.data) == 4
+    assert {t.name for t in overview.data} == {
+        "Total ren", "Total gen", "Total H2", "Total BESS",
+    }
+
     with pytest.raises(ValueError, match="window_opf"):
         create_window_dash_app(pyf.Grid(S_base=100))
 
@@ -240,49 +288,48 @@ def _callback_fn(app, key):
     return app.callback_map[key]["callback"].__wrapped__
 
 
+def _find_callback_key(app, *needles):
+    """Find a callback_map key that contains all needle substrings."""
+    for key in app.callback_map:
+        if all(n in key for n in needles):
+            return key
+    raise KeyError(f"No callback key matching {needles!r}; keys={list(app.callback_map)}")
+
+
 def test_create_dash_app_callbacks_fire():
     """Invoke registered callbacks without starting a server."""
     grid = _grid_with_ts_results()
     app = create_dash_app(grid)
 
-    toggle = _callback_fn(
-        app, "..plot-2-controls.style...plot-2-container.style..",
-    )
-    style_controls, style_container = toggle(True)
-    assert style_controls["display"] == "block"
-    style_controls, style_container = toggle(False)
-    assert style_controls["display"] == "none"
+    toggle = _callback_fn(app, _find_callback_key(app, "sidebar.style", "content.style", "sidebar-open.data"))
+    side, content, opened, label = toggle(1, 0, True)
+    assert opened is False
+    assert "translateX(-100%)" in side["transform"]
+    assert content["marginLeft"] == "0"
+    assert "Show options" in label
+    side, content, opened, label = toggle(0, 0, False)
+    assert opened is False
 
-    update_opts = _callback_fn(
-        app,
-        "..subplot-selection-1.options...subplot-selection-1.value..."
-        "subplot-selection-2.options...subplot-selection-2.value..",
-    )
-    opts1, vals1, opts2, vals2 = update_opts(
-        "Power Generation by price zone",
-        "Market Prices",
-    )
-    assert vals1 == ["z1"]
-    assert vals2 == ["pz1"]
+    render = _callback_fn(app, _find_callback_key(app, "panel-controls.children", "panel-graphs.children"))
+    ctrls, graphs = render([0, 1])
+    assert len(ctrls) == 2
+    assert len(graphs) == 2
 
-    update_graphs = _callback_fn(
-        app, "..plot-output-1.figure...plot-output-2.figure..",
-    )
-    fig1, fig2 = update_graphs(
-        "Power Generation by generator",
-        "Market Prices",
-        ["g1"],
-        ["pz1"],
+    draw = _callback_fn(app, _find_callback_key(app, "plot-graph", "figure"))
+    figs, styles = draw(
+        ["Power Generation by generator", "Market Prices"],
+        [["g1"], ["pz1"]],
+        [0, 0],
+        [50, 100],
         0,
         5,
-        0,
-        50,
-        0,
-        100,
-        False,
+        360,
     )
-    assert len(fig1.data) >= 1
-    assert len(fig2.data) == 0
+    assert len(figs) == 2
+    assert len(figs[0].data) >= 1
+    assert len(figs[1].data) >= 1
+    assert figs[0].layout.height == 360
+    assert styles[0]["height"] == "360px"
 
 
 def test_create_mp_ts_dash_callbacks_fire():
@@ -297,62 +344,71 @@ def test_create_mp_ts_dash_callbacks_fire():
     compare_row, single_row = toggle_mode("single")
     assert single_row["display"] == "block"
 
-    update_fig = _callback_fn(app, "..mp-graph.figure...mp-graph-2.figure..")
-    fig1, fig2 = update_fig(
+    render = _callback_fn(app, _find_callback_key(app, "panel-controls.children", "panel-graphs.children"))
+    ctrls, graphs = render([0, 1])
+    assert len(ctrls) == 2
+    assert len(graphs) == 2
+
+    draw = _callback_fn(app, _find_callback_key(app, "plot-graph", "figure"))
+    figs, styles = draw(
         "single",
         "base",
         "base",
         "base",
         2,
-        "Power Generation by price zone",
-        ["z1"],
-        False,
-        "Market Prices",
-        ["pz1"],
+        ["Power Generation by price zone"],
+        [["z1"]],
+        [0],
+        [100],
         0,
         5,
-        0,
-        100,
+        None,
+        None,
+        400,
     )
-    assert len(fig1.data) >= 1
-    assert len(fig2.data) == 0
+    assert len(figs) == 1
+    assert len(figs[0].data) >= 1
+    assert figs[0].layout.height == 400
+    assert styles[0]["height"] == "400px"
 
-    fig_cmp, fig2_cmp = update_fig(
+    figs_cmp, _ = draw(
         "compare",
         "base",
         "base",
         1,
         2,
-        "Power Generation by generator",
-        ["g1"],
-        False,
-        "Market Prices",
-        [],
+        ["Power Generation by generator"],
+        [["g1"]],
+        [None],
+        [None],
         None,
         None,
         None,
         None,
+        480,
     )
-    assert len(fig_cmp.data) >= 1
+    assert len(figs_cmp) == 1
+    assert len(figs_cmp[0].data) >= 1
 
-    fig1, fig2 = update_fig(
+    figs_multi, _ = draw(
         "single",
         "base",
         "base",
         "base",
         2,
-        "Power Generation by price zone",
-        ["z1"],
-        True,
-        "Curtailment",
-        ["rs1"],
+        ["Power Generation by price zone", "Curtailment"],
+        [["z1"], ["rs1"]],
+        [0, 0],
+        [100, 100],
         0,
         5,
-        0,
-        100,
+        None,
+        None,
+        480,
     )
-    assert len(fig1.data) >= 1
-    assert len(fig2.data) >= 1
+    assert len(figs_multi) == 2
+    assert len(figs_multi[0].data) >= 1
+    assert len(figs_multi[1].data) >= 1
 
 
 def run_test():

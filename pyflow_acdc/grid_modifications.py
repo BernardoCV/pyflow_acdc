@@ -1107,6 +1107,35 @@ def _look_up_converter(grid, conv):
         raise ValueError(f"Converter {conv_name} not found.")
     return conv_obj
 
+
+def _look_up_ren_source(grid, ren_source):
+    sources = getattr(grid, "RenSources", [])
+    if not isinstance(ren_source, str):
+        if ren_source in sources:
+            return ren_source
+        raise ValueError(f"Ren_Source {ren_source} not found in grid")
+
+    name = ren_source
+    found = next((rs for rs in sources if rs.name == name), None)
+    if found is None:
+        raise ValueError(f"Ren_Source {name} not found.")
+    return found
+
+
+def _look_up_ren_source_zone(grid, zone):
+    zones = getattr(grid, "RenSource_zones", [])
+    if not isinstance(zone, str):
+        if zone in zones:
+            return zone
+        raise ValueError(f"Ren_source_zone {zone} not found in grid")
+
+    name = zone
+    found = next((z for z in zones if z.name == name), None)
+    if found is None:
+        raise ValueError(f"Ren_source_zone {name} not found.")
+    return found
+
+
 def add_gen(grid, node,gen_name=None, price_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
     """Append an AC generator to ``grid.Generators``.
 
@@ -2303,17 +2332,26 @@ def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None
     s = 1
 
 
-def assign_RenToZone(grid,ren_source_name,new_zone_name):
-    """Move a renewable source into ``new_zone_name``.
+def assign_RenToZone(grid, ren_source, zone, link_availability=True):
+    """Assign a renewable source to a ren-source zone (membership and optional link).
+
+    Membership always places the source in ``zone.RenSources`` and sets
+    ``Ren_source_zone`` for aggregation (e.g. total gen per zone). When
+    ``link_availability`` is True (default), ``PGRi_linked`` is set so zone
+    ``PRGi_available`` time series / parameter updates propagate to the source
+    (same idea as ``link_load`` on :func:`assign_nodeToPrice_Zone`).
 
     Parameters
     ----------
     grid : Grid
         Grid containing the source and zones.
-    ren_source_name : str
-        :class:`~pyflow_acdc.Classes.Ren_Source` name.
-    new_zone_name : str
-        Target :class:`~pyflow_acdc.Classes.Ren_source_zone` name.
+    ren_source : Ren_Source or str
+        Renewable source object or name.
+    zone : Ren_source_zone or str
+        Target zone object or name.
+    link_availability : bool, optional
+        If True, link source availability to the zone parameter
+        (``PGRi_linked=True``). If False, keep membership only.
 
     Returns
     -------
@@ -2327,49 +2365,23 @@ def assign_RenToZone(grid,ren_source_name,new_zone_name):
     Examples
     --------
     >>> pyf.assign_RenToZone(grid, 'wind1', 'WindZone1')
-    >>> pyf.assign_RenToZone(grid, 'wind2', 'WindZone1')
-
-    Or assign via :func:`add_RenSource` using ``zone='WindZone1'``.
+    >>> pyf.assign_RenToZone(grid, rs_obj, zone_obj, link_availability=False)
     """
-    new_zone = None
-    old_zone = None
-    ren_source_to_reassign = None
+    new_zone = _look_up_ren_source_zone(grid, zone)
+    ren_source_to_reassign = _look_up_ren_source(grid, ren_source)
 
-    for RenZone in grid.RenSource_zones:
-        if RenZone.name == new_zone_name:
-            new_zone = RenZone
-            break
-    if new_zone is None:
-        raise ValueError(f"Zone {new_zone_name} not found.")
-
-    # Remove node from its old price_zone
-    for RenZone in grid.RenSource_zones:
-        for ren_source in RenZone.RenSources:
-            if ren_source.name == ren_source_name:
-                old_zone = RenZone
-                ren_source_to_reassign = ren_source
-                break
-        if old_zone:
+    for ren_zone in grid.RenSource_zones:
+        if ren_source_to_reassign in ren_zone.RenSources:
+            ren_zone.RenSources = [
+                rs for rs in ren_zone.RenSources if rs is not ren_source_to_reassign
+            ]
             break
 
-    if old_zone is not None:
-        RenZone.ren_source = [ren_source for ren_source in old_zone.RenSources
-                               if ren_source.name != ren_source_name]
-
-    # If the node was not found in any Renewable zone, check grid.nodes_AC
-    if ren_source_to_reassign is None:
-        for ren_source in grid.RenSources:
-            if ren_source.name == ren_source_name:
-                ren_source_to_reassign = ren_source
-                break
-
-    if ren_source_to_reassign is None:
-        raise ValueError(f"Renewable source {ren_source_name} not found.")
-    ren_source_to_reassign.PGRi_linked = True
+    ren_source_to_reassign.PGRi_linked = bool(link_availability)
     ren_source_to_reassign.Ren_source_zone = new_zone.name
-    # Add node to the new price_zone
     if ren_source_to_reassign not in new_zone.RenSources:
         new_zone.RenSources.append(ren_source_to_reassign)
+
 
 "Assigning components to zones"
 

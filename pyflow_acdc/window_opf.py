@@ -18,7 +18,11 @@ from .ACDC_OPF_NL_model import export_acdc_nl_model_to_pyflow_acdc, opf_create_n
 from .constants import AcDcSide
 from .grid_analysis import analyse_grid
 from .pyomo_model_solve import build_only_solver_stats, pyomo_model_solve
-from .Time_series import _modify_parameters, update_grid_data
+from .Time_series import (
+    _calculate_line_loading_from_model,
+    _modify_parameters,
+    update_grid_data,
+)
 
 __all__ = ['window_nl_opf']
 
@@ -163,6 +167,7 @@ def export_window_opf_results(model, grid, frames):
     rows_soc = []
     rows_pc = []
     rows_pd = []
+    rows_p = []
     rows_q = []
 
     if ordered and grid.storage_elements:
@@ -176,23 +181,28 @@ def export_window_opf_results(model, grid, frames):
         row_soc = {'frame': t}
         row_pc = {'frame': t}
         row_pd = {'frame': t}
+        row_p = {'frame': t}
         row_q = {'frame': t}
         for storage in grid.storage_elements:
             name = storage.name
             s = storage.storageNumber
             if storage.connected == AcDcSide.AC:
                 row_soc[name] = np.float64(pyo.value(block.SoC[s]))
-                row_pc[name] = np.float64(pyo.value(block.P_storage_charge[s])) * grid.S_base
-                row_pd[name] = np.float64(pyo.value(block.P_storage_discharge[s])) * grid.S_base
+                pc = np.float64(pyo.value(block.P_storage_charge[s])) * grid.S_base
+                pd_ = np.float64(pyo.value(block.P_storage_discharge[s])) * grid.S_base
                 row_q[name] = np.float64(pyo.value(block.Q_storage[s])) * grid.S_base
             else:
                 row_soc[name] = np.float64(pyo.value(block.SoC_DC[s]))
-                row_pc[name] = np.float64(pyo.value(block.P_storage_charge_DC[s])) * grid.S_base
-                row_pd[name] = np.float64(pyo.value(block.P_storage_discharge_DC[s])) * grid.S_base
+                pc = np.float64(pyo.value(block.P_storage_charge_DC[s])) * grid.S_base
+                pd_ = np.float64(pyo.value(block.P_storage_discharge_DC[s])) * grid.S_base
                 row_q[name] = np.nan
+            row_pc[name] = pc
+            row_pd[name] = pd_
+            row_p[name] = pd_ - pc
         rows_soc.append(row_soc)
         rows_pc.append(row_pc)
         rows_pd.append(row_pd)
+        rows_p.append(row_p)
         rows_q.append(row_q)
 
     summary_rows = []
@@ -212,8 +222,7 @@ def export_window_opf_results(model, grid, frames):
 
     results = {
         'storage_soc': pd.DataFrame(rows_soc),
-        'storage_P_charge': pd.DataFrame(rows_pc),
-        'storage_P_discharge': pd.DataFrame(rows_pd),
+        'storage_power': pd.DataFrame(rows_p),
         'storage_Q': pd.DataFrame(rows_q),
         'storage_summary': pd.DataFrame(summary_rows),
         'total_objective': np.float64(pyo.value(model.obj)),
@@ -308,6 +317,82 @@ def export_window_opf_results(model, grid, frames):
             rows_rprice.append(row_rprice)
         results['ren_power'] = pd.DataFrame(rows_rp)
         results['ren_price'] = pd.DataFrame(rows_rprice)
+
+        rows_curt = []
+        for t in ordered:
+            block = model.frame_model[t]
+            row_c = {'frame': t}
+            for rs in grid.RenSources:
+                r = rs.rsNumber
+                np_rs = np.float64(pyo.value(block.np_rsgen[r]))
+                if np_rs <= 0:
+                    row_c[rs.name] = 0.0
+                else:
+                    row_c[rs.name] = 1.0 - np.float64(pyo.value(block.gamma[r]))
+            rows_curt.append(row_c)
+        results['curtailment'] = pd.DataFrame(rows_curt)
+
+    if ordered and (grid.ACmode or grid.DCmode):
+        rows_ac = []
+        rows_dc = []
+        for t in ordered:
+            block = model.frame_model[t]
+            line_data, _, _ = _calculate_line_loading_from_model(grid, block, t)
+            row_ac = {'frame': t}
+            row_dc = {'frame': t}
+            for key, val in line_data.items():
+                if key.startswith('AC_Load_'):
+                    row_ac[key[len('AC_Load_'):]] = val
+                elif key.startswith('DC_Load_'):
+                    row_dc[key[len('DC_Load_'):]] = val
+            rows_ac.append(row_ac)
+            rows_dc.append(row_dc)
+        if grid.ACmode and grid.lines_AC:
+            results['ac_loading'] = pd.DataFrame(rows_ac)
+        if grid.DCmode and grid.lines_DC:
+            results['dc_loading'] = pd.DataFrame(rows_dc)
+
+    if (
+        ordered
+        and grid.ACmode
+        and grid.DCmode
+        and grid.Converters_ACDC
+    ):
+        rows_conv = []
+        for t in ordered:
+            block = model.frame_model[t]
+            row_conv = {'frame': t}
+            p_s = {
+                k: np.float64(pyo.value(v))
+                for k, v in block.P_conv_s_AC.items()
+            }
+            q_s = {
+                k: np.float64(pyo.value(v))
+                for k, v in block.Q_conv_s_AC.items()
+            }
+            p_c = {
+                k: np.float64(pyo.value(v))
+                for k, v in block.P_conv_c_AC.items()
+            }
+            p_loss = {
+                k: np.float64(pyo.value(v))
+                for k, v in block.P_conv_loss.items()
+            }
+            for conv in grid.Converters_ACDC:
+                n = conv.ConvNumber
+                p_ac = p_s[n] * conv.np_conv
+                q_ac = q_s[n] * conv.np_conv
+                p_dc = -(p_c[n] + p_loss[n]) * conv.np_conv
+                if conv.np_conv == 0:
+                    row_conv[conv.name] = 0.0
+                else:
+                    s_ac = np.sqrt(p_ac**2 + q_ac**2)
+                    row_conv[conv.name] = (
+                        max(s_ac, abs(p_dc)) * grid.S_base
+                        / (conv.MVA_max * conv.np_conv)
+                    )
+            rows_conv.append(row_conv)
+        results['converter_loading'] = pd.DataFrame(rows_conv)
 
     return results
 

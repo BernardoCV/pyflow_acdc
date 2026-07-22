@@ -9,8 +9,9 @@ Does not own: static plotting (see ``Graph_and_plot``).
 """
 
 import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash import dcc, html, ctx
+from dash.dependencies import Input, Output, State, ALL, MATCH
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -27,6 +28,36 @@ __all__ = [
     'plot_window_res_dash',
 ]
 
+# Docs Furo "SCADA panel" light palette (docs/conf.py light_css_variables).
+_THEME = {
+    'sidebar_bg': '#142033',
+    'sidebar_border': '#253a57',
+    'sidebar_text': '#d0dbe7',
+    'sidebar_text_top': '#60a5fa',
+    'sidebar_caption': '#8da2bb',
+    'bg_primary': '#f7f9fc',
+    'bg_secondary': '#eef3f8',
+    'bg_hover': '#e1e8f0',
+    'border': '#d6dee8',
+    'text_primary': '#172033',
+    'text_secondary': '#3f4f63',
+    'text_muted': '#6b7788',
+    'accent': '#2563eb',
+    'accent_hover': '#1d4ed8',
+    'accent_visited': '#6d28d9',
+    'header_tint': '#dde6f1',
+    'fig_paper': '#f7f9fc',
+    'fig_plot': 'white',
+    'fig_grid': '#d6dee8',
+    'fig_zero': '#172033',
+    'fig_font': '#172033',
+}
+
+_SERIES_COLORS = [
+    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+]
+
 _TS_PLOT_CHOICES = [
     'Power Generation by price zone',
     'Power Generation by generator',
@@ -40,9 +71,9 @@ _TS_PLOT_CHOICES = [
 ]
 
 _WINDOW_PLOT_CHOICES = [
+    'Total power',
     'Storage SoC',
-    'Storage charge',
-    'Storage discharge',
+    'Storage power',
     'Storage Q',
     'Hydrogen mass',
     'Hydrogen power',
@@ -50,7 +81,18 @@ _WINDOW_PLOT_CHOICES = [
     'Generator price',
     'Renewable power',
     'Renewable price',
+    'Curtailment',
+    'AC line loading',
+    'DC line loading',
+    'AC/DC Converters',
 ]
+
+_WINDOW_TOTAL_POWER_SERIES = (
+    ('Total ren', 'ren_power'),
+    ('Total gen', 'gen_power'),
+    ('Total H2', 'hydrogen_P_e'),
+    ('Total BESS', 'storage_power'),
+)
 
 _MP_PLOT_CHOICES = [
     'Power Generation by price zone',
@@ -69,6 +111,237 @@ _MP_PLOT_CHOICES = [
     'AC/DC Converters',
     'Curtailment',
 ]
+
+
+def _card_style(**overrides):
+    style = {
+        'backgroundColor': _THEME['bg_secondary'],
+        'border': f"1px solid {_THEME['border']}",
+        'borderRadius': '10px',
+        'padding': '16px',
+        'marginBottom': '16px',
+        'boxShadow': '0 1px 3px rgba(23,32,51,0.08)',
+    }
+    style.update(overrides)
+    return style
+
+
+def _label_style(on_dark=False):
+    return {
+        'fontWeight': '600',
+        'display': 'block',
+        'marginBottom': '6px',
+        'color': _THEME['sidebar_caption'] if on_dark else _THEME['text_secondary'],
+    }
+
+
+_SIDEBAR_WIDTH_PX = 420
+_DEFAULT_PLOT_HEIGHT = 480
+
+
+def _normalize_plot_height(height):
+    if height is None:
+        return _DEFAULT_PLOT_HEIGHT
+    try:
+        h = int(height)
+    except (TypeError, ValueError):
+        raise ValueError(f'plot height must be an integer, got {height!r}')
+    if h < 200:
+        raise ValueError(f'plot height must be >= 200, got {h}')
+    return h
+
+
+def _apply_plot_height(fig, height):
+    fig.update_layout(height=_normalize_plot_height(height))
+    return fig
+
+
+def _graph_style(height):
+    return {'height': f'{_normalize_plot_height(height)}px'}
+
+
+def _sidebar_style(is_open):
+    # Do not set ``color`` here — it cascades into Dropdown menus (white bg +
+    # pale inherited text). Labels / radios / checklists set their own colors.
+    return {
+        'position': 'fixed',
+        'top': 0,
+        'left': 0,
+        'height': '100vh',
+        'width': f'{_SIDEBAR_WIDTH_PX}px',
+        'overflowY': 'auto',
+        'padding': '18px',
+        'boxSizing': 'border-box',
+        'zIndex': 1000,
+        'backgroundColor': _THEME['sidebar_bg'],
+        'borderRight': f"1px solid {_THEME['sidebar_border']}",
+        'transition': 'transform .25s ease',
+        'transform': 'translateX(0)' if is_open else 'translateX(-100%)',
+    }
+
+
+def _content_style(is_open):
+    return {
+        'marginLeft': f'{_SIDEBAR_WIDTH_PX}px' if is_open else '0',
+        'transition': 'margin-left .25s ease',
+        'padding': '24px',
+        'backgroundColor': _THEME['bg_primary'],
+        'minHeight': '100vh',
+        'boxSizing': 'border-box',
+        'fontFamily': 'Arial, sans-serif',
+        'color': _THEME['text_primary'],
+    }
+
+
+_DASH_CUSTOM_CSS = f"""
+/* Dropdown / select: dark text on light surfaces (readable over navy sidebar) */
+#sidebar .Select-control,
+#sidebar .Select-menu-outer,
+#sidebar .Select-value-label,
+#sidebar .Select-placeholder,
+#sidebar .Select-input > input {{
+    color: {_THEME['text_primary']} !important;
+}}
+#sidebar .Select-menu-outer .VirtualizedSelectOption,
+#sidebar .Select-menu-outer .VirtualizedSelectFocusedOption {{
+    color: {_THEME['text_primary']} !important;
+    background-color: #ffffff;
+}}
+#sidebar .Select-menu-outer .VirtualizedSelectFocusedOption {{
+    background-color: {_THEME['header_tint']} !important;
+}}
+/* Dash / react-select v4+ */
+#sidebar div[class*="-control"],
+#sidebar div[class*="-menu"],
+#sidebar div[class*="-option"],
+#sidebar div[class*="-singleValue"],
+#sidebar div[class*="-placeholder"],
+#sidebar div[class*="-Input"] input {{
+    color: {_THEME['text_primary']} !important;
+}}
+#sidebar div[class*="-option"] {{
+    background-color: #ffffff;
+}}
+#sidebar div[class*="-option"]:hover,
+#sidebar div[class*="-option"][aria-selected="true"],
+#sidebar div[class*="-option"][class*="focused"] {{
+    background-color: {_THEME['header_tint']} !important;
+    color: {_THEME['text_primary']} !important;
+}}
+#sidebar input[type="number"] {{
+    color: {_THEME['text_primary']} !important;
+    background-color: #ffffff;
+}}
+#sidebar .dash-checklist label,
+#sidebar .dash-radio-items label {{
+    color: {_THEME['sidebar_text']} !important;
+}}
+"""
+
+
+def _attach_app_css(app):
+    app.index_string = f"""<!DOCTYPE html>
+<html>
+    <head>
+        {{%metas%}}
+        <title>{{%title%}}</title>
+        {{%favicon%}}
+        {{%css%}}
+        <style>{_DASH_CUSTOM_CSS}</style>
+    </head>
+    <body>
+        {{%app_entry%}}
+        <footer>
+            {{%config%}}
+            {{%scripts%}}
+            {{%renderer%}}
+        </footer>
+    </body>
+</html>"""
+
+
+
+def _btn_style(**overrides):
+    style = {
+        'backgroundColor': _THEME['accent'],
+        'color': 'white',
+        'border': 'none',
+        'borderRadius': '6px',
+        'padding': '8px 12px',
+        'cursor': 'pointer',
+        'fontWeight': '600',
+        'marginBottom': '12px',
+        'width': '100%',
+    }
+    style.update(overrides)
+    return style
+
+
+def _toggle_btn_style():
+    return {
+        'backgroundColor': _THEME['accent'],
+        'color': 'white',
+        'border': 'none',
+        'borderRadius': '6px',
+        'padding': '8px 14px',
+        'cursor': 'pointer',
+        'fontWeight': '600',
+        'marginBottom': '16px',
+    }
+
+
+def _remove_btn_style():
+    return {
+        'backgroundColor': 'transparent',
+        'color': _THEME['sidebar_caption'],
+        'border': f"1px solid {_THEME['sidebar_border']}",
+        'borderRadius': '4px',
+        'padding': '2px 8px',
+        'cursor': 'pointer',
+        'fontSize': '12px',
+    }
+
+
+def _sidebar_panel_card_style():
+    return {
+        'backgroundColor': '#1a2a40',
+        'border': f"1px solid {_THEME['sidebar_border']}",
+        'borderRadius': '8px',
+        'padding': '12px',
+        'marginBottom': '12px',
+    }
+
+
+def _apply_fig_theme(fig, *, show_title=True):
+    fig.update_layout(
+        paper_bgcolor=_THEME['fig_paper'],
+        plot_bgcolor=_THEME['fig_plot'],
+        font=dict(family='Arial, sans-serif', color=_THEME['fig_font']),
+        hovermode='x unified',
+        legend=dict(
+            bgcolor='rgba(255,255,255,0.9)',
+            bordercolor=_THEME['border'],
+            borderwidth=1,
+        ),
+        margin=dict(l=60, r=30, t=80 if show_title else 40, b=60),
+    )
+    axis = dict(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor=_THEME['fig_grid'],
+        zeroline=True,
+        zerolinewidth=1,
+        zerolinecolor=_THEME['fig_zero'],
+    )
+    fig.update_xaxes(**axis)
+    fig.update_yaxes(**axis)
+    return fig
+
+
+def _hex_to_rgba(hex_color, alpha=0.5):
+    h = hex_color.lstrip('#')
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return f'rgba({r},{g},{b},{alpha})'
 
 
 def _get_df_and_label_from_ts(time_series_results, S_base, plotting_choice):
@@ -127,12 +400,48 @@ def _frame_column_to_index(df):
     return out
 
 
+def _window_total_power_df(window_opf_results):
+    """Sum ren / gen / H₂ / BESS power into one multi-series frame (MW)."""
+    series = {}
+    for label, key in _WINDOW_TOTAL_POWER_SERIES:
+        df = _frame_column_to_index(window_opf_results.get(key))
+        if df is None or df.empty:
+            continue
+        series[label] = df.sum(axis=1)
+    if not series:
+        return None
+    return pd.DataFrame(series)
+
+
 def _get_df_and_label_from_window(window_opf_results, plotting_choice):
     """Resolve (dataframe, y-axis label) from ``grid.window_opf_results``."""
+    if plotting_choice == 'Total power':
+        df = _window_total_power_df(window_opf_results)
+        return df, 'Power (MW)' if df is not None else ''
+    if plotting_choice == 'Curtailment':
+        df = _frame_column_to_index(window_opf_results.get('curtailment'))
+        return (df * 100.0) if df is not None else None, (
+            'Curtailment %' if df is not None else ''
+        )
+    if plotting_choice == 'AC line loading':
+        df = _frame_column_to_index(window_opf_results.get('ac_loading'))
+        return (df * 100.0) if df is not None else None, (
+            'AC Line Loading %' if df is not None else ''
+        )
+    if plotting_choice == 'DC line loading':
+        df = _frame_column_to_index(window_opf_results.get('dc_loading'))
+        return (df * 100.0) if df is not None else None, (
+            'DC Line Loading %' if df is not None else ''
+        )
+    if plotting_choice == 'AC/DC Converters':
+        df = _frame_column_to_index(window_opf_results.get('converter_loading'))
+        return (df * 100.0) if df is not None else None, (
+            'AC/DC Converters loading %' if df is not None else ''
+        )
+
     key_map = {
         'Storage SoC': ('storage_soc', 'SoC'),
-        'Storage charge': ('storage_P_charge', 'Charge (MW)'),
-        'Storage discharge': ('storage_P_discharge', 'Discharge (MW)'),
+        'Storage power': ('storage_power', 'Storage P (MW, +discharge/−charge)'),
         'Storage Q': ('storage_Q', 'Q (MVAr)'),
         'Hydrogen mass': ('hydrogen_mass_H2', 'H₂ mass (kg)'),
         'Hydrogen power': ('hydrogen_P_e', 'Electrolyser P (MW)'),
@@ -173,6 +482,32 @@ def _available_window_plot_choices(grid):
     return choices
 
 
+def _columns_for_choice(grid, plotting_choice):
+    df, _ = _get_df_and_label(grid, plotting_choice)
+    if df is None or df.empty:
+        return []
+    return df.columns.tolist()
+
+
+def _auto_ylimits(grid, plotting_choice):
+    data, _ = _get_df_and_label(grid, plotting_choice)
+    if data is None or data.empty:
+        return 0, 1
+    y_min = int(min(0, data.min().min() - 5))
+    if plotting_choice in [
+        'Power Generation by generator area chart',
+        'Power Generation by price zone area chart',
+    ]:
+        y_max = int(data.sum(axis=1).max() + 10)
+    elif plotting_choice in ['AC line loading', 'DC line loading', 'Curtailment']:
+        y_max = int(min(data.max().max() + 10, 100))
+    elif plotting_choice == 'Storage SoC':
+        y_min, y_max = 0, 1
+    else:
+        y_max = int(data.max().max() + 10)
+    return y_min, y_max
+
+
 def plot_TS_res_from_ts(
     time_series_results,
     S_base,
@@ -190,51 +525,58 @@ def plot_TS_res_from_ts(
         fig.update_layout(
             title=(f"Time Series: {plotting_choice}" if show_title else None),
             xaxis_title="Time",
-            yaxis_title=y_label if y_label else "Value"
+            yaxis_title=y_label if y_label else "Value",
         )
-        return fig
+        return _apply_fig_theme(fig, show_title=show_title)
 
     time = df.index
 
     fig = go.Figure()
     cumulative_sum = None
-    stack_areas = plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']
-
-    # Custom color palette
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    stack_areas = plotting_choice in [
+        'Power Generation by generator area chart',
+        'Power Generation by price zone area chart',
+    ]
 
     for i, col in enumerate(selected_rows):
         if col in df.columns:
             y_values = df[col]
-            color = colors[i % len(colors)]
+            color = _SERIES_COLORS[i % len(_SERIES_COLORS)]
             trace_name = f'{legend_prefix}{col}' if legend_prefix else col
 
             if stack_areas:
                 if cumulative_sum is None:
                     cumulative_sum = y_values.copy()
                     fig.add_trace(
-                        go.Scatter(x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
-                                 fill='tozeroy', line=dict(color=color), fillcolor=f'rgba{tuple(list(int(color.lstrip("#")[i:i+2], 16) for i in (0, 2, 4)) + [0.5])}')
+                        go.Scatter(
+                            x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
+                            fill='tozeroy', line=dict(color=color),
+                            fillcolor=_hex_to_rgba(color),
+                        )
                     )
                 else:
                     y_values = cumulative_sum + y_values
                     cumulative_sum = y_values
                     fig.add_trace(
-                        go.Scatter(x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
-                                 fill='tonexty', line=dict(color=color), fillcolor=f'rgba{tuple(list(int(color.lstrip("#")[i:i+2], 16) for i in (0, 2, 4)) + [0.5])}')
+                        go.Scatter(
+                            x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
+                            fill='tonexty', line=dict(color=color),
+                            fillcolor=_hex_to_rgba(color),
+                        )
                     )
             else:
                 fig.add_trace(
-                    go.Scatter(x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
-                             line=dict(color=color, width=2))
+                    go.Scatter(
+                        x=time, y=y_values, name=trace_name, hoverinfo='x+y+name',
+                        line=dict(color=color, width=2),
+                    )
                 )
 
-    # Enhanced layout
     title_block = None
     if show_title:
         title_block = dict(
             text=f"Time Series: {plotting_choice}",
-            font=dict(size=24, color="#2c3e50"),
+            font=dict(size=24, color=_THEME['text_primary']),
             x=0.5,
             xanchor='center',
         )
@@ -242,36 +584,9 @@ def plot_TS_res_from_ts(
         title=title_block,
         xaxis_title=dict(text="Time", font=dict(size=14)),
         yaxis_title=dict(text=y_label, font=dict(size=14)),
-        hovermode="x unified",
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        font=dict(family="Arial, sans-serif"),
-        margin=dict(l=60, r=30, t=80, b=60),
         showlegend=True,
-        legend=dict(
-            bgcolor='rgba(255,255,255,0.9)',
-            bordercolor='#2c3e50',
-            borderwidth=1
-        )
     )
-
-    # Grid styling
-    fig.update_xaxes(
-        showgrid=True,
-        gridwidth=1,
-        gridcolor='#e1e1e1',
-        zeroline=True,
-        zerolinewidth=1,
-        zerolinecolor='#2c3e50'
-    )
-    fig.update_yaxes(
-        showgrid=True,
-        gridwidth=1,
-        gridcolor='#e1e1e1',
-        zeroline=True,
-        zerolinewidth=1,
-        zerolinecolor='#2c3e50'
-    )
+    _apply_fig_theme(fig, show_title=show_title)
 
     if x_limits is None:
         x_limits = (df.index[0], df.index[-1])
@@ -307,29 +622,101 @@ def plot_window_res_dash(grid, plotting_choice, selected_rows, x_limits=None, y_
             xaxis_title="Frame",
             yaxis_title=y_label if y_label else "Value",
         )
-        return fig
+        return _apply_fig_theme(fig)
 
-    # Reuse the TS figure builder by stuffing a one-key mapping with already-scaled df.
-    # plot_TS_res_from_ts multiplies some TS keys by S_base; window data is already in
-    # engineering units, so we pass through a fake TS key path via direct figure build.
     time = df.index
     fig = go.Figure()
     cols = selected_rows if selected_rows else list(df.columns)
-    for col in cols:
+    for i, col in enumerate(cols):
         if col not in df.columns:
             continue
-        fig.add_trace(go.Scatter(x=time, y=df[col], mode='lines', name=str(col)))
+        color = _SERIES_COLORS[i % len(_SERIES_COLORS)]
+        fig.add_trace(
+            go.Scatter(
+                x=time, y=df[col], mode='lines', name=str(col),
+                line=dict(color=color, width=2),
+            )
+        )
     fig.update_layout(
-        title=f"Window OPF: {plotting_choice}",
+        title=dict(
+            text=f"Window OPF: {plotting_choice}",
+            font=dict(size=24, color=_THEME['text_primary']),
+            x=0.5,
+            xanchor='center',
+        ),
         xaxis_title="Frame",
         yaxis_title=y_label,
         legend_title="Elements",
+        showlegend=True,
     )
+    _apply_fig_theme(fig)
     if x_limits is not None and x_limits[0] is not None and x_limits[1] is not None:
         fig.update_xaxes(range=list(x_limits))
     if y_limits is not None and y_limits[0] is not None and y_limits[1] is not None:
         fig.update_yaxes(range=list(y_limits))
     return fig
+
+
+def _panel_control_card(i, default_choice, dd_options):
+    return html.Div(style=_sidebar_panel_card_style(), children=[
+        html.Div(
+            style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center',
+                   'marginBottom': '10px'},
+            children=[
+                html.Span(f'Plot {i + 1}', style={
+                    'fontWeight': '700', 'color': _THEME['sidebar_text_top'],
+                }),
+                html.Button(
+                    '✕',
+                    id={'type': 'plot-remove', 'index': i},
+                    n_clicks=0,
+                    style=_remove_btn_style(),
+                ),
+            ],
+        ),
+        html.Label('Plot type', style=_label_style(on_dark=True)),
+        dcc.Dropdown(
+            id={'type': 'plot-choice', 'index': i},
+            options=dd_options,
+            value=default_choice,
+            clearable=False,
+            style={'marginBottom': '10px'},
+        ),
+        html.Label('Components', style=_label_style(on_dark=True)),
+        dcc.Checklist(
+            id={'type': 'plot-series', 'index': i},
+            options=[],
+            value=[],
+            style={'marginBottom': '10px', 'color': _THEME['sidebar_text']},
+        ),
+        html.Label('Y-axis limits', style=_label_style(on_dark=True)),
+        html.Div(style={'display': 'flex', 'gap': '8px'}, children=[
+            dcc.Input(
+                id={'type': 'plot-ymin', 'index': i},
+                type='number',
+                placeholder='Min',
+                style={'flex': 1, 'padding': '5px'},
+            ),
+            dcc.Input(
+                id={'type': 'plot-ymax', 'index': i},
+                type='number',
+                placeholder='Max',
+                style={'flex': 1, 'padding': '5px'},
+            ),
+        ]),
+    ])
+
+
+def _panel_graph_card(i, height=None):
+    return html.Div(
+        style=_card_style(backgroundColor='white'),
+        children=[
+            dcc.Graph(
+                id={'type': 'plot-graph', 'index': i},
+                style=_graph_style(height),
+            ),
+        ],
+    )
 
 
 def _build_dual_plot_dash_app(
@@ -342,199 +729,169 @@ def _build_dual_plot_dash_app(
     plot_fn,
     x_axis_label='Time',
 ):
-    """Shared dual-plot Dash layout used by TS and window apps."""
+    """Shared multi-plot Dash layout used by TS and window apps."""
+    if not plot_choices:
+        raise ValueError('plot_choices is empty')
+
     app = dash.Dash(__name__)
+    _attach_app_css(app)
     dd_options = [{'label': c, 'value': c} for c in plot_choices]
 
-    app.layout = html.Div(style={
-        'maxWidth': '1200px',
-        'margin': '0 auto',
-        'padding': '20px',
-        'fontFamily': 'Arial, sans-serif',
-        'backgroundColor': '#f5f6fa'
-    }, children=[
-        html.H1(title,
-                style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '30px'}),
-
-        html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
-            html.H3("Plot 1", style={'color': '#2c3e50', 'marginBottom': '15px'}),
-            html.Label("Select Plot Type:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
-            dcc.Dropdown(
-                id='plotting-choice-1',
-                options=dd_options,
-                value=default_choice_1,
-                style={'marginBottom': '20px'}
-            ),
-            html.Label("Select Components:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
-            dcc.Checklist(
-                id='subplot-selection-1',
-                options=[],
-                value=[],
-                inline=True,
-                style={'marginBottom': '20px'}
-            ),
-            html.Div(style={'display': 'flex', 'gap': '20px', 'marginBottom': '20px'}, children=[
-                html.Div(style={'flex': 1}, children=[
-                    html.Label('Y-axis limits:', style={'fontWeight': 'bold'}),
-                    html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
-                        dcc.Input(id='y-min-1', type='number', placeholder='Min', value=0, style={'flex': 1, 'padding': '5px'}),
-                        dcc.Input(id='y-max-1', type='number', placeholder='Max', value=100, style={'flex': 1, 'padding': '5px'})
-                    ])
-                ])
-            ])
-        ]),
-
-        html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
-            html.Label("Show Second Plot:", style={'fontWeight': 'bold', 'marginRight': '10px'}),
-            dcc.RadioItems(
-                id='show-plot-2',
-                options=[
-                    {'label': 'Yes', 'value': True},
-                    {'label': 'No', 'value': False}
+    app.layout = html.Div([
+        dcc.Store(id='sidebar-open', data=True),
+        dcc.Store(id='plot-panels', data=[0]),
+        html.Div(id='sidebar', style=_sidebar_style(True), children=[
+            html.Div(
+                style={'display': 'flex', 'justifyContent': 'space-between',
+                       'alignItems': 'flex-start', 'gap': '8px', 'marginBottom': '12px'},
+                children=[
+                    html.H2(title, style={
+                        'color': _THEME['sidebar_text_top'],
+                        'fontSize': '18px',
+                        'margin': 0,
+                        'flex': 1,
+                    }),
+                    html.Button(
+                        'Hide ✕',
+                        id='hide-sidebar',
+                        n_clicks=0,
+                        style=_remove_btn_style(),
+                    ),
                 ],
-                value=False,
-                inline=True
-            )
-        ]),
-
-        html.Div(id='plot-2-controls', style={'display': 'none'}, children=[
-            html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
-                html.H3("Plot 2", style={'color': '#2c3e50', 'marginBottom': '15px'}),
-                html.Label("Select Plot Type:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
-                dcc.Dropdown(
-                    id='plotting-choice-2',
-                    options=dd_options,
-                    value=default_choice_2,
-                    style={'marginBottom': '20px'}
+            ),
+            html.Div(id='global-controls', children=[
+                html.Label(f'X-axis limits ({x_axis_label})', style=_label_style(on_dark=True)),
+                html.Div(style={'display': 'flex', 'gap': '8px', 'marginBottom': '12px'}, children=[
+                    dcc.Input(
+                        id='x-min', type='number', placeholder='Min',
+                        style={'flex': 1, 'padding': '5px'},
+                    ),
+                    dcc.Input(
+                        id='x-max', type='number', placeholder='Max',
+                        style={'flex': 1, 'padding': '5px'},
+                    ),
+                ]),
+                html.Label('Plot height (px)', style=_label_style(on_dark=True)),
+                dcc.Input(
+                    id='plot-height',
+                    type='number',
+                    value=_DEFAULT_PLOT_HEIGHT,
+                    min=200,
+                    step=20,
+                    style={'width': '100%', 'padding': '5px', 'marginBottom': '12px',
+                           'boxSizing': 'border-box'},
                 ),
-                html.Label("Select Components:", style={'fontWeight': 'bold', 'marginBottom': '10px'}),
-                dcc.Checklist(
-                    id='subplot-selection-2',
-                    options=[],
-                    value=[],
-                    inline=True,
-                    style={'marginBottom': '20px'}
-                ),
-                html.Div(style={'display': 'flex', 'gap': '20px', 'marginBottom': '20px'}, children=[
-                    html.Div(style={'flex': 1}, children=[
-                        html.Label('Y-axis limits:', style={'fontWeight': 'bold'}),
-                        html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
-                            dcc.Input(id='y-min-2', type='number', placeholder='Min', value=0, style={'flex': 1, 'padding': '5px'}),
-                            dcc.Input(id='y-max-2', type='number', placeholder='Max', value=100, style={'flex': 1, 'padding': '5px'})
-                        ])
-                    ])
-                ])
-            ])
+            ]),
+            html.Button('➕ Add plot', id='add-plot', n_clicks=0, style=_btn_style()),
+            html.Div(id='panel-controls'),
         ]),
-
-        html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'marginBottom': '20px'}, children=[
-            html.Label(f'X-axis limits ({x_axis_label}):', style={'fontWeight': 'bold'}),
-            html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
-                dcc.Input(id='x-min', type='number', placeholder='Min', style={'flex': 1, 'padding': '5px'}),
-                dcc.Input(id='x-max', type='number', placeholder='Max', style={'flex': 1, 'padding': '5px'})
-            ])
+        html.Div(id='content', style=_content_style(True), children=[
+            html.Button(
+                '☰ Hide options',
+                id='toggle-sidebar',
+                n_clicks=0,
+                style=_toggle_btn_style(),
+            ),
+            html.Div(id='panel-graphs'),
         ]),
-
-        html.Div(style={
-            'backgroundColor': 'white',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'marginTop': '20px',
-            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-        }, children=[
-            dcc.Graph(id='plot-output-1'),
-            html.Div(id='plot-2-container', style={'display': 'none'}, children=[
-                dcc.Graph(id='plot-output-2')
-            ])
-        ])
     ])
 
     @app.callback(
-        [Output('plot-2-controls', 'style'),
-         Output('plot-2-container', 'style')],
-        [Input('show-plot-2', 'value')]
+        [Output('sidebar', 'style'),
+         Output('content', 'style'),
+         Output('sidebar-open', 'data'),
+         Output('toggle-sidebar', 'children')],
+        [Input('toggle-sidebar', 'n_clicks'),
+         Input('hide-sidebar', 'n_clicks')],
+        [State('sidebar-open', 'data')],
     )
-    def toggle_plot_2(show_plot_2):
-        if show_plot_2:
-            return {'display': 'block'}, {'display': 'block'}
-        return {'display': 'none'}, {'display': 'none'}
-
-    @app.callback(
-        [Output('subplot-selection-1', 'options'),
-         Output('subplot-selection-1', 'value'),
-         Output('subplot-selection-2', 'options'),
-         Output('subplot-selection-2', 'value')],
-        [Input('plotting-choice-1', 'value'),
-         Input('plotting-choice-2', 'value')]
-    )
-    def update_subplot_options(plotting_choice_1, plotting_choice_2):
-        def get_columns(plotting_choice):
-            df, _ = _get_df_and_label(grid, plotting_choice)
-            if df is None or df.empty:
-                return []
-            return df.columns.tolist()
-
-        cols_1 = get_columns(plotting_choice_1)
-        cols_2 = get_columns(plotting_choice_2)
-        options_1 = [{'label': col, 'value': col} for col in cols_1]
-        options_2 = [{'label': col, 'value': col} for col in cols_2]
-        return options_1, cols_1, options_2, cols_2
-
-    @app.callback(
-        [Output('y-min-1', 'value'),
-         Output('y-max-1', 'value'),
-         Output('y-min-2', 'value'),
-         Output('y-max-2', 'value')],
-        [Input('plotting-choice-1', 'value'),
-         Input('plotting-choice-2', 'value')]
-    )
-    def update_limits(plotting_choice_1, plotting_choice_2):
-        def get_limits(plotting_choice):
-            data, _ = _get_df_and_label(grid, plotting_choice)
-            if data is None or data.empty:
-                return 0, 1
-            y_min = int(min(0, data.min().min() - 5))
-            if plotting_choice in ['Power Generation by generator area chart', 'Power Generation by price zone area chart']:
-                y_max = int(data.sum(axis=1).max() + 10)
-            elif plotting_choice in ['AC line loading', 'DC line loading', 'Curtailment']:
-                y_max = int(min(data.max().max() + 10, 100))
-            elif plotting_choice == 'Storage SoC':
-                y_min, y_max = 0, 1
+    def _toggle_sidebar(n_toggle, n_hide, is_open):
+        try:
+            trig = ctx.triggered_id
+        except dash.exceptions.MissingCallbackContextException:
+            if (n_toggle or 0) > 0:
+                trig = 'toggle-sidebar'
+            elif (n_hide or 0) > 0:
+                trig = 'hide-sidebar'
             else:
-                y_max = int(data.max().max() + 10)
-            return y_min, y_max
-
-        y_min_1, y_max_1 = get_limits(plotting_choice_1)
-        y_min_2, y_max_2 = get_limits(plotting_choice_2)
-        return y_min_1, y_max_1, y_min_2, y_max_2
+                trig = None
+        if trig in ('toggle-sidebar', 'hide-sidebar'):
+            new_open = not bool(is_open)
+        else:
+            new_open = True if is_open is None else bool(is_open)
+        label = '☰ Show options' if not new_open else '☰ Hide options'
+        return _sidebar_style(new_open), _content_style(new_open), new_open, label
 
     @app.callback(
-        [Output('plot-output-1', 'figure'),
-         Output('plot-output-2', 'figure')],
-        [Input('plotting-choice-1', 'value'),
-         Input('plotting-choice-2', 'value'),
-         Input('subplot-selection-1', 'value'),
-         Input('subplot-selection-2', 'value'),
+        Output('plot-panels', 'data'),
+        [Input('add-plot', 'n_clicks'),
+         Input({'type': 'plot-remove', 'index': ALL}, 'n_clicks')],
+        [State('plot-panels', 'data')],
+        prevent_initial_call=True,
+    )
+    def _manage_panels(add_clicks, remove_clicks, panels):
+        panels = list(panels or [0])
+        trig = ctx.triggered_id
+        if trig == 'add-plot':
+            next_id = (max(panels) + 1) if panels else 0
+            return panels + [next_id]
+        if isinstance(trig, dict) and trig.get('type') == 'plot-remove':
+            rid = trig['index']
+            remaining = [p for p in panels if p != rid]
+            return remaining if remaining else panels
+        return panels
+
+    @app.callback(
+        [Output('panel-controls', 'children'),
+         Output('panel-graphs', 'children')],
+        [Input('plot-panels', 'data')],
+    )
+    def _render_panels(panels):
+        panels = panels or [0]
+        defaults = [default_choice_1, default_choice_2]
+        ctrls, graphs = [], []
+        for pos, i in enumerate(panels):
+            dc = defaults[pos] if pos < len(defaults) else plot_choices[0]
+            ctrls.append(_panel_control_card(i, dc, dd_options))
+            graphs.append(_panel_graph_card(i))
+        return ctrls, graphs
+
+    @app.callback(
+        [Output({'type': 'plot-series', 'index': MATCH}, 'options'),
+         Output({'type': 'plot-series', 'index': MATCH}, 'value'),
+         Output({'type': 'plot-ymin', 'index': MATCH}, 'value'),
+         Output({'type': 'plot-ymax', 'index': MATCH}, 'value')],
+        [Input({'type': 'plot-choice', 'index': MATCH}, 'value')],
+    )
+    def _panel_series(choice):
+        cols = _columns_for_choice(grid, choice)
+        ymin, ymax = _auto_ylimits(grid, choice)
+        return [{'label': c, 'value': c} for c in cols], cols, ymin, ymax
+
+    @app.callback(
+        [Output({'type': 'plot-graph', 'index': ALL}, 'figure'),
+         Output({'type': 'plot-graph', 'index': ALL}, 'style')],
+        [Input({'type': 'plot-choice', 'index': ALL}, 'value'),
+         Input({'type': 'plot-series', 'index': ALL}, 'value'),
+         Input({'type': 'plot-ymin', 'index': ALL}, 'value'),
+         Input({'type': 'plot-ymax', 'index': ALL}, 'value'),
          Input('x-min', 'value'),
          Input('x-max', 'value'),
-         Input('y-min-1', 'value'),
-         Input('y-max-1', 'value'),
-         Input('y-min-2', 'value'),
-         Input('y-max-2', 'value'),
-         Input('show-plot-2', 'value')]
+         Input('plot-height', 'value')],
     )
-    def update_graphs(plotting_choice_1, plotting_choice_2, selected_rows_1, selected_rows_2,
-                     x_min, x_max, y_min_1, y_max_1, y_min_2, y_max_2, show_plot_2):
-        x_limits = (x_min, x_max) if x_min is not None and x_max is not None else None
-        y_limits_1 = (y_min_1, y_max_1) if y_min_1 is not None and y_max_1 is not None else None
-        y_limits_2 = (y_min_2, y_max_2) if y_min_2 is not None and y_max_2 is not None else None
-
-        fig1 = plot_fn(grid, plotting_choice_1, selected_rows_1, x_limits=x_limits, y_limits=y_limits_1)
-        if show_plot_2:
-            fig2 = plot_fn(grid, plotting_choice_2, selected_rows_2, x_limits=x_limits, y_limits=y_limits_2)
-        else:
-            fig2 = go.Figure()
-        return fig1, fig2
+    def _draw(choices, series, ymins, ymaxs, xmin, xmax, plot_height):
+        x_limits = (xmin, xmax) if xmin is not None and xmax is not None else None
+        height = _normalize_plot_height(
+            plot_height if plot_height is not None else _DEFAULT_PLOT_HEIGHT
+        )
+        figs = []
+        styles = []
+        for choice, sel, ymin, ymax in zip(choices or [], series or [], ymins or [], ymaxs or []):
+            y_limits = (ymin, ymax) if ymin is not None and ymax is not None else None
+            fig = plot_fn(grid, choice, sel or [], x_limits=x_limits, y_limits=y_limits)
+            figs.append(_apply_plot_height(fig, height))
+            styles.append(_graph_style(height))
+        return figs, styles
 
     return app
 
@@ -687,6 +1044,24 @@ def create_mp_ts_dash(ts_inv, grid_name='MP time series'):
         cols = df.columns.tolist()
         return [{'label': c, 'value': c} for c in cols], cols
 
+    def _auto_ylimits_snap(plot_type, snap):
+        data, _ = _get_df_and_label_from_ts(
+            snap['time_series_results'], snap['S_base'], plot_type
+        )
+        if data is None or data.empty:
+            return 0, 1
+        y_min = int(min(0, data.min().min() - 5))
+        if plot_type in [
+            'Power Generation by generator area chart',
+            'Power Generation by price zone area chart',
+        ]:
+            y_max = int(data.sum(axis=1).max() + 10)
+        elif plot_type in ['AC line loading', 'DC line loading', 'Curtailment']:
+            y_max = int(min(data.max().max() + 10, 100))
+        else:
+            y_max = int(data.max().max() + 10)
+        return y_min, y_max
+
     period_opts = []
     for p in period_order:
         if p == 'base':
@@ -702,202 +1077,10 @@ def create_mp_ts_dash(ts_inv, grid_name='MP time series'):
         return a, b, c
 
     d1, d2, d3 = _default_triple()
+    default_choice_1 = 'Power Generation by price zone'
+    default_choice_2 = 'Market Prices'
 
-    app = dash.Dash(__name__)
-    app.layout = html.Div(style={
-        'maxWidth': '1400px',
-        'margin': '0 auto',
-        'padding': '20px',
-        'fontFamily': 'Arial, sans-serif',
-        'backgroundColor': '#f5f6fa',
-    }, children=[
-        html.H1(f'{grid_name} — TS by investment period', style={'textAlign': 'center', 'color': '#2c3e50'}),
-        dcc.RadioItems(
-            id='mp-mode',
-            options=[
-                {'label': 'Single period', 'value': 'single'},
-                {'label': 'Compare three periods (columns)', 'value': 'compare'},
-            ],
-            value='single',
-            inline=True,
-            style={'marginBottom': '16px'},
-        ),
-        html.Div(id='mp-single-row', children=[
-            html.Label('Period:', style={'fontWeight': 'bold'}),
-            dcc.Dropdown(
-                id='mp-period-single',
-                options=period_opts,
-                value=period_order[0],
-                clearable=False,
-                style={'marginBottom': '12px'},
-            ),
-        ]),
-        html.Div(id='mp-compare-row', style={'display': 'none'}, children=[
-            html.Div(style={'display': 'flex', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
-                html.Div(style={'flex': 1, 'minWidth': '180px'}, children=[
-                    html.Label('Column 1', style={'fontWeight': 'bold'}),
-                    dcc.Dropdown(id='mp-p1', options=period_opts_skip, value=d1, clearable=False),
-                ]),
-                html.Div(style={'flex': 1, 'minWidth': '180px'}, children=[
-                    html.Label('Column 2', style={'fontWeight': 'bold'}),
-                    dcc.Dropdown(id='mp-p2', options=period_opts_skip, value=d2, clearable=False),
-                ]),
-                html.Div(style={'flex': 1, 'minWidth': '180px'}, children=[
-                    html.Label('Column 3', style={'fontWeight': 'bold'}),
-                    dcc.Dropdown(id='mp-p3', options=period_opts_skip, value=d3, clearable=False),
-                ]),
-            ]),
-        ]),
-        html.Label('Plot type:', style={'fontWeight': 'bold'}),
-        dcc.Dropdown(
-            id='mp-plot-type',
-            options=plot_dd_options,
-            value='Power Generation by price zone',
-            style={'marginBottom': '12px'},
-        ),
-        html.Label('Series:', style={'fontWeight': 'bold'}),
-        dcc.Checklist(id='mp-cols', options=[], value=[], inline=True, style={'marginBottom': '16px'}),
-        html.Div(style={'backgroundColor': 'white', 'padding': '12px', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.05)', 'marginBottom': '16px'}, children=[
-            html.Label('Show Second Plot:', style={'fontWeight': 'bold', 'marginRight': '10px'}),
-            dcc.RadioItems(
-                id='mp-show-plot-2',
-                options=[
-                    {'label': 'Yes', 'value': True},
-                    {'label': 'No', 'value': False},
-                ],
-                value=False,
-                inline=True,
-            ),
-        ]),
-        html.Div(id='mp-plot-2-controls', style={'display': 'none'}, children=[
-            html.Label('Plot type 2:', style={'fontWeight': 'bold'}),
-            dcc.Dropdown(
-                id='mp-plot-type-2',
-                options=plot_dd_options,
-                value='Market Prices',
-                style={'marginBottom': '12px'},
-            ),
-            html.Label('Series 2:', style={'fontWeight': 'bold'}),
-            dcc.Checklist(id='mp-cols-2', options=[], value=[], inline=True, style={'marginBottom': '16px'}),
-        ]),
-        html.Div(style={'display': 'flex', 'gap': '10px', 'flexWrap': 'wrap', 'marginBottom': '12px'}, children=[
-            html.Div(style={'display': 'flex', 'gap': '6px', 'alignItems': 'center'}, children=[
-                html.Span('X min:'), dcc.Input(id='mp-xmin', type='number', placeholder='auto', style={'width': '100px'}),
-                html.Span('X max:'), dcc.Input(id='mp-xmax', type='number', placeholder='auto', style={'width': '100px'}),
-            ]),
-            html.Div(style={'display': 'flex', 'gap': '6px', 'alignItems': 'center'}, children=[
-                html.Span('Y min:'), dcc.Input(id='mp-ymin', type='number', placeholder='auto', style={'width': '100px'}),
-                html.Span('Y max:'), dcc.Input(id='mp-ymax', type='number', placeholder='auto', style={'width': '100px'}),
-            ]),
-        ]),
-        dcc.Graph(id='mp-graph', style={'height': '560px'}),
-        html.Div(id='mp-graph-2-container', style={'display': 'none'}, children=[
-            dcc.Graph(id='mp-graph-2', style={'height': '560px'}),
-        ]),
-    ])
-
-    @app.callback(
-        [Output('mp-compare-row', 'style'),
-         Output('mp-single-row', 'style')],
-        [Input('mp-mode', 'value')],
-    )
-    def _toggle_mode(mode):
-        if mode == 'compare':
-            return {'display': 'block'}, {'display': 'none'}
-        return {'display': 'none'}, {'display': 'block'}
-
-    @app.callback(
-        [Output('mp-plot-2-controls', 'style'),
-         Output('mp-graph-2-container', 'style')],
-        [Input('mp-show-plot-2', 'value')],
-    )
-    def _toggle_plot_2(show_plot_2):
-        if show_plot_2:
-            return {'display': 'block'}, {'display': 'block'}
-        return {'display': 'none'}, {'display': 'none'}
-
-    @app.callback(
-        [Output('mp-cols', 'options'),
-         Output('mp-cols', 'value')],
-        [Input('mp-plot-type', 'value'),
-         Input('mp-mode', 'value'),
-         Input('mp-period-single', 'value')],
-    )
-    def _update_cols(plot_type, mode, period_single):
-        ref = _ref_snapshot()
-        if mode == 'single' and period_single is not None and period_single in ts_inv:
-            ref = ts_inv[period_single]
-        opts, cols = _columns_for(plot_type, ref)
-        return opts, cols
-
-    @app.callback(
-        [Output('mp-cols-2', 'options'),
-         Output('mp-cols-2', 'value')],
-        [Input('mp-plot-type-2', 'value'),
-         Input('mp-mode', 'value'),
-         Input('mp-period-single', 'value')],
-    )
-    def _update_cols_2(plot_type_2, mode, period_single):
-        ref = _ref_snapshot()
-        if mode == 'single' and period_single is not None and period_single in ts_inv:
-            ref = ts_inv[period_single]
-        opts, cols = _columns_for(plot_type_2, ref)
-        return opts, cols
-
-    @app.callback(
-        [Output('mp-graph', 'figure'),
-         Output('mp-graph-2', 'figure')],
-        [Input('mp-mode', 'value'),
-         Input('mp-period-single', 'value'),
-         Input('mp-p1', 'value'),
-         Input('mp-p2', 'value'),
-         Input('mp-p3', 'value'),
-         Input('mp-plot-type', 'value'),
-         Input('mp-cols', 'value'),
-         Input('mp-show-plot-2', 'value'),
-         Input('mp-plot-type-2', 'value'),
-         Input('mp-cols-2', 'value'),
-         Input('mp-xmin', 'value'),
-         Input('mp-xmax', 'value'),
-         Input('mp-ymin', 'value'),
-         Input('mp-ymax', 'value')],
-    )
-    def _update_mp_fig(mode, ps, p1, p2, p3, plot_type, cols, show_plot_2, plot_type_2, cols_2, xmin, xmax, ymin, ymax):
-        cols = cols or []
-        cols_2 = cols_2 or []
-        x_limits = (xmin, xmax) if xmin is not None and xmax is not None else None
-        y_limits = (ymin, ymax) if ymin is not None and ymax is not None else None
-
-        if mode == 'single':
-            if ps is None or ps not in ts_inv:
-                fig = go.Figure()
-                fig.update_layout(title='Invalid period')
-                return fig, go.Figure()
-            snap = ts_inv[ps]
-            fig1 = plot_TS_res_from_ts(
-                snap['time_series_results'],
-                snap['S_base'],
-                plot_type,
-                cols,
-                x_limits=x_limits,
-                y_limits=y_limits,
-                show_title=True,
-                legend_prefix='',
-            )
-            if not show_plot_2:
-                return fig1, go.Figure()
-            fig2 = plot_TS_res_from_ts(
-                snap['time_series_results'],
-                snap['S_base'],
-                plot_type_2,
-                cols_2,
-                x_limits=x_limits,
-                y_limits=y_limits,
-                show_title=False,
-                legend_prefix='',
-            )
-            return fig1, fig2
-
+    def _build_compare_fig(plot_type, cols, p1, p2, p3, x_limits, y_limits):
         titles = []
         for p in (p1, p2, p3):
             if p == -1:
@@ -929,8 +1112,6 @@ def create_mp_ts_dash(ts_inv, grid_name='MP time series'):
                 legend_prefix='',
             )
             for tr in sub.data:
-                # In compare mode, each selected series is repeated per period column.
-                # Show each legend entry only once to avoid mixed/repeated legends.
                 tr.showlegend = tr.name not in shown_legends
                 shown_legends.add(tr.name)
                 fig.add_trace(tr, row=1, col=ci + 1)
@@ -944,76 +1125,263 @@ def create_mp_ts_dash(ts_inv, grid_name='MP time series'):
                 y=0.5,
                 showarrow=False,
             )
-        fig.update_layout(
-            height=520,
-            hovermode='x unified',
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            showlegend=True,
-            margin=dict(l=50, r=30, t=80, b=50),
-        )
+        fig.update_layout(height=520, showlegend=True)
+        _apply_fig_theme(fig, show_title=False)
         if x_limits is not None:
             for c in range(1, 4):
                 fig.update_xaxes(range=x_limits, row=1, col=c)
         if y_limits is not None:
             fig.update_yaxes(range=y_limits, row=1, col=1)
-        if not show_plot_2:
-            return fig, go.Figure()
+        return fig
 
-        # Second-row plot with a different TS type (same period columns).
-        fig2_titles = titles
-        fig2 = make_subplots(
-            rows=1,
-            cols=3,
-            subplot_titles=fig2_titles,
-            shared_yaxes=True,
+    app = dash.Dash(__name__)
+    _attach_app_css(app)
+    app.layout = html.Div([
+        dcc.Store(id='sidebar-open', data=True),
+        dcc.Store(id='plot-panels', data=[0]),
+        html.Div(id='sidebar', style=_sidebar_style(True), children=[
+            html.Div(
+                style={'display': 'flex', 'justifyContent': 'space-between',
+                       'alignItems': 'flex-start', 'gap': '8px', 'marginBottom': '12px'},
+                children=[
+                    html.H2(
+                        f'{grid_name} — TS by investment period',
+                        style={
+                            'color': _THEME['sidebar_text_top'],
+                            'fontSize': '18px',
+                            'margin': 0,
+                            'flex': 1,
+                        },
+                    ),
+                    html.Button(
+                        'Hide ✕',
+                        id='hide-sidebar',
+                        n_clicks=0,
+                        style=_remove_btn_style(),
+                    ),
+                ],
+            ),
+            html.Label('Mode', style=_label_style(on_dark=True)),
+            dcc.RadioItems(
+                id='mp-mode',
+                options=[
+                    {'label': ' Single period', 'value': 'single'},
+                    {'label': ' Compare three periods', 'value': 'compare'},
+                ],
+                value='single',
+                style={'marginBottom': '12px', 'color': _THEME['sidebar_text']},
+            ),
+            html.Div(id='mp-single-row', children=[
+                html.Label('Period', style=_label_style(on_dark=True)),
+                dcc.Dropdown(
+                    id='mp-period-single',
+                    options=period_opts,
+                    value=period_order[0],
+                    clearable=False,
+                    style={'marginBottom': '12px'},
+                ),
+            ]),
+            html.Div(id='mp-compare-row', style={'display': 'none'}, children=[
+                html.Label('Column 1', style=_label_style(on_dark=True)),
+                dcc.Dropdown(
+                    id='mp-p1', options=period_opts_skip, value=d1, clearable=False,
+                    style={'marginBottom': '8px'},
+                ),
+                html.Label('Column 2', style=_label_style(on_dark=True)),
+                dcc.Dropdown(
+                    id='mp-p2', options=period_opts_skip, value=d2, clearable=False,
+                    style={'marginBottom': '8px'},
+                ),
+                html.Label('Column 3', style=_label_style(on_dark=True)),
+                dcc.Dropdown(
+                    id='mp-p3', options=period_opts_skip, value=d3, clearable=False,
+                    style={'marginBottom': '12px'},
+                ),
+            ]),
+            html.Label('X-axis limits', style=_label_style(on_dark=True)),
+            html.Div(style={'display': 'flex', 'gap': '8px', 'marginBottom': '8px'}, children=[
+                dcc.Input(id='mp-xmin', type='number', placeholder='auto', style={'flex': 1}),
+                dcc.Input(id='mp-xmax', type='number', placeholder='auto', style={'flex': 1}),
+            ]),
+            html.Label('Y-axis limits (global fallback)', style=_label_style(on_dark=True)),
+            html.Div(style={'display': 'flex', 'gap': '8px', 'marginBottom': '8px'}, children=[
+                dcc.Input(id='mp-ymin', type='number', placeholder='auto', style={'flex': 1}),
+                dcc.Input(id='mp-ymax', type='number', placeholder='auto', style={'flex': 1}),
+            ]),
+            html.Label('Plot height (px)', style=_label_style(on_dark=True)),
+            dcc.Input(
+                id='plot-height',
+                type='number',
+                value=_DEFAULT_PLOT_HEIGHT,
+                min=200,
+                step=20,
+                style={'width': '100%', 'padding': '5px', 'marginBottom': '12px',
+                       'boxSizing': 'border-box'},
+            ),
+            html.Button('➕ Add plot', id='add-plot', n_clicks=0, style=_btn_style()),
+            html.Div(id='panel-controls'),
+        ]),
+        html.Div(id='content', style=_content_style(True), children=[
+            html.Button(
+                '☰ Hide options',
+                id='toggle-sidebar',
+                n_clicks=0,
+                style=_toggle_btn_style(),
+            ),
+            html.Div(id='panel-graphs'),
+        ]),
+    ])
+
+    @app.callback(
+        [Output('sidebar', 'style'),
+         Output('content', 'style'),
+         Output('sidebar-open', 'data'),
+         Output('toggle-sidebar', 'children')],
+        [Input('toggle-sidebar', 'n_clicks'),
+         Input('hide-sidebar', 'n_clicks')],
+        [State('sidebar-open', 'data')],
+    )
+    def _toggle_sidebar(n_toggle, n_hide, is_open):
+        try:
+            trig = ctx.triggered_id
+        except dash.exceptions.MissingCallbackContextException:
+            if (n_toggle or 0) > 0:
+                trig = 'toggle-sidebar'
+            elif (n_hide or 0) > 0:
+                trig = 'hide-sidebar'
+            else:
+                trig = None
+        if trig in ('toggle-sidebar', 'hide-sidebar'):
+            new_open = not bool(is_open)
+        else:
+            new_open = True if is_open is None else bool(is_open)
+        label = '☰ Show options' if not new_open else '☰ Hide options'
+        return _sidebar_style(new_open), _content_style(new_open), new_open, label
+
+    @app.callback(
+        [Output('mp-compare-row', 'style'),
+         Output('mp-single-row', 'style')],
+        [Input('mp-mode', 'value')],
+    )
+    def _toggle_mode(mode):
+        if mode == 'compare':
+            return {'display': 'block'}, {'display': 'none'}
+        return {'display': 'none'}, {'display': 'block'}
+
+    @app.callback(
+        Output('plot-panels', 'data'),
+        [Input('add-plot', 'n_clicks'),
+         Input({'type': 'plot-remove', 'index': ALL}, 'n_clicks')],
+        [State('plot-panels', 'data')],
+        prevent_initial_call=True,
+    )
+    def _manage_panels(add_clicks, remove_clicks, panels):
+        panels = list(panels or [0])
+        trig = ctx.triggered_id
+        if trig == 'add-plot':
+            next_id = (max(panels) + 1) if panels else 0
+            return panels + [next_id]
+        if isinstance(trig, dict) and trig.get('type') == 'plot-remove':
+            rid = trig['index']
+            remaining = [p for p in panels if p != rid]
+            return remaining if remaining else panels
+        return panels
+
+    @app.callback(
+        [Output('panel-controls', 'children'),
+         Output('panel-graphs', 'children')],
+        [Input('plot-panels', 'data')],
+    )
+    def _render_panels(panels):
+        panels = panels or [0]
+        defaults = [default_choice_1, default_choice_2]
+        ctrls, graphs = [], []
+        for pos, i in enumerate(panels):
+            dc = defaults[pos] if pos < len(defaults) else _MP_PLOT_CHOICES[0]
+            ctrls.append(_panel_control_card(i, dc, plot_dd_options))
+            graphs.append(_panel_graph_card(i))
+        return ctrls, graphs
+
+    @app.callback(
+        [Output({'type': 'plot-series', 'index': MATCH}, 'options'),
+         Output({'type': 'plot-series', 'index': MATCH}, 'value'),
+         Output({'type': 'plot-ymin', 'index': MATCH}, 'value'),
+         Output({'type': 'plot-ymax', 'index': MATCH}, 'value')],
+        [Input({'type': 'plot-choice', 'index': MATCH}, 'value'),
+         Input('mp-mode', 'value'),
+         Input('mp-period-single', 'value')],
+    )
+    def _panel_series(choice, mode, period_single):
+        ref = _ref_snapshot()
+        if mode == 'single' and period_single is not None and period_single in ts_inv:
+            ref = ts_inv[period_single]
+        opts, cols = _columns_for(choice, ref)
+        ymin, ymax = _auto_ylimits_snap(choice, ref)
+        return opts, cols, ymin, ymax
+
+    @app.callback(
+        [Output({'type': 'plot-graph', 'index': ALL}, 'figure'),
+         Output({'type': 'plot-graph', 'index': ALL}, 'style')],
+        [Input('mp-mode', 'value'),
+         Input('mp-period-single', 'value'),
+         Input('mp-p1', 'value'),
+         Input('mp-p2', 'value'),
+         Input('mp-p3', 'value'),
+         Input({'type': 'plot-choice', 'index': ALL}, 'value'),
+         Input({'type': 'plot-series', 'index': ALL}, 'value'),
+         Input({'type': 'plot-ymin', 'index': ALL}, 'value'),
+         Input({'type': 'plot-ymax', 'index': ALL}, 'value'),
+         Input('mp-xmin', 'value'),
+         Input('mp-xmax', 'value'),
+         Input('mp-ymin', 'value'),
+         Input('mp-ymax', 'value'),
+         Input('plot-height', 'value')],
+    )
+    def _draw(mode, ps, p1, p2, p3, choices, series_list, ymins, ymaxs, xmin, xmax, gmin, gmax, plot_height):
+        choices = choices or []
+        series_list = series_list or []
+        ymins = ymins or []
+        ymaxs = ymaxs or []
+        x_limits = (xmin, xmax) if xmin is not None and xmax is not None else None
+        global_y = (gmin, gmax) if gmin is not None and gmax is not None else None
+        height = _normalize_plot_height(
+            plot_height if plot_height is not None else _DEFAULT_PLOT_HEIGHT
         )
-        any_trace2 = False
-        shown_legends2 = set()
-        for ci, p in enumerate((p1, p2, p3)):
-            if p == -1 or p not in ts_inv:
-                continue
-            snap = ts_inv[p]
-            sub2 = plot_TS_res_from_ts(
-                snap['time_series_results'],
-                snap['S_base'],
-                plot_type_2,
-                cols_2,
-                x_limits=x_limits,
-                y_limits=y_limits,
-                show_title=False,
-                legend_prefix='',
-            )
-            for tr in sub2.data:
-                tr.showlegend = tr.name not in shown_legends2
-                shown_legends2.add(tr.name)
-                fig2.add_trace(tr, row=1, col=ci + 1)
-                any_trace2 = True
 
-        if not any_trace2:
-            fig2.add_annotation(
-                text='Select at least one period column',
-                xref='paper',
-                yref='paper',
-                x=0.5,
-                y=0.5,
-                showarrow=False,
-            )
-        fig2.update_layout(
-            height=520,
-            hovermode='x unified',
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            showlegend=True,
-            margin=dict(l=50, r=30, t=80, b=50),
-        )
-        if x_limits is not None:
-            for c in range(1, 4):
-                fig2.update_xaxes(range=x_limits, row=1, col=c)
-        if y_limits is not None:
-            fig2.update_yaxes(range=y_limits, row=1, col=1)
+        figs = []
+        styles = []
+        for choice, cols, ymin, ymax in zip(choices, series_list, ymins, ymaxs):
+            cols = cols or []
+            if ymin is not None and ymax is not None:
+                y_limits = (ymin, ymax)
+            else:
+                y_limits = global_y
 
-        return fig, fig2
+            if mode == 'single':
+                if ps is None or ps not in ts_inv:
+                    fig = go.Figure()
+                    fig.update_layout(title='Invalid period')
+                    figs.append(_apply_plot_height(_apply_fig_theme(fig), height))
+                else:
+                    snap = ts_inv[ps]
+                    fig = plot_TS_res_from_ts(
+                        snap['time_series_results'],
+                        snap['S_base'],
+                        choice,
+                        cols,
+                        x_limits=x_limits,
+                        y_limits=y_limits,
+                        show_title=True,
+                        legend_prefix='',
+                    )
+                    figs.append(_apply_plot_height(fig, height))
+            else:
+                figs.append(_apply_plot_height(
+                    _build_compare_fig(choice, cols, p1, p2, p3, x_limits, y_limits),
+                    height,
+                ))
+            styles.append(_graph_style(height))
+        return figs, styles
 
     return app
 
@@ -1021,6 +1389,3 @@ def create_mp_ts_dash(ts_inv, grid_name='MP time series'):
 def run_mp_ts_dash(ts_inv, grid_name='MP time series', debug=True, use_reloader=False):
     app = create_mp_ts_dash(ts_inv, grid_name=grid_name)
     app.run(debug=debug, use_reloader=use_reloader)
-
-
-

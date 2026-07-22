@@ -163,8 +163,7 @@ def test_storage_window_reporting():
     soc_df, summary_df = res.storage_window(print_table=False)
 
     assert "Storage_window_soc" in res.tables
-    assert "Storage_window_P_charge" in res.tables
-    assert "Storage_window_P_discharge" in res.tables
+    assert "Storage_window_power" in res.tables
     assert len(soc_df) == 5
     assert len(summary_df) == 2
 

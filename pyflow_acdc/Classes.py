@@ -3949,7 +3949,8 @@ class Ren_source_zone:
     def PRGi_available(self, value):
         self._PRGi_available = value
         for ren_source in self.RenSources:
-                ren_source.PRGi_available=value
+            if ren_source.PGRi_linked:
+                ren_source.PRGi_available = value
                 ren_source.Ren_source_zone = self.name
 
     def __init__(self,name=None):

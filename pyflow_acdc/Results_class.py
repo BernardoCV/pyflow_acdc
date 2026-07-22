@@ -1417,17 +1417,15 @@ class Results:
 
         results = self.Grid.window_opf_results
         soc_df = results['storage_soc'].copy()
-        pc_df = results['storage_P_charge'].copy()
-        pd_df = results['storage_P_discharge'].copy()
+        p_df = results['storage_power'].copy()
         summary_df = results['storage_summary'].copy()
 
-        for df in (soc_df, pc_df, pd_df, summary_df):
+        for df in (soc_df, p_df, summary_df):
             numeric_cols = df.select_dtypes(include='number').columns
             df[numeric_cols] = df[numeric_cols].round(self.dec)
 
         self.tables["Storage_window_soc"] = soc_df
-        self.tables["Storage_window_P_charge"] = pc_df
-        self.tables["Storage_window_P_discharge"] = pd_df
+        self.tables["Storage_window_power"] = p_df
         self.tables["Storage_window_summary"] = summary_df
 
         if print_table:
@@ -1435,11 +1433,8 @@ class Results:
             print('BESS window SoC trajectory (pu, by frame)')
             print(soc_df.to_string(index=False))
             print('--------------')
-            print('BESS window P charge (MW, by frame)')
-            print(pc_df.to_string(index=False))
-            print('--------------')
-            print('BESS window P discharge (MW, by frame)')
-            print(pd_df.to_string(index=False))
+            print('BESS window P (MW, discharge − charge, by frame)')
+            print(p_df.to_string(index=False))
             print('--------------')
             print('BESS window energy summary')
             print(summary_df.to_string(index=False))
