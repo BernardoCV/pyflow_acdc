@@ -7,7 +7,9 @@ literalinclude / interactive use only.
 
 from pathlib import Path
 
-from pyflow_tests._bess_h2_pei_data import PEI_SEASONS, build_pei_bess_h2_grid
+import pyflow_acdc as pyf
+
+from pyflow_acdc.example_grids.PF._pei_bess_data import PEI_SEASONS
 from pyflow_tests._test_solver_deps import (
     dash_missing_for_run_test,
     require_dash,
@@ -32,7 +34,13 @@ def run_test():
     if not EXAMPLE.is_file():
         raise FileNotFoundError(f"Missing window OPF doc example: {EXAMPLE}")
     for season in PEI_SEASONS:
-        build_pei_bess_h2_grid(seasons=(season,))
+        pyf.cases["PEI_grid"](
+            include_countries=["GB", "DK"],
+            storage=True,
+            hydrogen=True,
+            data="season_comparison",
+            seasons=(season,),
+        )
     print("OK window_opf doc smoke passed")
 
 

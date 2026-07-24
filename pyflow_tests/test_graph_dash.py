@@ -292,6 +292,10 @@ def test_run_dash_routing_errors():
     with pytest.raises(ValueError, match="dash_mode=window"):
         run_dash(grid)
 
+    grid.dash_mode = "rolling"
+    with pytest.raises(ValueError, match="dash_mode=rolling"):
+        run_dash(grid)
+
 
 def _grid_with_window_results():
     grid = pyf.Grid(S_base=100)
@@ -366,6 +370,32 @@ def test_create_window_dash_app_layout_and_plot():
 
     with pytest.raises(ValueError, match="window_opf"):
         create_window_dash_app(pyf.Grid(S_base=100))
+
+
+def test_rolling_window_dash_controls_and_frame_limits():
+    from pyflow_acdc.Graph_Dash import (
+        _rolling_frame_limits,
+        create_rolling_dash_app,
+    )
+
+    info = {
+        "window_size": 24,
+        "n_windows": 3,
+        "commits": [(0, 23), (24, 47), (48, 71)],
+    }
+    assert _rolling_frame_limits(info, 1, 3) is None
+    assert _rolling_frame_limits(info, 1, 1) == (0, 23)
+    assert _rolling_frame_limits(info, 2, 1) == (24, 47)
+    assert _rolling_frame_limits(info, 2, 2) == (24, 71)
+
+    grid = _grid_with_window_results()
+    grid.rolling_window_opf_run = True
+    grid.rolling_window_info = info
+    app = create_rolling_dash_app(grid)
+    assert app.layout is not None
+
+    with pytest.raises(ValueError, match="rolling"):
+        create_rolling_dash_app(pyf.Grid(S_base=100))
 
 
 def _synthetic_window_opf_results(*, ren, gen, h2, bess, soc=None, h2_mass=None, gen_price=None):

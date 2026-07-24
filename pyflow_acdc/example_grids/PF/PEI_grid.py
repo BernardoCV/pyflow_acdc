@@ -5,12 +5,48 @@ import pandas as pd
 from shapely.geometry import Point, LineString
 
 from pyflow_acdc.constants import ConverterDCType, NodeType, Polarity
+from pyflow_acdc.example_grids.PF import _pei_bess_data as pei_data
 
 
-def PEI_grid(include_countries: list[str] = None):    
+def PEI_grid(
+    include_countries: list[str] = None,
+    *,
+    storage: bool = False,
+    hydrogen: bool = False,
+    data: str | None = None,
+    seasons=None,
+    attach_wind: bool = True,
+    attach_export_prices: bool = True,
+    ts_start=None,
+    ts_end=None,
+):
+    """Princess Elisabeth Island case.
+
+    Parameters
+    ----------
+    include_countries : list of str, optional
+        ``GB`` (Nautilus) and/or ``DK`` (Triton). Default empty (Belgium only).
+    storage : bool, optional
+        Add Table-1 BESS on ``PE_Island``.
+    hydrogen : bool, optional
+        Add hub electrolyser (``H2_MASS_MAX_KG`` / ``H2_MASS_FINAL_KG``).
+    data : {None, 'season_comparison', 'full'}, optional
+        Attach wind + export ``b_CG`` time series from seasonal folders or
+        ``Full_data`` (sets ``grid.ts_timestamps`` for ``full``).
+    seasons : str or sequence of str, optional
+        Seasonal windows when ``data='season_comparison'`` (default Autumn).
+    attach_wind, attach_export_prices : bool, optional
+        When ``data`` is set, toggle which series to attach (default both).
+    ts_start, ts_end : optional
+        UTC bounds ``[ts_start, ts_end)`` when ``data='full'``.
+    """
     "Inlcude country can be either GB for nautilus link and/or DK for triton Link"
     if include_countries is None:
         include_countries = []
+    if data is not None and data not in pei_data.PEI_DATA_MODES:
+        raise ValueError(
+            f"data must be None or one of {pei_data.PEI_DATA_MODES}, got {data!r}"
+        )
     # Converter parameters (OPF_ACDC_Energy_Islands.py, pu on grid S_base)
     _CONV_T_R = 0.0015
     _CONV_T_X = 0.1121
@@ -664,6 +700,50 @@ def PEI_grid(include_countries: list[str] = None):
         grid.update_graph_dc()
         grid.update_p_dc()
         grid.create_Ybus_DC()
+
+    # --- Optional BESS / H₂ / time series (see _pei_bess_data) ---
+    if data == pei_data.DATA_SEASON_COMPARISON:
+        seasons = pei_data.normalize_pei_seasons(seasons)
+        if attach_export_prices:
+            pei_data.attach_pei_export_prices(grid, seasons=seasons)
+        if attach_wind:
+            pei_data.attach_pei_wind_time_series(grid, seasons=seasons)
+    elif data == pei_data.DATA_FULL:
+        if attach_export_prices or attach_wind:
+            if not (attach_export_prices and attach_wind):
+                raise ValueError(
+                    "data='full' requires attach_wind=True and attach_export_prices=True"
+                )
+            pei_data.attach_pei_full_time_series(
+                grid, ts_start=ts_start, ts_end=ts_end
+            )
+
+    if storage:
+        pyf.add_storage(
+            grid,
+            pei_data.HUB_NODE,
+            E_max_MWh=pei_data.BESS_E_MAX_MWH,
+            P_charge_MW=pei_data.BESS_P_NOM_MW,
+            P_discharge_MW=pei_data.BESS_P_NOM_MW,
+            eta_charge=pei_data.BESS_ETA_C,
+            eta_discharge=pei_data.BESS_ETA_D,
+            soc_min=pei_data.BESS_SOC_MIN,
+            soc_max=pei_data.BESS_SOC_MAX,
+            soc_initial=pei_data.BESS_SOC_INITIAL,
+            soc_final=pei_data.BESS_SOC_FINAL,
+        )
+    if hydrogen:
+        pyf.add_electrolyser(
+            grid,
+            pei_data.HUB_NODE,
+            P_max_MW=pei_data.H2_P_MAX_MW,
+            P_min_MW=pei_data.H2_P_MIN_MW,
+            b_h=pei_data.H2_B_H,
+            c_h=pei_data.H2_C_H,
+            H2_mass_max_kg=pei_data.H2_MASS_MAX_KG,
+            H2_mass_initial_kg=0.0,
+            H2_mass_final_kg=pei_data.H2_MASS_FINAL_KG,
+        )
 
     return grid, res
 

@@ -1518,6 +1518,8 @@ def _migrate_legacy_grid_attrs(grid):
         grid.storage_elements = []
     if not hasattr(grid, 'electrolysers'):
         grid.electrolysers = []
+    if not hasattr(grid, 'ts_timestamps'):
+        grid.ts_timestamps = None
     for node in grid.nodes_AC + grid.nodes_DC:
         if not hasattr(node, 'connected_storage'):
             node.connected_storage = []

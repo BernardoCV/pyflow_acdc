@@ -27,6 +27,11 @@ Elements attach to any **AC** or **DC** bus
 - On **DC**, ``Q`` is fixed at zero.
 - Inventory ``mass_H2`` is in **kg** (``H2_mass_max``, ``H2_mass_initial``,
   optional ``H2_mass_final`` for window OPF only).
+- ``h2_price`` (EUR/kg, default ``0``), static or ``TSType.H2_PRICE`` series:
+  with ``ObjRule={'H2_sale': 1, ...}`` a zero price contributes nothing. Mass
+  target and sale can be used separately or together.
+- Rolling horizons: :func:`~pyflow_acdc.rolling_window_nl_opf` (1-based
+  ``start``/``end`` like ``ts_acdc_opf``).
 
 Linear production each hour:
 

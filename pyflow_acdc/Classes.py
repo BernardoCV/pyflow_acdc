@@ -252,6 +252,9 @@ class Grid:
 
         self.Time_series = []
         self.Time_series_dic ={}
+        # Optional calendar axis aligned 1:1 with Time_series frame indices
+        # (length == len(Time_series[0].data) when set). Used by rolling / Dash.
+        self.ts_timestamps = None
 
         self.Price_Zones =[]
         self.Price_Zones_dic ={}
@@ -294,6 +297,7 @@ class Grid:
         self.Seq_STEP_run = False
         self.Seq_MS_STEP_run = False
         self.window_opf_run = False
+        self.rolling_window_opf_run = False
 
     @property
     def nodes_AC(self):
@@ -1697,6 +1701,7 @@ class Electrolyser:
         H2_mass_max: float,
         H2_mass_initial: float = 0.0,
         H2_mass_final=None,
+        h2_price: float = 0.0,
         Q_min: float = 0.0,
         Q_max: float = 0.0,
         S_base: float = 100,
@@ -1714,6 +1719,8 @@ class Electrolyser:
             raise ValueError("H2_mass_initial must lie within [0, H2_mass_max]")
         if H2_mass_final is not None and not (0 <= H2_mass_final <= H2_mass_max):
             raise ValueError("H2_mass_final must lie within [0, H2_mass_max]")
+        if h2_price < 0:
+            raise ValueError("h2_price must be >= 0")
         if connected == AcDcSide.AC and Q_min > Q_max:
             raise ValueError("Q_min must be <= Q_max")
         if dt_hours <= 0:
@@ -1751,7 +1758,9 @@ class Electrolyser:
         self.H2_mass_max = float(H2_mass_max)
         self.H2_mass_initial = float(H2_mass_initial)
         self.H2_mass_final = H2_mass_final
+        self.h2_price = float(h2_price)
         self.dt_hours = dt_hours
+        self.TS_dict = {'h2_price': None}
 
         self.P_electrolyser = 0.0
         self.mass_H2 = H2_mass_initial

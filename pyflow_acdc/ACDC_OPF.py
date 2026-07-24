@@ -484,6 +484,22 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
         if weights_def[ObjComponent.GEN_SET_DEV]['w']==0:
             return 0
         return sum((model.PGi_gen[gen.genNumber]-gen.Pset*gen.np_gen)**2 for gen in grid.Generators)
+
+    def formula_H2_sale():
+        if weights_def[ObjComponent.H2_SALE]['w'] == 0:
+            return 0
+        if not grid.H2:
+            raise ValueError("H2_sale weight > 0 requires grid.H2 / electrolysers")
+        # Minimise -price·Δm  ≡  maximise H₂ sale revenue (EUR for Δm in kg).
+        # h2_price defaults to 0 → term is zero until set or driven by H2_PRICE TS.
+        return sum(
+            -float(el.h2_price) * (
+                el.b_h * model.P_electrolyser[el.electrolyserNumber] * el.S_base * el.dt_hours
+                + el.c_h
+            )
+            for el in grid.electrolysers
+        )
+
     s=1
     for key, entry in weights_def.items():
         if key == ObjComponent.EXT_GEN:
@@ -508,6 +524,8 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
             entry['f']  =formula_Offshoreprofit()
         elif key == ObjComponent.GEN_SET_DEV:
             entry['f']  =formula_Gen_set_dev()
+        elif key == ObjComponent.H2_SALE:
+            entry['f'] = formula_H2_sale()
 
     s=1
     total_weight = sum(entry['w'] for entry in weights_def.values())
@@ -1017,6 +1035,15 @@ def calculate_objective(grid,obj,OnlyGen=True):
 
     if obj==ObjComponent.GEN_SET_DEV:
         return sum((gen.PGen-gen.Pset*gen.np_gen)**2 for gen in grid.Generators)
+
+    if obj == ObjComponent.H2_SALE:
+        if not grid.H2:
+            return 0
+        total = 0.0
+        for el in grid.electrolysers:
+            h_prod = el.b_h * el.P_electrolyser * el.S_base * el.dt_hours + el.c_h
+            total += -float(el.h2_price) * h_prod
+        return total
 
     return 0
 

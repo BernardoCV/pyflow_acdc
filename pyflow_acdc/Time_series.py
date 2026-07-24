@@ -249,6 +249,17 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
         if rs:
             rs.PRGi_available = ts_data[idx]
 
+    elif typ == TSType.H2_PRICE:
+        if not hasattr(grid, 'electrolysers_dict'):
+            grid.electrolysers_dict = {el.name: el for el in grid.electrolysers}
+        el = grid.electrolysers_dict.get(ts.element_name, None)
+        if el is None:
+            raise ValueError(
+                f"H2_PRICE time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
+            )
+        el.h2_price = ts_data[idx]
+
 def _update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
     for node in grid.nodes_AC:

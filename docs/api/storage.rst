@@ -4,6 +4,7 @@ Battery energy storage
 :class:`~pyflow_acdc.Storage` and :func:`~pyflow_acdc.add_storage` attach
 operation-only BESS elements to AC or DC buses. Nonlinear OPF constraints and
 coupled multi-hour runs use :func:`~pyflow_acdc.window_nl_opf`.
+Long series: :func:`~pyflow_acdc.rolling_window_nl_opf`.
 
 User guide: :doc:`../usage_storage`.
 
@@ -18,6 +19,10 @@ Add storage
 -----------
 
 .. autofunction:: pyflow_acdc.add_storage
+
+.. autofunction:: pyflow_acdc.window_nl_opf
+
+.. autofunction:: pyflow_acdc.rolling_window_nl_opf
 
 Modelling note
 --------------

@@ -22,11 +22,13 @@ __all__ = [
     'run_dash',
     'run_ts_dash',
     'run_window_dash',
+    'run_rolling_dash',
     'run_season_compare_dash',
     'run_mp_ts_dash',
     'create_mp_ts_dash',
     'create_dash_app',
     'create_window_dash_app',
+    'create_rolling_dash_app',
     'create_season_compare_dash_app',
     'build_season_window_compare',
     'attach_season_window_compare',
@@ -151,6 +153,7 @@ _FAMILY_SPECS = {
         'zone_agg': 'pz',
         'reduce': 'price',
         'kind': 'gen',
+        'allow_total': False,
     },
     'Storage': {
         'key': 'storage_power',
@@ -755,6 +758,7 @@ def available_family_aggregations(grid, family, window_opf_results=None, source=
     if family not in _FAMILY_SPECS:
         raise ValueError(f"Unknown family {family!r}")
     spec = _FAMILY_SPECS[family]
+    allow_total = spec.get('allow_total', True)
     if spec.get('kind') == 'power':
         if window_opf_results is None:
             return [spec['entity_agg']]
@@ -762,7 +766,9 @@ def available_family_aggregations(grid, family, window_opf_results=None, source=
         if df is None or df.empty:
             return []
         return [spec['entity_agg']]
-    ordered = [spec['entity_agg'], spec['node_agg'], spec['zone_agg'], 'total']
+    ordered = [spec['entity_agg'], spec['node_agg'], spec['zone_agg']]
+    if allow_total:
+        ordered.append('total')
     if window_opf_results is None:
         return ordered
     df = _family_result_df(window_opf_results, grid, family, source, s_base=s_base)
@@ -772,15 +778,16 @@ def available_family_aggregations(grid, family, window_opf_results=None, source=
         r for r in _family_entity_records(grid, family) if r['name'] in df.columns
     ]
     if not records:
-        # Results columns with no topology match: entity + total only.
-        return [spec['entity_agg'], 'total']
+        # Results columns with no topology match: entity (+ total when allowed).
+        return [spec['entity_agg'], 'total'] if allow_total else [spec['entity_agg']]
     out = [spec['entity_agg']]
     if any(r['node'] for r in records):
         out.append(spec['node_agg'])
     zone_field = 'zone' if spec['zone_agg'] == 'zone' else 'pz'
     if any(r.get(zone_field) for r in records):
         out.append(spec['zone_agg'])
-    out.append('total')
+    if allow_total:
+        out.append('total')
     return out
 
 
@@ -1248,6 +1255,43 @@ def _window_opf_usable(grid):
         and isinstance(getattr(grid, 'window_opf_results', None), dict)
         and bool(grid.window_opf_results)
     )
+
+
+def _rolling_opf_usable(grid):
+    info = getattr(grid, 'rolling_window_info', None)
+    return (
+        bool(getattr(grid, 'rolling_window_opf_run', False))
+        and isinstance(getattr(grid, 'window_opf_results', None), dict)
+        and bool(grid.window_opf_results)
+        and isinstance(info, dict)
+        and bool(info.get('commits'))
+    )
+
+
+def _rolling_frame_limits(rolling_info, start_window, visible_windows):
+    """Map 1-based start window + count → absolute frame ``(xmin, xmax)`` or ``None`` (all)."""
+    if not rolling_info:
+        raise ValueError('rolling_info is required')
+    commits = list(rolling_info.get('commits') or [])
+    n = len(commits)
+    if n == 0:
+        raise ValueError('rolling_info.commits is empty')
+    n_all = int(rolling_info.get('n_windows', n))
+    if start_window is None:
+        raise ValueError('start_window is required')
+    if visible_windows is None:
+        raise ValueError('visible_windows is required')
+    start = int(start_window)
+    visible = int(visible_windows)
+    if start < 1:
+        raise ValueError(f'start_window must be >= 1, got {start}')
+    if visible < 1:
+        raise ValueError(f'visible_windows must be >= 1, got {visible}')
+    i0 = min(max(start - 1, 0), n - 1)
+    i1 = min(i0 + visible - 1, n - 1)
+    if i0 == 0 and i1 == n - 1:
+        return None
+    return (commits[i0][0], commits[i1][1])
 
 
 def _available_window_plot_choices(grid):
@@ -2111,6 +2155,357 @@ def create_window_dash_app(grid):
     )
 
 
+def _rolling_default_family(families):
+    if not families:
+        raise ValueError('No plottable families in rolling window_opf_results')
+    if 'SoC' in families:
+        return 'SoC'
+    if 'Storage' in families:
+        return 'Storage'
+    return families[0]
+
+
+def _rolling_family_defaults(grid, results, family):
+    aggs = available_family_aggregations(grid, family, results, source='window')
+    if not aggs:
+        raise ValueError(f'No aggregations for family {family!r}')
+    agg = 'total' if 'total' in aggs else aggs[0]
+    el_opts = family_element_options(grid, results, family, agg, source='window')
+    el_vals = _default_element_selection(el_opts, agg)
+    df, _ = resolve_family_df(results, grid, family, agg, source='window')
+    ymin, ymax = _family_auto_ylimits(df, family)
+    return aggs, agg, el_opts, el_vals, ymin, ymax
+
+
+def _rolling_panel_card(i, *, families, family, aggs, agg, el_opts, el_vals, ymin, ymax):
+    return html.Div(style=_sidebar_panel_card_style(), children=[
+        html.Div(
+            style={'display': 'flex', 'justifyContent': 'space-between',
+                   'alignItems': 'center', 'marginBottom': '10px'},
+            children=[
+                html.Span(f'Plot {i + 1}', style={
+                    'fontWeight': '700', 'color': _THEME['sidebar_text_top'],
+                }),
+                html.Button(
+                    '✕',
+                    id={'type': 'roll-plot-remove', 'index': i},
+                    n_clicks=0,
+                    style=_remove_btn_style(),
+                ),
+            ],
+        ),
+        html.Label('Family', style=_label_style(on_dark=True)),
+        dcc.Dropdown(
+            id={'type': 'roll-plot-family', 'index': i},
+            options=[{'label': f, 'value': f} for f in families],
+            value=family,
+            clearable=False,
+            style={'marginBottom': '10px'},
+        ),
+        html.Label('Aggregation', style=_label_style(on_dark=True)),
+        dcc.Dropdown(
+            id={'type': 'roll-plot-agg', 'index': i},
+            options=[{'label': a, 'value': a} for a in aggs],
+            value=agg,
+            clearable=False,
+            style={'marginBottom': '10px'},
+        ),
+        html.Label('Elements', style=_label_style(on_dark=True)),
+        dcc.Checklist(
+            id={'type': 'roll-plot-elements', 'index': i},
+            options=[{'label': e, 'value': e} for e in el_opts],
+            value=list(el_vals),
+            style={'marginBottom': '10px', 'color': _THEME['sidebar_text']},
+        ),
+        html.Label('Y-axis limits', style=_label_style(on_dark=True)),
+        html.Div(style={'display': 'flex', 'gap': '8px'}, children=[
+            dcc.Input(
+                id={'type': 'roll-plot-ymin', 'index': i},
+                type='number', value=ymin, placeholder='Min',
+                style={'flex': 1, 'padding': '5px'},
+            ),
+            dcc.Input(
+                id={'type': 'roll-plot-ymax', 'index': i},
+                type='number', value=ymax, placeholder='Max',
+                style={'flex': 1, 'padding': '5px'},
+            ),
+        ]),
+    ])
+
+
+def _rolling_graph_card(i, figure, height=None):
+    return html.Div(
+        style=_card_style(
+            backgroundColor='white',
+            borderLeft=f"3px solid {_THEME['accent']}",
+        ),
+        children=[
+            dcc.Loading(
+                type='dot',
+                color=_THEME['accent'],
+                children=dcc.Graph(
+                    id={'type': 'roll-plot-graph', 'index': i},
+                    figure=figure,
+                    style=_graph_style(height),
+                    responsive=True,
+                    config={'displaylogo': False},
+                ),
+            ),
+        ],
+    )
+
+
+def create_rolling_dash_app(grid):
+    """Dash app for rolling-window OPF results (``grid.window_opf_results``).
+
+    Sidebar uses commit-window start / visible count instead of raw frame limits.
+    Self-contained — does not modify the shared window/season Dash builder.
+    """
+    if not _rolling_opf_usable(grid):
+        raise ValueError(
+            "create_rolling_dash_app requires grid.rolling_window_opf_run, "
+            "grid.window_opf_results, and grid.rolling_window_info['commits']"
+        )
+    results = grid.window_opf_results
+    info = grid.rolling_window_info
+    families = available_dash_families(grid, results, source='window')
+    if not families:
+        raise ValueError('rolling window_opf_results has no plottable families')
+    n_win = int(info['n_windows'])
+    default_family = _rolling_default_family(families)
+    aggs0, agg0, el_opts0, el_vals0, ymin0, ymax0 = _rolling_family_defaults(
+        grid, results, default_family
+    )
+    fig0 = plot_window_family_dash(
+        grid, default_family, agg0, el_vals0 or [],
+        results=results, source='window', x_axis_label='Frame',
+    )
+    fig0 = _apply_plot_height(fig0, _DEFAULT_PLOT_HEIGHT)
+
+    app = dash.Dash(__name__, suppress_callback_exceptions=True)
+    _attach_app_css(app)
+    title = getattr(grid, 'name', None) or 'grid'
+
+    init_ctrl = _rolling_panel_card(
+        0,
+        families=families,
+        family=default_family,
+        aggs=aggs0,
+        agg=agg0,
+        el_opts=el_opts0,
+        el_vals=el_vals0,
+        ymin=ymin0,
+        ymax=ymax0,
+    )
+    init_graph = _rolling_graph_card(0, fig0)
+
+    app.layout = html.Div([
+        dcc.Store(id='sidebar-open', data=True),
+        dcc.Store(id='roll-plot-panels', data=[0]),
+        html.Div(id='sidebar', style=_sidebar_style(True), children=[
+            _sidebar_header(app, title, subtitle='Rolling Window OPF'),
+            html.Div(id='global-controls', children=[
+                html.Label(
+                    f'From window (1–{n_win})',
+                    style=_label_style(on_dark=True),
+                ),
+                dcc.Input(
+                    id='roll-start-window',
+                    type='number',
+                    value=1,
+                    min=1,
+                    max=n_win,
+                    step=1,
+                    style={'width': '100%', 'padding': '5px', 'marginBottom': '12px',
+                           'boxSizing': 'border-box'},
+                ),
+                html.Label(
+                    f'Windows visible (default {n_win} = all)',
+                    style=_label_style(on_dark=True),
+                ),
+                dcc.Input(
+                    id='roll-visible-windows',
+                    type='number',
+                    value=n_win,
+                    min=1,
+                    max=n_win,
+                    step=1,
+                    style={'width': '100%', 'padding': '5px', 'marginBottom': '12px',
+                           'boxSizing': 'border-box'},
+                ),
+                html.Label('Plot height (px)', style=_label_style(on_dark=True)),
+                dcc.Input(
+                    id='roll-plot-height',
+                    type='number',
+                    value=_DEFAULT_PLOT_HEIGHT,
+                    min=200,
+                    step=20,
+                    style={'width': '100%', 'padding': '5px', 'marginBottom': '12px',
+                           'boxSizing': 'border-box'},
+                ),
+            ]),
+            html.Button('➕ Add plot', id='roll-add-plot', n_clicks=0, style=_btn_style()),
+            html.Div(id='roll-panel-controls', children=[init_ctrl]),
+        ]),
+        html.Div(id='content', style=_content_style(True), children=[
+            html.Div(
+                style={
+                    'position': 'sticky', 'top': 0, 'zIndex': 5,
+                    'display': 'flex', 'alignItems': 'center', 'gap': '12px',
+                    'justifyContent': 'space-between',
+                    'backgroundColor': _THEME['bg_secondary'],
+                    'borderBottom': f"1px solid {_THEME['border']}",
+                    'padding': '10px 4px 12px 4px', 'marginBottom': '16px',
+                },
+                children=[
+                    html.Div('Rolling Window OPF dashboard', style={
+                        'flex': 1, 'fontFamily': _FONT_STACK, 'fontSize': '15px',
+                        'fontWeight': '600', 'color': _THEME['text_primary'],
+                        'alignSelf': 'center',
+                    }),
+                    html.Button(
+                        '☰ Hide options', id='toggle-sidebar', n_clicks=0,
+                        style=_toggle_btn_style(),
+                    ),
+                ],
+            ),
+            html.Div(id='roll-panel-graphs', children=[init_graph]),
+        ]),
+    ])
+
+    # Rolling app has its own hide button id conflict with shared helper —
+    # register sidebar toggle with the same ids used above.
+    _register_sidebar_toggle(app)
+
+    @app.callback(
+        Output('roll-plot-panels', 'data'),
+        [Input('roll-add-plot', 'n_clicks'),
+         Input({'type': 'roll-plot-remove', 'index': ALL}, 'n_clicks')],
+        [State('roll-plot-panels', 'data')],
+        prevent_initial_call=True,
+    )
+    def _manage_roll_panels(add_clicks, remove_clicks, panels):
+        panels = list(panels or [0])
+        trig = ctx.triggered_id
+        if trig == 'roll-add-plot':
+            next_id = (max(panels) + 1) if panels else 0
+            return panels + [next_id]
+        if isinstance(trig, dict) and trig.get('type') == 'roll-plot-remove':
+            rid = trig['index']
+            remaining = [p for p in panels if p != rid]
+            return remaining if remaining else panels
+        return panels
+
+    def _build_panels(panels):
+        panels = panels or [0]
+        ctrls, graphs = [], []
+        for pos, i in enumerate(panels):
+            fam = default_family
+            if pos == 1 and len(families) > 1:
+                fam = families[1] if families[1] != fam else fam
+            aggs, agg, el_opts, el_vals, ymin, ymax = _rolling_family_defaults(
+                grid, results, fam
+            )
+            ctrls.append(_rolling_panel_card(
+                i, families=families, family=fam, aggs=aggs, agg=agg,
+                el_opts=el_opts, el_vals=el_vals, ymin=ymin, ymax=ymax,
+            ))
+            fig = plot_window_family_dash(
+                grid, fam, agg, el_vals or [],
+                results=results, source='window', x_axis_label='Frame',
+            )
+            graphs.append(_rolling_graph_card(
+                i, _apply_plot_height(fig, _DEFAULT_PLOT_HEIGHT)
+            ))
+        return ctrls, graphs
+
+    @app.callback(
+        [Output('roll-panel-controls', 'children'),
+         Output('roll-panel-graphs', 'children')],
+        [Input('roll-plot-panels', 'data')],
+    )
+    def _render_roll_panels(panels):
+        return _build_panels(panels)
+
+    @app.callback(
+        [Output({'type': 'roll-plot-agg', 'index': MATCH}, 'options'),
+         Output({'type': 'roll-plot-agg', 'index': MATCH}, 'value')],
+        [Input({'type': 'roll-plot-family', 'index': MATCH}, 'value')],
+    )
+    def _roll_family_aggs(family):
+        if not family:
+            raise ValueError('roll-plot-family is required')
+        aggs = available_family_aggregations(grid, family, results, source='window')
+        if not aggs:
+            raise ValueError(f'No aggregations for family {family!r}')
+        default = 'total' if 'total' in aggs else aggs[0]
+        return [{'label': a, 'value': a} for a in aggs], default
+
+    @app.callback(
+        [Output({'type': 'roll-plot-elements', 'index': MATCH}, 'options'),
+         Output({'type': 'roll-plot-elements', 'index': MATCH}, 'value'),
+         Output({'type': 'roll-plot-ymin', 'index': MATCH}, 'value'),
+         Output({'type': 'roll-plot-ymax', 'index': MATCH}, 'value')],
+        [Input({'type': 'roll-plot-family', 'index': MATCH}, 'value'),
+         Input({'type': 'roll-plot-agg', 'index': MATCH}, 'value')],
+    )
+    def _roll_family_series(family, aggregation):
+        if not family or not aggregation:
+            raise ValueError(
+                f'family and aggregation required; got {family!r}/{aggregation!r}'
+            )
+        el_opts_list = family_element_options(
+            grid, results, family, aggregation, source='window'
+        )
+        el_opts = [{'label': e, 'value': e} for e in el_opts_list]
+        el_vals = _default_element_selection(el_opts_list, aggregation)
+        df, _ = resolve_family_df(results, grid, family, aggregation, source='window')
+        ymin, ymax = _family_auto_ylimits(df, family)
+        return el_opts, el_vals, ymin, ymax
+
+    @app.callback(
+        [Output({'type': 'roll-plot-graph', 'index': ALL}, 'figure'),
+         Output({'type': 'roll-plot-graph', 'index': ALL}, 'style')],
+        [Input({'type': 'roll-plot-family', 'index': ALL}, 'value'),
+         Input({'type': 'roll-plot-agg', 'index': ALL}, 'value'),
+         Input({'type': 'roll-plot-elements', 'index': ALL}, 'value'),
+         Input({'type': 'roll-plot-ymin', 'index': ALL}, 'value'),
+         Input({'type': 'roll-plot-ymax', 'index': ALL}, 'value'),
+         Input('roll-start-window', 'value'),
+         Input('roll-visible-windows', 'value'),
+         Input('roll-plot-height', 'value')],
+    )
+    def _draw_roll(families_sel, aggs, elements_sel, ymins, ymaxs,
+                   roll_start, roll_visible, plot_height):
+        x_limits = _rolling_frame_limits(info, roll_start, roll_visible)
+        height = _normalize_plot_height(
+            plot_height if plot_height is not None else _DEFAULT_PLOT_HEIGHT
+        )
+        figs, styles = [], []
+        for family, agg, els, ymin, ymax in zip(
+            families_sel or [], aggs or [], elements_sel or [],
+            ymins or [], ymaxs or [],
+        ):
+            if not family or not agg:
+                raise ValueError(
+                    f'Plot draw missing family/aggregation: '
+                    f'family={family!r} aggregation={agg!r}'
+                )
+            y_limits = (
+                (ymin, ymax) if ymin is not None and ymax is not None else None
+            )
+            fig = plot_window_family_dash(
+                grid, family, agg, els or [],
+                x_limits=x_limits, y_limits=y_limits,
+                results=results, source='window', x_axis_label='Frame',
+            )
+            figs.append(_apply_plot_height(fig, height))
+            styles.append(_graph_style(height))
+        return figs, styles
+
+    return app
+
+
 def create_season_compare_dash_app(grid):
     """Dash app comparing seasons with Family / Aggregation / Seasons / Elements."""
     if not _season_compare_usable(grid):
@@ -2156,6 +2551,12 @@ def run_window_dash(grid, debug=True, use_reloader=False):
     app.run(debug=debug, use_reloader=use_reloader)
 
 
+def run_rolling_dash(grid, debug=True, use_reloader=False):
+    """Run the rolling-window OPF Dash app (requires ``grid.rolling_window_opf_run``)."""
+    app = create_rolling_dash_app(grid)
+    app.run(debug=debug, use_reloader=use_reloader)
+
+
 def run_season_compare_dash(grid, debug=True, use_reloader=False):
     """Run the season-compare Dash app (requires ``grid.season_window_compare_run``)."""
     app = create_season_compare_dash_app(grid)
@@ -2167,19 +2568,20 @@ def run_dash(grid, debug=True, use_reloader=False):
     Start the appropriate Dash app from grid run flags (same family as ``Grid.reset_run_flags``).
 
     * ``grid.dash_mode`` optional: ``'auto'`` (default), ``'mp_ts'``, ``'single_ts'``,
-      ``'window'``, or ``'season_compare'``.
+      ``'window'``, ``'rolling'``, or ``'season_compare'``.
 
     **auto** (precedence):
 
     1. ``season_window_compare_run`` with ``grid.season_window_compare`` → season compare.
-    2. ``window_opf_run`` with ``grid.window_opf_results`` → window OPF dashboard.
-    3. ``MP_TEP_run`` or ``MP_MS_TEP_run`` and ``grid.ts_inv`` populated (MS TS-OPF post-processing)
+    2. ``rolling_window_opf_run`` with results + ``rolling_window_info`` → rolling dashboard.
+    3. ``window_opf_run`` with ``grid.window_opf_results`` → window OPF dashboard.
+    4. ``MP_TEP_run`` or ``MP_MS_TEP_run`` and ``grid.ts_inv`` populated (MS TS-OPF post-processing)
        → multi-period TS dashboard.
-    4. Else ``Time_series_ran`` → single-grid TS dashboard.
-    5. Else raise ``ValueError``.
+    5. Else ``Time_series_ran`` → single-grid TS dashboard.
+    6. Else raise ``ValueError``.
     """
     mode = getattr(grid, 'dash_mode', 'auto')
-    if mode not in ('auto', 'mp_ts', 'single_ts', 'window', 'season_compare'):
+    if mode not in ('auto', 'mp_ts', 'single_ts', 'window', 'rolling', 'season_compare'):
         mode = 'auto'
 
     if mode == 'season_compare':
@@ -2189,6 +2591,13 @@ def run_dash(grid, debug=True, use_reloader=False):
                 'grid.season_window_compare_run and grid.season_window_compare'
             )
         return run_season_compare_dash(grid, debug=debug, use_reloader=use_reloader)
+    if mode == 'rolling':
+        if not _rolling_opf_usable(grid):
+            raise ValueError(
+                'run_dash: dash_mode=rolling requires grid.rolling_window_opf_run, '
+                'grid.window_opf_results, and grid.rolling_window_info'
+            )
+        return run_rolling_dash(grid, debug=debug, use_reloader=use_reloader)
     if mode == 'window':
         if not _window_opf_usable(grid):
             raise ValueError(
@@ -2210,6 +2619,8 @@ def run_dash(grid, debug=True, use_reloader=False):
     # auto
     if _season_compare_usable(grid):
         return run_season_compare_dash(grid, debug=debug, use_reloader=use_reloader)
+    if _rolling_opf_usable(grid):
+        return run_rolling_dash(grid, debug=debug, use_reloader=use_reloader)
     if _window_opf_usable(grid):
         return run_window_dash(grid, debug=debug, use_reloader=use_reloader)
     if (getattr(grid, 'MP_TEP_run', False) or getattr(grid, 'MP_MS_TEP_run', False)) and _ts_inv_usable(grid):
@@ -2224,10 +2635,12 @@ def run_dash(grid, debug=True, use_reloader=False):
 
     raise ValueError(
         'run_dash (auto): need season_window_compare_run, '
+        'rolling_window_opf_run with rolling_window_info, '
         'window_opf_run with window_opf_results, '
         'or (MP_TEP_run or MP_MS_TEP_run) with grid.ts_inv, '
         'or Time_series_ran after TS_ACDC_OPF. '
-        "Override with grid.dash_mode='season_compare', 'window', 'mp_ts', or 'single_ts'."
+        "Override with grid.dash_mode='season_compare', 'rolling', 'window', "
+        "'mp_ts', or 'single_ts'."
     )
 
 

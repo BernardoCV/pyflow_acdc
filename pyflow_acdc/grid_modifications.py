@@ -1664,6 +1664,7 @@ def add_electrolyser(
     electrolyser_name=None,
     H2_mass_initial_kg=0.0,
     H2_mass_final_kg=None,
+    h2_price=0.0,
     Q_min_MVAR=0.0,
     Q_max_MVAR=0.0,
     dt_hours=1.0,
@@ -1673,6 +1674,9 @@ def add_electrolyser(
 
     AC nodes: active load plus optional reactive compensation (``Q_min_MVAR`` /
     ``Q_max_MVAR``). DC nodes: active load only.
+
+    ``h2_price`` (EUR/kg, default 0) is used when ``ObjRule={'H2_sale': 1}``;
+    optional ``TSType.H2_PRICE`` series overrides it per frame.
     """
     node = _look_up_node(grid, node, ac_or_dc="any")
 
@@ -1693,6 +1697,7 @@ def add_electrolyser(
             H2_mass_max=H2_mass_max_kg,
             H2_mass_initial=H2_mass_initial_kg,
             H2_mass_final=H2_mass_final_kg,
+            h2_price=h2_price,
             Q_min=Q_min_MVAR / s_base,
             Q_max=Q_max_MVAR / s_base,
             S_base=s_base,
@@ -1710,6 +1715,7 @@ def add_electrolyser(
             H2_mass_max=H2_mass_max_kg,
             H2_mass_initial=H2_mass_initial_kg,
             H2_mass_final=H2_mass_final_kg,
+            h2_price=h2_price,
             S_base=s_base,
             dt_hours=dt_hours,
         )
@@ -1784,6 +1790,12 @@ def time_series_dict(grid, ts):
             if ts.element_name == rs.name:
                 rs.TS_dict['PRGi_available'] = ts.TS_num
                 break  # Stop after assigning to the correct node
+
+    elif typ == TSType.H2_PRICE:
+        for el in grid.electrolysers:
+            if ts.element_name == el.name:
+                el.TS_dict['h2_price'] = ts.TS_num
+                break
 
 
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):

@@ -154,8 +154,12 @@ try:
         'ts_acdc_opf', 'results_ts_opf',
     ])
     try:
-        from .window_opf import window_nl_opf
-        __all__.append('window_nl_opf')
+        from .window_opf import (
+            window_nl_opf, rolling_window_nl_opf, results_window_opf,
+        )
+        __all__.extend([
+            'window_nl_opf', 'rolling_window_nl_opf', 'results_window_opf',
+        ])
     except ImportError:
         pass
     HAS_OPF = True
@@ -215,11 +219,13 @@ try:
         'run_dash',
         'run_ts_dash',
         'run_window_dash',
+        'run_rolling_dash',
         'run_season_compare_dash',
         'run_mp_ts_dash',
         'create_mp_ts_dash',
         'create_dash_app',
         'create_window_dash_app',
+        'create_rolling_dash_app',
         'create_season_compare_dash_app',
         'build_season_window_compare',
         'attach_season_window_compare',
@@ -299,7 +305,7 @@ for folder in _case_folders:
         continue
 
     for case_file in sorted(folder.glob("*.py")):
-        if case_file.name == "__init__.py":
+        if case_file.name == "__init__.py" or case_file.name.startswith("_"):
             continue
 
         rel_module = case_file.relative_to(_cases_root).with_suffix("")

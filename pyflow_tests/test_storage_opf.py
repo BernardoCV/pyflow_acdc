@@ -164,7 +164,7 @@ def test_storage_window_reporting():
 
     assert "Storage_window_soc" in res.tables
     assert "Storage_window_power" in res.tables
-    assert len(soc_df) == 5
+    assert len(soc_df) == 6  # frames -1…4 (leading soc_initial row)
     assert len(summary_df) == 2
 
 

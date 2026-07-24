@@ -3,18 +3,17 @@
 
 import pyflow_acdc as pyf
 
-from pyflow_tests._bess_h2_pei_data import (
-    PEI_OBJ_RULE,
-    WINDOW_END,
-    WINDOW_START,
-    build_pei_bess_h2_grid,
+grid, _ = pyf.cases["PEI_grid"](
+    include_countries=["GB", "DK"],
+    storage=True,
+    hydrogen=True,
+    data="season_comparison",
 )
-
-grid = build_pei_bess_h2_grid(attach_wind=True)
+n_hours = len(grid.Time_series[0].data)
 pyf.window_nl_opf(
     grid,
-    start=WINDOW_START,
-    end=WINDOW_END,
-    ObjRule=PEI_OBJ_RULE,
+    start=0,
+    end=n_hours - 1,
+    ObjRule={"Energy_cost": 1},
     build_only=True,
 )

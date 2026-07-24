@@ -8,8 +8,9 @@ Add BESS / electrolysers first — see :doc:`usage_storage` and
 :doc:`usage_hydrogen`. Interactive plots: :doc:`api/dash`.
 
 Seasonal data for the Princess Elisabeth Island (PEI) case lives under
-``examples/PEI_BESS/<Season>/``. Loaders in ``pyflow_tests._bess_h2_pei_data``
-prefer a local checkout, otherwise fetch from GitHub ``main``::
+``examples/PEI_BESS/<Season>/`` (local checkout, else GitHub ``main``).
+Build with case flags ``storage``, ``hydrogen``, and
+``data='season_comparison'`` / ``'full'``::
 
     https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/
 
@@ -42,17 +43,18 @@ Single-window solve
 
 For one seasonal (or concatenated) window without season-compare::
 
-    from pyflow_tests._bess_h2_pei_data import (
-        PEI_OBJ_RULE, WINDOW_START, build_pei_bess_h2_grid, window_end,
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+        seasons=("Autumn",),
     )
-
-    seasons = ("Autumn",)
-    grid = build_pei_bess_h2_grid(seasons=seasons)
     pyf.window_nl_opf(
         grid,
-        start=WINDOW_START,
-        end=window_end(seasons),
-        ObjRule=PEI_OBJ_RULE,
+        start=0,
+        end=23,
+        ObjRule={"Energy_cost": 1},
         solver="ipopt",
     )
     pyf.run_dash(grid)

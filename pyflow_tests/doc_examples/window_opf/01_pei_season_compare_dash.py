@@ -7,12 +7,9 @@ literalinclude for ``docs/usage_window_opf.rst``. Run interactively, or use
 """
 
 import pyflow_acdc as pyf
-from pyflow_tests._bess_h2_pei_data import (
+from pyflow_acdc.example_grids.PF._pei_bess_data import (
     PEI_OBJ_RULE,
     PEI_SEASONS,
-    WINDOW_START,
-    build_pei_bess_h2_grid,
-    window_end,
 )
 
 if not pyf.is_pyomo_solver_available("ipopt"):
@@ -21,11 +18,18 @@ if not pyf.is_pyomo_solver_available("ipopt"):
 season_results = {}
 grid = None
 for season in PEI_SEASONS:
-    grid = build_pei_bess_h2_grid(seasons=(season,))
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+        seasons=(season,),
+    )
+    n_hours = len(grid.Time_series[0].data)
     pyf.window_nl_opf(
         grid,
-        start=WINDOW_START,
-        end=window_end((season,)),
+        start=0,
+        end=n_hours - 1,
         ObjRule=PEI_OBJ_RULE,
         solver="ipopt",
     )

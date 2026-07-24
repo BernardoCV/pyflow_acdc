@@ -85,6 +85,7 @@ class ObjComponent(str, Enum):
     PZ_COST_OF_GENERATION = 'PZ_cost_of_generation'
     RENEWABLE_PROFIT = 'Renewable_profit'
     GEN_SET_DEV = 'Gen_set_dev'
+    H2_SALE = 'H2_sale'
 
 
 class CssMode(str, Enum):
@@ -146,6 +147,7 @@ class TSType(str, Enum):
     PGL_MIN = 'PGL_min'
     PGL_MAX = 'PGL_max'
     PRICE = 'price'
+    H2_PRICE = 'h2_price'
     LOAD = 'Load'
     # Renewable availability series (see TS_RENEWABLE_TYPES)
     WPP = 'WPP'

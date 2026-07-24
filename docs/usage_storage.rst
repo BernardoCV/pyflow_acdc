@@ -7,7 +7,8 @@ follows Useche-Arteaga et al. (2026) [#useche2026]_ (§3.3); see :doc:`citing`.
 Implemented: :class:`~pyflow_acdc.Storage`,
 :func:`~pyflow_acdc.add_storage`, NL OPF when ``grid.ESS``,
 :func:`~pyflow_acdc.window_nl_opf`, and ``Results.ext_storage`` /
-``Results.storage_window``.
+``Results.storage_window``. For long series, :func:`~pyflow_acdc.rolling_window_nl_opf`
+chains windows (1-based ``start``/``end`` like ``ts_acdc_opf``) with SoC carry-over.
 
 Related API: :doc:`api/storage`.
 

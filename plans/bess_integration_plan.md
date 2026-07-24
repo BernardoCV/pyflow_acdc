@@ -594,7 +594,9 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 - Data: `power_matrix.csv`, `BE_Price.csv`, `GB_Price.csv`, `DK_Price.csv`
 - pyflow grid: `PEI_grid()` — hub **`PE_Island`** (G9; Mario node `0`)
 
-**Files:** `pyflow_tests/test_pei_window_nl_opf_bess_h2.py`, `pyflow_tests/_bess_h2_pei_data.py`, and/or `pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py`
+**Files:** `pyflow_tests/test_pei_window_nl_opf_bess_h2.py`,
+`example_grids/PF/_pei_bess_data.py`, and/or
+`pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py`
 
 #### 6.1 Grid & asset setup
 

@@ -8,23 +8,18 @@ assembly, Table 1 asset parameters, and (when IPOPT is available) a coupled solv
 import pytest
 import pyflow_acdc as pyf
 
-from pyflow_tests._bess_h2_pei_data import (
+from pyflow_acdc.example_grids.PF._pei_bess_data import (
     BESS_E_MAX_MWH,
     BESS_P_NOM_MW,
-    DEFAULT_SEASONS,
     EXPORT_NODE_TO_ZONE,
     EXPORT_PRICE_NODES,
     EXPORT_PRICE_ZONES,
+    H2_MASS_FINAL_KG,
     HUB_NODE,
     PEI_OBJ_RULE,
     PEI_SEASONS,
-    WINDOW_START,
-    build_pei_bess_h2_grid,
-    h2_mass_final_kg,
     load_pei_export_prices,
     load_pei_power_matrix,
-    pei_hours,
-    window_end,
 )
 from pyflow_tests._test_solver_deps import require_pyomo
 
@@ -49,7 +44,13 @@ def test_pei_export_prices_available():
 
 
 def test_pei_bess_h2_grid_assets():
-    grid = build_pei_bess_h2_grid(attach_wind=False)
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+        attach_wind=False,
+    )
     pyf.analyse_grid(grid)
 
     assert grid.ESS is True
@@ -81,29 +82,34 @@ def test_pei_bess_h2_grid_assets():
     assert bess.P_discharge_max * grid.S_base == pytest.approx(BESS_P_NOM_MW)
     assert grid.electrolysers[0].Node == HUB_NODE
     assert grid.electrolysers[0].H2_mass_final == pytest.approx(
-        h2_mass_final_kg(DEFAULT_SEASONS), rel=1e-6
+        H2_MASS_FINAL_KG, rel=1e-6
     )
 
 
 def test_pei_window_nl_opf_bess_h2_builds():
     require_pyomo()
-    grid = build_pei_bess_h2_grid(attach_wind=True)
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+    )
     assert len(grid.Time_series) == 163
 
-    end = window_end(DEFAULT_SEASONS)
+    n_hours = len(grid.Time_series[0].data)
     model, _, _, _ = pyf.window_nl_opf(
         grid,
-        start=WINDOW_START,
-        end=end,
+        start=0,
+        end=n_hours - 1,
         ObjRule=PEI_OBJ_RULE,
         build_only=True,
     )
 
     assert hasattr(model, "window_soc_constraint")
     assert hasattr(model, "window_h2_constraint")
-    assert len(model.frames) == pei_hours(DEFAULT_SEASONS)
+    assert len(model.frames) == n_hours
 
-    block0 = model.frame_model[WINDOW_START]
+    block0 = model.frame_model[0]
     assert hasattr(block0, "storage_AC")
     assert hasattr(block0, "electrolyser")
     assert len(block0.storage_AC) == 1
@@ -116,12 +122,17 @@ def test_pei_window_nl_opf_bess_h2_solves_when_ipopt_available():
     if not pyf.is_pyomo_solver_available("ipopt"):
         pytest.skip("IPOPT not available")
 
-    grid = build_pei_bess_h2_grid(attach_wind=True)
-    end = window_end(DEFAULT_SEASONS)
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+    )
+    n_hours = len(grid.Time_series[0].data)
     model, _, _, stats = pyf.window_nl_opf(
         grid,
-        start=WINDOW_START,
-        end=end,
+        start=0,
+        end=n_hours - 1,
         ObjRule=PEI_OBJ_RULE,
         solver="ipopt",
         tee=False,
