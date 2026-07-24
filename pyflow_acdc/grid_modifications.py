@@ -1543,6 +1543,7 @@ def add_storage(
     soc_max=1.0,
     soc_initial=0.5,
     soc_final=None,
+    soc_ref=None,
     dt_hours=1.0,
     geometry=None,
 ):
@@ -1575,6 +1576,9 @@ def add_storage(
         Initial SoC in pu.
     soc_final : float or None, optional
         Terminal SoC in pu for horizon OPF.
+    soc_ref : float or None, optional
+        Soft SoC reference in pu for ``ObjRule['SoC_deviation']`` (myopic TS).
+        Defaults to ``soc_initial``.
     dt_hours : float, optional
         Timestep duration in hours.
     geometry : shapely.Geometry or str, optional
@@ -1619,6 +1623,7 @@ def add_storage(
             soc_max=soc_max,
             soc_initial=soc_initial,
             soc_final=soc_final,
+            soc_ref=soc_ref,
             S_base=s_base,
             dt_hours=dt_hours,
         )
@@ -1637,6 +1642,7 @@ def add_storage(
             soc_max=soc_max,
             soc_initial=soc_initial,
             soc_final=soc_final,
+            soc_ref=soc_ref,
             S_base=s_base,
             dt_hours=dt_hours,
         )

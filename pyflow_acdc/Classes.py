@@ -1490,6 +1490,8 @@ class Storage:
 
     SoC is in **pu** (fraction of ``E_max``). ``E_max`` is physical capacity in MWh.
     On AC: ``S_max`` and optional ``Q``. On DC: ``P_max`` net active limit.
+    ``soc_ref`` is the soft SoC target for ``ObjRule['SoC_deviation']`` (defaults to
+    ``soc_initial``); used by myopic ``ts_acdc_opf``.
     """
     storageNumber = 0
     names = set()
@@ -1562,6 +1564,7 @@ class Storage:
         soc_max: float = 1.0,
         soc_initial: float = 0.5,
         soc_final=None,
+        soc_ref=None,
         S_base: float = 100,
         dt_hours: float = 1.0,
     ):
@@ -1579,6 +1582,10 @@ class Storage:
             raise ValueError("soc_initial must lie within [soc_min, soc_max]")
         if soc_final is not None and not (soc_min <= soc_final <= soc_max):
             raise ValueError("soc_final must lie within [soc_min, soc_max]")
+        if soc_ref is None:
+            soc_ref = soc_initial
+        if not (soc_min <= soc_ref <= soc_max):
+            raise ValueError("soc_ref must lie within [soc_min, soc_max]")
         if P_charge_max < 0 or P_discharge_max < 0:
             raise ValueError("P_charge_max and P_discharge_max must be >= 0")
         if connected == AcDcSide.AC:
@@ -1622,6 +1629,7 @@ class Storage:
         self.soc_max = soc_max
         self.soc_initial = soc_initial
         self.soc_final = soc_final
+        self.soc_ref = float(soc_ref)
         self.dt_hours = dt_hours
 
         self.P_charge = 0.0

@@ -5,6 +5,8 @@ Battery energy storage
 operation-only BESS elements to AC or DC buses. Nonlinear OPF constraints and
 coupled multi-hour runs use :func:`~pyflow_acdc.window_nl_opf`.
 Long series: :func:`~pyflow_acdc.rolling_window_nl_opf`.
+Myopic sequential hours: :func:`~pyflow_acdc.ts_acdc_opf` with optional
+``ObjRule['SoC_deviation']`` (soft ``soc_ref``).
 
 User guide: :doc:`../usage_storage`.
 

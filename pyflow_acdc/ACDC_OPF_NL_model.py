@@ -251,6 +251,11 @@ def storage_variables(model, grid, storage_info, window_block=False):
             bounds=soc_bounds,
             initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
         )
+        model.soc_ref = pyo.Param(
+            model.storage_AC,
+            initialize={s: storage_ac[s].soc_ref for s in lista_storage_ac},
+            mutable=True,
+        )
         if not window_block:
             model.SoC_prev = pyo.Param(
                 model.storage_AC,
@@ -279,6 +284,11 @@ def storage_variables(model, grid, storage_info, window_block=False):
             model.storage_DC,
             bounds=soc_DC_bounds,
             initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
+        )
+        model.soc_ref_DC = pyo.Param(
+            model.storage_DC,
+            initialize={s: storage_dc[s].soc_ref for s in lista_storage_dc},
+            mutable=True,
         )
         if not window_block:
             model.SoC_prev_DC = pyo.Param(

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Snapshot NL OPF with AC and DC BESS (Phase 2)."""
+"""Snapshot NL OPF with AC and DC BESS (Phase 2). Myopic TS + soft soc_ref (Phase 8)."""
 
 import pandas as pd
 import pytest
 import pyflow_acdc as pyf
 
+from pyflow_acdc.constants import ObjComponent
 from pyflow_tests._test_solver_deps import require_pyomo
 
 
@@ -168,13 +169,62 @@ def test_storage_window_reporting():
     assert len(summary_df) == 2
 
 
+def test_storage_soc_ref_defaults_to_soc_initial():
+    grid = _grid_with_storage()
+    for st in grid.storage_elements:
+        assert st.soc_ref == st.soc_initial
+
+
+def test_storage_soc_ref_param_and_soc_deviation_obj():
+    require_pyomo()
+    grid = _grid_with_storage()
+    pyf.analyse_grid(grid)
+    model, _, _, _ = pyf.optimal_pf(
+        grid,
+        ObjRule={"Energy_cost": 1, "SoC_deviation": 1},
+        build_only=True,
+    )
+    assert hasattr(model, "soc_ref")
+    assert hasattr(model, "soc_ref_DC")
+    ac_id = next(iter(model.storage_AC))
+    assert model.soc_ref[ac_id].value == pytest.approx(0.5)
+    from pyflow_acdc.constants import default_obj_weights
+    assert ObjComponent.SOC_DEVIATION in default_obj_weights()
+
+
+def test_ts_acdc_opf_carries_soc_when_ipopt_available():
+    require_pyomo()
+    if not pyf.is_pyomo_solver_available("ipopt"):
+        return
+
+    grid = _grid_with_storage_and_ts(n_frames=4)
+    pyf.ts_acdc_opf(
+        grid,
+        start=1,
+        end=4,
+        ObjRule={"Energy_cost": 1, "SoC_deviation": 10},
+        solver="ipopt",
+    )
+    assert "storage_soc" in grid.time_series_results
+    assert "storage_power" in grid.time_series_results
+    soc_df = grid.time_series_results["storage_soc"]
+    assert len(soc_df) == 4
+    ac = next(s for s in grid.storage_elements if s.connected.value == "AC")
+    assert ac.soc_initial == pytest.approx(float(soc_df[ac.name].iloc[-1]), abs=1e-6)
+    assert ac.soc_min - 1e-5 <= float(soc_df[ac.name].min())
+    assert float(soc_df[ac.name].max()) <= ac.soc_max + 1e-5
+
+
 def run_test():
     test_storage_nl_model_builds()
     test_ext_storage_reporting()
     test_storage_opf_solves_when_ipopt_available()
+    test_storage_soc_ref_defaults_to_soc_initial()
+    test_storage_soc_ref_param_and_soc_deviation_obj()
     test_window_nl_opf_requires_time_series()
     test_window_nl_opf_builds_multi_frame_model()
     test_storage_window_reporting()
+    test_ts_acdc_opf_carries_soc_when_ipopt_available()
     print("OK test_storage_opf")
 
 

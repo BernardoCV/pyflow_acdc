@@ -60,12 +60,34 @@ Roadmap
 +------------------+-----------------------------------------------------------+
 | PEI + Dash       | Done — see :doc:`usage_window_opf` (season-compare)       |
 +------------------+-----------------------------------------------------------+
-| ``ts_acdc_opf``  | Myopic sequential SoC (deferred)                          |
+| ``ts_acdc_opf``  | Done — myopic SoC carry + soft ``soc_ref`` via            |
+|                  | ``ObjRule['SoC_deviation']`` (quadratic)                   |
 +------------------+-----------------------------------------------------------+
 
 Full phase list and design decisions:
 `plans/bess_integration_plan.md
 <https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md>`_.
+
+Myopic TS + soft SoC reference
+-------------------------------
+
+Sequential ``ts_acdc_opf`` carries BESS SoC hour-to-hour.
+A secondary objective ``SoC_deviation`` penalises ``(SoC - soc_ref)**2`` so the
+battery is pulled back toward ``soc_ref`` (defaults to ``soc_initial``) instead of
+emptying and staying empty under pure energy-cost myopia.
+
+.. code-block:: python
+
+    pyf.ts_acdc_opf(
+        grid,
+        ObjRule={"Energy_cost": 1, "SoC_deviation": 10},
+        solver="ipopt",
+    )
+
+Coupled ``window_nl_opf`` / rolling keep hard ``soc_initial`` / ``soc_final``;
+soft SoC is for the forward-only TS path.
+
+H₂ in the same myopic run is **direct sale** (no tank) — see :doc:`usage_hydrogen`.
 
 **References**
 

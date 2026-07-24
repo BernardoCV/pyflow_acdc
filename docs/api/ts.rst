@@ -60,6 +60,13 @@ Time series
    Objective rule (``ObjRule``) — see :ref:`Objective Functions <obj_functions>`.
    ``price_zone_restrictions`` adds price-zone restrictions to the model [1]_.
 
+   With BESS (``grid.ESS``): SoC is carried hour-to-hour; optional soft reference
+   via ``ObjRule['SoC_deviation']`` (see :doc:`../usage_storage`).
+   With H₂ (``grid.H2``): **direct sale** via ``ObjRule['H2_sale']`` — no tank
+   carry and no ``H2_mass_final`` (see :doc:`../usage_hydrogen`).
+   For coupled inventory / terminal mass use :func:`~pyflow_acdc.window_nl_opf`
+   or :func:`~pyflow_acdc.rolling_window_nl_opf`.
+
 
    **Example**
 

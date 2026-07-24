@@ -26,10 +26,11 @@ Elements attach to any **AC** or **DC** bus
   (generation convention: positive ``Q`` injects vars).
 - On **DC**, ``Q`` is fixed at zero.
 - Inventory ``mass_H2`` is in **kg** (``H2_mass_max``, ``H2_mass_initial``,
-  optional ``H2_mass_final`` for window OPF only).
+  optional ``H2_mass_final`` for **window / rolling OPF only**).
 - ``h2_price`` (EUR/kg, default ``0``), static or ``TSType.H2_PRICE`` series:
-  with ``ObjRule={'H2_sale': 1, ...}`` a zero price contributes nothing. Mass
-  target and sale can be used separately or together.
+  with ``ObjRule={'H2_sale': 1, ...}`` a zero price contributes nothing.
+  In myopic ``ts_acdc_opf``, use **sale only** (no tank); mass target and
+  inventory belong to window/rolling.
 - Rolling horizons: :func:`~pyflow_acdc.rolling_window_nl_opf` (1-based
   ``start``/``end`` like ``ts_acdc_opf``).
 
@@ -55,8 +56,22 @@ Running OPF
   terminal ``H2_mass_final``.
 - **Coupled** :func:`~pyflow_acdc.window_nl_opf`: parent chain across frames;
   ``H2_mass_final`` enforced on the last frame when set.
+- **Myopic** :func:`~pyflow_acdc.ts_acdc_opf`: **direct sale only** — no H₂
+  tank / inventory carry between hours, and no ``H2_mass_final`` (there is no
+  foresight to meet a mass target). Economics use ``ObjRule['H2_sale']``;
+  hourly production is limited by electrolyser ``P_min`` / ``P_max`` only.
+  There is no cumulative sale cap over the series. Use window/rolling when a
+  tank + terminal mass is required.
 - Results: ``Results.ext_electrolyser()`` (snapshot) and
   ``Results.hydrogen_window()`` after a window solve.
+
+.. code-block:: python
+
+    pyf.ts_acdc_opf(
+        grid,
+        ObjRule={"Energy_cost": 1, "H2_sale": 1},
+        solver="ipopt",
+    )
 
 Roadmap
 -------
@@ -72,7 +87,7 @@ Roadmap
 +------------------+-----------------------------------------------------------+
 | PEI + Dash       | Done — see :doc:`usage_window_opf` (season-compare)       |
 +------------------+-----------------------------------------------------------+
-| ``ts_acdc_opf``  | Myopic H₂ carry-over (deferred)                           |
+| ``ts_acdc_opf``  | Direct sale via ``H2_sale`` (no tank / no mass target)    |
 +------------------+-----------------------------------------------------------+
 
 Full phase list and design decisions:

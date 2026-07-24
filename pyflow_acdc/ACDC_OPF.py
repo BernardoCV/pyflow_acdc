@@ -500,6 +500,20 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
             for el in grid.electrolysers
         )
 
+    def formula_SoC_deviation():
+        if weights_def[ObjComponent.SOC_DEVIATION]['w'] == 0:
+            return 0
+        if not grid.ESS:
+            raise ValueError("SoC_deviation weight > 0 requires grid.ESS / storage")
+        total = 0
+        for st in grid.storage_elements:
+            s = st.storageNumber
+            if st.connected == AcDcSide.AC:
+                total += (model.SoC[s] - model.soc_ref[s]) ** 2
+            else:
+                total += (model.SoC_DC[s] - model.soc_ref_DC[s]) ** 2
+        return total
+
     s=1
     for key, entry in weights_def.items():
         if key == ObjComponent.EXT_GEN:
@@ -526,7 +540,8 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
             entry['f']  =formula_Gen_set_dev()
         elif key == ObjComponent.H2_SALE:
             entry['f'] = formula_H2_sale()
-
+        elif key == ObjComponent.SOC_DEVIATION:
+            entry['f'] = formula_SoC_deviation()
     s=1
     total_weight = sum(entry['w'] for entry in weights_def.values())
     if total_weight== 0:
@@ -1044,6 +1059,11 @@ def calculate_objective(grid,obj,OnlyGen=True):
             h_prod = el.b_h * el.P_electrolyser * el.S_base * el.dt_hours + el.c_h
             total += -float(el.h2_price) * h_prod
         return total
+
+    if obj == ObjComponent.SOC_DEVIATION:
+        if not grid.ESS:
+            return 0
+        return sum((st.SoC - st.soc_ref) ** 2 for st in grid.storage_elements)
 
     return 0
 

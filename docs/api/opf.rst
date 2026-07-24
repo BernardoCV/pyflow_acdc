@@ -137,6 +137,12 @@ The user can define the objective by setting the weight of each sub objective. T
     * - ``Gen_set_dev``
       - Generator setpoint deviation
       - :math:`\sum_{g \in G}  \left(P_g -P_{g,set}\right)^2`
+    * - ``SoC_deviation``
+      - Soft BESS SoC reference (myopic TS)
+      - :math:`\sum_{s} (SoC_s - soc_{ref,s})^2`
+    * - ``H2_sale``
+      - Hydrogen sale revenue (minimise negative revenue)
+      - :math:`-\sum_{e} price_{H2,e}\,\Delta m_{e}`
 
 .. _model_solving:
 

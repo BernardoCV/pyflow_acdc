@@ -28,7 +28,7 @@ Permanent GitHub links (``main`` branch):
 | G1 | Scope | **BESS** implemented (Phases 0–4). **Hydrogen** → Phase 5. **Mario PEI validation** (BESS + H₂ + exports) → **Phase 6**. Rolling horizon → Phase 7. **Myopic TS + soft `soc_ref`** → Phase 8. TEP / linear OPF → Phase 9. **Docs:** concurrent track (not gated on a phase number). |
 | G2 | OPF modes | **Nonlinear OPF only** (no linear OPF, no TEP sizing) |
 | G3 | Multi-hour optimization | **Coupled horizon** in a new top-level script `window_opf.py`; BESS constraints live **inside the NL model** (not a post-processing layer) |
-| G4 | Time series (`ts_acdc_opf`) | **Phase 8** — **myopic / forward-only** SoC: one snapshot NL OPF per hour with `SoC_prev` carry. Soft **`soc_ref`** (class attr + mutable Param, init = `soc_initial`) via quadratic `SoC_deviation` in `ObjRule`. Window modes keep hard `soc_initial` / `soc_final`. Not equivalent to `window_nl_opf`. |
+| G4 | Time series (`ts_acdc_opf`) | **Phase 8** — **myopic / forward-only** SoC: one snapshot NL OPF per hour with `SoC_prev` carry. Soft **`soc_ref`** (class attr + mutable Param, init = `soc_initial`) via quadratic `SoC_deviation` in `ObjRule`. **H₂:** direct sale via `H2_sale` only — **no tank / inventory carry**, no `H2_mass_final`, no cumulative sale cap over the series. Window modes keep hard SoC ini/final and H₂ tank + `H2_mass_final`. Not equivalent to `window_nl_opf`. |
 | G5 | SoC units | **SoC in pu** in the Pyomo model; physical capacity via class attribute **`E_max` [MWh]** (enables future degradation modelling on `E_max`) |
 | G6 | Simultaneous charge/discharge | Keep Mario/paper formulation (separate `P_charge` / `P_discharge` vars, no exclusivity binary). Optimizer should cancel overlap in practice. **Add code comment: revisit later** if artefacts appear |
 | G7 | Apparent-power limit | **Per element**, side-dependent (mirrors `Ren_Source`): AC — `(P_dis − P_ch)² + Q² ≤ S_max²`; DC — active power only, `|P_dis − P_ch| ≤ P_max` (no `Q`, no S-circle) |
@@ -71,6 +71,7 @@ Hooks mirror **`Gen_AC` / `Gen_DC` / `Ren_Source`**:
 │  ts_acdc_opf (Phase 8)    Myopic / forward-only hours (G4)        │
 │  ─────────────────        SoC_prev ← previous SoC* each hour      │
 │                           Soft soc_ref via ObjRule SoC_deviation  │
+│                           H₂: direct sale (H2_sale), no tank      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -661,7 +662,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 ---
 
-### Phase 8 — Myopic / forward-only time series + soft `soc_ref` (G4) ← next
+### Phase 8 — Myopic / forward-only time series + soft `soc_ref` (G4) ✅
 
 **When:** After Phase 7 rolling window is in use; independent of hard `soc_final` window policy.
 
@@ -673,7 +674,7 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 | ID | Topic | Decision |
 |----|--------|----------|
-| P8-1 | Foresight | **Myopic only** — one hour per solve; `SoC_prev` ← previous hour’s solved SoC (and H₂ `M_prev` when `grid.H2`) |
+| P8-1 | Foresight | **Myopic only** — one hour per solve; `SoC_prev` ← previous hour’s solved SoC. **H₂ is not carried** (direct sale; see P8-9) |
 | P8-2 | Soft reference | New class attribute **`soc_ref`** [pu] on `Storage`. **Init = `soc_initial`**. In the NL model: **mutable `Param`** (scalar for now; mutable so a future per-frame / TS `soc_ref` is possible) |
 | P8-3 | Penalty form | **Quadratic only** `(SoC − soc_ref)²`. No absolute-value form (Pyomo / IPOPT do not handle abs well) |
 | P8-4 | Objective API | New `ObjComponent` **`SoC_deviation`**. Active when `ObjRule['SoC_deviation']['w'] > 0`. Explicit opt-in (no silent auto-enable when ESS present) |
@@ -681,17 +682,18 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 | P8-6 | Hard terminal SoC | **`ts_acdc_opf`:** no hard `soc_final` — soft `soc_ref` only. **`window_nl_opf` / rolling:** keep hard **`soc_initial` + `soc_final`** constraints (unchanged); soft SoC not part of window Phase 8 |
 | P8-7 | Scope | **`ts_acdc_opf` for now** (penalty lives in snapshot `opf_obj` because TS calls snapshot OPF each hour). Window paths do not adopt soft SoC in v1 |
 | P8-8 | Equivalence | Document clearly: myopic + `SoC_deviation` ≠ global `window_nl_opf` optimum |
-
+| P8-9 | H₂ in myopic TS | **Direct sale only** — one-way electrolyser load; economics via `H2_sale`. **No tank:** do not carry `mass_H2` between hours; do not enforce `H2_mass_final`; no cumulative sale cap over the series. Hourly production limited by `P_min`/`P_max` only. Tank + `H2_mass_final` remain window/rolling only |
 #### 8.2 Implementation tasks
 
-- [ ] `Classes.py` / `add_storage`: `soc_ref` attribute, init = `soc_initial`
-- [ ] `constants.py`: `ObjComponent.SOC_DEVIATION = 'SoC_deviation'`
-- [ ] `ACDC_OPF.py` `opf_obj`: `w * Σ (SoC − soc_ref)²` via existing ObjRule weight path
-- [ ] `ACDC_OPF_NL_model.py`: `soc_ref` / `soc_ref_DC` as **mutable Param**; wire into objective; snapshot SoC balance already exists
-- [ ] `Time_series.py` `ts_acdc_opf`: after each successful hour, write `st.soc_initial` / `SoC_prev` from solved `SoC`; same for H₂ if present
-- [ ] Results: record per-hour SoC / charge / discharge in TS results (reuse or extend existing TS export patterns)
-- [ ] Tests: small grid — without `SoC_deviation`, empty-and-idle after discharge; with weight, SoC returns toward `soc_ref` over subsequent hours
-- [ ] Docs: `usage_storage.rst` “Myopic TS + SoC reference”; `api/storage.rst` for `soc_ref` / `SoC_deviation`
+- [x] `Classes.py` / `add_storage`: `soc_ref` attribute, init = `soc_initial`
+- [x] `constants.py`: `ObjComponent.SOC_DEVIATION = 'SoC_deviation'`
+- [x] `ACDC_OPF.py` `opf_obj`: `w * Σ (SoC − soc_ref)²` via existing ObjRule weight path
+- [x] `ACDC_OPF_NL_model.py`: `soc_ref` / `soc_ref_DC` as **mutable Param**; wire into objective; snapshot SoC balance already exists
+- [x] `Time_series.py` `ts_acdc_opf`: after each successful hour, write `st.soc_initial` / `SoC_prev` from solved `SoC`
+- [ ] `Time_series.py` H₂ myopic policy (P8-9): **no** mass carry; `mass_H2_prev = 0` each hour (direct sale); fail-fast if `H2_mass_final` is set
+- [x] Results: record per-hour SoC / charge / discharge in TS results (reuse or extend existing TS export patterns)
+- [x] Tests: small grid — SoC carry + `SoC_deviation`; H₂ direct-sale (no tank) when implemented
+- [x] Docs: `usage_storage.rst` / `usage_hydrogen.rst` / `api/hydrogen.rst` / `api/ts.rst` — myopic SoC + H₂ direct sale
 
 #### 8.3 Exit criteria
 
@@ -768,7 +770,7 @@ Sections:
 - [ ] H₂ API + usage pages (Phase 5)
 - [ ] PEI validation literalinclude (Phase 6)
 - [ ] Rolling-window usage note (Phase 7)
-- [ ] Myopic TS + `soc_ref` / `SoC_deviation` (Phase 8)
+- [x] Myopic TS + `soc_ref` / `SoC_deviation` (Phase 8)
 
 ---
 
@@ -788,7 +790,7 @@ Sections:
 | `Results_class.py` (Phase 5) | `ext_electrolyser()`, `hydrogen_window()` ✅ |
 | `ACDC_OPF.py` | `storage_info` in `translate_pyf_opf`; pass horizon if needed |
 | `Results_class.py` | `ext_storage()`, `storage_window()` |
-| `Time_series.py` | **Phase 8** — myopic SoC (+ H₂) carry in `ts_acdc_opf`; soft `soc_ref` via `SoC_deviation` |
+| `Time_series.py` | **Phase 8** — myopic SoC carry + soft `soc_ref`; H₂ **direct sale** (no tank carry; P8-9) |
 | `__init__.py` | Export new symbols |
 | `pyflow_tests/...` | **Phase 6** — full PEI Mario validation test; `test_hydrogen_opf.py` ✅ |
 | `docs/api/storage.rst` | **New** — `Storage_AC`, `add_storage`, `window_opf` API |
@@ -838,7 +840,7 @@ If simultaneous charge/discharge appears in results:
 6. Phase 5 — hydrogen / electrolyser ✅  
 7. Phase 6 — Mario PEI validation (BESS + H₂ + exports) ✅ / in use  
 8. Phase 7 — rolling window ✅  
-9. **Phase 8 — myopic TS + soft `soc_ref` (`SoC_deviation`)** ← **next**  
+9. **Phase 8 — myopic TS + soft `soc_ref` (`SoC_deviation`)** ✅  
 10. Phase 9 — TEP / linear OPF (later)  
 
 **Concurrent (throughout):** Documentation — update RST, examples, and citations with each phase above.

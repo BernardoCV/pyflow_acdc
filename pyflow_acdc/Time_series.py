@@ -14,7 +14,7 @@ import time
 
 from .grid_analysis import analyse_grid, grid_state
 from .ACDC_PF import ac_power_flow, dc_power_flow, acdc_sequential
-from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights, TSType, TS_RENEWABLE_TYPES
+from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights, TSType, TS_RENEWABLE_TYPES, AcDcSide
 
 
 # Base __all__ with functions that don't require OPF
@@ -907,6 +907,68 @@ def _modify_parameters(grid,model,Price_Zones):
     for idx, val in P_renSource.items():
         model.P_renSource[idx].set_value(val)
 
+    if grid.ESS:
+        for storage in grid.storage_elements:
+            s = storage.storageNumber
+            if storage.connected == AcDcSide.AC:
+                model.SoC_prev[s].set_value(float(storage.soc_initial))
+                model.soc_ref[s].set_value(float(storage.soc_ref))
+            else:
+                model.SoC_prev_DC[s].set_value(float(storage.soc_initial))
+                model.soc_ref_DC[s].set_value(float(storage.soc_ref))
+
+    if grid.H2:
+        for el in grid.electrolysers:
+            model.mass_H2_prev[el.electrolyserNumber].set_value(
+                float(el.H2_mass_initial)
+            )
+
+
+def _carry_storage_h2_state_from_model(grid, model):
+    """Write solved SoC / H₂ mass onto elements and set next-hour initials."""
+    if grid.ESS:
+        for storage in grid.storage_elements:
+            s = storage.storageNumber
+            if storage.connected == AcDcSide.AC:
+                soc = float(pyo.value(model.SoC[s]))
+                model.SoC_prev[s].set_value(soc)
+                storage.P_charge = float(pyo.value(model.P_storage_charge[s]))
+                storage.P_discharge = float(pyo.value(model.P_storage_discharge[s]))
+                storage.Q = float(pyo.value(model.Q_storage[s]))
+            else:
+                soc = float(pyo.value(model.SoC_DC[s]))
+                model.SoC_prev_DC[s].set_value(soc)
+                storage.P_charge = float(pyo.value(model.P_storage_charge_DC[s]))
+                storage.P_discharge = float(pyo.value(model.P_storage_discharge_DC[s]))
+            storage.SoC = soc
+            storage.soc_initial = soc
+
+    if grid.H2:
+        for el in grid.electrolysers:
+            e = el.electrolyserNumber
+            mass = float(pyo.value(model.mass_H2[e]))
+            el.mass_H2 = mass
+            el.H2_mass_initial = mass
+            model.mass_H2_prev[e].set_value(mass)
+            el.P_electrolyser = float(pyo.value(model.P_electrolyser[e]))
+
+
+def _ts_storage_soc_row(grid, time_1based):
+    row = {'time': time_1based}
+    for storage in grid.storage_elements:
+        row[storage.name] = np.float64(storage.SoC)
+    return row
+
+
+def _ts_storage_power_row(grid, time_1based):
+    """Net injection MW (discharge − charge) per storage element."""
+    row = {'time': time_1based}
+    for storage in grid.storage_elements:
+        row[storage.name] = np.float64(
+            (storage.P_discharge - storage.P_charge) * storage.S_base
+        )
+    return row
+
 
 def ts_acdc_opf(
     grid,
@@ -989,6 +1051,8 @@ def ts_acdc_opf(
         - ``res_available``: available renewable energy
         - ``ac_loading``, ``dc_loading``: line loading percentages
         - ``ac_MW_to``, ``dc_MW_to``: line active power flows
+        - ``storage_soc``: BESS SoC [pu] per element (when ``grid.ESS``)
+        - ``storage_power``: BESS net injection [MW] per element (when ``grid.ESS``)
     """
     idx = start-1
     warm_start_mode = str(warm_start_mode).lower()
@@ -1024,6 +1088,8 @@ def ts_acdc_opf(
     Time_series_a = []
     Time_series_b = []
     Time_series_res_available = []
+    Time_series_storage_soc = []
+    Time_series_storage_power = []
 
     weights_def = default_obj_weights()
 
@@ -1204,6 +1270,13 @@ def ts_acdc_opf(
         Time_series_Opt_res_P_extGrid.append(opt_res_P_extGrid)
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
+
+        if grid.ESS or grid.H2:
+            _carry_storage_h2_state_from_model(grid, model)
+        if grid.ESS:
+            Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
+            Time_series_storage_power.append(_ts_storage_power_row(grid, idx + 1))
+
         t_minus_1_values = _snapshot_initial_values(model)
 
         if print_step:
@@ -1228,7 +1301,8 @@ def ts_acdc_opf(
                             Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
                             Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
                             Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
-                            Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available)
+                            Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
+                            Time_series_storage_soc, Time_series_storage_power)
 
     av_t_modelsolve = total_solve_time / count if count else 0.0
     av_t_modelupdate=total_update_time / count if count else 0.0
@@ -1259,7 +1333,8 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
     Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
     Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
     Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
-    Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available)= ts_results
+    Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
+    Time_series_storage_soc, Time_series_storage_power)= ts_results
 
     grid.time_series_results['converter_p_dc'] = _to_dataframe(Time_series_Opt_res_P_conv_DC)
     grid.time_series_results['converter_q_ac'] = _to_dataframe(Time_series_Opt_res_Q_conv_AC)
@@ -1284,6 +1359,10 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
     grid.time_series_results['a'] = _to_dataframe(Time_series_a)
     grid.time_series_results['b'] = _to_dataframe(Time_series_b)
     grid.time_series_results['res_available'] = _to_dataframe(Time_series_res_available)
+    if Time_series_storage_soc:
+        grid.time_series_results['storage_soc'] = _to_dataframe(Time_series_storage_soc)
+    if Time_series_storage_power:
+        grid.time_series_results['storage_power'] = _to_dataframe(Time_series_storage_power)
     # Split line time-series into explicit loading and MW-to datasets
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)

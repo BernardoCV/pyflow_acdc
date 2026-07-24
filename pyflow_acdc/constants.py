@@ -86,6 +86,7 @@ class ObjComponent(str, Enum):
     RENEWABLE_PROFIT = 'Renewable_profit'
     GEN_SET_DEV = 'Gen_set_dev'
     H2_SALE = 'H2_sale'
+    SOC_DEVIATION = 'SoC_deviation'
 
 
 class CssMode(str, Enum):
