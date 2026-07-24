@@ -25,10 +25,10 @@ Permanent GitHub links (``main`` branch):
 
 | ID | Topic | Decision |
 |----|--------|----------|
-| G1 | Scope | **BESS** implemented (Phases 0–4). **Hydrogen** → Phase 5. **Mario PEI validation** (BESS + H₂ + exports) → **Phase 6**. Rolling horizon → Phase 7. TEP / linear OPF → Phase 9. **Docs:** concurrent track (not gated on a phase number). |
+| G1 | Scope | **BESS** implemented (Phases 0–4). **Hydrogen** → Phase 5. **Mario PEI validation** (BESS + H₂ + exports) → **Phase 6**. Rolling horizon → Phase 7. **Myopic TS + soft `soc_ref`** → Phase 8. TEP / linear OPF → Phase 9. **Docs:** concurrent track (not gated on a phase number). |
 | G2 | OPF modes | **Nonlinear OPF only** (no linear OPF, no TEP sizing) |
 | G3 | Multi-hour optimization | **Coupled horizon** in a new top-level script `window_opf.py`; BESS constraints live **inside the NL model** (not a post-processing layer) |
-| G4 | Time series (`ts_acdc_opf`) | **Deferred** — when added later, use **myopic** SoC propagation only (one hour at a time) |
+| G4 | Time series (`ts_acdc_opf`) | **Phase 8** — **myopic / forward-only** SoC: one snapshot NL OPF per hour with `SoC_prev` carry. Soft **`soc_ref`** (class attr + mutable Param, init = `soc_initial`) via quadratic `SoC_deviation` in `ObjRule`. Window modes keep hard `soc_initial` / `soc_final`. Not equivalent to `window_nl_opf`. |
 | G5 | SoC units | **SoC in pu** in the Pyomo model; physical capacity via class attribute **`E_max` [MWh]** (enables future degradation modelling on `E_max`) |
 | G6 | Simultaneous charge/discharge | Keep Mario/paper formulation (separate `P_charge` / `P_discharge` vars, no exclusivity binary). Optimizer should cancel overlap in practice. **Add code comment: revisit later** if artefacts appear |
 | G7 | Apparent-power limit | **Per element**, side-dependent (mirrors `Ren_Source`): AC — `(P_dis − P_ch)² + Q² ≤ S_max²`; DC — active power only, `|P_dis − P_ch| ≤ P_max` (no `Q`, no S-circle) |
@@ -45,7 +45,7 @@ Permanent GitHub links (``main`` branch):
 | P4-1a | `window_block=True` | **Skip** in-block use of `soc_initial` / `SoC_prev ← soc_initial` and **`storage_soc_balance`** (parent owns dynamics). **Remove** `storage_soc_final_*` in blocks. Standalone `optimal_pf` (no flag) keeps Phase 2 snapshot behaviour including `soc_initial` / optional `soc_final`. |
 | P4-1b | Energy state (future) | Comment in code/plan: parent links may later use **actual energy** [MWh] (or `SoC × E_max_eff`) instead of pu SoC, to support **capacity degradation** / time-varying `E_max`. Phase 4 v1 stays **pu SoC** links. |
 | P4-2 | Builder API | **`opf_create_nl_model_acdc(..., window_block=True)`** — snapshot builder with block-specific SoC omissions; **`window_opf.py`** assembles blocks + parent links + objective. |
-| P4-3 | Objective | **No new objective terms** — `model.obj = sum_t opf_obj(hour_model[t], …)` using existing per-block operational objectives only. |
+| P4-3 | Objective | **No new objective terms in Phase 4** — `model.obj = sum_t opf_obj(hour_model[t], …)` using existing per-block operational objectives only. Soft SoC reference (`SoC_deviation`) arrives in **Phase 8** for **`ts_acdc_opf`** only; window keeps hard ini/final SoC. |
 | P4-4 | Hour indexing | **Python convention:** block indices `t ∈ {0, …, T−1}` aligned with `Time_series` row indexing (0-based). |
 | P4-5 | Block build | **Clone structure** (cf. `multi_scenario_TEP`: build template once, `clone()` per hour, patch mutable params). |
 | P4-6 | Window scope (v1) | **Single coupled window per call** (e.g. one 24 h solve). **Rolling / sliding window** → **Phase 7**, after Phase 6 validation. |
@@ -60,17 +60,17 @@ Hooks mirror **`Gen_AC` / `Gen_DC` / `Ren_Source`**:
 - Nodal aggregation: `PGi_storage` / `QGi_storage` (AC) and `PGi_storage_DC` (DC only)
 - `connected` flag (`AcDcSide.AC` / `AcDcSide.DC`) — same branching pattern as `Ren_Source.connected` in the NL model
 
-### Two run modes (by design)
+### Three run modes (by design)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  window_opf.py          Coupled multi-hour NLP (paper-faithful) │
-│  window_nl_opf()          Parent SoC (+ Phase 5: H₂) links       │
-│  frame_model[t] blocks    Mario validation in Phase 6 (full PEI) │
-│  (Phase 4 v1: one window)                                         │
+│  window_opf.py            Coupled multi-hour NLP (paper-faithful) │
+│  window_nl_opf()            Parent SoC (+ H₂) links               │
+│  rolling_window_nl_opf()    Chained windows (Phase 7)             │
 ├─────────────────────────────────────────────────────────────────┤
-│  ts_acdc_opf (later)      Myopic sequential hours (G4 deferred)   │
-│  ─────────────────        SoC_prev param updated each hour        │
+│  ts_acdc_opf (Phase 8)    Myopic / forward-only hours (G4)        │
+│  ─────────────────        SoC_prev ← previous SoC* each hour      │
+│                           Soft soc_ref via ObjRule SoC_deviation  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,7 +97,7 @@ Reference: paper Eqs. (24)–(31), Mario script lines 584–605 (AC hub BESS onl
 |--------|--------------|--------------|
 | `E_max` [MWh] | ✓ | ✓ |
 | `η_c`, `η_d` | ✓ | ✓ |
-| `soc_min`, `soc_max`, `soc_initial`, `soc_final` | ✓ | ✓ |
+| `soc_min`, `soc_max`, `soc_initial`, `soc_final`, `soc_ref` | ✓ | ✓ |
 | `P_charge_max`, `P_discharge_max` [pu] | ✓ | ✓ |
 | `S_max` [pu] | apparent-power rating | — |
 | `P_max` [pu] | — | max active-power rating |
@@ -109,7 +109,19 @@ Reference: paper Eqs. (24)–(31), Mario script lines 584–605 (AC hub BESS onl
 SoC[s,t] = SoC[s,t-1] + (dt / E_max[s]) * (eta_c * P_charge[s,t] - P_discharge[s,t] / eta_d)
 ```
 
-Plus terminal SoC, bounds on SoC, and separate charge/discharge power bounds (G6 note unchanged).
+Plus terminal SoC (horizon modes), bounds on SoC, and separate charge/discharge power bounds (G6 note unchanged).
+
+**Soft SoC reference (Phase 8 — myopic `ts_acdc_opf`)** — secondary objective term, not a hard constraint:
+
+```
+J_SoC_dev = w * Σ_s (SoC[s] - soc_ref[s])**2
+```
+
+- **Quadratic only** — absolute deviation is avoided (Pyomo / IPOPT handle abs poorly).
+- ``soc_ref`` is a **class attribute** (fixed scalar, init = ``soc_initial``) and a **mutable Param** in the NL model so a future per-frame / TS update path is possible without rebuilding the model.
+- ``w`` uses the **existing ``ObjRule`` weighting** mechanism (same as ``Energy_cost``, ``H2_sale``, …). Scaling semantics may be revised later.
+- Active when ``ObjRule['SoC_deviation']`` weight ``> 0``. Entices return toward ``soc_ref`` after discharge under myopic foresight.
+- **Window modes** keep hard ``soc_initial`` / ``soc_final`` constraints; soft ``SoC_deviation`` is **not** part of Phase 8 window policy.
 
 **Net active injection** (generation convention):
 
@@ -639,27 +651,54 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 ---
 
-### Phase 7 — Rolling / sliding window (deferred)
+### Phase 7 — Rolling / sliding window ✅
 
-**Not in Phase 4 v1.** `window_nl_opf` solves **one** contiguous horizon per invocation (P4-6).
+**Status:** Implemented as `rolling_window_nl_opf` in `window_opf.py` (1-based `start`/`end`, SoC carry, `soc_final_mode`).
 
-**When:** After **Phase 6** Mario validation on a fixed 24 h window (not before — see Phase 6 ordering note).
-
-**Goal:** Advance `start` / `end` over a long `Time_series` — warm-start or carry `soc_initial` / `M_initial` from the previous window’s terminal state. Separate API (e.g. `rolling_window_opf`) or extended kwargs on `window_nl_opf`.
+**Goal (met):** Advance over a long `Time_series` — carry `soc_initial` / H₂ state from the previous window’s terminal state.
 
 **Exit criteria:** Multi-day `Time_series` solved as chained windows; terminal SoC / H₂ inventory carried between windows; doc example in **Concurrent — Documentation**.
 
 ---
 
-### Phase 8 — Deferred: myopic time series (G4)
+### Phase 8 — Myopic / forward-only time series + soft `soc_ref` (G4) ← next
 
-**Not in v1.** When implemented in `Time_series.py`:
+**When:** After Phase 7 rolling window is in use; independent of hard `soc_final` window policy.
 
-- Reuse **snapshot** NL model (Phase 2.1) with `SoC_prev` param
-- Each hour in `ts_acdc_opf`: set `SoC_prev` from previous solution → solve → record
-- No terminal `soc_final` except optionally on last hour of run
-- Document that this is **not** equivalent to `window_nl_opf` global optimum
-- When `grid.H2` is present: myopic `M_H2_prev` propagation (Phase 5 snapshot model) — design after Phase 5 v1
+**Problem:** Under pure energy-cost myopic OPF, a BESS can discharge in a high-price hour and then **stay empty** (no foresight of future need / no incentive to recharge). Coupled `window_nl_opf` / rolling already prevent that via horizon coupling and/or hard `soc_final`. Phase 8 adds the **causal TS** path with a **soft SoC reference** so sequential hours remain useful.
+
+**Goal:** Forward-only BESS in `ts_acdc_opf`: each hour is one snapshot NL OPF; SoC carries hour→hour; a secondary objective penalizes deviation from `soc_ref`.
+
+#### 8.1 Locked decisions (Phase 8 v1)
+
+| ID | Topic | Decision |
+|----|--------|----------|
+| P8-1 | Foresight | **Myopic only** — one hour per solve; `SoC_prev` ← previous hour’s solved SoC (and H₂ `M_prev` when `grid.H2`) |
+| P8-2 | Soft reference | New class attribute **`soc_ref`** [pu] on `Storage`. **Init = `soc_initial`**. In the NL model: **mutable `Param`** (scalar for now; mutable so a future per-frame / TS `soc_ref` is possible) |
+| P8-3 | Penalty form | **Quadratic only** `(SoC − soc_ref)²`. No absolute-value form (Pyomo / IPOPT do not handle abs well) |
+| P8-4 | Objective API | New `ObjComponent` **`SoC_deviation`**. Active when `ObjRule['SoC_deviation']['w'] > 0`. Explicit opt-in (no silent auto-enable when ESS present) |
+| P8-5 | Weighting | **Same `ObjRule` weighting mechanism** as existing objective terms (`Energy_cost`, `H2_sale`, …). Global weight only in v1 (no per-element `soc_ref_weight`). Scaling may be revised later |
+| P8-6 | Hard terminal SoC | **`ts_acdc_opf`:** no hard `soc_final` — soft `soc_ref` only. **`window_nl_opf` / rolling:** keep hard **`soc_initial` + `soc_final`** constraints (unchanged); soft SoC not part of window Phase 8 |
+| P8-7 | Scope | **`ts_acdc_opf` for now** (penalty lives in snapshot `opf_obj` because TS calls snapshot OPF each hour). Window paths do not adopt soft SoC in v1 |
+| P8-8 | Equivalence | Document clearly: myopic + `SoC_deviation` ≠ global `window_nl_opf` optimum |
+
+#### 8.2 Implementation tasks
+
+- [ ] `Classes.py` / `add_storage`: `soc_ref` attribute, init = `soc_initial`
+- [ ] `constants.py`: `ObjComponent.SOC_DEVIATION = 'SoC_deviation'`
+- [ ] `ACDC_OPF.py` `opf_obj`: `w * Σ (SoC − soc_ref)²` via existing ObjRule weight path
+- [ ] `ACDC_OPF_NL_model.py`: `soc_ref` / `soc_ref_DC` as **mutable Param**; wire into objective; snapshot SoC balance already exists
+- [ ] `Time_series.py` `ts_acdc_opf`: after each successful hour, write `st.soc_initial` / `SoC_prev` from solved `SoC`; same for H₂ if present
+- [ ] Results: record per-hour SoC / charge / discharge in TS results (reuse or extend existing TS export patterns)
+- [ ] Tests: small grid — without `SoC_deviation`, empty-and-idle after discharge; with weight, SoC returns toward `soc_ref` over subsequent hours
+- [ ] Docs: `usage_storage.rst` “Myopic TS + SoC reference”; `api/storage.rst` for `soc_ref` / `SoC_deviation`
+
+#### 8.3 Exit criteria
+
+- `ts_acdc_opf` on a grid with `grid.ESS` carries SoC across hours without NaNs / reset bugs
+- `ObjRule={'Energy_cost': 1, 'SoC_deviation': w}` runs; SoC trajectory visibly pulled toward `soc_ref` for `w` large enough
+- Window modes still use hard `soc_initial` / `soc_final` only (no soft SoC dependency)
+- Doc example + unit test committed; roadmap line in `usage_storage.rst` marks Phase 8 done when shipped
 
 ---
 
@@ -696,13 +735,14 @@ Out of scope per G2, G11.
 
 Sections:
 
-1. **Overview** — coupled horizon vs sequential `ts_acdc_opf` (Phase 8 myopic)
+1. **Overview** — coupled / rolling horizon vs sequential `ts_acdc_opf` (Phase 8 myopic + `SoC_deviation`)
 2. **Adding a BESS** — `add_storage` workflow on any AC node ✅
 3. **Running `window_nl_opf`** — time series, prices, `start` / `end`, objective ✅
 4. **Results** — `Results.ext_storage`, `Results.storage_window` ✅
 5. **PEI example** — hub bus `PE_Island` (full literalinclude pending **Phase 6**)
 6. **Modelling note** — Useche-Arteaga et al. (2026) §3.3 ✅
 7. **Phase 5:** H₂ usage page or section — §3.4 electrolyser model
+8. **Phase 8:** Myopic TS + soft `soc_ref` (`ObjRule['SoC_deviation']`)
 
 **Literalinclude examples** (under `pyflow_tests/doc_examples/`):
 
@@ -728,6 +768,7 @@ Sections:
 - [ ] H₂ API + usage pages (Phase 5)
 - [ ] PEI validation literalinclude (Phase 6)
 - [ ] Rolling-window usage note (Phase 7)
+- [ ] Myopic TS + `soc_ref` / `SoC_deviation` (Phase 8)
 
 ---
 
@@ -747,7 +788,7 @@ Sections:
 | `Results_class.py` (Phase 5) | `ext_electrolyser()`, `hydrogen_window()` ✅ |
 | `ACDC_OPF.py` | `storage_info` in `translate_pyf_opf`; pass horizon if needed |
 | `Results_class.py` | `ext_storage()`, `storage_window()` |
-| `Time_series.py` | Phase 8 only (deferred myopic TS) |
+| `Time_series.py` | **Phase 8** — myopic SoC (+ H₂) carry in `ts_acdc_opf`; soft `soc_ref` via `SoC_deviation` |
 | `__init__.py` | Export new symbols |
 | `pyflow_tests/...` | **Phase 6** — full PEI Mario validation test; `test_hydrogen_opf.py` ✅ |
 | `docs/api/storage.rst` | **New** — `Storage_AC`, `add_storage`, `window_opf` API |
@@ -794,10 +835,10 @@ If simultaneous charge/discharge appears in results:
 3. Phase 2 — snapshot NL model ✅  
 4. Phase 3 — `Results.ext_storage` + `storage_window` ✅  
 5. Phase 4 — `window_nl_opf` + `window_block` ✅  
-6. **Phase 5 — hydrogen / electrolyser** ✅  
-7. **Phase 6 — Mario PEI validation (BESS + H₂ + exports, all together)** ← next  
-8. Phase 7 — rolling window (later)  
-9. Phase 8 — myopic TS (later)  
+6. Phase 5 — hydrogen / electrolyser ✅  
+7. Phase 6 — Mario PEI validation (BESS + H₂ + exports) ✅ / in use  
+8. Phase 7 — rolling window ✅  
+9. **Phase 8 — myopic TS + soft `soc_ref` (`SoC_deviation`)** ← **next**  
 10. Phase 9 — TEP / linear OPF (later)  
 
 **Concurrent (throughout):** Documentation — update RST, examples, and citations with each phase above.
