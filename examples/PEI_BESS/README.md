@@ -18,18 +18,29 @@ GitHub raw base (``main``)::
 
     https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/
 
-``pyflow_tests._bess_h2_pei_data`` uses a local ``examples/PEI_BESS`` checkout when
-present, otherwise downloads from that URL.
+``PEI_grid(..., storage=True, hydrogen=True, data=...)`` loads seasonal or
+``Full_data`` series (local ``examples/PEI_BESS`` checkout, else GitHub raw URL).
 
 Usage::
 
-    from pyflow_tests._bess_h2_pei_data import build_pei_bess_h2_grid, PEI_SEASONS
+    import pyflow_acdc as pyf
 
-    # Default: Autumn only (24 h)
-    grid = build_pei_bess_h2_grid()
+    # Default Autumn 24 h + BESS + H₂
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+    )
 
     # All four seasons concatenated (96 h)
-    grid = build_pei_bess_h2_grid(seasons=PEI_SEASONS)
+    grid, _ = pyf.cases["PEI_grid"](
+        include_countries=["GB", "DK"],
+        storage=True,
+        hydrogen=True,
+        data="season_comparison",
+        seasons=("Spring", "Summer", "Autumn", "Winter"),
+    )
 
 Season-compare + Dash: see docs page ``usage_window_opf`` and
 ``pyflow_tests/doc_examples/window_opf/01_pei_season_compare_dash.py``.
