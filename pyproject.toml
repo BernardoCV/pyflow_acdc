@@ -75,6 +75,8 @@ OPF = ["pyomo"]
 
 Dash = ["dash"]
 
+GUI = ["PySide6"]
+
 LINEAR_ARRAY = ["ortools", "highspy==1.14.0"]
 
 TEP_pymoo = ["pymoo",
@@ -102,12 +104,20 @@ Repository     = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
 [tool.setuptools]
-packages = ["pyflow_acdc","pyflow_tests"]
+packages = [
+    "pyflow_acdc",
+    "pyflow_acdc.gui",
+    "pyflow_acdc.gui.tabs",
+    "pyflow_acdc.gui.widgets",
+    "pyflow_acdc.gui.workers",
+    "pyflow_tests",
+]
 
 [tool.setuptools.package-data]
 "pyflow_acdc" = [
     "assets/*.svg",
     "assets/*.css",
+    "gui/assets/*.qss",
     "folium_images/*.png",
     "Cable_database/*.yaml",
     "example_grids/*.py",
@@ -133,6 +143,7 @@ packages = ["pyflow_acdc","pyflow_tests"]
 [project.scripts]
 pyflow-acdc-test = "pyflow_tests.run_tests:main"
 pyflow-acdc-check-solvers = "pyflow_acdc.solver_utils:cli_check_solvers"
+pyflow-acdc-gui = "pyflow_acdc.gui:launch"
 
 [tool.ruff]
 line-length = 100          # dense numerical/Pyomo expressions; relax from default 88
@@ -174,4 +185,5 @@ ignore = [
 markers = [
     "slow: solver-heavy or long-running tests (array sizing, sequential CSS, TS OPF, large grids)",
     "integration: tests needing network access or heavy third-party stacks (folium, dash, remote CSVs)",
+    "gui: tests requiring PySide6 (desktop GUI)",
 ]

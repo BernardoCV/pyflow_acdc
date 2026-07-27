@@ -7,8 +7,8 @@ load a grid, run studies, inspect `Results` and plots — in one window.
 
 Complements (does not replace) Dash ([`plans/dash_improvement_plan.md`](dash_improvement_plan.md)).
 
-**Status:** product shape defined (3-tab workflow); **PySide6 locked** as shell;
-**no implementation started**. Remaining open questions in §10.
+**Status:** Phase 0 **bones implemented** (optional `pyflow_acdc.gui` package).
+Remaining open questions in §10.
 
 ---
 
@@ -433,3 +433,4 @@ pyflow_acdc/gui/
 | 2026-07-27 | Initial feasibility evaluation (`pyqt6_gui_plan.md`). |
 | 2026-07-27 | Reworked around 3-tab UX: Grid (builder / code / file) → Tests → Results. |
 | 2026-07-27 | Renamed to `gui_plan.md`; locked **PySide6** OSS shell; pyflow purpose unchanged; added §0–§1 stack. |
+| 2026-07-27 | Phase 0 bones: `pyflow_acdc/gui/` package, `pyflow-acdc-gui` entry point, smoke test. |
