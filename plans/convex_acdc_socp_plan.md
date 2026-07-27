@@ -1,5 +1,7 @@
 # Convex AC/DC SOCP plan for pyflow_acdc
 
+**Repository:** In-repo links target the [`mario_integration`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration) branch ([`plans/`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)).
+
 Living implementation plan for **sparse second-order cone programming (SOCP)**, **mixed-integer
 SOCP (MI-SOCP)**, **chance-constrained programming (CCP)**, and **robust convex optimization**
 methodologies from Mario Useche-Arteaga et al.
@@ -23,13 +25,14 @@ for before coding.
 
 **Related pyflow_acdc assets**
 
-| Document | Path |
+| Document | Link |
 |----------|------|
-| BESS / H₂ operation (NLP, shipped) | [plans/bess_integration_plan.md](bess_integration_plan.md) |
-| BESS sizing (separate build) | [plans/bess_sizing_ramp_plan.md](bess_sizing_ramp_plan.md) |
-| Architecture map | [docs/architecture.md](../docs/architecture.md) |
-| PEI validation grid | `pyflow_acdc/example_grids/PF/PEI_grid.py` |
-| PEI window OPF tests | `pyflow_tests/test_pei_window_nl_opf_bess_h2.py` |
+| BESS / H₂ operation (NLP, shipped) | [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) |
+| BESS sizing (separate build) | [bess_sizing_ramp_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_sizing_ramp_plan.md) |
+| OPTYMADD integration (separate) | [optymadd_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/optymadd_integration_plan.md) |
+| Architecture map | [docs/architecture.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/architecture.md) |
+| PEI validation grid | [`PEI_grid.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_acdc/example_grids/PF/PEI_grid.py) |
+| PEI window OPF tests | [`test_pei_window_nl_opf_bess_h2.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_tests/test_pei_window_nl_opf_bess_h2.py) |
 
 Local PDFs (user-provided): `efficient.pdf` (2026), `1-s2.0-S0378779624012537-main.pdf` (2025).
 
@@ -72,7 +75,7 @@ uncertainty frameworks.
 |-------|-------------|----------------------|
 | `optimal_pf` + `ACDC_OPF_NL_model.py` | **Nonlinear** polar OPF (`V`, `θ`) | Reference “exact” baseline for Paper A validation (Table 3) |
 | `window_nl_opf` | Coupled multi-hour **NLP** on full grid + BESS + H₂ | Operational peer; PEI tests already exist |
-| `bess_sizing.py` (planned) | Plant-level POI NLP | Separate problem class ([bess_sizing_ramp_plan.md](bess_sizing_ramp_plan.md)) |
+| `bess_sizing.py` (planned) | Plant-level POI NLP | Separate problem class ([bess_sizing_ramp_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_sizing_ramp_plan.md)) |
 
 **This plan adds a dedicated SOCP / MI-SOCP stack** with its own model builder and runner —
 not a patch to the shipped NLP builders.
@@ -746,7 +749,7 @@ https://doi.org/10.1016/j.epsr.2024.111367
 
 M. Useche-Arteaga et al., *Optimizing the operation of energy islands with predictive
 nonlinear programming* (PEI case study), Wind Energy Sci. **11**, 349–372 (2026).
-Implemented in [bess_integration_plan.md](bess_integration_plan.md) (`window_nl_opf`).
+Implemented in [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) (`window_nl_opf`).
 
 ### Convex optimization background (cited in papers)
 
@@ -761,6 +764,6 @@ robust counterpart (Paper B).
 
 ### pyflow_acdc siblings
 
-[bess_integration_plan.md](bess_integration_plan.md) — operational NLP BESS + H₂.
+[bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) — operational NLP BESS + H₂.
 
-[bess_sizing_ramp_plan.md](bess_sizing_ramp_plan.md) — plant-level BESS sizing (separate build).
+[bess_sizing_ramp_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_sizing_ramp_plan.md) — plant-level BESS sizing (separate build).

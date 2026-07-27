@@ -1,5 +1,7 @@
 # BESS sizing and ramp-rate plan for pyflow_acdc
 
+**Repository:** In-repo links target the [`mario_integration`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration) branch ([`plans/`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)).
+
 Living implementation plan for **optimal BESS sizing and operation under ramp-rate
 limits and degradation**, based on the publication below.
 
@@ -17,11 +19,13 @@ https://doi.org/10.1016/j.est.2024.114631.
 
 **Related pyflow_acdc assets**
 
-| Document | Path |
+| Document | Link |
 |----------|------|
-| BESS operation (already shipped) | [plans/bess_integration_plan.md](bess_integration_plan.md) |
-| Architecture map | [docs/architecture.md](../docs/architecture.md) |
-| Storage user guide | [docs/usage_storage.rst](../docs/usage_storage.rst) |
+| BESS operation (already shipped) | [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) |
+| Mario convex SOCP (separate) | [convex_acdc_socp_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/convex_acdc_socp_plan.md) |
+| OPTYMADD integration (separate) | [optymadd_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/optymadd_integration_plan.md) |
+| Architecture map | [docs/architecture.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/architecture.md) |
+| Storage user guide | [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) |
 
 ---
 
@@ -714,5 +718,5 @@ Energy **11**(4), 2130–2140 (2020). https://doi.org/10.1109/TSTE.2019.2950723
 ### pyflow_acdc (operation — separate concern)
 
 M. Useche-Arteaga et al., *Optimizing the operation of energy islands…*, Wind
-Energ. Sci. **11**, 349–372 (2026). Implemented in [bess_integration_plan.md](bess_integration_plan.md).
+Energ. Sci. **11**, 349–372 (2026). Implemented in [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md).
 Hand-off: `bess_sizing()` → `add_storage()` → `window_nl_opf`.

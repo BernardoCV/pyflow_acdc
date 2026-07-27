@@ -1,11 +1,13 @@
 # Dash visual improvement plan for pyflow_acdc
 
-Living plan for the interactive Dash apps in
-[`pyflow_acdc/Graph_Dash.py`](../pyflow_acdc/Graph_Dash.py).
+**Repository:** In-repo links target the [`mario_integration`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration) branch ([`plans/`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)).
 
-Related tests: [`pyflow_tests/test_graph_dash.py`](../pyflow_tests/test_graph_dash.py).
-Docs: [`docs/api/dash.rst`](../docs/api/dash.rst),
-[`docs/usage_window_opf.rst`](../docs/usage_window_opf.rst).
+Living plan for the interactive Dash apps in
+[`pyflow_acdc/Graph_Dash.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_acdc/Graph_Dash.py).
+
+Related tests: [`pyflow_tests/test_graph_dash.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_tests/test_graph_dash.py).
+Docs: [`docs/api/dash.rst`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/dash.rst),
+[`docs/usage_window_opf.rst`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_window_opf.rst).
 
 Original goal (3 items) is **done** (§A). Phases 5–8 below have **mostly shipped**; post-plan
 work (season-compare polish, rolling Dash, PEI docs) is also **done** (§B). The one remaining
@@ -151,7 +153,7 @@ below: `_sidebar_header(app, title, subtitle=None)` shared by all builders; favi
 ### Decisions
 | ID | Topic | Decision |
 |----|-------|----------|
-| B1 | Asset | Reuse [`docs/_static/logo_dark.svg`](../docs/_static/logo_dark.svg) (light-ink logo for dark backgrounds — matches the navy sidebar). |
+| B1 | Asset | Reuse [`docs/_static/logo_dark.svg`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/_static/logo_dark.svg) (light-ink logo for dark backgrounds — matches the navy sidebar). |
 | B2 | Serving | Copy to `pyflow_acdc/assets/pyflow_logo.svg`; Dash auto-serves `assets/` next to the app module (`dash.Dash(__name__)` root = `pyflow_acdc/`). |
 | B3 | Placement | Left of the sidebar title, in the existing header flex row; `Hide ✕` stays right. Optional `subtitle` under title (season / rolling apps). |
 | B4 | Fail-fast | Startup check raises `FileNotFoundError` if the asset is missing (no silently broken `<img>`). |

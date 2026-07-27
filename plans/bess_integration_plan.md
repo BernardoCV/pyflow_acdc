@@ -1,5 +1,7 @@
 # BESS integration plan for pyflow_acdc
 
+**Repository:** In-repo links target the [`mario_integration`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration) branch ([`plans/`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)).
+
 Implementation plan for adding Battery Energy Storage Systems (BESS) to the nonlinear AC/DC OPF, based on:
 
 - Mario Useche-Arteaga et al., *Wind Energ. Sci.* 11, 349–372 (2026) — §3.3 BESS model
@@ -7,17 +9,12 @@ Implementation plan for adding Battery Energy Storage Systems (BESS) to the nonl
 
 ## Documentation (GitHub / Read the Docs)
 
-| Document | Path | Read the Docs |
-|----------|------|---------------|
-| User guide | [docs/usage_storage.rst](../usage_storage.rst) | [usage_storage](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html) |
-| API reference | [docs/api/storage.rst](../api/storage.rst) | [api/storage](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html) |
-| This plan | [plans/bess_integration_plan.md](bess_integration_plan.md) | — |
-
-Permanent GitHub links (``main`` branch):
-
-- User guide: https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/usage_storage.rst
-- API: https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/docs/api/storage.rst
-- Plan: https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md
+| Document | GitHub (`mario_integration`) | Read the Docs |
+|----------|------------------------------|---------------|
+| User guide | [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) | [usage_storage](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html) |
+| API reference | [docs/api/storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/storage.rst) | [api/storage](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html) |
+| This plan | [plans/bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) | — |
+| Sibling plans | [plans/](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans) | — |
 
 ---
 
@@ -861,7 +858,8 @@ M. Useche-Arteaga, P. Gebraad, V. A. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmu
 
 ### pyflow_acdc assets
 
-- PEI grid — `pyflow_acdc/example_grids/PF/PEI_grid.py` (hub: **`PE_Island`**)
-- User guide — [docs/usage_storage.rst](../usage_storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html)
-- API — [docs/api/storage.rst](../api/storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html)
-- Integration plan — [plans/bess_integration_plan.md](bess_integration_plan.md)
+- PEI grid — [`PEI_grid.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_acdc/example_grids/PF/PEI_grid.py) (hub: **`PE_Island`**)
+- User guide — [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html)
+- API — [docs/api/storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html)
+- Integration plan — [plans/bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md)
+- Sibling plans — [plans/](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)
