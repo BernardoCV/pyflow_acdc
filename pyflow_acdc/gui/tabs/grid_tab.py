@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Tab 1 — load or sample grid (builder / code: placeholders)."""
+"""Left Grid column — logo, load, inventory, session log."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -10,13 +13,48 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 import pyflow_acdc as pyf
 
+from pyflow_acdc.gui.dialogs.cases_dialog import CasesDialog
+from pyflow_acdc.gui.dialogs.code_dialog import PasteCodeDialog
+from pyflow_acdc.gui.grid.inventory import format_grid_inventory
 from pyflow_acdc.gui.session import Session
+
+_LOGO_LIGHT = (
+    Path(__file__).resolve().parents[2] / "assets" / "pyflow_logo_light.svg"
+)
+
+
+def _sidebar_logo() -> QWidget:
+    """Light-background logo for the Grid column header."""
+    wrap = QWidget()
+    layout = QVBoxLayout(wrap)
+    layout.setContentsMargins(4, 4, 4, 0)
+
+    if _LOGO_LIGHT.is_file():
+        try:
+            from PySide6.QtSvgWidgets import QSvgWidget
+
+            logo = QSvgWidget(str(_LOGO_LIGHT))
+            logo.setObjectName("sidebarLogo")
+            logo.setFixedHeight(56)
+            logo.setMinimumWidth(180)
+            logo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            layout.addWidget(logo, alignment=Qt.AlignHCenter)
+            return wrap
+        except ImportError:
+            pass
+
+    title = QLabel("<b>pyflow-acdc</b>")
+    title.setAlignment(Qt.AlignCenter)
+    layout.addWidget(title)
+    return wrap
 
 
 class GridTab(QWidget):
@@ -25,50 +63,69 @@ class GridTab(QWidget):
         self._session = session
 
         self._status = QLabel("Status: Idle")
-        self._summary = QLabel("No grid loaded.")
-        self._summary.setWordWrap(True)
 
         self._load_pickle_btn = QPushButton("Load pickle…")
         self._load_pickle_btn.clicked.connect(self._load_pickle)
 
-        self._sample_btn = QPushButton("Load sample case (IEEE PJM 5-bus AC)")
-        self._sample_btn.clicked.connect(self._load_sample_case)
+        self._load_cases_btn = QPushButton("Load from cases…")
+        self._load_cases_btn.clicked.connect(self._load_from_cases)
 
-        load_group = QGroupBox("Load file")
+        self._load_code_btn = QPushButton("Load from code…")
+        self._load_code_btn.clicked.connect(self._load_from_code)
+
+        load_group = QGroupBox("Load")
         load_layout = QVBoxLayout(load_group)
         load_layout.addWidget(self._status)
         load_layout.addWidget(self._load_pickle_btn)
-        load_layout.addWidget(self._sample_btn)
+        load_layout.addWidget(self._load_cases_btn)
+        load_layout.addWidget(self._load_code_btn)
 
-        placeholder = QGroupBox("Coming soon")
-        placeholder_layout = QVBoxLayout(placeholder)
-        placeholder_layout.addWidget(
-            QLabel("Interactive add_* builder and paste-code editor will go here.")
-        )
+        size_group = QGroupBox("Grid size")
+        size_layout = QVBoxLayout(size_group)
+        self._inventory = QTextEdit()
+        self._inventory.setReadOnly(True)
+        self._inventory.setMinimumHeight(160)
+        self._inventory.setPlainText("No grid loaded.")
+        size_layout.addWidget(self._inventory)
 
-        inspector = QGroupBox("Inspector")
-        inspector_layout = QVBoxLayout(inspector)
-        inspector_layout.addWidget(self._summary)
+        log_group = QGroupBox("Log")
+        log_layout = QVBoxLayout(log_group)
+        self._log = QTextEdit()
+        self._log.setReadOnly(True)
+        self._log.setMinimumHeight(120)
+        self._log.setPlaceholderText("Solver log and messages…")
+        log_layout.addWidget(self._log)
 
         layout = QVBoxLayout(self)
+        layout.addWidget(_sidebar_logo())
         layout.addWidget(load_group)
-        layout.addWidget(placeholder)
-        layout.addWidget(inspector)
-        layout.addStretch()
+        layout.addWidget(size_group, 1)
+        layout.addWidget(log_group, 1)
 
-        session.grid_changed.connect(self._refresh_summary)
+        session.grid_changed.connect(self._refresh_inventory)
         session.busy_changed.connect(self._on_busy_changed)
         session.status_changed.connect(self._on_status_changed)
+        session.log_message.connect(self._append_log)
+
+    def _append_log(self, text: str) -> None:
+        self._log.append(text)
+
+    def _load_buttons(self):
+        return (
+            self._load_pickle_btn,
+            self._load_cases_btn,
+            self._load_code_btn,
+        )
 
     def _on_busy_changed(self, busy: bool) -> None:
-        self._load_pickle_btn.setEnabled(not busy)
-        self._sample_btn.setEnabled(not busy)
+        for btn in self._load_buttons():
+            btn.setEnabled(not busy)
 
     def _on_status_changed(self, status: str) -> None:
         self._status.setText(f"Status: {status}")
 
-    def _refresh_summary(self) -> None:
-        self._summary.setText(self._session.grid_summary())
+    def _refresh_inventory(self) -> None:
+        self._inventory.setPlainText(format_grid_inventory(self._session.grid))
 
     def _begin_load(self, status: str) -> bool:
         if self._session.busy:
@@ -100,13 +157,33 @@ class GridTab(QWidget):
             self._end_load("Load failed")
             QMessageBox.critical(self, "Load failed", str(exc))
 
-    def _load_sample_case(self) -> None:
-        if not self._begin_load("Loading sample case…"):
+    def _load_from_cases(self) -> None:
+        if self._session.busy:
+            QMessageBox.warning(self, "Busy", f"Wait — {self._session.status}")
+            return
+        dialog = CasesDialog(self)
+        if dialog.exec() != CasesDialog.Accepted or dialog.grid is None:
+            return
+        if not self._begin_load("Loading case…"):
             return
         try:
-            grid, _res = pyf.cases["pglib_opf_case5_pjm"]()
-            grid.name = "pglib_opf_case5_pjm"
-            self._session.set_grid(grid)
+            self._session.set_grid(dialog.grid)
+            self._end_load("Loaded")
+        except Exception as exc:
+            self._end_load("Load failed")
+            QMessageBox.critical(self, "Load failed", str(exc))
+
+    def _load_from_code(self) -> None:
+        if self._session.busy:
+            QMessageBox.warning(self, "Busy", f"Wait — {self._session.status}")
+            return
+        dialog = PasteCodeDialog(self, existing_grid=self._session.grid)
+        if dialog.exec() != PasteCodeDialog.Accepted or dialog.grid is None:
+            return
+        if not self._begin_load("Running pasted code…"):
+            return
+        try:
+            self._session.set_grid(dialog.grid)
             self._end_load("Loaded")
         except Exception as exc:
             self._end_load("Load failed")

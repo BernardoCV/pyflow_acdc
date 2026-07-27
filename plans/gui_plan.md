@@ -5,6 +5,13 @@
 Living plan for an **optional open-source desktop shell** around pyflow_acdc: build or
 load a grid, run studies, inspect `Results` and plots — in one window.
 
+**Audience / intent:** The GUI is also a **learning tool**. It should help people
+understand **what power flow and system studies are** — not only run them. Prefer
+**dynamic, illustrative, explanatory** UX: live progress, linked views (grid ↔
+results ↔ plots/maps), short in-app explanations of what each study does and what
+outputs mean. A later phase adds **theory / documentation** in the shell (see §6
+Phase 6), reusing or linking Sphinx docs rather than inventing a second curriculum.
+
 Complements (does not replace) Dash ([`plans/dash_improvement_plan.md`](dash_improvement_plan.md)).
 
 **Status:** Phase 0 **bones implemented** (optional `pyflow_acdc.gui` package).
@@ -21,6 +28,7 @@ Remaining open questions in §10.
 | **Thin shell only** | Widgets call existing `add_*`, `create_grid_*`, solvers, `Results`, plot helpers. No parallel grid model, no solver rewrite. |
 | **Open-source shell** | **PySide6 (LGPL)** — not PyQt6 GPL. Keeps distribution compatible with pyflow’s OSS posture. |
 | **Does not redefine purpose** | No commercial lock-in via GUI toolkit license; no requirement that users use the GUI to use pyflow. |
+| **Learn by doing** | Primary non-expert goal: make PF / OPF / window / TEP **visible and explainable**. Prefer interactive illustration (plots, maps, solve progress, tooltips / help panes) over opaque “run → dump tables”. Theory docs land in a dedicated later phase; until then, short study blurbs and linked existing docs are enough. |
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -198,19 +206,24 @@ res.all(print_table=False)   # fills res.tables without terminal spam
 
 Show only tables that exist after the last run (empty until first solve).
 
-#### Visualisation — sub-tabs
+#### Visualisation — Results plots vs Visualize map
+
+| Where | What | Notes |
+|-------|------|-------|
+| **Results → Plots** | Snapshot / TS plots from `Results.tables` and grid TS helpers | GUI-side Plotly builders (not required in core backend). Presets e.g. **AC voltages (all nodes)**, powerflow injections. |
+| **Tests → Solve progress** | Solver iteration / feasibility curves | Study progress only — not Results analytics. |
+| **Visualize** | Folium map | Geographic / planar network; not Results bar charts. |
+
+**GUI-owned Results plots (thin shell):** many illustrative charts (voltage bar charts, injection summaries) are **not** first-class `Graph_and_plot` APIs — build them in `gui/results/plot_builder.py` from `Results.tables`. Prefer that over expanding the backend plot surface for teaching UX.
+
+#### Visualisation — map / Dash
 
 | Sub-tab | Source | Widget |
 |---------|--------|--------|
-| **Network (Plotly)** | `Graph_and_plot` | `QWebEngineView` or matplotlib canvas |
-| **Map (Folium)** | `plot_folium`, `plot_folium_network`, `plot_folium_ts_results` | `QWebEngineView` + temp HTML (`[mapping]` extra) |
-| **Time series (Plotly)** | `plot_TS_res_dash`, `plot_window_family_dash`, … | Reuse Dash **figure builders** only — not callbacks |
-| **Dash (full)** | `run_dash` / `create_*_dash_app` | **Open in browser** button (embedded Dash server optional later) |
+| **Map (Folium)** | `plot_folium`, `plot_folium_network`, `plot_folium_ts_results` | `QWebEngineView` + temp HTML (`[mapping]` extra), else browser |
+| **Dash (full)** | `run_dash` / `create_*_dash_app` | **Open in browser** button |
 
-**Dash routing:** mirror `run_dash` auto mode (`grid.dash_mode`, `season_window_compare_run`,
-`rolling_window_opf_run`, …) — see [`Graph_Dash.py`](../pyflow_acdc/Graph_Dash.py).
-
-**Plotly offline:** bundle `plotly.min.js` in assets for air-gapped use (§10 Q-5).
+**In-window Plotly:** WebEngine when available; otherwise **static PNG via kaleido** (`[GUI]`). «Open in browser» keeps interactive Plotly.
 
 ---
 
@@ -221,6 +234,7 @@ Show only tables that exist after the last run (empty until first solve).
 | **Feasible?** | **Yes** — optional `pyflow_acdc[GUI]` with **PySide6**; thin shell over existing APIs. |
 | **Purpose impact?** | **None** — pyflow remains a Python library; GUI is an optional front-end. |
 | **Core idea** | **Grid → Tests → Results**; no duplicate solver or results logic. |
+| **Learning goal** | Help users **see and understand** power flow and system studies (dynamic / illustrative / explanatory). |
 | **vs Dash** | Dash stays the rich interactive TS UI; GUI integrates tables + launch + static/embed plots. |
 | **Hardest part** | Mode A forms staying in sync with every `add_*` signature; Mode B is cheap. |
 | **First milestone** | Tab shell + Mode C pickle + PF + `Results.all` table view. |
@@ -315,9 +329,10 @@ Phases follow **Tab 1 → 2 → 3**, not “results first”.
 | ID | Deliverable |
 |----|-------------|
 | P4-1 | All `Results.tables` navigable + export |
-| P4-2 | Plotly network / TS embed (`Graph_and_plot`, window family figures) |
-| P4-3 | Folium embed (`[mapping]`) |
+| P4-2 | **Results → Plots**: GUI Plotly from tables (presets: AC voltage, injections) + optional TS helpers |
+| P4-3 | Folium on **Visualize** (`[mapping]`) |
 | P4-4 | **Open Dash** + route by `grid` state |
+| P4-5 | In-window plots without WebEngine: kaleido PNG fallback |
 
 ### Phase 5 — Polish
 
@@ -325,7 +340,22 @@ Phases follow **Tab 1 → 2 → 3**, not “results first”.
 |----|-------------|
 | P5-1 | SCADA theme (`gui.qss` from Dash palette) |
 | P5-2 | `docs/usage_gui.rst` + screenshot |
-| P5-3 | `pyflow-acdc-gui` entry point, `[GUI] = ["PySide6", …]` in `pyproject.toml` |
+| P5-3 | `pyflow-acdc-gui` entry point, `[GUI] = ["PySide6", "kaleido", …]` in `pyproject.toml` |
+
+### Phase 6 — Learning: theory & explanatory UX
+
+Goal: turn the shell into a place to **learn** power flow and system studies, not
+only operate them. Prefer linking / embedding existing Sphinx material over
+rewriting theory in Qt.
+
+| ID | Deliverable |
+|----|-------------|
+| P6-1 | Per-study **help blurbs** in Tests (what the study is, when to use it, what outputs mean) |
+| P6-2 | In-app **Learn / Theory** pane or tab: power-flow basics, AC vs DC, OPF vs PF, window/TS/TEP at a high level |
+| P6-3 | Wire blurbs / Learn pane to existing docs (`docs/`, architecture, usage) — open HTML or QWebEngine where feasible |
+| P6-4 | **Illustrative** cues during/after solve: annotate progress plots, highlight key `Results` columns, optional “what changed” after PF |
+| P6-5 | Guided mini-walkthroughs (e.g. load sample case → run PF → open voltage / map) — optional, after P6-1–4 |
+| P6-6 | **Academic node model view** (later): pick a bus / converter and show the **node equation picture** — inputs (gens, loads, converters) and outputs (injections / flows to neighbours). Example: all gens at the node and **how much each injects toward other nodes**. Built for teaching; may use `Results` + topology from `Grid`, not a new solver. |
 
 ---
 
@@ -397,6 +427,8 @@ pyflow_acdc/gui/
 | Q-5 | Project file: pickle only vs YAML pointing to CSV paths | Pickle v1 |
 | Q-6 | Plotly JS: bundle vs CDN | Bundle in package |
 | Q-7 | Convex SOCP studies in Tests tab | When [`convex_acdc_socp_plan.md`](convex_acdc_socp_plan.md) ships |
+| Q-8 | Learn/Theory: embed Sphinx HTML vs link out to ReadTheDocs / local `docs/_build`? | Link out first; embed later if packaging is clean |
+| Q-9 | How deep should in-app theory go (definitions only vs equations)? | Definitions + intuition first; equations optional / linked |
 
 ---
 
@@ -409,6 +441,8 @@ pyflow_acdc/gui/
 | Phase 2 | Add nodes/lines/gens via forms without a script |
 | Phase 3 | Run `window_nl_opf` from GUI |
 | Phase 4 | View Folium map + open season-compare Dash from same session |
+| Phase 6 | Read what PF/OPF mean in-app, follow a short walkthrough, and relate outputs to the study they ran |
+| Phase 6 (later) | Inspect a **node model**: gens/loads in, neighbour injections / flows out |
 
 ---
 
@@ -434,3 +468,5 @@ pyflow_acdc/gui/
 | 2026-07-27 | Reworked around 3-tab UX: Grid (builder / code / file) → Tests → Results. |
 | 2026-07-27 | Renamed to `gui_plan.md`; locked **PySide6** OSS shell; pyflow purpose unchanged; added §0–§1 stack. |
 | 2026-07-27 | Phase 0 bones: `pyflow_acdc/gui/` package, `pyflow-acdc-gui` entry point, smoke test. |
+| 2026-07-27 | Learning intent: GUI for understanding PF / system studies; dynamic & explanatory UX; Phase 6 theory/docs. |
+| 2026-07-27 | Results-owned plots (GUI builders + voltage preset); Visualize = map; kaleido in-window fallback; plan P6-6 node model. |

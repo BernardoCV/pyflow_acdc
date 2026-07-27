@@ -4,7 +4,15 @@ QMainWindow {
     color: #111111;
 }
 
+QWidget {
+    color: #111111;
+}
+
 QLabel {
+    color: #111111;
+}
+
+QCheckBox {
     color: #111111;
 }
 
@@ -33,6 +41,8 @@ QGroupBox {
     border-radius: 4px;
     margin-top: 12px;
     padding-top: 8px;
+    color: #111111;
+    background-color: #ffffff;
 }
 
 QGroupBox::title {
@@ -56,6 +66,35 @@ QPushButton:hover {
 
 QPushButton:disabled {
     background-color: #9aa5b8;
+    color: #ffffff;
+}
+
+QComboBox {
+    background-color: #ffffff;
+    color: #111111;
+    border: 1px solid #c5cdd8;
+    border-radius: 4px;
+    padding: 4px 8px;
+    min-height: 24px;
+}
+
+QComboBox:disabled {
+    background-color: #e8ecf2;
+    color: #5a6578;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #111111;
+    selection-background-color: #c8d6f0;
+    selection-color: #111111;
+    border: 1px solid #c5cdd8;
+    outline: 0;
 }
 
 QListWidget {
@@ -97,6 +136,22 @@ QTextEdit {
     selection-color: #111111;
 }
 
+QMessageBox {
+    background-color: #ffffff;
+    color: #111111;
+}
+
+QMessageBox QLabel {
+    color: #111111;
+    background-color: transparent;
+}
+
+QMessageBox QPushButton {
+    background-color: #000080;
+    color: #ffffff;
+    min-width: 72px;
+}
+
 QStatusBar {
     background: #e8ecf2;
     color: #1a2744;
@@ -105,6 +160,10 @@ QStatusBar {
 #gridSidebar {
     background-color: #eef1f6;
     border-right: 1px solid #c5cdd8;
+}
+
+#sidebarLogo {
+    background: transparent;
 }
 
 #sidebarToggle {

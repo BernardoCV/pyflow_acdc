@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Main window: left Grid sidebar + Tests / Results tabs."""
+"""Main window: left Grid sidebar + Tests / Results / Visualize."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from pyflow_acdc.gui.session import Session
 from pyflow_acdc.gui.tabs.grid_tab import GridTab
 from pyflow_acdc.gui.tabs.results_tab import ResultsTab
 from pyflow_acdc.gui.tabs.tests_tab import TestsTab
+from pyflow_acdc.gui.tabs.visualize_tab import VisualizeTab
 
 _SIDEBAR_WIDTH = 340
 
@@ -42,7 +43,9 @@ class MainWindow(QMainWindow):
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(8, 6, 8, 4)
         toolbar_layout.addWidget(self._toggle)
-        toolbar_layout.addWidget(QLabel("Grid sidebar · Tests / Results on the right"))
+        toolbar_layout.addWidget(
+            QLabel("Grid sidebar · Tests / Results / Visualize")
+        )
         toolbar_layout.addStretch()
 
         self._grid_panel = QWidget()
@@ -50,12 +53,12 @@ class MainWindow(QMainWindow):
         self._grid_panel.setMinimumWidth(260)
         grid_layout = QVBoxLayout(self._grid_panel)
         grid_layout.setContentsMargins(8, 4, 8, 8)
-        grid_layout.addWidget(QLabel("<b>Grid</b>"))
         grid_layout.addWidget(GridTab(session))
 
         tabs = QTabWidget()
         tabs.addTab(TestsTab(session), "Tests")
         tabs.addTab(ResultsTab(session), "Results")
+        tabs.addTab(VisualizeTab(session), "Visualize")
 
         self._splitter = QSplitter(Qt.Horizontal)
         self._splitter.addWidget(self._grid_panel)
@@ -86,6 +89,8 @@ class MainWindow(QMainWindow):
         self._grid_panel.setVisible(self._grid_open)
         if self._grid_open:
             self._toggle.setText("Hide grid ◀")
-            self._splitter.setSizes([_SIDEBAR_WIDTH, max(400, self.width() - _SIDEBAR_WIDTH)])
+            self._splitter.setSizes(
+                [_SIDEBAR_WIDTH, max(400, self.width() - _SIDEBAR_WIDTH)]
+            )
         else:
             self._toggle.setText("Show grid ▶")

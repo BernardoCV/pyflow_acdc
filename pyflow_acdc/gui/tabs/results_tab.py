@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Tab 3 — Results tables (plots / Dash: placeholders)."""
+"""Results tab — Results.tables + Results-based Plotly plots."""
 
 from __future__ import annotations
 
 import pandas as pd
 from PySide6.QtWidgets import (
-    QGroupBox,
     QLabel,
     QListWidget,
     QSplitter,
+    QTabWidget,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
+from pyflow_acdc.gui.results.plots_panel import PlotsPanel
 from pyflow_acdc.gui.session import Session
 from pyflow_acdc.gui.widgets.pandas_model import PandasTableModel
 
@@ -32,25 +33,22 @@ class ResultsTab(QWidget):
         self._table_view.setModel(self._model)
         self._table_view.setAlternatingRowColors(True)
 
-        tables_group = QGroupBox("Results tables")
-        tables_layout = QVBoxLayout(tables_group)
+        tables_split = QSplitter()
+        tables_split.addWidget(self._table_list)
+        tables_split.addWidget(self._table_view)
+        tables_split.setStretchFactor(1, 1)
+
+        tables_page = QWidget()
+        tables_layout = QVBoxLayout(tables_page)
         tables_layout.addWidget(self._empty)
+        tables_layout.addWidget(tables_split)
 
-        splitter = QSplitter()
-        splitter.addWidget(self._table_list)
-        splitter.addWidget(self._table_view)
-        splitter.setStretchFactor(1, 1)
-        tables_layout.addWidget(splitter)
-
-        plots_group = QGroupBox("Visualisation")
-        plots_layout = QVBoxLayout(plots_group)
-        plots_layout.addWidget(
-            QLabel("Plotly, Folium, and Open Dash will be added in a later phase.")
-        )
+        tabs = QTabWidget()
+        tabs.addTab(tables_page, "Tables")
+        tabs.addTab(PlotsPanel(session), "Plots")
 
         layout = QVBoxLayout(self)
-        layout.addWidget(tables_group)
-        layout.addWidget(plots_group)
+        layout.addWidget(tabs)
 
         session.results_changed.connect(self._refresh_tables)
 
