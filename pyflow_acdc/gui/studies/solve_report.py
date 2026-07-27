@@ -17,6 +17,7 @@ class StudyReport:
     log: str = ""
     tracker: dict | None = None
     ac_iters: list[int] = field(default_factory=list)
+    tol_history: list[float] = field(default_factory=list)
     solver_stats: dict | None = None
     timing_info: dict | None = None
 
@@ -26,6 +27,8 @@ class StudyReport:
             lines.append(f"Elapsed: {self.elapsed_s:.4f} s")
         if self.final_tol is not None:
             lines.append(f"Final tolerance: {self.final_tol}")
+        if self.tol_history:
+            lines.append(f"Iterations recorded: {len(self.tol_history)}")
         if self.ac_iters:
             lines.append(f"AC Newton iterations: {self.ac_iters}")
         if self.tracker:
@@ -49,33 +52,42 @@ def figure_from_study_report(report: StudyReport | None) -> go.Figure:
         fig.update_layout(title="No solve yet", template="plotly_white")
         return fig
 
-    if report.kind in ("pf_ac", "pf_dc") and report.ac_iters:
+    if report.kind in ("pf_ac", "pf_dc") and report.tol_history:
+        y = [float(np.asarray(v).reshape(-1)[0]) for v in report.tol_history]
+        x = list(range(1, len(y) + 1))
         fig.add_trace(
-            go.Bar(
-                x=[f"call {i+1}" for i in range(len(report.ac_iters))],
-                y=report.ac_iters,
-                name="Newton iterations",
+            go.Scatter(
+                x=x,
+                y=y,
+                mode="lines+markers",
+                name="Mismatch",
             )
         )
+        final = (
+            float(np.asarray(report.final_tol).reshape(-1)[0])
+            if report.final_tol is not None
+            else y[-1]
+        )
         fig.update_layout(
-            title=f"PF Newton iterations (tol={float(np.asarray(report.final_tol).reshape(-1)[0]):.3e})",
-            yaxis_title="Iterations",
+            title=f"PF convergence (final tol={final:.3e})",
+            xaxis_title="Iteration",
+            yaxis_title="Tolerance",
+            yaxis_type="log",
             template="plotly_white",
+            hovermode="x unified",
         )
         return fig
 
     if report.kind == "pf_acdc" and report.tracker:
         tr = report.tracker
-        seq = list(tr.get("sequential_iterations") or [])
+        seq = list(tr.get("sequential_iterations") or report.tol_history or [])
         ac = list(tr.get("ac_pf_tolerances") or [])
         dc = list(tr.get("dc_pf_tolerances") or [])
-        n = max(len(seq), len(ac), len(dc), 1)
-        x = list(range(1, n + 1))
         if seq:
             fig.add_trace(
                 go.Scatter(
                     x=list(range(1, len(seq) + 1)),
-                    y=seq,
+                    y=[float(np.asarray(v).reshape(-1)[0]) for v in seq],
                     mode="lines+markers",
                     name="Sequential |ΔP|",
                 )
@@ -84,24 +96,24 @@ def figure_from_study_report(report: StudyReport | None) -> go.Figure:
             fig.add_trace(
                 go.Scatter(
                     x=list(range(1, len(ac) + 1)),
-                    y=ac,
+                    y=[float(np.asarray(v).reshape(-1)[0]) for v in ac],
                     mode="lines+markers",
-                    name="AC PF tol",
+                    name="AC PF final tol",
                 )
             )
         if dc:
             fig.add_trace(
                 go.Scatter(
                     x=list(range(1, len(dc) + 1)),
-                    y=dc,
+                    y=[float(np.asarray(v).reshape(-1)[0]) for v in dc],
                     mode="lines+markers",
-                    name="DC PF tol",
+                    name="DC PF final tol",
                 )
             )
         fig.update_layout(
             title="AC/DC sequential PF convergence",
-            xaxis_title="Outer iteration",
-            yaxis_title="Tolerance / mismatch",
+            xaxis_title="Iteration",
+            yaxis_title="Tolerance",
             yaxis_type="log",
             template="plotly_white",
             hovermode="x unified",

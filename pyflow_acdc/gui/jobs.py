@@ -46,20 +46,27 @@ def run_power_flow_job(grid: Grid) -> tuple[Results, StudyReport]:
                 final_tol=tracker.get("final_sequential_tolerance"),
                 tracker=tracker,
                 ac_iters=list(grid.iter_flow_AC),
+                tol_history=list(tracker.get("sequential_iterations") or []),
             )
         if grid.ACmode:
-            t, tol = ac_power_flow(grid, DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER)
+            t, tol, history = ac_power_flow(grid, DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER)
             return StudyReport(
                 kind="pf_ac",
                 elapsed_s=t,
                 final_tol=tol,
                 ac_iters=list(grid.iter_flow_AC),
+                tol_history=list(history),
             )
         if grid.DCmode:
-            t, tol = dc_power_flow(
+            t, tol, history = dc_power_flow(
                 grid, DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, Droop_PF=True
             )
-            return StudyReport(kind="pf_dc", elapsed_s=t, final_tol=tol)
+            return StudyReport(
+                kind="pf_dc",
+                elapsed_s=t,
+                final_tol=tol,
+                tol_history=list(history),
+            )
         raise RuntimeError("Grid has neither AC nor DC mode set")
 
     report, log = _capture_io(_solve)
@@ -79,7 +86,7 @@ def run_optimal_pf_job(grid: Grid, solver: str = "ipopt") -> tuple[Results, Stud
             grid,
             solver=solver,
             tee=False,
-            callback=False,
+            callback=True,
         )
         return StudyReport(
             kind="opf",
