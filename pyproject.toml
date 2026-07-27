@@ -75,7 +75,9 @@ OPF = ["pyomo"]
 
 Dash = ["dash"]
 
-GUI = ["PySide6"]
+GUI = ["PySide6", "kaleido"]
+# Interactive HTML embed needs Qt WebEngine (often broken on Windows pip).
+# kaleido enables static in-window Plotly when WebEngine is unavailable.
 
 LINEAR_ARRAY = ["ortools", "highspy==1.14.0"]
 
@@ -110,6 +112,10 @@ packages = [
     "pyflow_acdc.gui.tabs",
     "pyflow_acdc.gui.widgets",
     "pyflow_acdc.gui.workers",
+    "pyflow_acdc.gui.grid",
+    "pyflow_acdc.gui.dialogs",
+    "pyflow_acdc.gui.results",
+    "pyflow_acdc.gui.studies",
     "pyflow_tests",
 ]
 
