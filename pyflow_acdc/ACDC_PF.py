@@ -59,11 +59,13 @@ def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Dro
     Returns
     -------
     tuple
-        ``(elapsed_seconds, final_tolerance)``.
+        ``(elapsed_seconds, final_tolerance, tol_history)`` where
+        ``tol_history`` is a list of mismatch values per iteration
+        (Newton for AC/DC-only; outer sequential mismatches for hybrid).
 
     Examples
     --------
-    >>> time, tol = pyf.power_flow(grid)
+    >>> time, tol, history = pyf.power_flow(grid)
     """
     analyse_grid(grid)
     if grid.ACmode and grid.DCmode:
@@ -75,11 +77,14 @@ def power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, Dro
             Droop_PF=Droop_PF,
         )
         tol = tracker['final_sequential_tolerance']
+        history = list(tracker.get('sequential_iterations') or [])
     elif grid.ACmode:
-        t, tol = ac_power_flow(grid, tol_lim, maxIter)
+        t, tol, history = ac_power_flow(grid, tol_lim, maxIter)
     elif grid.DCmode:
-        t, tol = dc_power_flow(grid, tol_lim, maxIter, Droop_PF=Droop_PF)
-    return t, tol
+        t, tol, history = dc_power_flow(grid, tol_lim, maxIter, Droop_PF=Droop_PF)
+    else:
+        raise RuntimeError("Grid has neither AC nor DC mode set")
+    return t, tol, history
 
 
 def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
@@ -97,11 +102,12 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     Returns
     -------
     tuple
-        ``(elapsed_seconds, final_tolerance)``.
+        ``(elapsed_seconds, final_tolerance, tol_history)`` where
+        ``tol_history`` lists the mismatch after each Newton iteration.
 
     Examples
     --------
-    >>> time, tol = pyf.ac_power_flow(grid)
+    >>> time, tol, history = pyf.ac_power_flow(grid)
     """
     tol_lim = _effective_pf_tol(grid, tol_lim)
     time_1 = time.perf_counter()
@@ -109,12 +115,12 @@ def ac_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     grid.update_pq_ac()
     grid.create_Ybus_AC()
     grid.check_stand_alone_is_slack()
-    ac_tol =load_flow_ac(grid, tol_lim, maxIter)
+    ac_tol, tol_history = load_flow_ac(grid, tol_lim, maxIter)
     grid.update_pq_ac()
     grid.line_ac_calc()
     grid.line_ac_calc_exp()
     time_2 = time.perf_counter()
-    return time_2-time_1,ac_tol
+    return time_2 - time_1, ac_tol, tol_history
 
 def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
     """Solve the DC-side power flow.
@@ -132,21 +138,22 @@ def dc_power_flow(grid, tol_lim=DEFAULT_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
     Returns
     -------
     tuple
-        ``(elapsed_seconds, final_tolerance)``.
+        ``(elapsed_seconds, final_tolerance, tol_history)`` where
+        ``tol_history`` lists the mismatch after each Newton iteration.
 
     Examples
     --------
-    >>> time, tol = pyf.dc_power_flow(grid)
+    >>> time, tol, history = pyf.dc_power_flow(grid)
     """
     tol_lim = _effective_pf_tol(grid, tol_lim)
     time_1 = time.perf_counter()
     grid.reset_run_flags()
     grid.update_p_dc()
-    dc_tol =load_flow_dc(grid, tol_lim, maxIter,Droop_PF)
+    dc_tol, tol_history = load_flow_dc(grid, tol_lim, maxIter, Droop_PF)
     grid.update_p_dc()
     grid.line_dc_calc()
     time_2 = time.perf_counter()
-    return time_2-time_1,dc_tol
+    return time_2 - time_1, dc_tol, tol_history
 
 def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER, internal_tol=PF_INNER_TOLERANCE,change_slack2Droop=False, QLimit=False,Droop_PF=True):
     """Solve a coupled AC/DC system by sequential iteration.
@@ -174,12 +181,18 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
     Returns
     -------
     tuple
-        ``(elapsed_seconds, final_tolerance, tolerance_tracker)`` where
-        ``tolerance_tracker`` is a dict of per-iteration convergence detail.
+        ``(elapsed_seconds, tolerance_tracker, ps_iterations)`` where
+        ``tolerance_tracker`` includes:
+
+        - ``sequential_iterations``: outer interface mismatch per outer iter
+        - ``ac_pf_tolerances`` / ``dc_pf_tolerances``: final inner PF tol per outer iter
+        - ``ac_pf_iter_tolerances`` / ``dc_pf_iter_tolerances``: Newton mismatch
+          histories (list of lists) for each outer iteration
+        - ``final_sequential_tolerance``
 
     Examples
     --------
-    >>> time, tol, ps_iterations = pyf.acdc_sequential(grid)
+    >>> time, tracker, ps_iterations = pyf.acdc_sequential(grid)
     """
     tol_lim = _effective_pf_tol(grid, tol_lim)
     internal_tol = _effective_pf_tol(grid, internal_tol)
@@ -193,6 +206,8 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         'sequential_iterations': [],
         'ac_pf_tolerances': [],
         'dc_pf_tolerances': [],
+        'ac_pf_iter_tolerances': [],
+        'dc_pf_iter_tolerances': [],
         'converter_tolerances': [],
         'converter_names': [],
         'final_sequential_tolerance': None,
@@ -224,8 +239,9 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         grid.Ps_AC_new = np.zeros((grid.nn_AC, 1))
 
         # Track AC power flow tolerance
-        ac_tol = load_flow_ac(grid, tol_lim=internal_tol, maxIter=maxIter)
+        ac_tol, ac_hist = load_flow_ac(grid, tol_lim=internal_tol, maxIter=maxIter)
         tolerance_tracker['ac_pf_tolerances'].append(ac_tol)
+        tolerance_tracker['ac_pf_iter_tolerances'].append(ac_hist)
 
         for conv in grid.Converters_ACDC:
             if conv.type== ConverterDCType.PAC:
@@ -259,8 +275,9 @@ def acdc_sequential(grid, tol_lim=PF_OUTER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITE
         grid.update_p_dc()
 
         # Track DC power flow tolerance
-        dc_tol = load_flow_dc(grid, tol_lim=internal_tol, maxIter=maxIter, Droop_PF=Droop_PF)
+        dc_tol, dc_hist = load_flow_dc(grid, tol_lim=internal_tol, maxIter=maxIter, Droop_PF=Droop_PF)
         tolerance_tracker['dc_pf_tolerances'].append(dc_tol)
+        tolerance_tracker['dc_pf_iter_tolerances'].append(dc_hist)
 
         # Track converter tolerances
         conv_tolerances = []
@@ -358,6 +375,10 @@ def jacobian_dc(grid, V_DC, P,Droop_PF):
 
     return J
 
+def _as_tol_float(tol) -> float:
+    return float(np.asarray(tol).reshape(-1)[0])
+
+
 def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,Droop_PF=True):
 
     iter_num = 0
@@ -369,6 +390,7 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
     for node in grid.nodes_DC:
         V[node.nodeNumber] = node.V
     tol = 1
+    tol_history = []
 
 
 
@@ -418,6 +440,7 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
                 V[i] += dV
                 k += 1  # Move to the next element in dV
         tol = max(abs(dPa))
+        tol_history.append(_as_tol_float(tol))
         # print(f"Iteration {iter_num}, Max Voltage Change: {max(abs(dV))}, tolerance: {tol}")
 
         if iter_num == maxIter:
@@ -456,7 +479,7 @@ def load_flow_dc(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER,D
                 s = 1
     grid.update_p_dc()
     s = 1
-    return tol
+    return _as_tol_float(tol), tol_history
 def jacobian_ac(grid, Voltages, Angles,P,Q):
     grid.slack_bus_number_AC = []
 
@@ -528,6 +551,7 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
 
     tol = 1
     iter_num = 0
+    tol_history = []
     while tol > tol_lim and iter_num < maxIter:
         iter_num += 1
 
@@ -593,7 +617,7 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
         dV = X[grid.nn_AC-nps:]
 
         # Recall the updated voltage vector into the correct place
-        k = 0  # Index for dV vector
+        k = 0  # Index for dTh vector
         for i in range(grid.nn_AC):
             if grid.nodes_AC[i].type != NodeType.SLACK:
                 s = 1
@@ -608,6 +632,7 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
                 k += 1  # Move to the next element in dV
 
         tol = max(abs(M))
+        tol_history.append(_as_tol_float(tol))
         if iter_num == maxIter:
             warnings.warn(f'AC load flow did not converge. Lowest tolerance: {np.round(tol, decimals=int(-np.log10(tol_lim)))}')
 
@@ -649,7 +674,7 @@ def load_flow_ac(grid, tol_lim=PF_INNER_TOLERANCE, maxIter=DEFAULT_PF_MAX_ITER):
     grid.P_AC_INJ = np.vstack([node.P_INJ for node in grid.nodes_AC])
     grid.Q_INJ = np.vstack([node.Q_INJ for node in grid.nodes_AC])
     s=1
-    return tol
+    return _as_tol_float(tol), tol_history
 def flow_conv_P_AC(grid, conv):
     Us = conv.Node_AC.V
     th_s = conv.Node_AC.theta

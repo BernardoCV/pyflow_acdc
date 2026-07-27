@@ -609,9 +609,9 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
 
             acdc_sequential(grid,QLimit=False)
         elif grid.ACmode:
-            t,tol=ac_power_flow(grid,tol_lim, maxIter)
+            t,tol,_hist=ac_power_flow(grid,tol_lim, maxIter)
         elif grid.DCmode:
-            t,tol=dc_power_flow(grid,tol_lim, maxIter)
+            t,tol,_hist=dc_power_flow(grid,tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
             # Submit the functions to the executor
