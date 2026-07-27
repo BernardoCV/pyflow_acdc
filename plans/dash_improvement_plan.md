@@ -15,7 +15,7 @@ functional item is **MP family panels** (§1.5).
 
 ## A. Shipped (done — do not re-plan)
 
-All green: `pytest pyflow_tests/test_graph_dash.py` (~31 passed).
+All green: `pytest pyflow_tests/test_graph_dash.py` (29 passed).
 
 | Area | What shipped | Key symbols |
 |------|--------------|-------------|
