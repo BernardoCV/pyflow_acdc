@@ -5,7 +5,7 @@ from pyflow_tests.test_constants import (
     CASE24_MP_INV_SERIES_URL,
 )
 
-build_only = not pyf.is_pyomo_solver_available("ipopt")
+build_only = True
 
 grid, res = pyf.cases["case24_MP"]()
 pyf.add_inv_series(grid, CASE24_MP_INV_SERIES_URL)

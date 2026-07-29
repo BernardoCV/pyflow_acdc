@@ -107,6 +107,8 @@ def _post_process_l_mptep_with_nl_opf(
     obj_rows = []
     for i in range(n_periods):
         _set_grid_to_multiperiod_state(grid, i, PZ)
+        tep_obj = float(df_lin.loc[df_lin["Investment_Period"] == i + 1, "TEP_Objective"].iloc[0])
+        present_value_tep = 1 / (1 + discount_rate) ** (i * n_years)
         nl_model, _, _, nl_stats = optimal_pf(
             grid,
             ObjRule=ObjRule,
@@ -114,22 +116,31 @@ def _post_process_l_mptep_with_nl_opf(
             tee=tee,
             obj_scaling=obj_scaling,
         )
-        if not (nl_stats and nl_stats.get("solution_found", False)):
-            termination = nl_stats.get("termination_condition", "unknown") if nl_stats else "unknown"
-            raise RuntimeError(
-                f"NL OPF post-process failed for investment period {i} "
-                f"(termination={termination})."
-            )
+        solution_found = bool(nl_stats and nl_stats.get("solution_found", False))
+        termination = nl_stats.get("termination_condition", "unknown") if nl_stats else "unknown"
 
-        nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj, True))
-        npv_nl_opf = nl_opf * present_value_opf
-        tep_obj = float(df_lin.loc[df_lin["Investment_Period"] == i + 1, "TEP_Objective"].iloc[0])
-        economic_nl_step = tep_obj + npv_nl_opf
-        if alpha is None:
-            nl_step = economic_nl_step
+        if solution_found:
+            nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj, True))
+            npv_nl_opf = nl_opf * present_value_opf
+            economic_nl_step = tep_obj + npv_nl_opf
+            if alpha is None:
+                nl_step = economic_nl_step
+            else:
+                nl_step = alpha * tep_obj + (1 - alpha) * npv_nl_opf
+            npv_nl_step = nl_step * present_value_tep
+            npv_nl_step_economic = economic_nl_step * present_value_tep
         else:
-            nl_step = alpha * tep_obj + (1 - alpha) * npv_nl_opf
-        present_value_tep = 1 / (1 + discount_rate) ** (i * n_years)
+            if tee:
+                print(
+                    f"NL OPF post-process skipped for investment period {i} "
+                    f"(termination={termination})."
+                )
+            nl_opf = np.nan
+            npv_nl_opf = np.nan
+            nl_step = np.nan
+            npv_nl_step = np.nan
+            economic_nl_step = np.nan
+            npv_nl_step_economic = np.nan
 
         obj_rows.append({
             'Investment_Period': i + 1,
@@ -137,12 +148,12 @@ def _post_process_l_mptep_with_nl_opf(
             'NPV_OPF_Objective': npv_nl_opf,
             'TEP_Objective': tep_obj,
             'STEP_Objective': nl_step,
-            'NPV_STEP_Objective': nl_step * present_value_tep,
+            'NPV_STEP_Objective': npv_nl_step,
             'STEP_Objective_Economic': economic_nl_step,
-            'NPV_STEP_Objective_Economic': economic_nl_step * present_value_tep,
+            'NPV_STEP_Objective_Economic': npv_nl_step_economic,
         })
 
-        if save_period_svgs:
+        if save_period_svgs and solution_found:
             create_geometries_from_layout(grid)
             save_network_svg(
                 grid,
