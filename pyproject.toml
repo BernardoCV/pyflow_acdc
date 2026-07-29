@@ -80,6 +80,8 @@ LINEAR_ARRAY = ["ortools", "highspy==1.14.0"]
 TEP_pymoo = ["pymoo",
              "pyomo"]
 
+SOCP = ["cvxpy"]
+
 Gurobi = ["gurobipy"]
 
 plotting = ["kaleido"]
@@ -94,7 +96,8 @@ All = ["folium",
        "ortools",
        "highspy==1.14.0",
        "pymoo",
-       "kaleido"]
+       "kaleido",
+       "cvxpy"]
 
 [project.urls]
 Homepage       = "https://github.com/CITCEA-UPC/pyflow_acdc"

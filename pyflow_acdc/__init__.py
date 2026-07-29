@@ -266,6 +266,14 @@ try:
 except ImportError:
     HAS_CLUSTERING = False
 
+# SOCP stack — optional; requires [SOCP] extra (cvxpy)
+try:
+    from .ACDC_convex import socp_optimise, soc_window_optimisation, translate_pyf_socp
+    __all__.extend(['socp_optimise', 'soc_window_optimisation', 'translate_pyf_socp'])
+    HAS_SOCP = True
+except ImportError:
+    HAS_SOCP = False
+
 # Deprecated mixed-case aliases (snake_case is the default API).
 # Imported last so the legacy names resolve to the deprecation wrappers.
 from . import depreciation_methods
