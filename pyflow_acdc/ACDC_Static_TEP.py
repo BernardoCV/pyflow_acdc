@@ -12,15 +12,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from .grid_analysis import analyse_grid
-from .constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor, TSType, TS_RENEWABLE_TYPES
+from .constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, present_value_factor, TSType, TS_RENEWABLE_TYPES
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
-from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
 from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
 from .ACDC_OPF import (
     opf_obj,
-    opf_obj_l,
-    opf_obj_l_array_losses,
     obj_w_rule,
     export_acdc_nl_model_to_pyflow_acdc,
     calculate_objective,
