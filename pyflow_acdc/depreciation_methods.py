@@ -127,6 +127,7 @@ _RESULTS_METHOD_ALIASES = {
     'MP_TEP_results': 'mp_tep_results',
     'MP_MS_TEP_results': 'mp_ms_tep_results',
     'MP_TEP_obj_res': 'mp_tep_obj_res',
+    'MP_TEP_nl_obj_res': 'mp_tep_nl_obj_res',
     'MP_MS_TEP_obj_res': 'mp_ms_tep_obj_res',
     'MP_TEP_fuel_type_distribution': 'mp_tep_fuel_type_distribution',
     'Seq_STEP_results': 'seq_step_results',

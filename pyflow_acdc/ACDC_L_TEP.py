@@ -73,6 +73,101 @@ def _calculate_l_mptep_objective_from_model(model, grid, weights_def):
     return inv_objs, inv_opf_objs
 
 
+def _post_process_l_mptep_with_nl_opf(
+    grid,
+    ObjRule,
+    n_years,
+    discount_rate,
+    Hy,
+    alpha=None,
+    nl_solver='ipopt',
+    tee=False,
+    obj_scaling=1.0,
+    save_period_svgs=False,
+    period_svg_prefix='grid_L_MP_TEP',
+):
+    """Re-solve NL OPF per investment period; store results in ``MP_TEP_nl_obj_res``.
+
+    Linear ``grid.MP_TEP_obj_res`` is left unchanged. The NL table uses the same
+    column schema so the two Excel sheets are directly comparable.
+    ``optimal_pf`` clears run flags, so ``MP_TEP_run`` is restored at the end.
+    """
+    from .ACDC_MultiPeriod_TEP import _set_grid_to_multiperiod_state
+    from .ACDC_OPF import optimal_pf, calculate_objective_from_model
+    from .Graph_and_plot import save_network_svg, create_geometries_from_layout
+
+    df_lin = grid.MP_TEP_obj_res
+    if df_lin is None or df_lin.empty:
+        raise ValueError("MP_TEP_obj_res is missing; cannot post-process NL OPF.")
+
+    present_value_opf = present_value_factor(Hy, discount_rate, n_years)
+    n_periods = int(grid.TEP_n_periods)
+    _, PZ = obj_w_rule(grid, ObjRule, True)
+
+    obj_rows = []
+    for i in range(n_periods):
+        _set_grid_to_multiperiod_state(grid, i, PZ)
+        nl_model, _, _, nl_stats = optimal_pf(
+            grid,
+            ObjRule=ObjRule,
+            solver=nl_solver,
+            tee=tee,
+            obj_scaling=obj_scaling,
+        )
+        if not (nl_stats and nl_stats.get("solution_found", False)):
+            termination = nl_stats.get("termination_condition", "unknown") if nl_stats else "unknown"
+            raise RuntimeError(
+                f"NL OPF post-process failed for investment period {i} "
+                f"(termination={termination})."
+            )
+
+        nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj, True))
+        npv_nl_opf = nl_opf * present_value_opf
+        tep_obj = float(df_lin.loc[df_lin["Investment_Period"] == i + 1, "TEP_Objective"].iloc[0])
+        economic_nl_step = tep_obj + npv_nl_opf
+        if alpha is None:
+            nl_step = economic_nl_step
+        else:
+            nl_step = alpha * tep_obj + (1 - alpha) * npv_nl_opf
+        present_value_tep = 1 / (1 + discount_rate) ** (i * n_years)
+
+        obj_rows.append({
+            'Investment_Period': i + 1,
+            'OPF_Objective': nl_opf,
+            'NPV_OPF_Objective': npv_nl_opf,
+            'TEP_Objective': tep_obj,
+            'STEP_Objective': nl_step,
+            'NPV_STEP_Objective': nl_step * present_value_tep,
+            'STEP_Objective_Economic': economic_nl_step,
+            'NPV_STEP_Objective_Economic': economic_nl_step * present_value_tep,
+        })
+
+        if save_period_svgs:
+            create_geometries_from_layout(grid)
+            save_network_svg(
+                grid,
+                name=f"{period_svg_prefix}_P{i}",
+                journal=True,
+                legend=True,
+            )
+
+    grid.MP_TEP_nl_obj_res = pd.DataFrame(
+        obj_rows,
+        columns=[
+            'Investment_Period',
+            'OPF_Objective',
+            'NPV_OPF_Objective',
+            'TEP_Objective',
+            'STEP_Objective',
+            'NPV_STEP_Objective',
+            'STEP_Objective_Economic',
+            'NPV_STEP_Objective_Economic',
+        ],
+    )
+    grid.MP_TEP_run = True
+    return grid.MP_TEP_nl_obj_res
+
+
 def linear_transmission_expansion(
     grid,
     NPV=True,
@@ -217,6 +312,10 @@ def linear_multi_period_transmission_expansion(
     build_only=False,
     n_init_install=None,
     initiate_max=None,
+    post_process_nl_opf=False,
+    nl_solver='ipopt',
+    save_period_svgs=False,
+    period_svg_prefix='grid_L_MP_TEP',
 ):
     """Build and solve the linear (MILP) multi-period AC transmission-expansion problem.
 
@@ -259,6 +358,17 @@ def linear_multi_period_transmission_expansion(
         Pre-installation level used to initialise expandable elements.
     initiate_max : bool or None, optional
         Deprecated alias for ``n_init_install`` (``True`` maps to ``"max"``).
+    post_process_nl_opf : bool, optional
+        After a successful MILP solve, re-solve a single-state NL OPF for each
+        investment period and store results in ``grid.MP_TEP_nl_obj_res``
+        (same schema as linear ``MP_TEP_obj_res`` for side-by-side comparison).
+    nl_solver : str, optional
+        NLP solver used when ``post_process_nl_opf`` is True (default ``'ipopt'``).
+    save_period_svgs : bool, optional
+        Save one SVG per investment period at the end. With NL post-processing,
+        SVGs reflect the NL operating point; otherwise investment topology only.
+    period_svg_prefix : str, optional
+        Path/name prefix for period SVGs when ``save_period_svgs`` is True.
 
     Returns
     -------
@@ -280,6 +390,7 @@ def linear_multi_period_transmission_expansion(
         _inv_decision,
         export_mp_tep_results_to_pyflow_acdc,
         _save_inv_models,
+        save_MP_TEP_period_svgs,
     )
 
     if initiate_max is not None:
@@ -462,10 +573,43 @@ def linear_multi_period_transmission_expansion(
             'NPV_STEP_Objective_Economic',
         ],
     )
-    timing_info = {
-        "create": t2 - t1,
-        "solve": solver_stats["time"],
-        "export": t4 - t3,
-    }
+
+    solution_found = bool(solver_stats and solver_stats.get("solution_found", False))
+    if post_process_nl_opf and not build_only and solution_found:
+        t_pp0 = time.time()
+        _post_process_l_mptep_with_nl_opf(
+            grid,
+            ObjRule=ObjRule,
+            n_years=n_years,
+            discount_rate=discount_rate,
+            Hy=Hy,
+            alpha=alpha,
+            nl_solver=nl_solver,
+            tee=tee,
+            obj_scaling=obj_scaling,
+            save_period_svgs=save_period_svgs,
+            period_svg_prefix=period_svg_prefix,
+        )
+        t4 = time.time()
+        timing_info = {
+            "create": t2 - t1,
+            "solve": solver_stats["time"],
+            "export": t4 - t3,
+            "nl_post_process": t4 - t_pp0,
+        }
+    else:
+        if save_period_svgs and not build_only and solution_found:
+            save_MP_TEP_period_svgs(
+                grid,
+                name_prefix=period_svg_prefix,
+                journal=True,
+                legend=True,
+                Price_Zones=PZ,
+            )
+        timing_info = {
+            "create": t2 - t1,
+            "solve": solver_stats["time"],
+            "export": t4 - t3,
+        }
 
     return model, model_results, timing_info, solver_stats

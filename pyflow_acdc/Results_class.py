@@ -146,6 +146,7 @@ class Results:
         if self.Grid.MP_TEP_run:
             self.mp_tep_results(print_table=print_table)
             self.mp_tep_obj_res(print_table=print_table)
+            self.mp_tep_nl_obj_res(print_table=print_table)
             self.mp_tep_fuel_type_distribution(print_table=print_table)
         if self.Grid.MP_MS_TEP_run:
             self.mp_tep_results(print_table=print_table)
@@ -2224,6 +2225,70 @@ class Results:
                 tot_npv_cost+=npv_cost
             table2.add_row(['',''])
             # Format total with thousand separators (spaces) and decimal places
+            formatted_total = f"{np.round(tot_npv_cost, decimals=self.dec):,.{self.dec}f}".replace(',', ' ')
+            table2.add_row(['Total', formatted_total])
+            print(table2)
+            print('')
+
+        return df
+
+    def mp_tep_nl_obj_res(self, print_table=True):
+        """NL OPF post-process objectives (linear MP-TEP); separate Excel sheet."""
+        df = getattr(self.Grid, "MP_TEP_nl_obj_res", None)
+        if df is None:
+            return df
+
+        self.tables["MP_TEP_nl_obj_res"] = df
+
+        if print_table:
+            print('')
+            print('Dynamic Transmission Expansion Problem (NL OPF post-process)')
+            print('')
+            print('Objective results:')
+            print('')
+            table = pt()
+            columns_to_show = [
+                "Investment_Period",
+                "OPF_Objective",
+                "NPV_OPF_Objective",
+                "TEP_Objective",
+                "STEP_Objective",
+            ]
+            display_names = [
+                "Investment Period",
+                "NL Operational Cost [€]",
+                "NPV NL Operational Cost [€]",
+                "Investment Cost [€]",
+                "NL Total STEP Cost [€]",
+            ]
+            table.field_names = display_names
+            for _, row in df.iterrows():
+                formatted_row = []
+                for col in columns_to_show:
+                    val = row[col]
+                    if isinstance(val, (int, float)):
+                        rounded_val = val if isinstance(val, int) else np.round(val, decimals=self.dec)
+                        formatted_val = f"{rounded_val:,.{self.dec}f}".replace(',', ' ')
+                        formatted_row.append(formatted_val)
+                    else:
+                        formatted_row.append(val)
+                table.add_row(formatted_row)
+            print(table)
+
+            table2 = pt()
+            table2.field_names = ["Investment_Period", "NPV NL Cost"]
+            tot_npv_cost = 0
+            for _, row in df.iterrows():
+                inv = row['Investment_Period']
+                npv_cost = row['NPV_STEP_Objective']
+                if isinstance(npv_cost, (int, float)):
+                    rounded_val = np.round(npv_cost, decimals=self.dec)
+                    formatted_npv_cost = f"{rounded_val:,.{self.dec}f}".replace(',', ' ')
+                else:
+                    formatted_npv_cost = npv_cost
+                table2.add_row([inv, formatted_npv_cost])
+                tot_npv_cost += npv_cost
+            table2.add_row(['', ''])
             formatted_total = f"{np.round(tot_npv_cost, decimals=self.dec):,.{self.dec}f}".replace(',', ' ')
             table2.add_row(['Total', formatted_total])
             print(table2)
