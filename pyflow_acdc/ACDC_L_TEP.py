@@ -90,6 +90,7 @@ def _post_process_l_mptep_with_nl_opf(
 
     Linear ``grid.MP_TEP_obj_res`` is left unchanged. The NL table uses the same
     column schema so the two Excel sheets are directly comparable.
+    Failed NL OPFs do not export onto ``grid`` (``export_if_feasible=True``).
     ``optimal_pf`` clears run flags, so ``MP_TEP_run`` is restored at the end.
     """
     from .ACDC_MultiPeriod_TEP import _set_grid_to_multiperiod_state
@@ -104,9 +105,20 @@ def _post_process_l_mptep_with_nl_opf(
     n_periods = int(grid.TEP_n_periods)
     _, PZ = obj_w_rule(grid, ObjRule, True)
 
+    # NL post-process always uses obj_scaling=1 (MP scaling is for the MILP only).
+    nl_obj_scaling = 1.0
+
     obj_rows = []
     for i in range(n_periods):
         _set_grid_to_multiperiod_state(grid, i, PZ)
+        if save_period_svgs:
+            create_geometries_from_layout(grid)
+            save_network_svg(
+                grid,
+                name=f"{period_svg_prefix}_P{i}",
+                journal=True,
+                legend=True,
+            )
         tep_obj = float(df_lin.loc[df_lin["Investment_Period"] == i + 1, "TEP_Objective"].iloc[0])
         present_value_tep = 1 / (1 + discount_rate) ** (i * n_years)
         nl_model, _, _, nl_stats = optimal_pf(
@@ -114,7 +126,8 @@ def _post_process_l_mptep_with_nl_opf(
             ObjRule=ObjRule,
             solver=nl_solver,
             tee=tee,
-            obj_scaling=obj_scaling,
+            obj_scaling=nl_obj_scaling,
+            export_if_feasible=True,
         )
         solution_found = bool(nl_stats and nl_stats.get("solution_found", False))
         termination = nl_stats.get("termination_condition", "unknown") if nl_stats else "unknown"
@@ -152,15 +165,6 @@ def _post_process_l_mptep_with_nl_opf(
             'STEP_Objective_Economic': economic_nl_step,
             'NPV_STEP_Objective_Economic': npv_nl_step_economic,
         })
-
-        if save_period_svgs and solution_found:
-            create_geometries_from_layout(grid)
-            save_network_svg(
-                grid,
-                name=f"{period_svg_prefix}_P{i}",
-                journal=True,
-                legend=True,
-            )
 
     grid.MP_TEP_nl_obj_res = pd.DataFrame(
         obj_rows,
@@ -373,11 +377,13 @@ def linear_multi_period_transmission_expansion(
         After a successful MILP solve, re-solve a single-state NL OPF for each
         investment period and store results in ``grid.MP_TEP_nl_obj_res``
         (same schema as linear ``MP_TEP_obj_res`` for side-by-side comparison).
+        NL post-process always uses ``obj_scaling=1.0`` (independent of the MILP
+        ``obj_scaling``).
     nl_solver : str, optional
         NLP solver used when ``post_process_nl_opf`` is True (default ``'ipopt'``).
     save_period_svgs : bool, optional
-        Save one SVG per investment period at the end. With NL post-processing,
-        SVGs reflect the NL operating point; otherwise investment topology only.
+        Save one SVG per investment period from the assigned investment state
+        (``np_*``, loads). Independent of NL OPF success when post-processing.
     period_svg_prefix : str, optional
         Path/name prefix for period SVGs when ``save_period_svgs`` is True.
 
