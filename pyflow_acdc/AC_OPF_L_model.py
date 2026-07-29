@@ -71,7 +71,7 @@ def Generation_variables(model,grid,gen_info,TEP):
 
     model.ren_sources= pyo.Set(initialize=lista_rs)
     model.P_renSource = pyo.Param(model.ren_sources,initialize=P_renSource,mutable=True)
-    model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen,mutable=True)
+    # np_rsgen is owned by TEP_variables / TEP_parameters (Var when rs_GPR under TEP).
 
     def gamma_bounds(model,rs):
         ren_source= grid.RenSources[rs]
@@ -83,9 +83,12 @@ def Generation_variables(model,grid,gen_info,TEP):
 
 
     grid.GPR = False
+    grid.rs_GPR = False
 
     if any(gen.np_gen_opf for gen in grid.Generators) and TEP:
         grid.GPR = True
+    if any(rs.np_rsgen_opf for rs in grid.RenSources) and TEP:
+        grid.rs_GPR = True
 
     def P_Gen_bounds(model, g):
         gen = grid.Generators[g]
@@ -301,9 +304,80 @@ def AC_constraints(model,grid,AC_info):
 
     model.Gen_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_PAC_rule)
 
+    def _rs_gamma_lb(rs):
+        ren_source = grid.RenSources[rs]
+        if ren_source.curtailable:
+            return float(ren_source.min_gamma)
+        return 1.0
+
+    def _rs_needs_mccormick(rs):
+        # gamma is a free Var only when min_gamma < 1; otherwise gamma is fixed at 1.
+        return grid.rs_GPR and _rs_gamma_lb(rs) < 1.0 - 1e-12
+
+    mccormick_rs = [rs for rs in model.ren_sources if _rs_needs_mccormick(rs)]
+    if mccormick_rs:
+        from .ACDC_Static_TEP import get_TEP_variables
+        _tep_rs = get_TEP_variables(grid)['ren_sources']
+        np_rsgen_lb = {}
+        np_rsgen_ub = {}
+        for rs in mccormick_rs:
+            ren_source = grid.RenSources[rs]
+            base = _tep_rs['np_rsgen'][rs]
+            max_n = _tep_rs['np_rsgen_max'][rs]
+            if ren_source.np_rsgen_mp:
+                np_rsgen_lb[rs] = 0
+                np_rsgen_ub[rs] = max_n
+            elif ren_source.np_rsgen_opf:
+                np_rsgen_lb[rs] = base
+                np_rsgen_ub[rs] = max_n
+            else:
+                np_rsgen_lb[rs] = base
+                np_rsgen_ub[rs] = base
+
+        model.rs_mccormick = pyo.Set(initialize=mccormick_rs)
+
+        def z_rs_bounds(model, rs):
+            gamma_L = _rs_gamma_lb(rs)
+            return (gamma_L * np_rsgen_lb[rs], 1.0 * np_rsgen_ub[rs])
+
+        model.z_rs = pyo.Var(model.rs_mccormick, bounds=z_rs_bounds, initialize=0)
+
+        def z_rs_mccormick_lb1(model, rs):
+            gamma_L = _rs_gamma_lb(rs)
+            n_L = np_rsgen_lb[rs]
+            return model.z_rs[rs] >= gamma_L * model.np_rsgen[rs] + n_L * model.gamma[rs] - gamma_L * n_L
+
+        def z_rs_mccormick_lb2(model, rs):
+            n_U = np_rsgen_ub[rs]
+            return model.z_rs[rs] >= 1.0 * model.np_rsgen[rs] + n_U * model.gamma[rs] - 1.0 * n_U
+
+        def z_rs_mccormick_ub1(model, rs):
+            n_L = np_rsgen_lb[rs]
+            return model.z_rs[rs] <= 1.0 * model.np_rsgen[rs] + n_L * model.gamma[rs] - 1.0 * n_L
+
+        def z_rs_mccormick_ub2(model, rs):
+            gamma_L = _rs_gamma_lb(rs)
+            n_U = np_rsgen_ub[rs]
+            return model.z_rs[rs] <= gamma_L * model.np_rsgen[rs] + n_U * model.gamma[rs] - gamma_L * n_U
+
+        model.z_rs_mccormick_lb1 = pyo.Constraint(model.rs_mccormick, rule=z_rs_mccormick_lb1)
+        model.z_rs_mccormick_lb2 = pyo.Constraint(model.rs_mccormick, rule=z_rs_mccormick_lb2)
+        model.z_rs_mccormick_ub1 = pyo.Constraint(model.rs_mccormick, rule=z_rs_mccormick_ub1)
+        model.z_rs_mccormick_ub2 = pyo.Constraint(model.rs_mccormick, rule=z_rs_mccormick_ub2)
+
     def Gen_PREN_rule(model,node):
        nAC = grid.nodes_AC[node]
-       P_gen = sum(model.P_renSource[rs.rsNumber]*model.gamma[rs.rsNumber]*model.np_rsgen[rs.rsNumber] for rs in nAC.connected_RenSource)
+       terms = []
+       for rs in nAC.connected_RenSource:
+           r = rs.rsNumber
+           if _rs_needs_mccormick(r):
+               terms.append(model.P_renSource[r] * model.z_rs[r])
+           elif grid.rs_GPR and _rs_gamma_lb(r) >= 1.0 - 1e-12:
+               # gamma fixed at 1: skip McCormick / gamma product
+               terms.append(model.P_renSource[r] * model.np_rsgen[r])
+           else:
+               terms.append(model.P_renSource[r] * model.gamma[r] * model.np_rsgen[r])
+       P_gen = sum(terms)
        return  model.PGi_ren[node] ==   P_gen
 
     model.Gen_PREN_constraint =pyo.Constraint(model.nodes_AC, rule=Gen_PREN_rule)
@@ -715,7 +789,9 @@ def TEP_parameters(model,grid):
 
     # Extract generator variables
     np_gen = tep_vars['generators']['np_gen']
+    np_rsgen = tep_vars['ren_sources']['np_rsgen']
 
+    model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen,mutable=True)
     model.np_gen = pyo.Param(model.gen_AC,initialize=np_gen)
     if grid.TEP_AC:
         model.NumLinesACP = pyo.Param(model.lines_AC_exp ,initialize=NP_lineAC)
@@ -748,15 +824,40 @@ def TEP_variables(model,grid):
     np_gen = tep_vars['generators']['np_gen']
     np_gen_max = tep_vars['generators']['np_gen_max']
 
+    np_rsgen = tep_vars['ren_sources']['np_rsgen']
+    np_rsgen_model_first_guess = tep_vars['ren_sources']['np_rsgen_model_first_guess']
+    np_rsgen_max = tep_vars['ren_sources']['np_rsgen_max']
+
 
     "TEP variables"
 
+    if grid.rs_GPR:
+        def np_rsgen_bounds(model,rs):
+            ren_source = grid.RenSources[rs]
+            if ren_source.np_rsgen_mp:
+                return (0, np_rsgen_max[rs])
+            elif ren_source.np_rsgen_opf:
+                return (np_rsgen[rs], np_rsgen_max[rs])
+            else:
+                return (np_rsgen[rs], np_rsgen[rs])
+        model.np_rsgen = pyo.Var(
+            model.ren_sources,
+            within=pyo.NonNegativeIntegers,
+            bounds=np_rsgen_bounds,
+            initialize=np_rsgen_model_first_guess,
+        )
+        model.np_rsgen_base = pyo.Param(model.ren_sources,initialize=np_rsgen)
+    else:
+        model.np_rsgen = pyo.Param(model.ren_sources,initialize=np_rsgen)
+
     def np_gen_bounds(model,gen):
         g = grid.Generators[gen]
-        if g.np_gen_opf:
-            return (np_gen[gen],np_gen_max[gen])
+        if g.np_gen_mp:
+            return (0, np_gen_max[gen])
+        elif g.np_gen_opf:
+            return (np_gen[gen], np_gen_max[gen])
         else:
-            return (np_gen[gen],np_gen[gen])
+            return (np_gen[gen], np_gen[gen])
 
     if grid.GPR:
 
@@ -771,7 +872,12 @@ def TEP_variables(model,grid):
 
 
 
-        model.np_gen = pyo.Var(model.gen_AC,within=pyo.NonNegativeIntegers,bounds=np_gen_bounds,initialize=np_gen)
+        model.np_gen = pyo.Var(
+            model.gen_AC,
+            within=pyo.NonNegativeIntegers,
+            bounds=np_gen_bounds,
+            initialize=tep_vars['generators']['np_gen_model_first_guess'],
+        )
         model.np_gen_base = pyo.Param(model.gen_AC,initialize=np_gen)
 
         model.PGi_lower_bound = pyo.Constraint(model.gen_AC,rule=P_gen_lower_bound_rule)
@@ -903,6 +1009,11 @@ def export_acdc_l_model_to_pyflow_acdc(model,grid, solver_results=None, tee=Fals
         np_gen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_gen.items()}
         for gen in grid.Generators:
             gen.np_gen = np_gen_values[gen.genNumber]
+
+    if grid.rs_GPR:
+        np_rsgen_values = {k: np.float64(pyo.value(v)) for k, v in model.np_rsgen.items()}
+        for rs in grid.RenSources:
+            rs.np_rsgen = np_rsgen_values[rs.rsNumber]
 
     if grid.TEP_AC:
         lines_AC_TEP = {k: np.float64(pyo.value(v)) for k, v in model.NumLinesACP.items()}

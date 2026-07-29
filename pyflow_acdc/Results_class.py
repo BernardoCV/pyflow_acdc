@@ -6,7 +6,7 @@ from prettytable import PrettyTable as pt
 import pandas as pd
 
 from .Classes import Price_Zone
-from .constants import SQRT_3, HOURS_PER_YEAR, NodeType, AcDcSide
+from .constants import SQRT_3, HOURS_PER_YEAR, NodeType, AcDcSide, DataExportType, coerce_data_export_type
 
 __all__ = ['Results']
 
@@ -25,12 +25,13 @@ class Results:
         Decimal places for printed numeric values.
     export_location : str, optional
         Output folder; defaults to ``pyflowacdc_res``.
-    export_type : str, optional
-        ``"csv"``, ``"excel"``, or other (no automatic file export).
+    export_type : DataExportType or str, optional
+        ``DataExportType.CSV``, ``DataExportType.EXCEL`` (``xlsx`` accepted as
+        alias), or the matching string values.
     save_res : bool, optional
         When ``True``, write tables to ``export_location``.
     """
-    def __init__(self, Grid, decimals=2, export_location=None, export_type="csv", save_res=False):
+    def __init__(self, Grid, decimals=2, export_location=None, export_type=DataExportType.CSV, save_res=False):
         self.Grid = Grid
         self.dec = decimals
         # Default export folder if none provided
@@ -41,11 +42,10 @@ class Results:
         self.save_res = save_res
         # Ensure export directory exists
         os.makedirs(self.export_location, exist_ok=True)
-        # export_type controls how results are written when self.export is not None:
-        # "csv"  -> keep current CSV exports
-        # "excel" -> single Excel workbook with one sheet per results table
-        # any other value -> no automatic file export
-        self.export_type = export_type
+        # export_type controls how results are written when save_res is True:
+        # CSV   -> per-table CSV files
+        # EXCEL -> single Excel workbook with one sheet per results table
+        self.export_type = coerce_data_export_type(export_type)
         # Central registry for all DataFrames produced by this Results instance
         # Keys are method-level names such as "AC_Powerflow", "AC_voltage", etc.
         self.tables = {}
@@ -72,7 +72,7 @@ class Results:
             os.makedirs(self.export_location, exist_ok=True)
             self.save_res = True
         if export_type is not None:
-            self.export_type = export_type
+            self.export_type = coerce_data_export_type(export_type)
             self.save_res = True
             if export_location is None:
                 self.export_location = "pyflowacdc_res"
@@ -164,7 +164,7 @@ class Results:
         print('------')
 
         # Optional Excel export of all collected tables
-        if self.save_res and self.export_type == "excel" and self.tables:
+        if self.save_res and self.export_type == DataExportType.EXCEL and self.tables:
             base_name = file_name if file_name else (getattr(self.Grid, "name", None) or "pyflowacdc")
             excel_path = os.path.join(self.export_location, f"{base_name}_results.xlsx")
             with pd.ExcelWriter(excel_path) as writer:
@@ -624,7 +624,7 @@ class Results:
                     ])
                 print(table)
 
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/DC_bus.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -751,7 +751,7 @@ class Results:
                 print(table)
 
         # CSV export (backwards compatible) when requested
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/AC_Powerflow.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -795,7 +795,7 @@ class Results:
                     ])
                 print(table)
 
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/AC_voltage.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -880,7 +880,7 @@ class Results:
                         ])
                     print(tablei)
 
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/AC_line_current.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -1099,7 +1099,7 @@ class Results:
                         ])
                     print(tablep)
 
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/AC_line_power.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -2765,7 +2765,7 @@ class Results:
                     ])
                 print(tablei)
 
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/DC_line_current.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -2825,7 +2825,7 @@ class Results:
                     ])
                 print(tablep)
 
-        if self.save_res and self.export_type == "csv":
+        if self.save_res and self.export_type == DataExportType.CSV:
             csv_filename = f'{self.export_location}/DC_line_power.csv'
             df_all.to_csv(csv_filename, index=False)
 
@@ -2959,7 +2959,7 @@ class Results:
             print(table)
             print(table2)
 
-        if self.save_res and self.export_type == "csv" and not df_main.empty:
+        if self.save_res and self.export_type == DataExportType.CSV and not df_main.empty:
             csv_filename = f'{self.export_location}/Converter_results.csv'
             # Save full combined DataFrame (including capacity columns)
             df_combined.to_csv(csv_filename, index=False)

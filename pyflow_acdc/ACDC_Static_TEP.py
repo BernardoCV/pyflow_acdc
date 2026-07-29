@@ -38,7 +38,6 @@ __all__ = [
     'update_attributes',
     'expand_element',
     'transmission_expansion',
-    'linear_transmission_expansion',
     'multi_scenario_TEP',
     'identify_standalone_rs_conv_pairs',
     'export_TEP_multiScenario_results_to_excel',
@@ -1123,119 +1122,6 @@ def transmission_expansion(
         "export": t_modelexport,
     }
     return model, model_results, timing_info, solver_stats
-
-def linear_transmission_expansion(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAULT_DISCOUNT_RATE,ObjRule=None,solver='gurobi',time_limit=DEFAULT_TIME_LIMIT,tee=False,export=True,fs=False,obj_scaling=1.0,build_only=False):
-    """Build and solve the linear (MILP) static transmission-expansion problem.
-
-    Linear counterpart of :func:`transmission_expansion`: combines TEP
-    investment cost with the linear OPF operating cost (OPEX discounted to
-    present value when ``NPV`` is set), solves the MILP, and exports the
-    expansion decisions and operating point back onto ``grid``.
-
-    Parameters
-    ----------
-    grid : Grid
-        Network with candidate expandable elements (mutated in place).
-    NPV : bool, optional
-        Discount OPEX to present value over the planning horizon.
-    n_years : int, optional
-        Planning horizon in years.
-    Hy : float, optional
-        Operating hours per year used to annualise OPEX.
-    discount_rate : float, optional
-        Annual discount rate for the present-value factor.
-    ObjRule : dict or None, optional
-        Objective-component weights; ``None`` uses the grid defaults.
-    solver : str, optional
-        Pyomo MILP solver name.
-    time_limit : float, optional
-        Solver time limit in seconds.
-    tee : bool, optional
-        Stream raw solver output.
-    export : bool, optional
-        Write the solution back onto ``grid``.
-    fs : bool, optional
-        Enable the solver-progress callback.
-    obj_scaling : float, optional
-        Divide the objective by this factor for numerical conditioning.
-    build_only : bool, optional
-        Build the Pyomo model, skip the solver, and export initializer values
-        onto ``grid`` so :class:`~pyflow_acdc.Results_class.Results` can run
-        without a MILP solver.
-
-    Returns
-    -------
-    tuple
-        ``(model, model_results, timing_info, solver_stats)``; all ``None`` if
-        the solve fails.
-    """
-    grid.reset_run_flags()
-    analyse_grid(grid)
-
-    weights_def, _ = obj_w_rule(grid,ObjRule,True)
-
-    grid.TEP_n_years = n_years
-    grid.TEP_discount_rate =discount_rate
-
-    t1 = time.perf_counter()
-    model = pyo.ConcreteModel()
-    model.name = "TEP MTDC linear AC OPF"
-
-    opf_create_l_model_ac(model,grid,TEP=True)
-    _TEP_install_variables(model, grid)
-    _TEP_install_constraints(model, grid)
-
-
-    obj_TEP = tep_obj(model,grid,NPV)
-    obj_OPF = opf_obj_l(model,grid,weights_def) + opf_obj_l_array_losses(model,grid,weights_def)
-
-    present_value = present_value_factor(Hy, discount_rate, n_years)
-    if NPV:
-        obj_OPF *=present_value
-
-
-    total_cost = obj_TEP + obj_OPF
-    if obj_scaling != 1.0:
-        total_cost = total_cost / obj_scaling
-    model.obj = pyo.Objective(rule=total_cost, sense=pyo.minimize)
-    model.obj_scaling = obj_scaling
-
-    t2 = time.perf_counter()
-    t_modelcreate = t2-t1
-
-
-    # model.obj.pprint()
-    t3 = time.perf_counter()
-    if build_only:
-        model_results, solver_stats = build_only_solver_stats(solver, model)
-    else:
-        model_results,solver_stats = pyomo_model_solve(model,grid,solver,tee,time_limit,callback=fs)
-        if model_results is None:
-            return None, None, None, None
-
-
-    t1 = time.perf_counter()
-    if export:
-        export_acdc_l_model_to_pyflow_acdc(model, grid, solver_results=model_results, tee=tee)
-        for obj in weights_def:
-            weights_def[obj]['v']=calculate_objective(grid,obj,True)
-            weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
-    t2 = time.perf_counter()
-
-    t_modelexport = t2-t1
-
-
-    grid.TEP_run=True
-    grid.OPF_obj = weights_def
-
-    timing_info = {
-    "create": t_modelcreate,
-    "solve":  solver_stats['time'] if solver_stats['time'] is not None else t1-t3,
-    "export": t_modelexport,
-    }
-    return model, model_results , timing_info, solver_stats
-
-
 
 def _initialize_MS_STEP_sets_model(model,grid):
     if grid.DCmode:

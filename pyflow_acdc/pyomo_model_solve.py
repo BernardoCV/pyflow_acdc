@@ -988,9 +988,9 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     }
 
     # Decision policy for solution_found:
-    # 1) If solver termination is optimal/acceptable/feasible, trust solver and pass.
-    # 2) Otherwise (max iterations, internal error, etc.), validate loaded values
-    #    with the explicit feasibility checker and try alternative solution records.
+    # 1) If solver termination is optimal/acceptable/feasible/maxTimeLimit, trust solver.
+    # 2) User interrupt / aborted with a loaded incumbent counts as solution_found.
+    # 3) Otherwise validate loaded values with the quick point check.
     try:
         tc = str(getattr(results.solver, 'termination_condition', '') or '').lower() if results is not None else ''
     except AttributeError:
@@ -998,7 +998,15 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     solver_message_lc = solver_message.lower()
     solver_status_lc = str((solver_stats or {}).get('solver_status') or '').lower()
     solver_name_lc = str(solver).lower() if solver is not None else ''
-    trusted_termination = tc in ('optimal', 'feasible', 'locallyoptimal', 'acceptable', 'locally_optimal', 'maxiterations')
+    trusted_termination = tc in (
+        'optimal',
+        'feasible',
+        'locallyoptimal',
+        'acceptable',
+        'locally_optimal',
+        'maxiterations',
+        'maxtimelimit',
+    )
     explicit_infeasible_termination = tc in (
         'infeasible',
         'locallyinfeasible',
@@ -1025,6 +1033,19 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         trusted_termination = False
         explicit_infeasible_termination = True
 
+    # Ctrl-C / user abort: Gurobi often returns status aborted / tc error while
+    # leaving a usable incumbent on the model. Accept that incumbent below.
+    user_interrupt = (
+        'terminated by the user' in solver_message_lc
+        or 'interrupted by the user' in solver_message_lc
+        or 'interrupted by user' in solver_message_lc
+        or 'user interrupt' in solver_message_lc
+        or solver_status_lc == 'aborted'
+        or tc == 'aborted'
+    )
+    if user_interrupt:
+        explicit_error_termination = False
+
     if (
         'aborted' in solver_message_lc
         or 'error in step computation' in solver_message_lc
@@ -1034,12 +1055,13 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         or 'cannot open shared object file' in solver_message_lc
         or 'libhsl.so' in solver_message_lc
     ):
-        explicit_error_termination = True
+        if not user_interrupt:
+            explicit_error_termination = True
 
     # Some solver interfaces return termination_condition="other" for hard solver failures.
     # Promote those cases to explicit error so callers can catch them deterministically.
     if tc == 'other':
-        if solver_status_lc in ('error', 'aborted'):
+        if solver_status_lc in ('error', 'aborted') and not user_interrupt:
             explicit_error_termination = True
             solver_stats['termination_condition'] = 'error'
         elif (
@@ -1138,6 +1160,9 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     elif explicit_error_termination:
         loaded_solution_feasible = False
         checker_reason = "explicit_error_termination"
+    elif user_interrupt and (has_loaded_solution or has_model_values):
+        loaded_solution_feasible = True
+        checker_reason = "user_interrupt_with_incumbent"
     elif trusted_termination:
         loaded_solution_feasible = True
         checker_reason = "trusted_termination"
