@@ -14,7 +14,19 @@ import time
 
 from .grid_analysis import analyse_grid, grid_state
 from .ACDC_PF import ac_power_flow, dc_power_flow, acdc_sequential
-from .constants import DEFAULT_TOLERANCE, DEFAULT_PF_MAX_ITER, BINARY_THRESHOLD, HOURS_PER_YEAR, NodeType, ObjComponent, default_obj_weights, TSType, TS_RENEWABLE_TYPES
+from .constants import (
+    DEFAULT_TOLERANCE,
+    DEFAULT_PF_MAX_ITER,
+    BINARY_THRESHOLD,
+    HOURS_PER_YEAR,
+    NodeType,
+    ConverterDCType,
+    ObjComponent,
+    default_obj_weights,
+    TSType,
+    TS_RENEWABLE_TYPES,
+    TS_CONV_PF_TYPES,
+)
 
 
 # Base __all__ with functions that don't require OPF
@@ -23,7 +35,9 @@ __all__ = ['time_series_pf',
            'ts_ac_pf',
            'ts_dc_pf',
            'time_series_statistics',
-           'update_grid_data']
+           'update_grid_data',
+           'update_grid_for_pf',
+           'known_converter_pf_setpoints']
 
 try:
     import pyomo.environ as pyo
@@ -170,8 +184,15 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
     Used internally by :func:`~pyflow_acdc.ts_acdc_pf`, :func:`~pyflow_acdc.ts_acdc_opf`,
     and TEP scenario-frame updates. Call directly when building custom
     time-step loops.
+
+    Converter / future BESS PF setpoint series (``conv_P_DC``, etc.) are not
+    handled here — use :func:`update_grid_for_pf` after any Droop/P ``P_DC``
+    reset so prescribed setpoints win.
     """
     typ = ts.type
+    if typ in TS_CONV_PF_TYPES:
+        return
+
     if use_clusters:
         ts_data = ts.data_clustered[n_clusters]
     else:
@@ -240,6 +261,146 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
         rs = grid.RenSources_dict.get(ts.element_name, None)
         if rs:
             rs.PRGi_available = ts_data[idx]
+
+
+def known_converter_pf_setpoints(conv):
+    """Return the PF setpoints that are known for an ACDC converter's control modes.
+
+    Parameters
+    ----------
+    conv : AC_DC_converter
+        Converter whose ``type`` (DC) and ``AC_type`` define the known variables.
+
+    Returns
+    -------
+    frozenset of str
+        Subset of ``{'P_DC', 'P_AC', 'Q_AC'}``:
+
+        - ``P_DC`` when DC type is ``P`` or ``Droop`` (droop power reference)
+        - ``P_AC`` when DC type is ``PAC``
+        - ``Q_AC`` when AC type is ``PQ``
+
+        DC ``Slack`` does not expose a known ``P_DC``; AC ``PV`` / ``Slack`` do
+        not expose a known ``Q_AC``.
+    """
+    known = set()
+    if conv.type in (ConverterDCType.P, ConverterDCType.DROOP):
+        known.add('P_DC')
+    elif conv.type == ConverterDCType.PAC:
+        known.add('P_AC')
+    if conv.AC_type == NodeType.PQ:
+        known.add('Q_AC')
+    return frozenset(known)
+
+
+def update_grid_for_pf(grid, ts, idx, use_clusters=False, n_clusters=None):
+    """Apply one PF-setpoint time-series sample when ``ts`` is a PF setpoint type.
+
+    Always safe to call for every attached series: non-PF types are ignored
+    (no-op). Converter PF types update known setpoints only; future BESS / H₂
+    PF setpoint types can be added here the same way.
+
+    Unlike :func:`update_grid_data` (loads, renewables, prices), this only
+    updates prescribed PF setpoints. Converter values are in **per-unit** on
+    ``grid.S_base``, matching ``conv.P_DC`` / ``P_AC`` / ``Q_AC``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to update in place.
+    ts : TimeSeries
+        Any series; only PF setpoint types (currently ``conv_P_DC``,
+        ``conv_P_AC``, ``conv_Q_AC``) cause updates.
+    idx : int
+        Index into ``ts.data`` (or clustered data).
+    use_clusters : bool, optional
+        Read from ``ts.data_clustered[n_clusters]`` instead of ``ts.data``.
+    n_clusters : int, optional
+        Cluster count key when ``use_clusters=True``.
+
+    Raises
+    ------
+    ValueError
+        If ``ts`` is a converter PF setpoint type but the converter name is
+        unknown, or that setpoint is not known for the converter's
+        ``AC_type`` / DC ``type`` (see :func:`known_converter_pf_setpoints`).
+    """
+    typ = ts.type
+    if typ not in TS_CONV_PF_TYPES:
+        return
+
+    if use_clusters:
+        ts_data = ts.data_clustered[n_clusters]
+    else:
+        ts_data = ts.data
+
+    if not hasattr(grid, 'Converters_ACDC_dict'):
+        grid.Converters_ACDC_dict = {c.name: c for c in grid.Converters_ACDC}
+
+    conv = grid.Converters_ACDC_dict.get(ts.element_name, None)
+    if conv is None:
+        raise ValueError(
+            f"{typ} time series element_name={ts.element_name!r} "
+            f"does not match any ACDC converter"
+        )
+
+    known = known_converter_pf_setpoints(conv)
+    value = float(ts_data[idx])
+
+    if typ == TSType.CONV_P_DC:
+        if 'P_DC' not in known:
+            raise ValueError(
+                f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
+                f"{conv.AC_type!r}) does not have known PF setpoint P_DC; "
+                f"known={sorted(known)}"
+            )
+        conv.P_DC = value
+        conv.Node_DC.Pconv = value
+    elif typ == TSType.CONV_P_AC:
+        if 'P_AC' not in known:
+            raise ValueError(
+                f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
+                f"{conv.AC_type!r}) does not have known PF setpoint P_AC; "
+                f"known={sorted(known)}"
+            )
+        conv.P_AC = value
+        conv.Node_AC.P_s = value
+    elif typ == TSType.CONV_Q_AC:
+        if 'Q_AC' not in known:
+            raise ValueError(
+                f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
+                f"{conv.AC_type!r}) does not have known PF setpoint Q_AC; "
+                f"known={sorted(known)}"
+            )
+        conv.Q_AC = value
+
+
+def _converter_names_with_pf_ts(grid, ts_type):
+    """Return converter names that have an attached PF setpoint series of ``ts_type``."""
+    return {
+        ts.element_name
+        for ts in grid.Time_series
+        if ts.type == ts_type
+    }
+
+
+def _apply_droop_p_dc_baseline(grid):
+    """Restore Droop/P ``P_DC`` from ``Pconv_save`` when no ``conv_P_DC`` TS exists.
+
+    Converters with a ``conv_P_DC`` series are left alone here; ``update_grid_for_pf``
+    applies that series. Without a series, reset to the hour-0 reference so the
+    previous PF solve does not leave a polluted droop/P setpoint.
+    """
+    ts_p_dc = _converter_names_with_pf_ts(grid, TSType.CONV_P_DC)
+    for conv in grid.Converters_ACDC:
+        if conv.type not in (ConverterDCType.DROOP, ConverterDCType.P):
+            continue
+        if conv.name in ts_p_dc:
+            continue
+        p_dc = grid.Pconv_save[conv.ConvNumber]
+        conv.P_DC = p_dc
+        conv.Node_DC.Pconv = p_dc
+
 
 def _update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
@@ -579,15 +740,17 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
         grid.Pconv_save[conv.ConvNumber] = conv.P_DC
 
     while idx < max_time:
-
+        # Droop/P: either hour-0 Pconv_save (no TS) or conv_P_DC via update_grid_for_pf.
+        if grid.ACmode and grid.DCmode:
+            _apply_droop_p_dc_baseline(grid)
 
         for ts in grid.Time_series:
-            update_grid_data(grid, ts, idx)
-        if grid.ACmode and grid.DCmode:
-            for conv in grid.Converters_ACDC:
-                if conv.type in ['Droop', 'P']:
-                    conv.P_DC = grid.Pconv_save[conv.ConvNumber] #This resets the converters droop target
+            if ts.type in TS_CONV_PF_TYPES:
+                update_grid_for_pf(grid, ts, idx)
+            else:
+                update_grid_data(grid, ts, idx)
 
+        if grid.ACmode and grid.DCmode:
             acdc_sequential(grid,QLimit=False)
         elif grid.ACmode:
             t,tol=ac_power_flow(grid,tol_lim, maxIter)

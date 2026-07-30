@@ -177,6 +177,10 @@ class TSType(str, Enum):
     PGL_MAX = 'PGL_max'
     PRICE = 'price'
     LOAD = 'Load'
+    # PF setpoint series for ACDC converters (see update_grid_for_pf)
+    CONV_P_DC = 'conv_P_DC'
+    CONV_P_AC = 'conv_P_AC'
+    CONV_Q_AC = 'conv_Q_AC'
     # Renewable availability series (see TS_RENEWABLE_TYPES)
     WPP = 'WPP'
     OWPP = 'OWPP'
@@ -187,6 +191,9 @@ class TSType(str, Enum):
 
 # Renewable-availability TS labels handled together as one group.
 TS_RENEWABLE_TYPES = (TSType.WPP, TSType.OWPP, TSType.SF, TSType.REN, TSType.SOLAR)
+
+# Converter PF setpoint TS labels (update_grid_for_pf).
+TS_CONV_PF_TYPES = (TSType.CONV_P_DC, TSType.CONV_P_AC, TSType.CONV_Q_AC)
 
 
 # Default fuel / technology labels for Grid.gen_ac_types (ENTSO-E-like; grids may extend).
