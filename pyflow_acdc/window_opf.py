@@ -270,7 +270,7 @@ def _create_frame_blocks(
         abs_t = ts_base + i
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
-        _modify_parameters(grid, model.frame_model[i], price_zones)
+        _modify_parameters(grid, model.frame_model[i], price_zones, window_block=True)
         obj_rule = opf_obj(model.frame_model[i], grid, weights_def, only_gen)
         model.frame_model[i].obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
         if grid.nn_DC != 0 and any(conv.OPF_fx for conv in grid.Converters_ACDC):
@@ -285,7 +285,7 @@ def _update_window_frame_params(model, grid, frames, ts_base, price_zones):
         abs_t = ts_base + i
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
-        _modify_parameters(grid, model.frame_model[i], price_zones)
+        _modify_parameters(grid, model.frame_model[i], price_zones, window_block=True)
 
 
 def _set_window_state_params(model, grid):
@@ -745,7 +745,7 @@ def window_nl_opf(
         last_abs = ts_base + last_local
         for ts in grid.Time_series:
             update_grid_data(grid, ts, last_abs, price_zone_restrictions=price_zones)
-        _modify_parameters(grid, model.frame_model[last_local], price_zones)
+        _modify_parameters(grid, model.frame_model[last_local], price_zones, window_block=True)
         export_acdc_nl_model_to_pyflow_acdc(
             model.frame_model[last_local], grid, price_zones)
 

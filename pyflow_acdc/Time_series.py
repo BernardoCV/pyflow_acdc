@@ -829,7 +829,7 @@ def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
     grid.Time_series_ran = True
 
 
-def _modify_parameters(grid,model,Price_Zones):
+def _modify_parameters(grid,model,Price_Zones,window_block=False):
     opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
     AC_info = opf_data['AC_info']
     DC_info = opf_data['DC_info']
@@ -911,13 +911,15 @@ def _modify_parameters(grid,model,Price_Zones):
         for storage in grid.storage_elements:
             s = storage.storageNumber
             if storage.connected == AcDcSide.AC:
-                model.SoC_prev[s].set_value(float(storage.soc_initial))
+                if not window_block:
+                    model.SoC_prev[s].set_value(float(storage.soc_initial))
                 model.soc_ref[s].set_value(float(storage.soc_ref))
             else:
-                model.SoC_prev_DC[s].set_value(float(storage.soc_initial))
+                if not window_block:
+                    model.SoC_prev_DC[s].set_value(float(storage.soc_initial))
                 model.soc_ref_DC[s].set_value(float(storage.soc_ref))
 
-    if grid.H2:
+    if grid.H2 and not window_block:
         for el in grid.electrolysers:
             model.mass_H2_prev[el.electrolyserNumber].set_value(
                 float(el.H2_mass_initial)
