@@ -67,7 +67,7 @@ If you use :class:`~pyflow_acdc.Storage`,
 M. Useche-Arteaga, P. Gebraad, V. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmunt, *Optimizing the operation of energy islands with predictive nonlinear programming -- a case study based on the Princess Elisabeth Energy Island*, Wind Energy Science, 11(2), 349--372, 2026, https://doi.org/10.5194/wes-11-349-2026.
 
 Modelling: :doc:`api/modelling_storage_hydrogen` (BESS §3.3, electrolyser §3.4).
-Coupled window / rolling usage: :doc:`usage_window_opf`.
+Coupled window / rolling: :doc:`api/window` (API), :doc:`usage_window_opf` (workflow).
 
 .. code-block:: bibtex
 

@@ -67,7 +67,7 @@ Time series
    ``ObjRule['H2_sale']``.
    Element models: :doc:`modelling_storage_hydrogen`.
    Coupled multi-hour inventory / terminal mass:
-   :doc:`../usage_window_opf`.
+   :doc:`window` (API) and :doc:`../usage_window_opf` (workflow).
 
 
    **Example**

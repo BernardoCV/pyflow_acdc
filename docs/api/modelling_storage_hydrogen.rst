@@ -7,7 +7,7 @@ for hybrid AC/DC grids. The formulation follows Useche-Arteaga et al. (2026)
 
 Elements attach with :func:`~pyflow_acdc.add_storage` /
 :func:`~pyflow_acdc.add_electrolyser` (:doc:`grid_mod`). Coupled multi-hour
-runs: :doc:`../usage_window_opf`. Myopic sequential hours:
+runs: :doc:`window` / :doc:`../usage_window_opf`. Myopic sequential hours:
 :func:`~pyflow_acdc.ts_acdc_opf` (:doc:`ts`).
 
 .. _Storage_modelling:

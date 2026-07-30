@@ -1,56 +1,54 @@
 Coupled window NL OPF
 =====================
 
-:func:`~pyflow_acdc.window_nl_opf` solves a **multi-hour nonlinear OPF** with
-coupled storage SoC and (when present) H₂ inventory across frames.
-:func:`~pyflow_acdc.rolling_window_nl_opf` chains successive windows with
-SoC / H₂ carry-over between commits.
+Multi-hour nonlinear OPF with **coupled** BESS SoC and (when present) H₂
+inventory across frames — unlike myopic :func:`~pyflow_acdc.ts_acdc_opf`,
+which solves hour-by-hour.
 
-Add BESS / electrolysers first — see :doc:`api/modelling_storage_hydrogen`.
-Interactive plots: :doc:`api/dash`.
+API reference: :doc:`api/window`. Element models:
+:doc:`api/modelling_storage_hydrogen`. Dash: :doc:`api/dash`.
 
-Seasonal data for the Princess Elisabeth Island (PEI) case lives under
-``examples/PEI_BESS/<Season>/`` (local checkout, else GitHub ``main``).
-Build with case flags ``storage``, ``hydrogen``, and
-``data='season_comparison'`` / ``'full'``::
+Requires ``ipopt`` and ``pip install "pyflow-acdc[OPF]"`` (add ``Dash`` for
+interactive plots).
+
+Workflow
+--------
+
+1. Build or load a grid with time series
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Start from a case that already has ``Time_series``, or attach series with
+:func:`~pyflow_acdc.add_TimeSeries` (:doc:`api/ts_mod`).
+
+Princess Elisabeth Island (PEI) seasonal data lives under
+``examples/PEI_BESS/<Season>/`` (local checkout, else GitHub ``main``)::
 
     https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/
 
-API
----
+Load with case flags ``storage``, ``hydrogen``, and
+``data='season_comparison'`` / ``'full'``.
 
-.. autofunction:: pyflow_acdc.window_nl_opf
+2. Add BESS and/or electrolysers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: pyflow_acdc.rolling_window_nl_opf
+Attach operation-only storage and hydrogen with
+:func:`~pyflow_acdc.add_storage` / :func:`~pyflow_acdc.add_electrolyser`
+(or enable them on the PEI case). Modelling details:
+:doc:`api/modelling_storage_hydrogen`.
 
-PEI season-compare + Dash
--------------------------
+``window_nl_opf`` requires ``grid.ESS`` or ``grid.H2`` (and time series).
 
-Solve each season as its own 24 h window, attach compare tables, then open the
-season-compare dashboard (Overlay / Split layouts, Power and other families).
+3. Choose an objective
+^^^^^^^^^^^^^^^^^^^^^^
 
-Requires ``ipopt`` and ``pip install "pyflow-acdc[OPF,Dash]"``.
+Pass ``ObjRule`` keys from :ref:`obj_functions` (e.g. ``Energy_cost``,
+``H2_sale``). Soft ``SoC_deviation`` is mainly for myopic TS, not coupled
+windows (coupled runs use hard ``soc_initial`` / ``soc_final``).
 
-The example lives in ``pyflow_tests/doc_examples/window_opf/``. Docs CI only
-smoke-loads the seasonal CSVs (four IPOPT windows are too heavy for the suite).
-Interactively prefer ``pyf.run_dash(grid)`` over ``create_season_compare_dash_app``.
+4. Run a single coupled window
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. literalinclude:: ../pyflow_tests/doc_examples/window_opf/01_pei_season_compare_dash.py
-   :language: python
-   :lines: 9-
-
-Once running, open http://127.0.0.1:8050/ .
-
-.. themed-figure:: pei_season_compare_dash
-   :width: 100%
-   :alt: PEI BESS H2 season-compare Dash
-
-   Season-compare Dash: Power (source) and SoC across Spring–Winter (split layout).
-
-Single-window solve
--------------------
-
-For one seasonal (or concatenated) window without season-compare::
+``start`` / ``end`` are **0-based inclusive** frame indices::
 
     grid, _ = pyf.cases["PEI_grid"](
         include_countries=["GB", "DK"],
@@ -68,26 +66,24 @@ For one seasonal (or concatenated) window without season-compare::
     )
     pyf.run_dash(grid)
 
-Build-only PEI example (no solve):
+Build-only smoke (no solve):
 
 .. literalinclude:: ../pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py
    :language: python
    :lines: 2-
 
-Rolling window
---------------
+5. Or run a rolling horizon
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Indexing uses 1-based ``start`` / ``end`` like ``ts_acdc_opf``. Tank empties
-between windows follow each electrolyser's ``empty_tank_cycle``:
+``start`` / ``end`` are **1-based inclusive** (same as ``ts_acdc_opf``).
+SoC carries between commits. H₂ tank empties follow each electrolyser's
+``empty_tank_cycle``:
 
 - ``None`` → empty at every commit window boundary
-- ``N`` → empty at the first commit end hour ``>= k·N`` (boundary at or past
-  each cycle multiple)
+- ``N`` → empty at the first commit end hour ``>= k·N``
 
-Coupled windows keep hard ``soc_initial`` / ``soc_final`` and optional
-``H2_mass_final`` on the last frame when set.
-
-.. code-block:: python
+Optional ``H2_mass_final`` is enforced on the terminal frame of each
+coupled solve when set::
 
     pyf.rolling_window_nl_opf(
         grid,
@@ -98,19 +94,30 @@ Coupled windows keep hard ``soc_initial`` / ``soc_final`` and optional
         solver="ipopt",
     )
 
-Myopic TS (related)
--------------------
+6. Season-compare + Dash (PEI)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Sequential :func:`~pyflow_acdc.ts_acdc_opf` carries BESS SoC and H₂ inventory
-hour-to-hour (no coupled horizon). Soft SoC reference via
-``ObjRule['SoC_deviation']``; H₂ economics via ``ObjRule['H2_sale']``.
-Myopic tank empties: ``empty_tank_cycle=None`` never empties; ``N`` empties
-after every ``N`` solved hours. ``H2_mass_final`` is not enforced in myopic OPF.
+Solve each season as its own 24 h window, attach compare tables, then open
+the season-compare dashboard.
 
-.. code-block:: python
+Docs CI only smoke-loads the seasonal CSVs (four IPOPT windows are too heavy).
+Interactively prefer ``pyf.run_dash(grid)`` over ``create_season_compare_dash_app``.
 
-    pyf.ts_acdc_opf(
-        grid,
-        ObjRule={"Energy_cost": 1, "SoC_deviation": 10, "H2_sale": 1},
-        solver="ipopt",
-    )
+.. literalinclude:: ../pyflow_tests/doc_examples/window_opf/01_pei_season_compare_dash.py
+   :language: python
+   :lines: 9-
+
+Once running, open http://127.0.0.1:8050/ .
+
+.. themed-figure:: pei_season_compare_dash
+   :width: 100%
+   :alt: PEI BESS H2 season-compare Dash
+
+   Season-compare Dash: Power (source) and SoC across Spring–Winter (split layout).
+
+Related: myopic TS
+------------------
+
+Sequential :func:`~pyflow_acdc.ts_acdc_opf` carries SoC / H₂ hour-to-hour
+without a coupled horizon. Use ``ObjRule['SoC_deviation']`` /
+``ObjRule['H2_sale']`` there — see :doc:`api/ts` and :ref:`obj_functions`.

@@ -65,6 +65,7 @@ API Documentation
    api/ts_mod
    api/clustering
    api/ts
+   api/window
    api/market_coef
 
 .. toctree::

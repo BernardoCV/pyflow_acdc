@@ -1082,11 +1082,6 @@ def rolling_window_nl_opf(
     for k, (c_start, c_end) in enumerate(commits):
         t_win0 = time.perf_counter()
         wall_start = datetime.now(timezone.utc).isoformat()
-        if print_step:
-            print(
-                f"[{wall_start}] Rolling window {k + 1}/{n_win} "
-                f"(frames {c_start}–{c_end})"
-            )
         is_last = k == n_win - 1
         use_foresight = (
             soc_final_mode == 'future_sight' and not is_last
@@ -1109,6 +1104,14 @@ def rolling_window_nl_opf(
                 force_soc = ((k + 1) % soc_final_every_m == 0) or is_last
             h2_frames = None  # last frame of this solve
             h2_scale = None
+        if print_step:
+            step_msg = (
+                f"[{wall_start}] Rolling window {k + 1}/{n_win} "
+                f"(frames {c_start}–{c_end})"
+            )
+            if use_foresight:
+                step_msg += f" + future-sight ({c_end + 1}–{next_end})"
+            print(step_msg)
         t_prepare = time.perf_counter() - t_win0
 
         t_opf0 = time.perf_counter()
