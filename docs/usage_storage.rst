@@ -87,7 +87,8 @@ emptying and staying empty under pure energy-cost myopia.
 Coupled ``window_nl_opf`` / rolling keep hard ``soc_initial`` / ``soc_final``;
 soft SoC is for the forward-only TS path.
 
-H₂ in the same myopic run is **direct sale** (no tank) — see :doc:`usage_hydrogen`.
+H₂ in the same myopic run carries inventory (``empty_tank_cycle``) — see
+:doc:`usage_hydrogen`.
 
 **References**
 

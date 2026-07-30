@@ -147,12 +147,93 @@ def test_window_nl_opf_electrolyser_only_requires_time_series():
         pyf.window_nl_opf(grid, start=0, end=1, build_only=True)
 
 
+def test_empty_tank_cycle_validation_and_myopic_helper():
+    from pyflow_acdc.Time_series import _maybe_empty_h2_after_myopic_step
+
+    grid = _grid_with_electrolyser()
+    pyf.analyse_grid(grid)
+    el = grid.electrolysers[0]
+    assert el.empty_tank_cycle is None
+    assert grid.H2 is True
+
+    with pytest.raises(ValueError, match="empty_tank_cycle"):
+        pyf.add_electrolyser(
+            grid,
+            "30",
+            P_max_MW=10.0,
+            P_min_MW=0.0,
+            b_h=1.0,
+            c_h=0.0,
+            H2_mass_max_kg=100.0,
+            empty_tank_cycle=0,
+        )
+
+    el.empty_tank_cycle = 2
+    el.mass_H2 = 12.0
+    el.H2_mass_initial = 12.0
+
+    class _Param:
+        def __init__(self):
+            self.value = 12.0
+
+        def set_value(self, v):
+            self.value = float(v)
+
+    class _FakeModel:
+        def __init__(self):
+            self.mass_H2_prev = {el.electrolyserNumber: _Param()}
+
+    model = _FakeModel()
+    _maybe_empty_h2_after_myopic_step(grid, model, 1)
+    assert el.mass_H2 == pytest.approx(12.0)
+    _maybe_empty_h2_after_myopic_step(grid, model, 2)
+    assert el.mass_H2 == pytest.approx(0.0)
+    assert el.H2_mass_initial == pytest.approx(0.0)
+    assert model.mass_H2_prev[el.electrolyserNumber].value == pytest.approx(0.0)
+
+
+def test_rolling_empty_tank_cycle_boundary_selection():
+    from pyflow_acdc.window_opf import (
+        _electrolysers_to_empty_after_rolling_commit,
+        _rolling_h2_empty_targets,
+    )
+
+    grid = _grid_with_electrolyser()
+    el_none = grid.electrolysers[0]
+    el_n = pyf.add_electrolyser(
+        grid,
+        "30",
+        P_max_MW=10.0,
+        P_min_MW=0.0,
+        b_h=1.0,
+        c_h=0.0,
+        H2_mass_max_kg=100.0,
+        electrolyser_name="el_cycle48",
+        empty_tank_cycle=48,
+    )
+    els = [el_none, el_n]
+    targets = _rolling_h2_empty_targets(els)
+
+    # Window ends at hour 24: None empties; N=48 does not.
+    to_empty = _electrolysers_to_empty_after_rolling_commit(els, 24, targets)
+    assert el_none in to_empty
+    assert el_n not in to_empty
+
+    # Window ends at hour 48: both empty; next target for N becomes 96.
+    to_empty = _electrolysers_to_empty_after_rolling_commit(els, 48, targets)
+    assert el_none in to_empty
+    assert el_n in to_empty
+    assert targets[el_n.electrolyserNumber] == 96
+
+
 def run_test():
     test_hydrogen_nl_model_builds()
     test_ext_electrolyser_reporting()
     test_window_nl_opf_h2_builds_multi_frame_model()
     test_hydrogen_window_reporting()
     test_window_nl_opf_electrolyser_only_requires_time_series()
+    test_empty_tank_cycle_validation_and_myopic_helper()
+    test_rolling_empty_tank_cycle_boundary_selection()
     print("OK test_hydrogen_opf")
 
 

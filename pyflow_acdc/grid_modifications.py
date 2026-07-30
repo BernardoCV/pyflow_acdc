@@ -1677,6 +1677,7 @@ def add_electrolyser(
     Q_min_MVAR=0.0,
     Q_max_MVAR=0.0,
     dt_hours=1.0,
+    empty_tank_cycle=None,
     geometry=None,
 ):
     """Append an electrolyser to ``grid.electrolysers``.
@@ -1686,6 +1687,10 @@ def add_electrolyser(
 
     ``h2_price`` (EUR/kg, default 0) is used when ``ObjRule={'H2_sale': 1}``;
     optional ``TSType.H2_PRICE`` series overrides it per frame.
+
+    ``empty_tank_cycle`` (``None`` or int ``>= 1``) sets out-of-opt tank empties:
+    myopic never empties when ``None``, else every ``N`` hours; rolling empties
+    every window when ``None``, else at commit boundaries at/past each ``k·N``.
     """
     node = _look_up_node(grid, node, ac_or_dc="any")
 
@@ -1711,6 +1716,7 @@ def add_electrolyser(
             Q_max=Q_max_MVAR / s_base,
             S_base=s_base,
             dt_hours=dt_hours,
+            empty_tank_cycle=empty_tank_cycle,
         )
     else:
         electrolyser = Electrolyser(
@@ -1727,6 +1733,7 @@ def add_electrolyser(
             h2_price=h2_price,
             S_base=s_base,
             dt_hours=dt_hours,
+            empty_tank_cycle=empty_tank_cycle,
         )
 
     if geometry is not None:

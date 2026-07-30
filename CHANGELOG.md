@@ -25,8 +25,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``storage_window`` / ``hydrogen_window``.
 - **Myopic time-series OPF** with BESS / H₂: ``ts_acdc_opf`` carries SoC
   hour-to-hour; optional ``ObjRule['SoC_deviation']`` soft SoC reference;
-  H₂ as direct sale only (``ObjRule['H2_sale']``, ``TSType.H2_PRICE``) without
-  tank carry — use window/rolling for inventory + terminal mass.
+  H₂ inventory carries within ``H2_mass_max`` with out-of-opt
+  ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
+  ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
+  rolling keep hard SoC ini/final and optional ``H2_mass_final``.
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
   ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``.
 - **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /

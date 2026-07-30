@@ -3,11 +3,10 @@ Green hydrogen / electrolyser
 
 :class:`~pyflow_acdc.Electrolyser` and :func:`~pyflow_acdc.add_electrolyser`
 attach operation-only electrolysers to AC or DC buses. Active power is a
-**load**; inventory ``mass_H2`` is tracked in **kg** for snapshot and coupled
-horizon OPF. Nonlinear multi-hour inventory uses
-:func:`~pyflow_acdc.window_nl_opf`. Myopic :func:`~pyflow_acdc.ts_acdc_opf`
-treats H₂ as **direct sale** (``ObjRule['H2_sale']``): no tank carry and no
-``H2_mass_final``.
+**load**; inventory ``mass_H2`` is tracked in **kg** for snapshot, myopic TS,
+and coupled horizon OPF. Nonlinear multi-hour inventory uses
+:func:`~pyflow_acdc.window_nl_opf`. Out-of-opt tank resets use
+``empty_tank_cycle`` (see :doc:`../usage_hydrogen`).
 
 User guide: :doc:`../usage_hydrogen`.
 
@@ -32,10 +31,11 @@ one-step inventory balance for snapshot OPF. Multi-hour coupled runs use
 :func:`~pyflow_acdc.window_nl_opf` (parent ``window_h2_constraints``; terminal
 ``H2_mass_final`` when set).
 
-Myopic :func:`~pyflow_acdc.ts_acdc_opf` does **not** carry H₂ inventory between
-hours and does not enforce ``H2_mass_final``. Use ``H2_sale`` for economics;
-production each hour is bounded by electrolyser power limits only (no
-cumulative sale cap over the series).
+Myopic :func:`~pyflow_acdc.ts_acdc_opf` **carries** H₂ inventory hour-to-hour
+within ``H2_mass_max``. ``empty_tank_cycle`` (``None`` or ``N``) empties the
+tank between solves (never / every ``N`` hours). ``H2_mass_final`` is not
+enforced in myopic OPF; use ``H2_sale`` for economics. Rolling empties follow
+the same attribute (every window vs boundaries at/past ``k·N``).
 
 Production each frame (Useche-Arteaga et al. 2026 §3.4; ``c_h`` every hour):
 

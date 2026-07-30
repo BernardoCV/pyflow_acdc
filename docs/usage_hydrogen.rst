@@ -26,11 +26,19 @@ Elements attach to any **AC** or **DC** bus
   (generation convention: positive ``Q`` injects vars).
 - On **DC**, ``Q`` is fixed at zero.
 - Inventory ``mass_H2`` is in **kg** (``H2_mass_max``, ``H2_mass_initial``,
-  optional ``H2_mass_final`` for **window / rolling OPF only**).
+  optional ``H2_mass_final`` for **window / rolling OPF** when a terminal mass
+  target is set).
+- ``empty_tank_cycle`` (``None`` or int ``N >= 1``) controls **out-of-opt**
+  tank resets (between solves, not a Pyomo constraint):
+
+  - **Myopic** ``ts_acdc_opf``: ``None`` → never empty (mass carries; production
+    stops when ``H2_mass_max`` binds). ``N`` → empty after every ``N`` solved
+    hours.
+  - **Rolling** ``rolling_window_nl_opf``: ``None`` → empty at every commit
+    window boundary. ``N`` → empty at the first commit end hour
+    ``>= k·N`` (window boundary at or past each cycle multiple).
 - ``h2_price`` (EUR/kg, default ``0``), static or ``TSType.H2_PRICE`` series:
   with ``ObjRule={'H2_sale': 1, ...}`` a zero price contributes nothing.
-  In myopic ``ts_acdc_opf``, use **sale only** (no tank); mass target and
-  inventory belong to window/rolling.
 - Rolling horizons: :func:`~pyflow_acdc.rolling_window_nl_opf` (1-based
   ``start``/``end`` like ``ts_acdc_opf``).
 
@@ -56,12 +64,12 @@ Running OPF
   terminal ``H2_mass_final``.
 - **Coupled** :func:`~pyflow_acdc.window_nl_opf`: parent chain across frames;
   ``H2_mass_final`` enforced on the last frame when set.
-- **Myopic** :func:`~pyflow_acdc.ts_acdc_opf`: **direct sale only** — no H₂
-  tank / inventory carry between hours, and no ``H2_mass_final`` (there is no
-  foresight to meet a mass target). Economics use ``ObjRule['H2_sale']``;
-  hourly production is limited by electrolyser ``P_min`` / ``P_max`` only.
-  There is no cumulative sale cap over the series. Use window/rolling when a
-  tank + terminal mass is required.
+- **Myopic** :func:`~pyflow_acdc.ts_acdc_opf`: inventory carries hour-to-hour
+  within ``H2_mass_max``. Economics use ``ObjRule['H2_sale']``. Tank empties
+  follow ``empty_tank_cycle`` (``None`` = never; ``N`` = every ``N`` hours),
+  applied between solves. ``H2_mass_final`` is not enforced in myopic OPF.
+- **Rolling** :func:`~pyflow_acdc.rolling_window_nl_opf`: same inventory model
+  inside each window; empties between windows per ``empty_tank_cycle``.
 - Results: ``Results.ext_electrolyser()`` (snapshot) and
   ``Results.hydrogen_window()`` after a window solve.
 
@@ -87,7 +95,7 @@ Roadmap
 +------------------+-----------------------------------------------------------+
 | PEI + Dash       | Done — see :doc:`usage_window_opf` (season-compare)       |
 +------------------+-----------------------------------------------------------+
-| ``ts_acdc_opf``  | Direct sale via ``H2_sale`` (no tank / no mass target)    |
+| ``ts_acdc_opf``  | Inventory carry + ``empty_tank_cycle``; ``H2_sale`` economics |
 +------------------+-----------------------------------------------------------+
 
 Full phase list and design decisions:

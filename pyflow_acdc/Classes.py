@@ -1677,6 +1677,15 @@ class Electrolyser:
     bounds allow reactive compensation. ``mass_H2`` is in **kg**.
     Power flow uses operating ``P_electrolyser`` as a known load (and AC
     ``Q_electrolyser`` as a known reactive injection), like generator setpoints.
+
+    ``empty_tank_cycle`` controls out-of-opt inventory resets (not a Pyomo
+    constraint):
+
+    * ``None`` (default): myopic ``ts_acdc_opf`` never empties (mass carries until
+      ``H2_mass_max`` binds); rolling windows empty at every commit boundary.
+    * positive int ``N``: myopic empties after every ``N`` solved frames; rolling
+      empties at the first commit boundary whose 1-based end hour is
+      ``>= k·N`` (window boundary at or past each cycle multiple).
     """
     electrolyserNumber = 0
     names = set()
@@ -1715,6 +1724,11 @@ class Electrolyser:
     def loading(self):
         return self.P_electrolyser / self.P_max * 100 if self.P_max > 0 else 0.0
 
+    def empty_tank(self):
+        """Reset inventory to empty (carry / between-solve only; not an OPF constraint)."""
+        self.H2_mass_initial = 0.0
+        self.mass_H2 = 0.0
+
     def __init__(
         self,
         name,
@@ -1732,6 +1746,7 @@ class Electrolyser:
         Q_max: float = 0.0,
         S_base: float = 100,
         dt_hours: float = 1.0,
+        empty_tank_cycle=None,
     ):
         if connected not in (AcDcSide.AC, AcDcSide.DC):
             raise ValueError("connected must be AcDcSide.AC or AcDcSide.DC")
@@ -1751,6 +1766,12 @@ class Electrolyser:
             raise ValueError("Q_min must be <= Q_max")
         if dt_hours <= 0:
             raise ValueError("dt_hours must be positive")
+        if empty_tank_cycle is not None:
+            if not isinstance(empty_tank_cycle, int) or empty_tank_cycle < 1:
+                raise ValueError(
+                    "empty_tank_cycle must be None or an int >= 1, "
+                    f"got {empty_tank_cycle!r}"
+                )
 
         self.electrolyserNumber = Electrolyser.electrolyserNumber
         Electrolyser.electrolyserNumber += 1
@@ -1786,6 +1807,7 @@ class Electrolyser:
         self.H2_mass_final = H2_mass_final
         self.h2_price = float(h2_price)
         self.dt_hours = dt_hours
+        self.empty_tank_cycle = empty_tank_cycle
         self.TS_dict = {'h2_price': None}
 
         self.P_electrolyser = 0.0

@@ -842,11 +842,42 @@ def _carry_state_from_results(grid, results, commit_end):
             st.soc_initial = float(row.iloc[0][st.name])
 
 
-def _empty_h2_tank(grid):
-    """Assume H₂ is removed at window end; next window starts empty."""
-    for el in (getattr(grid, 'electrolysers', None) or []):
-        el.H2_mass_initial = 0.0
-        el.mass_H2 = 0.0
+def _empty_h2_tank(grid, electrolysers=None):
+    """Reset selected (or all) H₂ tanks between solves — not an OPF constraint."""
+    els = electrolysers if electrolysers is not None else grid.electrolysers
+    for el in els:
+        el.empty_tank()
+
+
+def _rolling_h2_empty_targets(electrolysers):
+    """Next 1-based hour targets for ``empty_tank_cycle`` (``None`` → always)."""
+    targets = {}
+    for el in electrolysers:
+        n = el.empty_tank_cycle
+        targets[el.electrolyserNumber] = None if n is None else int(n)
+    return targets
+
+
+def _electrolysers_to_empty_after_rolling_commit(electrolysers, commit_end_1based, targets):
+    """Return electrolysers to empty after a rolling commit ending at hour ``h``.
+
+    ``empty_tank_cycle is None`` → every window boundary.
+    Otherwise empty at the first commit boundary with ``h >= k·N`` (ceil to the
+    next window end at or past each cycle multiple), then advance the target.
+    """
+    to_empty = []
+    for el in electrolysers:
+        e = el.electrolyserNumber
+        next_t = targets[e]
+        if next_t is None:
+            to_empty.append(el)
+            continue
+        if commit_end_1based < next_t:
+            continue
+        to_empty.append(el)
+        n = el.empty_tank_cycle
+        targets[e] = ((commit_end_1based // n) + 1) * n
+    return to_empty
 
 
 def rolling_window_nl_opf(
@@ -881,9 +912,18 @@ def rolling_window_nl_opf(
     ``hard``). Short last windows and future-sight ``2X`` solves use separate
     cached models.
 
-    Each window starts from the previous terminal SoC. The H₂ tank is assumed
-    **emptied at every commit-window end** (next window starts at
-    ``H2_mass_initial = 0``), whether the goal is a mass target or sale-only.
+    Each window starts from the previous terminal SoC. H₂ tank empties are
+    **out-of-opt** (between solves), gated by each electrolyser's
+    ``empty_tank_cycle``:
+
+    * ``None`` (default) — empty at **every** commit-window boundary (next
+      window starts at ``H2_mass_initial = 0``).
+    * positive ``N`` — empty at the first commit boundary whose 1-based end
+      hour is ``>= k·N`` (window end at or past each cycle multiple); inventory
+      otherwise carries across windows.
+
+    Whether the goal is a mass target or sale-only does not change the empty
+    policy above.
 
     Terminal SoC is controlled by rolling via ``enforce_soc_final`` on each
     :func:`window_nl_opf` call (terminals always sit on that solve's last frame):
@@ -897,10 +937,11 @@ def rolling_window_nl_opf(
 
     H₂ mass target (``H2_mass_final``) and H₂ sale (``ObjRule['H2_sale']`` with
     ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target,
-    each commit window regenerates ``H2_mass_final`` from an empty tank. Under
-    future sight the continuous *x*+*x+1* solve pins ``H2_mass_final`` at end of
-    *x* and ``2 · H2_mass_final`` at end of *x+1* (inventory carries only inside
-    that solve); ``H2_mass_max`` must be at least ``2 · H2_mass_final``.
+    each commit window regenerates ``H2_mass_final`` from the carried (or
+    emptied) tank. Under future sight the continuous *x*+*x+1* solve pins
+    ``H2_mass_final`` at end of *x* and ``2 · H2_mass_final`` at end of *x+1*
+    (inventory carries only inside that solve); ``H2_mass_max`` must be at
+    least ``2 · H2_mass_final``.
 
     Parameters
     ----------
@@ -954,12 +995,14 @@ def rolling_window_nl_opf(
     commits = _rolling_commit_windows(idx0, idx1, window_size)
     n_win = len(commits)
 
-    storage = list(getattr(grid, 'storage_elements', None) or [])
+    storage = list(grid.storage_elements)
+    electrolysers = list(grid.electrolysers)
     orig_soc_final = {st.name: st.soc_final for st in storage}
     enforce_h2_mass = any(
         el.H2_mass_final is not None
-        for el in (getattr(grid, 'electrolysers', None) or [])
+        for el in electrolysers
     )
+    h2_empty_targets = _rolling_h2_empty_targets(electrolysers)
 
     if grid.ESS and any(v is None for v in orig_soc_final.values()):
         missing = [n for n, v in orig_soc_final.items() if v is None]
@@ -1073,9 +1116,13 @@ def rolling_window_nl_opf(
             _carry_state_from_results(grid, full, c_end)
             t_carry = time.perf_counter() - t_c0
             timing_acc['carry'] += t_carry
-            # Tank emptied at commit-window end (sale or offtake).
+            # Out-of-opt tank empty (empty_tank_cycle); None → every boundary.
             t_e0 = time.perf_counter()
-            _empty_h2_tank(grid)
+            to_empty = _electrolysers_to_empty_after_rolling_commit(
+                electrolysers, c_end + 1, h2_empty_targets
+            )
+            if to_empty:
+                _empty_h2_tank(grid, to_empty)
             t_empty = time.perf_counter() - t_e0
             timing_acc['empty_h2'] += t_empty
 

@@ -1143,6 +1143,22 @@ def _carry_storage_h2_state_from_model(grid, model):
             el.P_electrolyser = float(pyo.value(model.P_electrolyser[e]))
 
 
+def _maybe_empty_h2_after_myopic_step(grid, model, hour_1based):
+    """Out-of-opt tank empty after a myopic hour (``empty_tank_cycle``).
+
+    ``None`` → never empty. Positive ``N`` → empty when ``hour_1based % N == 0``.
+    Caller must only invoke when ``grid.H2`` is true.
+    """
+    for el in grid.electrolysers:
+        n = el.empty_tank_cycle
+        if n is None:
+            continue
+        if hour_1based % n != 0:
+            continue
+        el.empty_tank()
+        model.mass_H2_prev[el.electrolyserNumber].set_value(0.0)
+
+
 def _ts_storage_soc_row(grid, time_1based):
     row = {'time': time_1based}
     for storage in grid.storage_elements:
@@ -1463,6 +1479,8 @@ def ts_acdc_opf(
 
         if grid.ESS or grid.H2:
             _carry_storage_h2_state_from_model(grid, model)
+            if grid.H2:
+                _maybe_empty_h2_after_myopic_step(grid, model, idx + 1)
         if grid.ESS:
             Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
             Time_series_storage_power.append(_ts_storage_power_row(grid, idx + 1))
