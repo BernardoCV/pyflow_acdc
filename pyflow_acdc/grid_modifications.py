@@ -39,6 +39,7 @@ from .constants import (
     LinkCost,
     TSType,
     TS_RENEWABLE_TYPES,
+    TS_CONV_PF_TYPES,
 )
 from .grid_analysis import (
     pol2cart,
@@ -1803,6 +1804,20 @@ def time_series_dict(grid, ts):
                 el.TS_dict['h2_price'] = ts.TS_num
                 break
 
+    elif typ in TS_CONV_PF_TYPES:
+        matched = False
+        for conv in grid.Converters_ACDC:
+            if ts.element_name == conv.name:
+                if not hasattr(conv, 'TS_dict') or conv.TS_dict is None:
+                    conv.TS_dict = {}
+                conv.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any ACDC converter"
+            )
 
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
     """Attach investment-period time series to grid elements from a CSV file.
