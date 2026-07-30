@@ -51,91 +51,65 @@ def build_only_solver_stats(solver=None, model=None):
         "obj_scaling": getattr(model, "obj_scaling", 1.0) if model is not None else 1.0,
     }
 
-def log_infeasible_constraints_limited(model, max_per_type=5):
-    """
-    Custom function to check and display infeasible constraints with limited output.
-    """
+def log_infeasible_constraints_limited(model, max_per_type=5, tol=1e-6):
+    """Print violated constraints in Pyomo-style ``INFO: CONSTR ... =/= 0.0`` form."""
     from pyomo.core import Constraint
     from collections import defaultdict
+
+    def _as_float(val):
+        if val is None:
+            return None
+        return float(pyo.value(val))
 
     print("=" * 80)
     print("INFEASIBLE CONSTRAINTS SUMMARY")
     print("=" * 80)
 
-    # Group constraints by their type/name pattern
     constraint_groups = defaultdict(list)
 
-    # Check all constraints in the model
     for constraint in model.component_objects(Constraint, active=True):
         constraint_name = constraint.name
-
-        # Check if constraint is violated
         for index in constraint:
             try:
-                # Get the constraint expression
-                expr = constraint[index]
+                con = constraint[index]
+                body = _as_float(con.body)
+                lower = _as_float(con.lower)
+                upper = _as_float(con.upper)
+                label = f"{constraint_name}[{index}]"
 
-                # Evaluate the constraint
-                if hasattr(expr, 'expr'):
-                    # For inequality constraints
-                    if hasattr(expr, 'lower') and expr.lower is not None:
-                        lower_val = expr.lower
-                        upper_val = expr.upper if hasattr(expr, 'upper') and expr.upper is not None else None
-
-                        # Evaluate the expression
-                        try:
-                            expr_val = pyo.value(expr.expr)
-
-                            # Check for violations
-                            if lower_val is not None and expr_val < lower_val - 1e-6:
-                                constraint_groups[constraint_name].append(
-                                    f"{constraint_name}[{index}]: {expr_val:.6f} < {lower_val:.6f} (lower bound violation)"
-                                )
-                            elif upper_val is not None and expr_val > upper_val + 1e-6:
-                                constraint_groups[constraint_name].append(
-                                    f"{constraint_name}[{index}]: {expr_val:.6f} > {upper_val:.6f} (upper bound violation)"
-                                )
-                        except ValueError:
-                            # If we can't evaluate, just note the constraint
-                            constraint_groups[constraint_name].append(
-                                f"{constraint_name}[{index}]: Unable to evaluate"
-                            )
-                else:
-                    # For equality constraints
-                    try:
-                        expr_val = pyo.value(expr)
-                        if abs(expr_val) > 1e-6:
-                            constraint_groups[constraint_name].append(
-                                f"{constraint_name}[{index}]: {expr_val:.6f} != 0 (equality violation)"
-                            )
-                    except ValueError:
+                if con.equality:
+                    rhs = lower if lower is not None else 0.0
+                    residual = body - rhs
+                    if abs(residual) > tol:
                         constraint_groups[constraint_name].append(
-                            f"{constraint_name}[{index}]: Unable to evaluate"
+                            f"INFO: CONSTR {label}: {residual} =/= 0.0"
                         )
-
-            except (AttributeError, KeyError, TypeError) as e:
+                else:
+                    if lower is not None and body < lower - tol:
+                        constraint_groups[constraint_name].append(
+                            f"INFO: CONSTR {label}: {body} </= {lower}"
+                        )
+                    if upper is not None and body > upper + tol:
+                        constraint_groups[constraint_name].append(
+                            f"INFO: CONSTR {label}: {body} >/= {upper}"
+                        )
+            except (AttributeError, KeyError, TypeError, ValueError) as e:
                 constraint_groups[constraint_name].append(
-                    f"{constraint_name}[{index}]: Error evaluating - {str(e)}"
+                    f"INFO: CONSTR {constraint_name}[{index}]: Unable to evaluate ({e})"
                 )
 
-    # Display results with limits
     total_violations = 0
     for group_name, violations in constraint_groups.items():
-        if violations:  # Only show groups with violations
-            print(f"\n{group_name}")
-            print("-" * len(group_name))
-
-            # Show first max_per_type violations
-            for i, violation in enumerate(violations[:max_per_type]):
-                print(f"  {violation}")
-
-            # Show summary if there are more
-            if len(violations) > max_per_type:
-                remaining = len(violations) - max_per_type
-                print(f"  ... and {remaining} other violations")
-
-            print(f"  Total: {len(violations)} violations")
-            total_violations += len(violations)
+        if not violations:
+            continue
+        print(f"\n{group_name}")
+        print("-" * len(group_name))
+        for violation in violations[:max_per_type]:
+            print(f"  {violation}")
+        if len(violations) > max_per_type:
+            print(f"  ... and {len(violations) - max_per_type} other violations")
+        print(f"  Total: {len(violations)} violations")
+        total_violations += len(violations)
 
     if total_violations == 0:
         print("\nNo constraint violations detected.")
@@ -988,9 +962,9 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     }
 
     # Decision policy for solution_found:
-    # 1) If solver termination is optimal/acceptable/feasible, trust solver and pass.
-    # 2) Otherwise (max iterations, internal error, etc.), validate loaded values
-    #    with the explicit feasibility checker and try alternative solution records.
+    # 1) If solver termination is optimal/acceptable/feasible/maxTimeLimit, trust solver.
+    # 2) User interrupt / aborted with a loaded incumbent counts as solution_found.
+    # 3) Otherwise validate loaded values with the quick point check.
     try:
         tc = str(getattr(results.solver, 'termination_condition', '') or '').lower() if results is not None else ''
     except AttributeError:
@@ -998,7 +972,15 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     solver_message_lc = solver_message.lower()
     solver_status_lc = str((solver_stats or {}).get('solver_status') or '').lower()
     solver_name_lc = str(solver).lower() if solver is not None else ''
-    trusted_termination = tc in ('optimal', 'feasible', 'locallyoptimal', 'acceptable', 'locally_optimal', 'maxiterations')
+    trusted_termination = tc in (
+        'optimal',
+        'feasible',
+        'locallyoptimal',
+        'acceptable',
+        'locally_optimal',
+        'maxiterations',
+        'maxtimelimit',
+    )
     explicit_infeasible_termination = tc in (
         'infeasible',
         'locallyinfeasible',
@@ -1025,6 +1007,19 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         trusted_termination = False
         explicit_infeasible_termination = True
 
+    # Ctrl-C / user abort: Gurobi often returns status aborted / tc error while
+    # leaving a usable incumbent on the model. Accept that incumbent below.
+    user_interrupt = (
+        'terminated by the user' in solver_message_lc
+        or 'interrupted by the user' in solver_message_lc
+        or 'interrupted by user' in solver_message_lc
+        or 'user interrupt' in solver_message_lc
+        or solver_status_lc == 'aborted'
+        or tc == 'aborted'
+    )
+    if user_interrupt:
+        explicit_error_termination = False
+
     if (
         'aborted' in solver_message_lc
         or 'error in step computation' in solver_message_lc
@@ -1034,12 +1029,13 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
         or 'cannot open shared object file' in solver_message_lc
         or 'libhsl.so' in solver_message_lc
     ):
-        explicit_error_termination = True
+        if not user_interrupt:
+            explicit_error_termination = True
 
     # Some solver interfaces return termination_condition="other" for hard solver failures.
     # Promote those cases to explicit error so callers can catch them deterministically.
     if tc == 'other':
-        if solver_status_lc in ('error', 'aborted'):
+        if solver_status_lc in ('error', 'aborted') and not user_interrupt:
             explicit_error_termination = True
             solver_stats['termination_condition'] = 'error'
         elif (
@@ -1138,6 +1134,9 @@ def pyomo_model_solve(model, grid=None, solver='ipopt', tee=False, time_limit=No
     elif explicit_error_termination:
         loaded_solution_feasible = False
         checker_reason = "explicit_error_termination"
+    elif user_interrupt and (has_loaded_solution or has_model_values):
+        loaded_solution_feasible = True
+        checker_reason = "user_interrupt_with_incumbent"
     elif trusted_termination:
         loaded_solution_feasible = True
         checker_reason = "trusted_termination"

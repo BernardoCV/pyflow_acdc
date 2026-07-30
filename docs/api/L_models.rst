@@ -7,9 +7,10 @@ making them suitable for fast studies, large sweeps, and the Pyomo backend of
 :func:`~pyflow_acdc.wind_farm_CSS`.
 
 Model construction lives in ``pyflow_acdc.AC_OPF_L_model``; the drivers
-(:func:`~pyflow_acdc.optimal_l_pf` and
-:func:`~pyflow_acdc.linear_transmission_expansion`) live in
-``pyflow_acdc.ACDC_OPF`` and ``pyflow_acdc.ACDC_Static_TEP``. Both drivers accept
+(:func:`~pyflow_acdc.optimal_l_pf`,
+:func:`~pyflow_acdc.linear_transmission_expansion`, and
+:func:`~pyflow_acdc.linear_multi_period_transmission_expansion`) live in
+``pyflow_acdc.ACDC_OPF`` and ``pyflow_acdc.ACDC_L_TEP``. Both TEP drivers accept
 ``build_only=True`` to build the Pyomo model and export initializer values without
 a solver (used by the doc tests when no LP/MIP solver is installed).
 
@@ -54,6 +55,22 @@ LP/MIP solver (not ``'ortools'``).
    reconductoring candidates store two admittance sets per element):
 
    .. literalinclude:: ../../pyflow_tests/doc_examples/L_models/02_linear_reconductoring.py
+      :language: python
+      :lines: 2-
+
+Linear Multi-Period Transmission Expansion
+------------------------------------------
+
+Linear (MILP) counterpart of :func:`~pyflow_acdc.multi_period_transmission_expansion`
+for **AC-only** grids. Lives in ``pyflow_acdc.ACDC_L_TEP``; default solver is
+Gurobi. See :doc:`../usage_mp_tep` for the nonlinear multi-period workflow and CSV
+setup; the linear driver reuses the same investment series.
+
+.. autofunction:: pyflow_acdc.linear_multi_period_transmission_expansion
+
+   Example on ``case24_MP`` (``build_only`` when Gurobi is unavailable):
+
+   .. literalinclude:: ../../pyflow_tests/doc_examples/L_models/04_linear_mp_tep_case24.py
       :language: python
       :lines: 2-
 

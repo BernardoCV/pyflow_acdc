@@ -7,7 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.0**.
+> packaged version is **0.6.2**.
 
 ## [Unreleased]
 
@@ -36,6 +36,46 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `clean_entsoe_data` now returns the output Excel path.
 - Docs and user-facing strings: **pyflow-acdc** / **pyflow_acdc** naming
   (replacing mixed ``PyFlow-ACDC`` / ``PyFlow ACDC`` variants).
+
+## [0.6.2] - 2026-07-29
+
+### Added
+- **Linear multi-period TEP** (`ACDC_L_TEP.linear_multi_period_transmission_expansion`):
+  MILP counterpart of multi-period TEP (AC-only; default solver Gurobi), with
+  shared investment/decommission handling and `MP_TEP_obj_res` / `MP_TEP_results`
+  export. Doc example
+  `pyflow_tests/doc_examples/L_models/04_linear_mp_tep_case24.py` (``build_only=True``)
+  and `pyflow_tests/test_linear_mp_tep.py`.
+- **NL OPF post-process** for linear MP-TEP: optional ``post_process_nl_opf`` /
+  ``nl_solver`` re-solves a single-state NL OPF per investment period after a
+  successful MILP. Results go to ``grid.MP_TEP_nl_obj_res`` (same column schema
+  as linear ``MP_TEP_obj_res``); NL always uses ``obj_scaling=1.0``. Failed period
+  NL solves soft-fail with NaNs and do not block the run. When post-processing,
+  NL calls ``optimal_pf(..., export_if_feasible=True)`` so an infeasible NL does
+  **not** export onto the grid (normal user OPF still always exports).
+- **Period SVGs** for linear MP-TEP: ``save_period_svgs`` / ``period_svg_prefix``
+  write one SVG per period from the assigned investment state (``np_*``, loads),
+  independent of NL OPF success.
+- **Results**: ``mp_tep_nl_obj_res`` table / Excel sheet ``MP_TEP_nl_obj_res``.
+- **`optimal_pf`**: optional ``export_if_feasible`` (default ``False``) to skip
+  grid export when no feasible solution was found.
+
+### Changed
+- Linear static TEP helpers consolidated under ``ACDC_L_TEP.py`` (linear MP driver
+  lives there alongside static linear TEP).
+- ``log_infeasible_constraints_limited`` prints Pyomo-style
+  ``INFO: CONSTR ... =/= 0.0`` lines (avoids ``NumericConstant`` formatting
+  crashes when dumping infeasible NL OPFs).
+
+## [0.6.1] - 2026-07-21
+
+### Added
+- **Linear models docs**: `docs/api/L_models.rst` and doc examples for linear
+  transmission expansion, reconductoring, and linear OPF (`L_models/01`–`03`).
+
+### Changed
+- Linear OPF / TEP model improvements (`AC_OPF_L_model.py`) and related API/doc
+  wiring (`usage_tep.rst`, TEP doc examples).
 
 ## [0.6.0] - 2026-06-16
 
