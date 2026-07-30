@@ -744,11 +744,16 @@ class Grid:
             node.PGi_ren = sum(rs.PGi_ren*rs.gamma*rs.np_rsgen for rs in node.connected_RenSource)
             # Aggregate connected-generator dispatch the node sees (PGen is total output).
             node.PGi_opt = sum(gen.PGen for gen in node.connected_gen)
+            # BESS net injection (discharge - charge); electrolyser is a known load.
+            node.PGi_storage = sum(st.net_P_pu for st in node.connected_storage)
+            node.PLi_electrolyser = sum(el.P_electrolyser for el in node.connected_electrolyser)
 
         self.P_DC = np.vstack([node.PGi-node.PLi
                                +node.PconvDC
                                +node.PGi_ren
                                +node.PGi_opt
+                               +node.PGi_storage
+                               -node.PLi_electrolyser
                                 for node in self.nodes_DC])
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
 
@@ -765,15 +770,24 @@ class Grid:
             # Aggregate connected-generator dispatch the node sees (PGen/QGen are total output).
             node.PGi_opt = sum(gen.PGen for gen in node.connected_gen)
             node.QGi_opt = sum(gen.QGen for gen in node.connected_gen)
+            # BESS / H2 operating setpoints as known PQ (same signs as NL OPF nodal balance).
+            node.PGi_storage = sum(st.net_P_pu for st in node.connected_storage)
+            node.QGi_storage = sum(st.Q for st in node.connected_storage)
+            node.PLi_electrolyser = sum(el.P_electrolyser for el in node.connected_electrolyser)
+            node.QGi_electrolyser = sum(el.Q_electrolyser for el in node.connected_electrolyser)
         # # Negative means power leaving the system, positive means injected into the system at a node
 
         self.P_AC = np.vstack([node.PGi
                                +node.PGi_ren
                                +node.PGi_opt
-                               -node.PLi for node in self.nodes_AC])
+                               +node.PGi_storage
+                               -node.PLi
+                               -node.PLi_electrolyser for node in self.nodes_AC])
         self.Q_AC = np.vstack([node.QGi
                                 +node.QGi_ren
                                 +node.QGi_opt
+                                +node.QGi_storage
+                                +node.QGi_electrolyser
                                -node.QLi +node.Q_s_fx for node in self.nodes_AC])
         self.Ps_AC = np.vstack([node.P_s for node in self.nodes_AC])
         self.Qs_AC = np.vstack([node.Q_s for node in self.nodes_AC])
@@ -1484,6 +1498,8 @@ class Storage:
 
     Single class for AC and DC (``connected`` flag, like :class:`Electrolyser`).
     Operation-only element for nonlinear OPF (Useche-Arteaga et al. 2026 §3.3).
+    Power flow treats operating ``net_P_pu`` (and AC ``Q``) as known injections,
+    like generator ``PGen``/``QGen``.
 
     Sign convention: net active power **injected into the bus** is
     ``P_discharge - P_charge`` (discharge counts as generation).
@@ -1659,6 +1675,17 @@ class Electrolyser:
     Single class for AC and DC buses (``connected`` flag, like :class:`Ren_Source`).
     Active power ``P_electrolyser`` is a **load**. On AC, optional ``Q_electrolyser``
     bounds allow reactive compensation. ``mass_H2`` is in **kg**.
+    Power flow uses operating ``P_electrolyser`` as a known load (and AC
+    ``Q_electrolyser`` as a known reactive injection), like generator setpoints.
+
+    ``empty_tank_cycle`` controls out-of-opt inventory resets (not a Pyomo
+    constraint):
+
+    * ``None`` (default): myopic ``ts_acdc_opf`` never empties (mass carries until
+      ``H2_mass_max`` binds); rolling windows empty at every commit boundary.
+    * positive int ``N``: myopic empties after every ``N`` solved frames; rolling
+      empties at the first commit boundary whose 1-based end hour is
+      ``>= k·N`` (window boundary at or past each cycle multiple).
     """
     electrolyserNumber = 0
     names = set()
@@ -1697,6 +1724,11 @@ class Electrolyser:
     def loading(self):
         return self.P_electrolyser / self.P_max * 100 if self.P_max > 0 else 0.0
 
+    def empty_tank(self):
+        """Reset inventory to empty (carry / between-solve only; not an OPF constraint)."""
+        self.H2_mass_initial = 0.0
+        self.mass_H2 = 0.0
+
     def __init__(
         self,
         name,
@@ -1714,6 +1746,7 @@ class Electrolyser:
         Q_max: float = 0.0,
         S_base: float = 100,
         dt_hours: float = 1.0,
+        empty_tank_cycle=None,
     ):
         if connected not in (AcDcSide.AC, AcDcSide.DC):
             raise ValueError("connected must be AcDcSide.AC or AcDcSide.DC")
@@ -1733,6 +1766,12 @@ class Electrolyser:
             raise ValueError("Q_min must be <= Q_max")
         if dt_hours <= 0:
             raise ValueError("dt_hours must be positive")
+        if empty_tank_cycle is not None:
+            if not isinstance(empty_tank_cycle, int) or empty_tank_cycle < 1:
+                raise ValueError(
+                    "empty_tank_cycle must be None or an int >= 1, "
+                    f"got {empty_tank_cycle!r}"
+                )
 
         self.electrolyserNumber = Electrolyser.electrolyserNumber
         Electrolyser.electrolyserNumber += 1
@@ -1768,6 +1807,7 @@ class Electrolyser:
         self.H2_mass_final = H2_mass_final
         self.h2_price = float(h2_price)
         self.dt_hours = dt_hours
+        self.empty_tank_cycle = empty_tank_cycle
         self.TS_dict = {'h2_price': None}
 
         self.P_electrolyser = 0.0

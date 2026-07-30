@@ -1,4 +1,4 @@
-"""Docs: api/L_models.rst — Linear (DC-style) optimal power flow"""
+"""Docs: api/L_models.rst — Linearised AC optimal power flow"""
 import pyflow_acdc as pyf
 from pyflow_acdc.constants import PYOMO_LINEAR_SOLVERS
 

@@ -4,7 +4,7 @@ Multi period Transmission Expansion Planning Module
 This module provides functions for multi-period transmission expansion planning
 with investment states applied over time.
 
-Functions are found in `pyflow_acdc.ACDC_MultiPeriod_TEP`.
+Functions are found in `pyflow_acdc.NL_models.ACDC_MultiPeriod_TEP`.
 
 For workflow-oriented notes:
 

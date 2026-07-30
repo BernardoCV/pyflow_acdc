@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import pyflow_acdc as pyf
 
-from pyflow_acdc.window_opf import (
+from pyflow_acdc.NL_models.window_opf import (
     _rolling_commit_windows,
     _ts_inclusive_0based,
 )
@@ -100,7 +100,7 @@ def test_rolling_window_nl_opf_future_sight_build_only():
     assert stats[0]["solve"] == (0, 7)  # commit 0–3 + next 4–7
     assert stats[0]["commit"] == (0, 3)
     assert stats[0]["h2_final_frames"] == [3, 7]
-    assert stats[0]["h2_final_scale"] == {3: 1.0, 7: 2.0}
+    assert stats[0]["h2_final_scale"] is None
     assert stats[-1]["future_sight"] is False
     assert stats[-1]["force_soc"] is True
     assert stats[-1]["solve"] == (8, 9)

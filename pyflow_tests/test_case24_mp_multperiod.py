@@ -95,7 +95,7 @@ def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):
             "time": 0.0,
         }
 
-    monkeypatch.setattr("pyflow_acdc.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
+    monkeypatch.setattr("pyflow_acdc.NL_models.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
 
     grid, _, mod = _case24_mp_grid_with_csvs()
     inv_csv = mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv")

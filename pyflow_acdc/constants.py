@@ -197,6 +197,16 @@ class TSType(str, Enum):
     PRICE = 'price'
     H2_PRICE = 'h2_price'
     LOAD = 'Load'
+    # PF setpoint series for ACDC converters (see update_grid_for_pf)
+    CONV_P_DC = 'conv_P_DC'
+    CONV_P_AC = 'conv_P_AC'
+    CONV_Q_AC = 'conv_Q_AC'
+    # PF setpoint series for BESS (net P; Q on AC only)
+    STORAGE_P = 'storage_P'
+    STORAGE_Q = 'storage_Q'
+    # PF setpoint series for electrolyser (P load; Q on AC only)
+    H2_P = 'h2_P'
+    H2_Q = 'h2_Q'
     # Renewable availability series (see TS_RENEWABLE_TYPES)
     WPP = 'WPP'
     OWPP = 'OWPP'
@@ -207,6 +217,18 @@ class TSType(str, Enum):
 
 # Renewable-availability TS labels handled together as one group.
 TS_RENEWABLE_TYPES = (TSType.WPP, TSType.OWPP, TSType.SF, TSType.REN, TSType.SOLAR)
+
+# Converter PF setpoint TS labels (update_grid_for_pf).
+TS_CONV_PF_TYPES = (TSType.CONV_P_DC, TSType.CONV_P_AC, TSType.CONV_Q_AC)
+
+# BESS PF setpoint TS labels (net active; reactive on AC only).
+TS_STORAGE_PF_TYPES = (TSType.STORAGE_P, TSType.STORAGE_Q)
+
+# Electrolyser PF setpoint TS labels (active load; reactive on AC only).
+TS_H2_PF_TYPES = (TSType.H2_P, TSType.H2_Q)
+
+# All PF setpoint TS labels dispatched via update_grid_for_pf.
+TS_PF_TYPES = TS_CONV_PF_TYPES + TS_STORAGE_PF_TYPES + TS_H2_PF_TYPES
 
 
 # Default fuel / technology labels for Grid.gen_ac_types (ENTSO-E-like; grids may extend).

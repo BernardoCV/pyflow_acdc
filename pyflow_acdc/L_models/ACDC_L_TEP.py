@@ -8,17 +8,17 @@ import pandas as pd
 import pyomo.environ as pyo
 
 from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
-from .ACDC_OPF import (
+from ..ACDC_OPF import (
     opf_obj_l,
     opf_obj_l_array_losses,
     obj_w_rule,
     calculate_objective,
     translate_pyf_opf,
 )
-from .ACDC_Static_TEP import _TEP_install_variables, _TEP_install_constraints, tep_obj
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
-from .grid_analysis import analyse_grid, current_fuel_type_distribution
-from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from ..NL_models.ACDC_Static_TEP import _TEP_install_variables, _TEP_install_constraints, tep_obj
+from ..constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, DEFAULT_TIME_LIMIT, present_value_factor
+from ..grid_analysis import analyse_grid, current_fuel_type_distribution
+from ..pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
 
 
 __all__ = [
@@ -59,7 +59,7 @@ def _modify_parameters_l(grid, model, Price_Zones):
 
 
 def _calculate_l_mptep_objective_from_model(model, grid, weights_def):
-    from .ACDC_MultiPeriod_TEP import _inv_model_obj
+    from ..NL_models.ACDC_MultiPeriod_TEP import _inv_model_obj
 
     inv_objs = {}
     inv_opf_objs = {}
@@ -93,9 +93,9 @@ def _post_process_l_mptep_with_nl_opf(
     Failed NL OPFs do not export onto ``grid`` (``export_if_feasible=True``).
     ``optimal_pf`` clears run flags, so ``MP_TEP_run`` is restored at the end.
     """
-    from .ACDC_MultiPeriod_TEP import _set_grid_to_multiperiod_state
-    from .ACDC_OPF import optimal_pf, calculate_objective_from_model
-    from .Graph_and_plot import save_network_svg, create_geometries_from_layout
+    from ..NL_models.ACDC_MultiPeriod_TEP import _set_grid_to_multiperiod_state
+    from ..ACDC_OPF import optimal_pf, calculate_objective_from_model
+    from ..Graph_and_plot import save_network_svg, create_geometries_from_layout
 
     df_lin = grid.MP_TEP_obj_res
     if df_lin is None or df_lin.empty:
@@ -392,7 +392,7 @@ def linear_multi_period_transmission_expansion(
     tuple
         ``(model, model_results, timing_info, solver_stats)``.
     """
-    from .ACDC_MultiPeriod_TEP import (
+    from ..NL_models.ACDC_MultiPeriod_TEP import (
         _fill_investment_decisions,
         _validate_grid_for_MP_TEP,
         _deactivate_non_pre_existing_loads,

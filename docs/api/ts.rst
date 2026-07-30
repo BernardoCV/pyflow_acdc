@@ -61,11 +61,13 @@ Time series
    ``price_zone_restrictions`` adds price-zone restrictions to the model [1]_.
 
    With BESS (``grid.ESS``): SoC is carried hour-to-hour; optional soft reference
-   via ``ObjRule['SoC_deviation']`` (see :doc:`../usage_storage`).
-   With H₂ (``grid.H2``): **direct sale** via ``ObjRule['H2_sale']`` — no tank
-   carry and no ``H2_mass_final`` (see :doc:`../usage_hydrogen`).
-   For coupled inventory / terminal mass use :func:`~pyflow_acdc.window_nl_opf`
-   or :func:`~pyflow_acdc.rolling_window_nl_opf`.
+   via ``ObjRule['SoC_deviation']``.
+   With H₂ (``grid.H2``): inventory carries within ``H2_mass_max``;
+   ``empty_tank_cycle`` empties between solves; economics via
+   ``ObjRule['H2_sale']``.
+   Element models: :doc:`modelling_storage_hydrogen`.
+   Coupled multi-hour inventory / terminal mass:
+   :doc:`window` (API) and :doc:`../usage_window_opf` (workflow).
 
 
    **Example**

@@ -254,7 +254,7 @@ def _normalize_plot_height(height):
     try:
         h = int(height)
     except (TypeError, ValueError):
-        raise ValueError(f'plot height must be an integer, got {height!r}')
+        raise ValueError(f'plot height must be an integer, got {height!r}') from None
     if h < 200:
         raise ValueError(f'plot height must be >= 200, got {h}')
     return h

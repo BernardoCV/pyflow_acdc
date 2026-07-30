@@ -7,11 +7,53 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.2**.
+> packaged version is **0.6.3**.
 
 ## [Unreleased]
 
 ### Added
+- **Battery storage (BESS)**: ``Storage`` class, ``add_storage``, and NL OPF
+  SoC dynamics / S-circle on AC or DC buses when ``grid.ESS``. Snapshot
+  results via ``Results.ext_storage``; docs ``usage_storage`` / ``api/storage``.
+- **Green hydrogen**: ``Electrolyser`` class, ``add_electrolyser``, and NL OPF
+  inventory when ``grid.H2``. Snapshot results via ``Results.ext_electrolyser``;
+  docs ``usage_hydrogen`` / ``api/hydrogen``.
+- **Coupled window NL OPF** (``window_opf.py``): ``window_nl_opf`` solves a
+  multi-hour nonlinear OPF with linked BESS SoC and H₂ inventory across frames;
+  ``rolling_window_nl_opf`` chains windows with state carry-over; export helpers
+  ``export_window_opf_results`` / ``results_window_opf``. Results tables
+  ``storage_window`` / ``hydrogen_window``.
+- **Myopic time-series OPF** with BESS / H₂: ``ts_acdc_opf`` carries SoC
+  hour-to-hour; optional ``ObjRule['SoC_deviation']`` soft SoC reference;
+  H₂ inventory carries within ``H2_mass_max`` with out-of-opt
+  ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
+  ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
+  rolling keep hard SoC ini/final and optional ``H2_mass_final``.
+- **Linearised AC OPF** (``optimal_l_pf``): BESS (P-only, no Q / S-circle) and
+  electrolyser inventory / ``H2_sale``; raises if ``grid.DCmode``;
+  ``SoC_deviation`` is rejected (quadratic).
+- **Objective / TS constants**: ``ObjComponent.H2_SALE``,
+  ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``.
+- **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /
+  ``linear``) and ``link_cost`` on ``add_gen`` / ``add_gen_DC`` / ``add_extgrid``
+  so OPF cost coeffs can track nodal / price-zone prices.
+- **Dash**: restyled interactive dashboard (``run_dash``, assets, season-compare
+  via ``create_season_compare_dash_app``); PEI season-compare doc example and
+  screenshot.
+- **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
+  data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
+  OPF.
+- **TS PF setpoints**: ``update_grid_for_pf`` applies prescribed PF setpoints
+  from time series in pu: ACDC converters (``conv_P_DC``, ``conv_P_AC``,
+  ``conv_Q_AC``), BESS (``storage_P`` net injection, ``storage_Q`` on AC), and
+  electrolyser (``h2_P`` load, ``h2_Q`` on AC). Safe to call for every series
+  (non-PF types no-op). ``h2_price`` stays a normal TS via ``update_grid_data``.
+  Accepted labels live in ``TS_PF_TYPES`` / ``TSType``; converter fields must
+  match DC ``type`` / ``AC_type``, and ``storage_Q`` / ``h2_Q`` require AC
+  (fail-fast on mismatch). ``ts_acdc_pf`` / ``ts_ac_pf`` / ``ts_dc_pf``
+  dispatch ``TS_PF_TYPES`` → ``update_grid_for_pf``, else → ``update_grid_data``.
+  Droop/P converters without a ``conv_P_DC`` series restore ``P_DC`` from
+  ``Pconv_save`` in ``ts_acdc_pf``.
 - **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
   ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets). Coverage
   reports and the README badge are maintained on Codecov.
@@ -29,6 +71,19 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
+- **Power flow known injections**: ``update_pq_ac`` / ``update_p_dc`` fold BESS
+  and H₂ operating fields into the PF known P/Q (same signs as NL OPF). Storage
+  contributes ``net_P_pu = P_discharge - P_charge`` (AC also ``Q``); electrolyser
+  ``P_electrolyser`` is a known load (AC also ``Q_electrolyser`` as injection).
+  Defaults remain zero until set / after OPF export.
+- **Window OPF parameter updates**: ``_modify_parameters(..., window_block=True)``
+  skips rewriting ``SoC_prev`` / ``mass_H2_prev`` so frame-to-frame inventory
+  links are not overwritten by ``soc_initial`` / ``H2_mass_initial``.
+- **Power flow API**: ``power_flow`` / ``ac_power_flow`` / ``dc_power_flow``
+  return ``(elapsed, tol, tol_history)``; sequential tracker adds per-outer
+  Newton histories (``ac_pf_iter_tolerances`` / ``dc_pf_iter_tolerances``).
+- **Price-zone ↔ node linking** and generator cost sync improved in
+  ``grid_modifications`` / ``Classes``.
 - **`dill`** is a required base dependency; removed optional-import fallbacks in
   `grid_creator` / `Export_files` and `require_dill` test skips.
 - **`Market_Coeff`**: module and public-function docstrings; expanded
