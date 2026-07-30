@@ -122,6 +122,7 @@ Workflow guides
    usage_opf
    usage_storage
    usage_hydrogen
+   usage_heat_pump
    usage_tep
    usage_mp_tep
    usage_window_opf

@@ -48,6 +48,7 @@ API Documentation
    api/grid_mod
    api/storage
    api/hydrogen
+   api/heat_pump
    api/cable_database
    api/grid_analysis
    api/results

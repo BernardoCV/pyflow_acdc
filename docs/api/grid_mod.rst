@@ -90,6 +90,13 @@ See :doc:`hydrogen` and :doc:`../usage_hydrogen` for the user guide.
 
 .. autofunction:: pyflow_acdc.add_electrolyser
 
+Add Heat Pump
+^^^^^^^^^^^^^
+
+See :doc:`heat_pump` and :doc:`../usage_heat_pump` for the user guide.
+
+.. autofunction:: pyflow_acdc.add_heat_pump
+
 Bulk Add Generators
 ^^^^^^^^^^^^^^^^^^^
 

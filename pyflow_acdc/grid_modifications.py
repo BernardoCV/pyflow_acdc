@@ -19,7 +19,7 @@ from shapely.wkt import loads
 
 from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC,
-    Gen_DC, Line_AC, Line_DC, MTDCPrice_Zone, Node_AC, Node_DC,
+    Gen_DC, HeatPump, Line_AC, Line_DC, MTDCPrice_Zone, Node_AC, Node_DC,
     OffshorePrice_Zone, Price_Zone, Ren_Source, Ren_source_zone,
     rec_Line_AC, Size_selection, Storage, Electrolyser, TF_Line_AC, TimeSeries,
 )
@@ -71,6 +71,7 @@ __all__ = [
     'add_RenSource',
     'add_storage',
     'add_electrolyser',
+    'add_heat_pump',
     'add_generators',
     'add_cable_option',
     'add_line_sizing',
@@ -1735,6 +1736,55 @@ def add_electrolyser(
     return electrolyser
 
 
+def add_heat_pump(
+    grid,
+    node,
+    *,
+    P_ref_MW,
+    Q_ref_MVAR=0.0,
+    n_units,
+    E_min_kWh,
+    E_max_kWh,
+    heat_pump_name=None,
+    P_unit_max_MW=1.76 / 1000,
+    E_state_initial_kWh=0.0,
+    dt_hours=1.0,
+    geometry=None,
+):
+    """Append an AC-only controllable heat pump to ``grid.heat_pumps``.
+
+    Snapshot inputs are scalars for one-step OPF. For multi-hour studies, attach
+    ``TSType.HP_P_REF`` / ``HP_Q_REF`` (pu) and ``HP_E_MIN`` / ``HP_E_MAX``
+    (kWh) series to the heat-pump name; those override the scalars per frame.
+    """
+    node = _look_up_node(grid, node, ac_or_dc="AC")
+
+    if heat_pump_name is None:
+        heat_pump_name = f"heat_pump_{node.name}"
+
+    heat_pump = HeatPump(
+        heat_pump_name,
+        node,
+        P_ref=P_ref_MW / grid.S_base,
+        Q_ref=Q_ref_MVAR / grid.S_base,
+        n_units=n_units,
+        P_unit_max=P_unit_max_MW / grid.S_base,
+        E_min=float(E_min_kWh),
+        E_max=float(E_max_kWh),
+        E_state_initial=float(E_state_initial_kWh),
+        dt_hours=dt_hours,
+        S_base=grid.S_base,
+    )
+
+    if geometry is not None:
+        if isinstance(geometry, str):
+            geometry = loads(geometry)
+        heat_pump.geometry = geometry
+
+    grid.heat_pumps.append(heat_pump)
+    return heat_pump
+
+
 "Time series data "
 
 
@@ -1801,6 +1851,12 @@ def time_series_dict(grid, ts):
         for el in grid.electrolysers:
             if ts.element_name == el.name:
                 el.TS_dict['h2_price'] = ts.TS_num
+                break
+
+    elif typ in (TSType.HP_P_REF, TSType.HP_Q_REF, TSType.HP_E_MIN, TSType.HP_E_MAX):
+        for hp in grid.heat_pumps:
+            if ts.element_name == hp.name:
+                hp.TS_dict[typ] = ts.TS_num
                 break
 
 

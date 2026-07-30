@@ -260,6 +260,28 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
             )
         el.h2_price = ts_data[idx]
 
+    elif typ in (TSType.HP_P_REF, TSType.HP_Q_REF, TSType.HP_E_MIN, TSType.HP_E_MAX):
+        grid.heat_pumps_dict = {hp.name: hp for hp in grid.heat_pumps}
+        hp = grid.heat_pumps_dict.get(ts.element_name, None)
+        if hp is None:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any heat pump"
+            )
+        if typ == TSType.HP_P_REF:
+            hp.P_ref = float(ts_data[idx])
+        elif typ == TSType.HP_Q_REF:
+            hp.Q_ref = float(ts_data[idx])
+        elif typ == TSType.HP_E_MIN:
+            hp.E_min = float(ts_data[idx])
+        else:
+            hp.E_max = float(ts_data[idx])
+        if hp.E_min > hp.E_max:
+            raise ValueError(
+                f"Heat pump {hp.name!r}: E_min ({hp.E_min}) > E_max ({hp.E_max}) "
+                f"after applying {typ} at idx={idx}"
+            )
+
 def _update_ac_nodes(grid, idx):
     row_data = {'time': idx+1}
     for node in grid.nodes_AC:
@@ -920,14 +942,24 @@ def _modify_parameters(grid,model,Price_Zones,window_block=False):
                 model.soc_ref_DC[s].set_value(float(storage.soc_ref))
 
     if grid.H2 and not window_block:
-        for el in grid.electrolysers:
-            model.mass_H2_prev[el.electrolyserNumber].set_value(
-                float(el.H2_mass_initial)
-            )
+            for el in grid.electrolysers:
+                model.mass_H2_prev[el.electrolyserNumber].set_value(
+                    float(el.H2_mass_initial)
+                )
+
+    if grid.HP:
+        for hp in grid.heat_pumps:
+            h = hp.heatPumpNumber
+            if not window_block:
+                model.E_heat_pump_prev[h].set_value(float(hp.E_state))
+            model.hp_p_ref[h].set_value(float(hp.P_ref))
+            model.hp_q_ref[h].set_value(float(hp.Q_ref))
+            model.hp_e_min[h].set_value(float(hp.E_min))
+            model.hp_e_max[h].set_value(float(hp.E_max))
 
 
 def _carry_storage_h2_state_from_model(grid, model):
-    """Write solved SoC / H₂ mass onto elements and set next-hour initials."""
+    """Write solved SoC / H₂ / HP state onto elements and set next-hour initials."""
     if grid.ESS:
         for storage in grid.storage_elements:
             s = storage.storageNumber
@@ -954,6 +986,19 @@ def _carry_storage_h2_state_from_model(grid, model):
             model.mass_H2_prev[e].set_value(mass)
             el.P_electrolyser = float(pyo.value(model.P_electrolyser[e]))
 
+    if grid.HP:
+        for hp in grid.heat_pumps:
+            h = hp.heatPumpNumber
+            e_state = float(pyo.value(model.E_heat_pump[h]))
+            p_hp = float(pyo.value(model.P_heat_pump[h]))
+            q_hp = float(pyo.value(model.Q_heat_pump[h]))
+            hp.E_state = e_state
+            hp.P_hp = p_hp
+            hp.Q_hp = q_hp
+            hp.P_shed = hp.P_ref - p_hp
+            hp.Q_shed = hp.Q_ref - q_hp
+            model.E_heat_pump_prev[h].set_value(e_state)
+
 
 def _ts_storage_soc_row(grid, time_1based):
     row = {'time': time_1based}
@@ -969,6 +1014,20 @@ def _ts_storage_power_row(grid, time_1based):
         row[storage.name] = np.float64(
             (storage.P_discharge - storage.P_charge) * storage.S_base
         )
+    return row
+
+
+def _ts_heat_pump_power_row(grid, time_1based):
+    row = {'time': time_1based}
+    for hp in grid.heat_pumps:
+        row[hp.name] = np.float64(hp.P_hp * hp.S_base)
+    return row
+
+
+def _ts_heat_pump_energy_row(grid, time_1based):
+    row = {'time': time_1based}
+    for hp in grid.heat_pumps:
+        row[hp.name] = np.float64(hp.E_state)
     return row
 
 
@@ -1092,6 +1151,8 @@ def ts_acdc_opf(
     Time_series_res_available = []
     Time_series_storage_soc = []
     Time_series_storage_power = []
+    Time_series_heat_pump_power = []
+    Time_series_heat_pump_energy = []
 
     weights_def = default_obj_weights()
 
@@ -1278,6 +1339,9 @@ def ts_acdc_opf(
         if grid.ESS:
             Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
             Time_series_storage_power.append(_ts_storage_power_row(grid, idx + 1))
+        if grid.HP:
+            Time_series_heat_pump_power.append(_ts_heat_pump_power_row(grid, idx + 1))
+            Time_series_heat_pump_energy.append(_ts_heat_pump_energy_row(grid, idx + 1))
 
         t_minus_1_values = _snapshot_initial_values(model)
 
@@ -1304,7 +1368,8 @@ def ts_acdc_opf(
                             Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
                             Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
                             Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
-                            Time_series_storage_soc, Time_series_storage_power)
+                            Time_series_storage_soc, Time_series_storage_power,
+                            Time_series_heat_pump_power, Time_series_heat_pump_energy)
 
     av_t_modelsolve = total_solve_time / count if count else 0.0
     av_t_modelupdate=total_update_time / count if count else 0.0
@@ -1336,7 +1401,8 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
     Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
     Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
     Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
-    Time_series_storage_soc, Time_series_storage_power)= ts_results
+    Time_series_storage_soc, Time_series_storage_power,
+    Time_series_heat_pump_power, Time_series_heat_pump_energy)= ts_results
 
     grid.time_series_results['converter_p_dc'] = _to_dataframe(Time_series_Opt_res_P_conv_DC)
     grid.time_series_results['converter_q_ac'] = _to_dataframe(Time_series_Opt_res_Q_conv_AC)
@@ -1365,6 +1431,10 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
         grid.time_series_results['storage_soc'] = _to_dataframe(Time_series_storage_soc)
     if Time_series_storage_power:
         grid.time_series_results['storage_power'] = _to_dataframe(Time_series_storage_power)
+    if Time_series_heat_pump_power:
+        grid.time_series_results['heat_pump_p'] = _to_dataframe(Time_series_heat_pump_power)
+    if Time_series_heat_pump_energy:
+        grid.time_series_results['heat_pump_energy_state'] = _to_dataframe(Time_series_heat_pump_energy)
     # Split line time-series into explicit loading and MW-to datasets
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)

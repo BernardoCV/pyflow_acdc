@@ -41,6 +41,7 @@ __all__ = [
     'Gen_DC',
     'Storage',
     'Electrolyser',
+    'HeatPump',
     'Ren_Source',
     'Node_AC',
     'Node_DC',
@@ -185,6 +186,9 @@ class Grid:
             'storage_p_charge': pd.DataFrame(),
             'storage_p_discharge': pd.DataFrame(),
             'storage_q': pd.DataFrame(),
+            'heat_pump_p': pd.DataFrame(),
+            'heat_pump_q': pd.DataFrame(),
+            'heat_pump_energy_state': pd.DataFrame(),
             }
 
         self.Clustering_information = {}
@@ -233,6 +237,7 @@ class Grid:
         self.RenSources =[]
         self.storage_elements = []
         self.electrolysers = []
+        self.heat_pumps = []
         self.rs2node = {'DC': {},
                         'AC': {}}
 
@@ -389,6 +394,10 @@ class Grid:
     @property
     def nelectrolysers(self):
         return len(self.electrolysers) if self.electrolysers is not None else 0
+
+    @property
+    def nheat_pumps(self):
+        return len(self.heat_pumps) if self.heat_pumps is not None else 0
 
     @property
     def tol_scaler(self):
@@ -1790,6 +1799,128 @@ class Electrolyser:
         Electrolyser.names.add(self.name)
 
 
+class HeatPump:
+    """Controllable AC heat-pump load with cumulative comfort-energy bounds.
+
+    Baseline electrical demand plus a bounded flexibility actuator with a
+    cumulative energy state. Snapshot attrs are scalars; time variation for
+    multi-hour studies is applied via ``TSType.HP_*`` series.
+    """
+    heatPumpNumber = 0
+    names = set()
+
+    @classmethod
+    def reset_class(cls):
+        cls.heatPumpNumber = 0
+        cls.names = set()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.P_ref *= rate
+                self.Q_ref *= rate
+                self.P_unit_max *= rate
+                self.P_hp *= rate
+                self.Q_hp *= rate
+                self.P_shed *= rate
+                self.Q_shed *= rate
+        self._S_base = new_S_base
+
+    def __init__(
+        self,
+        name,
+        node,
+        P_ref: float,
+        Q_ref: float,
+        n_units: int,
+        P_unit_max: float,
+        E_min: float,
+        E_max: float,
+        E_state_initial: float = 0.0,
+        dt_hours: float = 1.0,
+        S_base: float = 100,
+    ):
+        if n_units <= 0:
+            raise ValueError("n_units must be positive")
+        if P_unit_max <= 0:
+            raise ValueError("P_unit_max must be positive")
+        if dt_hours <= 0:
+            raise ValueError("dt_hours must be positive")
+        e_min = float(E_min)
+        e_max = float(E_max)
+        if e_min > e_max:
+            raise ValueError("E_min must be <= E_max")
+        if not (e_min <= E_state_initial <= e_max):
+            raise ValueError("E_state_initial must lie within [E_min, E_max]")
+
+        self.heatPumpNumber = HeatPump.heatPumpNumber
+        HeatPump.heatPumpNumber += 1
+        self.connected = AcDcSide.AC
+        self.S_base = S_base
+
+        self.Node = node.name
+        self.Node_AC = node.name
+        self._node = node
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
+        self.geometry = node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+
+        self.P_ref = float(P_ref)
+        self.Q_ref = float(Q_ref)
+        self.n_units = int(n_units)
+        self.P_unit_max = float(P_unit_max)
+        self.dt_hours = float(dt_hours)
+
+        self.E_min = e_min
+        self.E_max = e_max
+        self.E_state_initial = float(E_state_initial)
+        self.E_state = float(E_state_initial)
+
+        self.P_hp = self.P_ref
+        self.Q_hp = self.Q_ref
+        self.P_shed = 0.0
+        self.Q_shed = 0.0
+
+        self.TS_dict = {
+            'hp_P_ref': None,
+            'hp_Q_ref': None,
+            'hp_E_min': None,
+            'hp_E_max': None,
+        }
+
+        node.connected_heat_pumps.append(self)
+
+        if name in HeatPump.names:
+            count = 1
+            new_name = f"{name}_{count}"
+            while new_name in HeatPump.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
+        if name is None:
+            self._name = f"heat_pump_{node.name}"
+        else:
+            self._name = name
+
+        HeatPump.names.add(self.name)
+
+
 class Ren_Source:
     """Renewable generation source attached to a node.
 
@@ -2145,6 +2276,7 @@ class Node_AC:
         self.connected_RenSource=[]
         self.connected_storage=[]
         self.connected_electrolyser=[]
+        self.connected_heat_pumps=[]
 
         self.connected_toExpLine=[]
         self.connected_fromExpLine=[]
@@ -2431,6 +2563,7 @@ class Node_DC:
         self.connected_RenSource=[]
         self.connected_storage=[]
         self.connected_electrolyser=[]
+        self.connected_heat_pumps=[]
 
         self.PGi_ren = 0
         self.PGi_opt = 0
