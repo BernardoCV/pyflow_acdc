@@ -1,4 +1,4 @@
-"""Usage guide: Adding BESS (``docs/usage_storage.rst``)."""
+"""System modelling: Adding BESS (``docs/api/modelling_storage_hydrogen.rst``)."""
 import pyflow_acdc as pyf
 
 pyf.initialize_pyflowacdc()

@@ -3,9 +3,11 @@ Coupled window NL OPF
 
 :func:`~pyflow_acdc.window_nl_opf` solves a **multi-hour nonlinear OPF** with
 coupled storage SoC and (when present) H₂ inventory across frames.
+:func:`~pyflow_acdc.rolling_window_nl_opf` chains successive windows with
+SoC / H₂ carry-over between commits.
 
-Add BESS / electrolysers first — see :doc:`usage_storage` and
-:doc:`usage_hydrogen`. Interactive plots: :doc:`api/dash`.
+Add BESS / electrolysers first — see :doc:`api/modelling_storage_hydrogen`.
+Interactive plots: :doc:`api/dash`.
 
 Seasonal data for the Princess Elisabeth Island (PEI) case lives under
 ``examples/PEI_BESS/<Season>/`` (local checkout, else GitHub ``main``).
@@ -13,6 +15,13 @@ Build with case flags ``storage``, ``hydrogen``, and
 ``data='season_comparison'`` / ``'full'``::
 
     https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/
+
+API
+---
+
+.. autofunction:: pyflow_acdc.window_nl_opf
+
+.. autofunction:: pyflow_acdc.rolling_window_nl_opf
 
 PEI season-compare + Dash
 -------------------------
@@ -59,15 +68,24 @@ For one seasonal (or concatenated) window without season-compare::
     )
     pyf.run_dash(grid)
 
-See also ``pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py`` (build-only).
+Build-only PEI example (no solve):
+
+.. literalinclude:: ../pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py
+   :language: python
+   :lines: 2-
 
 Rolling window
 --------------
 
-:func:`~pyflow_acdc.rolling_window_nl_opf` chains successive coupled windows
-with SoC / H₂ carry-over between commits. Indexing uses 1-based ``start`` /
-``end`` like ``ts_acdc_opf``. Tank empties between windows follow each
-electrolyser's ``empty_tank_cycle`` (see :doc:`usage_hydrogen`).
+Indexing uses 1-based ``start`` / ``end`` like ``ts_acdc_opf``. Tank empties
+between windows follow each electrolyser's ``empty_tank_cycle``:
+
+- ``None`` → empty at every commit window boundary
+- ``N`` → empty at the first commit end hour ``>= k·N`` (boundary at or past
+  each cycle multiple)
+
+Coupled windows keep hard ``soc_initial`` / ``soc_final`` and optional
+``H2_mass_final`` on the last frame when set.
 
 .. code-block:: python
 
@@ -77,5 +95,22 @@ electrolyser's ``empty_tank_cycle`` (see :doc:`usage_hydrogen`).
         end=48,
         window_size=24,
         ObjRule={"Energy_cost": 1},
+        solver="ipopt",
+    )
+
+Myopic TS (related)
+-------------------
+
+Sequential :func:`~pyflow_acdc.ts_acdc_opf` carries BESS SoC and H₂ inventory
+hour-to-hour (no coupled horizon). Soft SoC reference via
+``ObjRule['SoC_deviation']``; H₂ economics via ``ObjRule['H2_sale']``.
+Myopic tank empties: ``empty_tank_cycle=None`` never empties; ``N`` empties
+after every ``N`` solved hours. ``H2_mass_final`` is not enforced in myopic OPF.
+
+.. code-block:: python
+
+    pyf.ts_acdc_opf(
+        grid,
+        ObjRule={"Energy_cost": 1, "SoC_deviation": 10, "H2_sale": 1},
         solver="ipopt",
     )

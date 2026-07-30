@@ -151,6 +151,12 @@ def window_h2_constraints(
 
     ``h2_mass_initial`` and per-pin ``h2_mass_final_target`` are mutable
     ``Param``s (rolling keeps initial at 0; targets fixed for a given structure).
+
+    * One terminal frame (default / single pin): ``mass_H2[t] == scale ·
+      H2_mass_final`` (optional ``final_scale``).
+    * Several pins (future sight passes end of *x* and end of *x+1*): each
+      segment must produce ``>= H2_mass_final`` (incremental). Tank ub stays
+      ``H2_mass_max`` through the first pin, then ``n_pins · H2_mass_max``.
     """
     ordered = list(frames)
     el_ids = [el.electrolyserNumber for el in grid.electrolysers]
@@ -194,6 +200,13 @@ def window_h2_constraints(
                     f"{ordered[0]}…{ordered[-1]}"
                 )
 
+    incremental = len(term_frames) > 1
+    if incremental and final_scale is not None:
+        raise ValueError(
+            "final_scale is not used when multiple H₂ final frames are set "
+            "(incremental / future-sight pins)"
+        )
+
     if final_scale is not None:
         for t in term_frames:
             if t not in final_scale:
@@ -201,14 +214,55 @@ def window_h2_constraints(
                     f"final_scale missing frame={t}; have {sorted(final_scale)}"
                 )
 
-    # One Param per (frame, electrolyser) final pin used by this structure.
+    els_with_final = [
+        (e, el) for e, el in el_by_number.items() if el.H2_mass_final is not None
+    ]
+    if not els_with_final:
+        return
+
+    for e, el in els_with_final:
+        if el.H2_mass_final > el.H2_mass_max:
+            raise ValueError(
+                f"H2_mass_final={el.H2_mass_final} exceeds "
+                f"H2_mass_max={el.H2_mass_max} on {el.name!r}"
+            )
+
+    if incremental:
+        n_pins = len(term_frames)
+        first_pin = term_frames[0]
+        for t in ordered:
+            ub_scale = 1.0 if t <= first_pin else float(n_pins)
+            for e, el in els_with_final:
+                model.frame_model[t].mass_H2[e].setub(ub_scale * el.H2_mass_max)
+
+        pin_index = [(t_term, e) for t_term in term_frames for e, _ in els_with_final]
+        pin_init = {
+            (t_term, e): float(el.H2_mass_final)
+            for t_term in term_frames
+            for e, el in els_with_final
+        }
+        model.h2_mass_final_target = pyo.Param(
+            pin_index, mutable=True, initialize=pin_init
+        )
+        for i, t_term in enumerate(term_frames):
+            for e, el in els_with_final:
+                mass_end = model.frame_model[t_term].mass_H2[e]
+                if i == 0:
+                    mass_start = model.h2_mass_initial[e]
+                else:
+                    mass_start = model.frame_model[term_frames[i - 1]].mass_H2[e]
+                model.window_h2_constraint.add(
+                    mass_end - mass_start
+                    >= model.h2_mass_final_target[t_term, e]
+                )
+        return
+
+    # Single pin: mass[t] == scale * H2_mass_final
     pin_index = []
     pin_init = {}
     for t_term in term_frames:
         scale = 1.0 if final_scale is None else float(final_scale[t_term])
-        for e, el in el_by_number.items():
-            if el.H2_mass_final is None:
-                continue
+        for e, el in els_with_final:
             target = scale * el.H2_mass_final
             if target > el.H2_mass_max:
                 raise ValueError(
@@ -218,9 +272,6 @@ def window_h2_constraints(
                 )
             pin_index.append((t_term, e))
             pin_init[(t_term, e)] = float(target)
-
-    if not pin_index:
-        return
 
     model.h2_mass_final_target = pyo.Param(
         pin_index, mutable=True, initialize=pin_init
@@ -938,10 +989,11 @@ def rolling_window_nl_opf(
     H₂ mass target (``H2_mass_final``) and H₂ sale (``ObjRule['H2_sale']`` with
     ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target,
     each commit window regenerates ``H2_mass_final`` from the carried (or
-    emptied) tank. Under future sight the continuous *x*+*x+1* solve pins
-    ``H2_mass_final`` at end of *x* and ``2 · H2_mass_final`` at end of *x+1*
-    (inventory carries only inside that solve); ``H2_mass_max`` must be at
-    least ``2 · H2_mass_final``.
+    emptied) tank. Under future sight the continuous *x*+*x+1* solve requires
+    **at least** ``H2_mass_final`` production in *x* and again in *x+1*
+    (incremental, not a cumulative ``2 · H2_mass_final`` absolute pin). Tank
+    capacity stays ``H2_mass_max`` through end of *x*, then
+    ``2 · H2_mass_max`` for the foresight half so both segments can fit.
 
     Parameters
     ----------
@@ -1044,11 +1096,11 @@ def rolling_window_nl_opf(
             solve_start, solve_end = c_start, next_end
             force_soc = True
             if enforce_h2_mass:
+                # Two pins → incremental ≥ H2_mass_final per half (see window_h2).
                 h2_frames = [c_end, next_end]
-                h2_scale = {c_end: 1.0, next_end: 2.0}
             else:
                 h2_frames = None
-                h2_scale = None
+            h2_scale = None
         else:
             solve_start, solve_end = c_start, c_end
             if soc_final_mode == 'future_sight':
