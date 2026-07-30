@@ -121,7 +121,7 @@ runner — not a patch to the shipped NLP builders.
 
 | File | Role |
 |------|------|
-| [`pyflow_acdc/convex_model.py`](../pyflow_acdc/convex_model.py) | `build_socp_data`, `socp_model`, subsystem `*_variables` / `*_constraints` |
+| [`pyflow_acdc/convex_model/convex_model.py`](../pyflow_acdc/convex_model/convex_model.py) | `build_socp_data`, `socp_model`, subsystem `*_variables` / `*_constraints` |
 | [`pyflow_acdc/ACDC_convex.py`](../pyflow_acdc/ACDC_convex.py) | `translate_pyf_socp`, `socp_optimise`, `soc_window_optimisation`, weighted objective, export |
 | [`pyproject.toml`](../pyproject.toml) | `SOCP = ["cvxpy"]` (+ folded into `All`) |
 | [`__init__.py`](../pyflow_acdc/__init__.py) | Guarded export: `socp_optimise`, `soc_window_optimisation`, `translate_pyf_socp` |
@@ -725,7 +725,7 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 
 | File | Action / status |
 |------|-----------------|
-| **`pyflow_acdc/convex_model.py`** | **Landed** — `build_socp_data`, `socp_model`, subsystem vars/constraints |
+| **`pyflow_acdc/convex_model/convex_model.py`** | **Landed** — `build_socp_data`, `socp_model`, subsystem vars/constraints |
 | **`pyflow_acdc/ACDC_convex.py`** | **Landed** — `translate_pyf_socp`, `socp_optimise`, `soc_window_optimisation`, objective, export |
 | `__init__.py` | **Landed** — guarded export of both runners + translate |
 | `pyproject.toml` | **Landed** — `SOCP = ["cvxpy"]`; folded into `All` |

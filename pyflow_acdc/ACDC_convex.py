@@ -7,7 +7,7 @@ socp_optimise(grid, ...)   – mirror of optimal_pf for the CVXPY SOCP stack.
 
 Design rules (locked):
   L2  – case-agnostic: works on any pyflow Grid
-  L4  – files: convex_model.py (build) + this file (run)
+  L4  – files: convex_model/convex_model.py (build) + this file (run)
   L5  – entry point: socp_optimise (British spelling)
   L16 – objective: min Σ Re(S_export)·price  (≡ max revenue)
   L20 – grid pu throughout; € only at objective scaling
@@ -30,7 +30,7 @@ except ImportError as exc:  # pragma: no cover
         "Install it with: pip install pyflow_acdc[SOCP]"
     ) from exc
 
-from .convex_model import build_socp_data, socp_model
+from .convex_model.convex_model import build_socp_data, socp_model
 
 __all__ = ["socp_optimise", "soc_window_optimisation", "translate_pyf_socp"]
 
