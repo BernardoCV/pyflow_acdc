@@ -18,6 +18,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **Green hydrogen**: ``Electrolyser`` class, ``add_electrolyser``, and NL OPF
   inventory when ``grid.H2``. Snapshot results via ``Results.ext_electrolyser``;
   docs ``usage_hydrogen`` / ``api/hydrogen``.
+- **Controllable heat pumps**: ``HeatPump`` class, ``add_heat_pump``, and NL OPF
+  when ``grid.HP`` (AC-only planning-oriented flexible load: baseline
+  ``P_ref``/``Q_ref``, served ``P_heat_pump``/``Q_heat_pump``, cumulative
+  ``E_heat_pump`` in kWh). Myopic carry in ``ts_acdc_opf``; parent energy chain
+  in ``window_nl_opf`` (``window_heat_pump_constraints``). Results
+  ``ext_heat_pump`` / ``heat_pump_window``. TS types ``hp_P_ref``, ``hp_Q_ref``,
+  ``hp_E_min``, ``hp_E_max``. Docs ``usage_heat_pump`` / ``api/heat_pump``;
+  plan ``plans/heat_pump_plan.md``; tests ``test_heat_pump_opf.py``.
 - **Coupled window NL OPF** (``window_opf.py``): ``window_nl_opf`` solves a
   multi-hour nonlinear OPF with linked BESS SoC and H₂ inventory across frames;
   ``rolling_window_nl_opf`` chains windows with state carry-over; export helpers
@@ -28,7 +36,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   H₂ as direct sale only (``ObjRule['H2_sale']``, ``TSType.H2_PRICE``) without
   tank carry — use window/rolling for inventory + terminal mass.
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
-  ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``.
+  ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``, and heat-pump
+  ``TSType.HP_P_REF`` / ``HP_Q_REF`` / ``HP_E_MIN`` / ``HP_E_MAX``.
 - **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /
   ``linear``) and ``link_cost`` on ``add_gen`` / ``add_gen_DC`` / ``add_extgrid``
   so OPF cost coeffs can track nodal / price-zone prices.
@@ -56,8 +65,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **Window OPF parameter updates**: ``_modify_parameters(..., window_block=True)``
-  skips rewriting ``SoC_prev`` / ``mass_H2_prev`` so frame-to-frame inventory
-  links are not overwritten by ``soc_initial`` / ``H2_mass_initial``.
+  skips rewriting ``SoC_prev`` / ``mass_H2_prev`` / ``E_heat_pump_prev`` so
+  frame-to-frame inventory links are not overwritten by
+  ``soc_initial`` / ``H2_mass_initial`` / ``E_state``.
 - **Power flow API**: ``power_flow`` / ``ac_power_flow`` / ``dc_power_flow``
   return ``(elapsed, tol, tol_history)``; sequential tracker adds per-outer
   Newton histories (``ac_pf_iter_tolerances`` / ``dc_pf_iter_tolerances``).
