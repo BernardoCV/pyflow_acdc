@@ -62,6 +62,8 @@ everything else builds on.
 - **`L_models/`** — Linearised model builders and drivers: `AC_OPF_L_model`
   (McCormick cable-type selection; optional BESS P-only and electrolyser
   inventory), `ACDC_L_TEP`, and `AC_L_CSS_ortools`.
+- **`convex_model/`** — CVXPY SOCP / MI-SOCP model builders: `convex_model`
+  (`build_socp_data`, `socp_model`). Runners live in `ACDC_convex.py`.
 
 ## Planning and sizing
 
