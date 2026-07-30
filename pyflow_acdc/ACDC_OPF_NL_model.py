@@ -97,7 +97,7 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
         price_zone_constraints(model,grid,Price_Zone_info)
     else:
         price_zone_parameters(model,grid,AC_info,DC_info,gen_info)
-        
+
     if grid.ESS:
         storage_constraints(model, grid, storage_info, window_block=window_block)
 
