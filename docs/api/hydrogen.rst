@@ -27,7 +27,7 @@ Modelling note
 
 When ``grid.H2`` is true, :mod:`~pyflow_acdc.ACDC_OPF_NL_model` adds
 ``P_electrolyser``, optional AC ``Q_electrolyser``, and ``mass_H2`` with a
-one-step inventory balance for snapshot OPF. Multi-hour coupled runs use
+one-step inventory balance for snapshot NL OPF. Multi-hour coupled runs use
 :func:`~pyflow_acdc.window_nl_opf` (parent ``window_h2_constraints``; terminal
 ``H2_mass_final`` when set).
 

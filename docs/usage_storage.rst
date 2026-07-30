@@ -10,7 +10,8 @@ Implemented: :class:`~pyflow_acdc.Storage`,
 ``Results.storage_window``. For long series, :func:`~pyflow_acdc.rolling_window_nl_opf`
 chains windows (1-based ``start``/``end`` like ``ts_acdc_opf``) with SoC carry-over.
 
-Related API: :doc:`api/storage`.
+Related API: :doc:`api/storage`. Window / rolling / PEI: :doc:`usage_window_opf`.
+H₂ (often co-optimized): :doc:`usage_hydrogen`.
 
 Adding a BESS
 -------------
@@ -22,7 +23,7 @@ pattern as generators and renewable sources
 :attr:`~pyflow_acdc.Grid.storage_elements`).
 
 AC storage supports reactive power (``Q``) and an apparent-power rating
-(``S_max``). DC storage has active power only (``P_max``).
+(``S_max``) in **nonlinear** OPF. DC storage has active power only (``P_max``).
 
 SoC is stored in **pu** (fraction of :attr:`~pyflow_acdc.Storage.E_max`).
 Physical energy capacity ``E_max`` is in **MWh** (reserved for future degradation
@@ -41,32 +42,14 @@ executed by ``test_docs_storage.py``.
 Princess Elisabeth Energy Island
 --------------------------------
 
-For the Mario validation case, the offshore hub in :func:`~pyflow_acdc.cases.PEI_grid`
-is bus **`PE_Island`** (220 kV), corresponding to node index ``0`` in the
-reference script.
+In :func:`~pyflow_acdc.cases.PEI_grid`, the offshore hub is bus **``PE_Island``**
+(220 kV). Coupled window (build-only) example:
 
-Roadmap
--------
+.. literalinclude:: ../pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py
+   :language: python
+   :lines: 2-
 
-+------------------+-----------------------------------------------------------+
-| Item             | Status                                                    |
-+==================+===========================================================+
-| NL OPF model     | Done — SoC dynamics and S-circle in                       |
-|                  | :mod:`pyflow_acdc.ACDC_OPF_NL_model`                      |
-+------------------+-----------------------------------------------------------+
-| ``window_nl_opf``| Done — coupled multi-hour nonlinear OPF                   |
-+------------------+-----------------------------------------------------------+
-| Results          | Done — ``ext_storage``, ``storage_window``                |
-+------------------+-----------------------------------------------------------+
-| PEI + Dash       | Done — see :doc:`usage_window_opf` (season-compare)       |
-+------------------+-----------------------------------------------------------+
-| ``ts_acdc_opf``  | Done — myopic SoC carry + soft ``soc_ref`` via            |
-|                  | ``ObjRule['SoC_deviation']`` (quadratic)                   |
-+------------------+-----------------------------------------------------------+
-
-Full phase list and design decisions:
-`plans/bess_integration_plan.md
-<https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md>`_.
+Season-compare + Dash: :doc:`usage_window_opf`.
 
 Myopic TS + soft SoC reference
 -------------------------------

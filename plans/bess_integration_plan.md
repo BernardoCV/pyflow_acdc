@@ -2,7 +2,8 @@
 
 **Repository:** In-repo links target the [`mario_integration`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration) branch ([`plans/`](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)).
 
-Implementation plan for adding Battery Energy Storage Systems (BESS) to the nonlinear AC/DC OPF, based on:
+Implementation plan for adding Battery Energy Storage Systems (BESS) and green
+hydrogen to pyflow_acdc (NL OPF primary; linear AC OPF operation in Phase 9), based on:
 
 - Mario Useche-Arteaga et al., *Wind Energ. Sci.* 11, 349–372 (2026) — §3.3 BESS model
 - Reference script: `mario_implementation/18414805/OPF_ACDC_Energy_Islands.py`
@@ -11,7 +12,10 @@ Implementation plan for adding Battery Energy Storage Systems (BESS) to the nonl
 
 | Document | GitHub (`mario_integration`) | Read the Docs |
 |----------|------------------------------|---------------|
-| User guide | [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) | [usage_storage](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html) |
+| User guide (BESS) | [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) | [usage_storage](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html) |
+| User guide (H₂) | [docs/usage_hydrogen.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_hydrogen.rst) | [usage_hydrogen](https://pyflow-acdc.readthedocs.io/en/latest/usage_hydrogen.html) |
+| Window / rolling | [docs/usage_window_opf.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_window_opf.rst) | [usage_window_opf](https://pyflow-acdc.readthedocs.io/en/latest/usage_window_opf.html) |
+| Linear OPF API | [docs/api/L_models.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/L_models.rst) | [api/L_models](https://pyflow-acdc.readthedocs.io/en/latest/api/L_models.html) |
 | API reference | [docs/api/storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/storage.rst) | [api/storage](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html) |
 | This plan | [plans/bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) | — |
 | Sibling plans | [plans/](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans) | — |
@@ -22,8 +26,8 @@ Implementation plan for adding Battery Energy Storage Systems (BESS) to the nonl
 
 | ID | Topic | Decision |
 |----|--------|----------|
-| G1 | Scope | **BESS** implemented (Phases 0–4). **Hydrogen** → Phase 5. **Mario PEI validation** (BESS + H₂ + exports) → **Phase 6**. Rolling horizon → Phase 7. **Myopic TS + soft `soc_ref`** → Phase 8. **Docs:** concurrent track (not gated on a phase number). TEP / linear OPF sizing is out of scope for this plan. |
-| G2 | OPF modes | **Nonlinear OPF only** (no linear OPF, no TEP sizing) |
+| G1 | Scope | **Phases 0–8 done** (BESS, H₂, PEI window, rolling, myopic TS). **Phase 9** — linear AC OPF operation (`optimal_l_pf`) for AC-connected BESS / H₂. **Docs:** concurrent track. **TEP sizing** remains out of scope. |
+| G2 | OPF modes | **NL OPF** is primary (full AC/DC, Q, S-circle). **Linear AC OPF** (`optimal_l_pf`) supports BESS (P-only) + electrolyser inventory / `H2_sale` on **AC-only** grids; raises if `grid.DCmode`; `SoC_deviation` rejected (quadratic). **No TEP sizing.** |
 | G3 | Multi-hour optimization | **Coupled horizon** in a new top-level script `window_opf.py`; BESS constraints live **inside the NL model** (not a post-processing layer) |
 | G4 | Time series (`ts_acdc_opf`) | **Phase 8** — **myopic / forward-only** SoC: one snapshot NL OPF per hour with `SoC_prev` carry. Soft **`soc_ref`** (class attr + mutable Param, init = `soc_initial`) via quadratic `SoC_deviation` in `ObjRule`. **H₂:** inventory carries within `H2_mass_max`; out-of-opt **`empty_tank_cycle`** empties (`None` = never empty in myopic; `N` = empty every `N` hours). Sale economics via `H2_sale` / `H2_PRICE`. Window/rolling: `None` empties every window boundary; `N` empties at commit ends `≥ k·N`. Hard `H2_mass_final` remains window/rolling only. Not equivalent to `window_nl_opf`. |
 | G5 | SoC units | **SoC in pu** in the Pyomo model; physical capacity via class attribute **`E_max` [MWh]** (enables future degradation modelling on `E_max`) |
@@ -57,7 +61,7 @@ Hooks mirror **`Gen_AC` / `Gen_DC` / `Ren_Source`**:
 - Nodal aggregation: `PGi_storage` / `QGi_storage` (AC) and `PGi_storage_DC` (DC only)
 - `connected` flag (`AcDcSide.AC` / `AcDcSide.DC`) — same branching pattern as `Ren_Source.connected` in the NL model
 
-### Three run modes (by design)
+### Run modes (by design)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -69,6 +73,9 @@ Hooks mirror **`Gen_AC` / `Gen_DC` / `Ren_Source`**:
 │  ─────────────────        SoC_prev ← previous SoC* each hour      │
 │                           Soft soc_ref via ObjRule SoC_deviation  │
 │                           H₂: inventory + empty_tank_cycle        │
+├─────────────────────────────────────────────────────────────────┤
+│  optimal_l_pf (Phase 9)   Linear AC OPF — AC BESS P-only + AC H₂ │
+│  ─────────────────        Energy_cost + H2_sale; no SoC_deviation │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -264,7 +271,7 @@ No reactive power term (electrolyser is active load only).
 
 ## 3. Implementation phases
 
-> **Numbering note:** Former **Phase 5** (BESS-only Mario validation) was **deleted** and folded into **Phase 6** (full coupled BESS + H₂ + exports). Phases **0–4** are complete; **5–8** are continuous with no gaps (TEP sizing is out of scope — not a phase). **Documentation** is a **concurrent** track at the end of §3 — update docs with each phase, not as a blocking gate.
+> **Numbering note:** Former **Phase 5** (BESS-only Mario validation) was **deleted** and folded into **Phase 6** (full coupled BESS + H₂ + exports). Phases **0–8** are the original NL track; **Phase 9** adds linear AC OPF operation. **TEP sizing** remains out of scope. **Documentation** is a **concurrent** track at the end of §3 — update docs with each phase, not as a blocking gate.
 
 ### Phase 0 — Design freeze
 
@@ -701,6 +708,28 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 ---
 
+### Phase 9 — Linear AC OPF (`optimal_l_pf`) ✅
+
+**When:** After Phases 0–8 (element API + NL model stable). Beyond original G2 (NL-only); kept as operation-only (no TEP sizing).
+
+**Goal:** Include **AC-connected** BESS and electrolysers in the linear (DC-style) AC OPF for fast LP studies.
+
+#### 9.1 Locked decisions
+
+| ID | Topic | Decision |
+|----|--------|----------|
+| P9-1 | Side | **AC-only grids**; raise if `grid.DCmode` |
+| P9-2 | BESS | Charge / discharge / SoC + `|P_net| ≤ S_max`; **no Q**, no S-circle |
+| P9-3 | H₂ | `P_electrolyser` + mass balance; **no Q**; optional `H2_sale` in `opf_obj_l` |
+| P9-4 | `SoC_deviation` | **Reject** if weight > 0 (quadratic; not LP-safe) |
+| P9-5 | Export | Write storage / electrolyser setpoints; `Q = 0` |
+
+**Files:** `AC_OPF_L_model.py`, `ACDC_OPF.py` (`opf_obj_l` / `optimal_l_pf`), `test_linear_opf_bess_h2.py`, docs `api/L_models`, `usage_storage` / `usage_hydrogen`.
+
+**Exit criteria:** `build_only` + optional LP solve tests; docs note linear vs NL. ✅ Done
+
+---
+
 ### Concurrent — Documentation (ongoing; not a blocking phase)
 
 **Goal:** Keep user-facing docs and citations aligned with each implementation phase — update **with every change**, not as a final gate.
@@ -722,31 +751,35 @@ t = T−1:   mass[t] = H2_mass_final   (when set)
 
 **Update:** `docs/api/opf.rst` — NL OPF supports `storage_elements`; coupled multi-hour runs use `window_nl_opf`
 
+**Update:** `docs/api/L_models.rst` — Phase 9 linear AC BESS / H₂ ✅
+
 #### D.2 Usage guide
 
 **New file:** `docs/usage_storage.rst` ✅
 
 Sections:
 
-1. **Overview** — coupled / rolling horizon vs sequential `ts_acdc_opf` (Phase 8 myopic + `SoC_deviation`)
-2. **Adding a BESS** — `add_storage` workflow on any AC node ✅
-3. **Running `window_nl_opf`** — time series, prices, `start` / `end`, objective ✅
+1. **Overview** — coupled / rolling / myopic TS / linear OPF ✅
+2. **Adding a BESS** — `add_storage` workflow on any AC/DC node ✅
+3. **Running `window_nl_opf`** — see `usage_window_opf.rst` ✅
 4. **Results** — `Results.ext_storage`, `Results.storage_window` ✅
-5. **PEI example** — hub bus `PE_Island` (full literalinclude pending **Phase 6**)
+5. **PEI example** — hub bus `PE_Island`; literalinclude `storage/02_window_nl_opf_pei.py` ✅
 6. **Modelling note** — Useche-Arteaga et al. (2026) §3.3 ✅
-7. **Phase 5:** H₂ usage page or section — §3.4 electrolyser model
-8. **Phase 8:** Myopic TS + soft `soc_ref` (`ObjRule['SoC_deviation']`)
+7. **H₂** — `usage_hydrogen.rst` (§3.4) ✅
+8. **Myopic TS** — soft `soc_ref` (`ObjRule['SoC_deviation']`) ✅
+9. **Linear OPF** — cross-link `api/L_models` / `optimal_l_pf` (Phase 9) ✅
 
 **Literalinclude examples** (under `pyflow_tests/doc_examples/`):
 
 - `storage/01_add_storage.py` ✅
-- `storage/02_window_nl_opf_pei.py` — PEI 24 h validation-aligned (pending **Phase 6**)
+- `storage/02_window_nl_opf_pei.py` — PEI window (build-only) ✅
+- `window_opf/01_pei_season_compare_dash.py` — season-compare + Dash ✅
 
 **Update:** `docs/index.rst`, `docs/usage.rst` ✅
 
 #### D.3 Citing
 
-**Update:** `docs/citing.rst` — *For BESS / energy-island operation* ✅ (extend for H₂ when Phase 5 lands)
+**Update:** `docs/citing.rst` — *For BESS / energy-island operation* ✅ (H₂ covered via same paper §3.4)
 
 #### D.4 Doc tests
 
@@ -757,12 +790,13 @@ Sections:
 - [x] `usage_storage.rst` and `api/storage.rst` build in Sphinx without warnings
 - [x] Mario paper cited in `citing.rst`, usage page, and plan §7
 - [x] Doc examples execute in CI (`test_docs_storage.py`)
-- [ ] Cross-links between plan and docs on GitHub / Read the Docs
+- [x] Cross-links between plan and docs on GitHub / Read the Docs
 - [x] H₂ API + usage pages (Phase 5)
-- [ ] PEI validation literalinclude (Phase 6)
-- [ ] Rolling-window usage note (Phase 7)
+- [x] PEI validation literalinclude (Phase 6) — `usage_window_opf` + `storage/02_…`
+- [x] Rolling-window usage note (Phase 7) — `usage_window_opf` / storage / hydrogen
 - [x] Myopic TS + `soc_ref` / `SoC_deviation` (Phase 8)
 - [x] H₂ `empty_tank_cycle` docs (P8-9)
+- [x] Linear AC OPF BESS / H₂ docs (Phase 9) — `api/L_models`, usage pages
 
 ---
 
@@ -783,10 +817,13 @@ Sections:
 | `ACDC_OPF.py` | `storage_info` in `translate_pyf_opf`; pass horizon if needed |
 | `Results_class.py` | `ext_storage()`, `storage_window()` |
 | `Time_series.py` | **Phase 8** — myopic SoC carry + soft `soc_ref`; H₂ inventory + `empty_tank_cycle` |
+| `AC_OPF_L_model.py` | **Phase 9** — AC BESS / H₂ vars, P balance, export ✅ |
+| `ACDC_OPF.py` | **Phase 9** — `opf_obj_l` (`Energy_cost` + `H2_sale`); `SoC_deviation` reject ✅ |
 | `__init__.py` | Export new symbols |
-| `pyflow_tests/...` | **Phase 6** — full PEI Mario validation test; `test_hydrogen_opf.py` ✅ |
-| `docs/api/storage.rst` | **New** — `Storage_AC`, `add_storage`, `window_opf` API |
-| `docs/usage_storage.rst` | **New** — usage guide + Mario modelling note + plan link |
+| `pyflow_tests/...` | PEI / H₂ / rolling / `test_linear_opf_bess_h2.py` ✅ |
+| `docs/api/storage.rst` | `Storage`, `add_storage`, window API + linear note ✅ |
+| `docs/usage_storage.rst` | Usage guide + Mario modelling note + plan link ✅ |
+| `docs/api/L_models.rst` | Linear OPF BESS / H₂ ✅ |
 | `docs/citing.rst` | BibTeX + citation for Useche-Arteaga et al. (2026) |
 | `docs/index.rst`, `docs/usage.rst` | Toctree / catalogue links |
 | `pyflow_tests/doc_examples/storage/` | Literalinclude examples |
@@ -800,6 +837,7 @@ Sections:
 
 - S-circle (AC) and AC power flow → **IPOPT** only; DC storage adds linear `P_max` bounds only
 - SoC dynamics are linear in pu when `E_max` is fixed
+- Linear OPF (Phase 9): AC BESS uses `|P_net| ≤ S_max` (no Q); H₂ and SoC dynamics stay LP-compatible; `SoC_deviation` excluded
 
 ### Code conventions
 
@@ -832,7 +870,8 @@ If simultaneous charge/discharge appears in results:
 6. Phase 5 — hydrogen / electrolyser ✅  
 7. Phase 6 — Mario PEI validation (BESS + H₂ + exports) ✅ / in use  
 8. Phase 7 — rolling window ✅  
-9. **Phase 8 — myopic TS + soft `soc_ref` (`SoC_deviation`) + H₂ `empty_tank_cycle`** ✅  
+9. Phase 8 — myopic TS + soft `soc_ref` (`SoC_deviation`) + H₂ `empty_tank_cycle` ✅  
+10. **Phase 9 — linear AC OPF (`optimal_l_pf`) AC BESS / H₂** ✅  
 
 **Concurrent (throughout):** Documentation — update RST, examples, and citations with each phase above.
 
@@ -854,6 +893,9 @@ M. Useche-Arteaga, P. Gebraad, V. A. Lacerda, M. Cheah-Mane, and O. Gomis-Bellmu
 
 - PEI grid — [`PEI_grid.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_acdc/example_grids/PF/PEI_grid.py) (hub: **`PE_Island`**)
 - User guide — [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/usage_storage.html)
+- H₂ guide — [docs/usage_hydrogen.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_hydrogen.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/usage_hydrogen.html)
+- Window / rolling — [docs/usage_window_opf.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_window_opf.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/usage_window_opf.html)
+- Linear OPF — [docs/api/L_models.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/L_models.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/api/L_models.html)
 - API — [docs/api/storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/api/storage.rst) · [Read the Docs](https://pyflow-acdc.readthedocs.io/en/latest/api/storage.html)
 - Integration plan — [plans/bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md)
 - Sibling plans — [plans/](https://github.com/CITCEA-UPC/pyflow_acdc/tree/mario_integration/plans)

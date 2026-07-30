@@ -60,3 +60,22 @@ For one seasonal (or concatenated) window without season-compare::
     pyf.run_dash(grid)
 
 See also ``pyflow_tests/doc_examples/storage/02_window_nl_opf_pei.py`` (build-only).
+
+Rolling window
+--------------
+
+:func:`~pyflow_acdc.rolling_window_nl_opf` chains successive coupled windows
+with SoC / H₂ carry-over between commits. Indexing uses 1-based ``start`` /
+``end`` like ``ts_acdc_opf``. Tank empties between windows follow each
+electrolyser's ``empty_tank_cycle`` (see :doc:`usage_hydrogen`).
+
+.. code-block:: python
+
+    pyf.rolling_window_nl_opf(
+        grid,
+        start=1,
+        end=48,
+        window_size=24,
+        ObjRule={"Energy_cost": 1},
+        solver="ipopt",
+    )

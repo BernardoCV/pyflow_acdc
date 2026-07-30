@@ -56,9 +56,13 @@ everything else builds on.
   feasibility checks, `reset_to_initialize`, `export_solver_progress_to_excel`.
   Distinct from `solver_utils.py` (environment probe only).
 - **`ACDC_OPF_NL_model.py`** — Builds the non-linear Pyomo model (full AC/DC
-  physics, converters, price zones, optional TEP variables).
-- **`AC_OPF_L_model.py`** — Builds the linear (DC-style) Pyomo model with
-  McCormick linearisations for cable-type selection.
+  physics, converters, price zones, optional TEP variables, BESS / H₂ when
+  ``grid.ESS`` / ``grid.H2``).
+- **`AC_OPF_L_model.py`** — Builds the linearised AC Pyomo model with
+  McCormick linearisations for cable-type selection; optional BESS (P-only)
+  and electrolyser inventory.
+- **`window_opf.py`** — Coupled / rolling multi-hour NL OPF with parent SoC and
+  H₂ inventory links.
 
 ## Planning and sizing
 

@@ -1,7 +1,7 @@
 Linear Models (OPF and TEP)
 ===========================
 
-Linear (DC-style) counterparts of the :doc:`OPF <opf>` and :doc:`TEP <tep>`
+Linearised AC counterparts of the :doc:`OPF <opf>` and :doc:`TEP <tep>`
 modules. [1]_ They trade full AC accuracy for speed and LP/MILP-solvability,
 making them suitable for fast studies, large sweeps, and the Pyomo backend of
 :func:`~pyflow_acdc.wind_farm_CSS`.
@@ -14,13 +14,16 @@ Model construction lives in ``pyflow_acdc.AC_OPF_L_model``; the drivers
 ``build_only=True`` to build the Pyomo model and export initializer values without
 a solver (used by the doc tests when no LP/MIP solver is installed).
 
-Linear Optimal Power Flow
--------------------------
+Linearised AC Optimal Power Flow
+--------------------------------
 
-Sets up and solves the AC 'dc linear' OPF: it creates the
+Sets up and solves the linearised AC OPF: it creates the
 :ref:`linear model <L_model_creation>`, minimises the weighted objective, solves
-with a Pyomo LP solver, and exports the solution back to the ``grid``. The linear
-objective only accounts for AC-generator energy cost.
+with a Pyomo LP solver, and exports the solution back to the ``grid``. Supported
+objective terms are generator ``Energy_cost`` and optional ``H2_sale``.
+When ``grid.ESS`` / ``grid.H2``, BESS (P-only) and electrolysers are included.
+DC / hybrid grids (``grid.DCmode``) raise ``ValueError`` (AC networks only for
+now). ``SoC_deviation`` is not supported (quadratic).
 
 .. autofunction:: pyflow_acdc.optimal_l_pf
 
@@ -89,14 +92,19 @@ The linear model includes variables for:
 - Generator active power
 - Renewable generation via availability and curtailment factors
 - AC line active power flows
+- Optional BESS charge / discharge / SoC (when ``grid.ESS``; P-only, no Q)
+- Optional electrolyser power / H₂ mass (when ``grid.H2``; no Q)
 
 **Constraints**
 
 The model enforces constraints for:
 
-- AC nodal active power balance (linearized)
+- AC nodal active power balance (linearized), including storage injection and
+  electrolyser load when present
 - Generator aggregation at nodes
 - Renewable injection aggregation at nodes
+- Optional storage SoC balance and ``|P_net| ≤ S_max``
+- Optional electrolyser mass balance
 - AC branch linearized power flow equations
 - Thermal limits (including linear big-M formulations for REC/CT states)
 - Slack angle constraints

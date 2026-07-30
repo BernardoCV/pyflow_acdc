@@ -18,9 +18,6 @@ For step-by-step examples (grid setup, generators, and calling ``optimal_pf``), 
 
 .. autofunction:: pyflow_acdc.optimal_pf
 
-For the linear (DC-style) OPF (:func:`~pyflow_acdc.optimal_l_pf`), see
-:doc:`L_models`.
-
 .. _model_creation:
 
 Creating the OPF model

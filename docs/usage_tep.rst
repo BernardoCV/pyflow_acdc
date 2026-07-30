@@ -124,7 +124,7 @@ Linear TEP
 For faster studies and large sweeps, :func:`~pyflow_acdc.linear_transmission_expansion`
 solves the MILP counterpart of static TEP (including reconductoring). It falls back
 to ``build_only`` when no MIP solver is available. See :doc:`api/L_models` for the
-full linear API (linear TEP and the linear OPF counterpart
+full linear API (linear TEP and the linearised AC OPF counterpart
 :func:`~pyflow_acdc.optimal_l_pf`).
 
 .. literalinclude:: ../pyflow_tests/doc_examples/L_models/01_linear_transmission_expansion.py

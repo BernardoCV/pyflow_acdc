@@ -11,6 +11,7 @@ Implemented: :class:`~pyflow_acdc.Electrolyser`,
 ``Results.ext_electrolyser`` / ``Results.hydrogen_window``.
 
 Related API: :doc:`api/hydrogen`. BESS (often co-optimized): :doc:`usage_storage`.
+Window / rolling / PEI: :doc:`usage_window_opf`.
 
 Adding an electrolyser
 ----------------------
@@ -23,7 +24,7 @@ Elements attach to any **AC** or **DC** bus
 
 - Active power ``P_electrolyser`` is a **load** (subtracted from nodal injection).
 - On **AC**, optional reactive compensation via ``Q_min_MVAR`` / ``Q_max_MVAR``
-  (generation convention: positive ``Q`` injects vars).
+  in **nonlinear** OPF (generation convention: positive ``Q`` injects vars).
 - On **DC**, ``Q`` is fixed at zero.
 - Inventory ``mass_H2`` is in **kg** (``H2_mass_max``, ``H2_mass_initial``,
   optional ``H2_mass_final`` for **window / rolling OPF** when a terminal mass
@@ -48,7 +49,7 @@ Linear production each hour:
 
    h = b_h\, P_e\, S_{\mathrm{base}}\, \Delta t + c_h
 
-with ``c_h`` applied **every** frame (paper and Mario script).
+with ``c_h`` applied **every** frame (Useche-Arteaga et al. 2026).
 
 The example below is taken from ``pyflow_tests/doc_examples/hydrogen/`` and
 executed by ``test_docs_hydrogen.py``.
@@ -62,6 +63,8 @@ Running OPF
 
 - **Snapshot** ``optimal_pf``: one inventory step from ``H2_mass_initial``; no
   terminal ``H2_mass_final``.
+- **Linearised AC** :func:`~pyflow_acdc.optimal_l_pf`: P + mass; optional
+  ``ObjRule['H2_sale']``.
 - **Coupled** :func:`~pyflow_acdc.window_nl_opf`: parent chain across frames;
   ``H2_mass_final`` enforced on the last frame when set.
 - **Myopic** :func:`~pyflow_acdc.ts_acdc_opf`: inventory carries hour-to-hour
@@ -80,27 +83,6 @@ Running OPF
         ObjRule={"Energy_cost": 1, "H2_sale": 1},
         solver="ipopt",
     )
-
-Roadmap
--------
-
-+------------------+-----------------------------------------------------------+
-| Item             | Status                                                    |
-+==================+===========================================================+
-| NL OPF model     | Done — ``hydrogen_variables`` / ``hydrogen_constraints``  |
-+------------------+-----------------------------------------------------------+
-| ``window_nl_opf``| Done — parent H₂ inventory chain                          |
-+------------------+-----------------------------------------------------------+
-| Results          | Done — ``ext_electrolyser``, ``hydrogen_window``          |
-+------------------+-----------------------------------------------------------+
-| PEI + Dash       | Done — see :doc:`usage_window_opf` (season-compare)       |
-+------------------+-----------------------------------------------------------+
-| ``ts_acdc_opf``  | Inventory carry + ``empty_tank_cycle``; ``H2_sale`` economics |
-+------------------+-----------------------------------------------------------+
-
-Full phase list and design decisions:
-`plans/bess_integration_plan.md
-<https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md>`_.
 
 **References**
 

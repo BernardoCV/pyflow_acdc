@@ -30,8 +30,9 @@ Modelling note
 --------------
 
 The BESS constraints (SoC dynamics, AC S-circle, DC net-P limit) are
-implemented in :mod:`~pyflow_acdc.ACDC_OPF_NL_model` for snapshot OPF when
-``grid.ESS`` is true. Multi-hour coupled runs use :func:`~pyflow_acdc.window_nl_opf`.
+implemented in :mod:`~pyflow_acdc.ACDC_OPF_NL_model` for snapshot NL OPF when
+``grid.ESS`` is true. Multi-hour coupled runs use
+:func:`~pyflow_acdc.window_nl_opf`.
 The formulation follows Useche-Arteaga et al. (2026)
 [#useche2026]_. See :doc:`../citing` for the BibTeX entry.
 

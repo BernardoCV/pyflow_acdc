@@ -29,6 +29,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
   ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
   rolling keep hard SoC ini/final and optional ``H2_mass_final``.
+- **Linearised AC OPF** (``optimal_l_pf``): BESS (P-only, no Q / S-circle) and
+  electrolyser inventory / ``H2_sale``; raises if ``grid.DCmode``;
+  ``SoC_deviation`` is rejected (quadratic).
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
   ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``.
 - **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /

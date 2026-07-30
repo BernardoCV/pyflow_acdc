@@ -73,12 +73,16 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0,build_only=False):
-    """Build and solve the linear (DC-style) OPF for ``grid``.
+    """Build and solve the linearised AC OPF for ``grid``.
 
-    Constructs the linear Pyomo model, minimises the weighted objective, solves
-    it, and exports the solution back onto ``grid``. The linear model only
-    accounts for AC-generator energy cost; non-zero weights on other objective
-    components trigger a warning.
+    Constructs the linearised AC Pyomo model, minimises the weighted objective,
+    solves it, and exports the solution back onto ``grid``. Supported objective
+    components are generator ``Energy_cost`` and (when electrolysers exist)
+    ``H2_sale``. ``SoC_deviation`` is quadratic and raises if weighted.
+    Other non-zero weights trigger a warning.
+
+    Raises if ``grid.DCmode`` (AC networks only for now). When ``grid.ESS`` /
+    ``grid.H2``, BESS (P-only) and electrolysers are included.
 
     Parameters
     ----------
@@ -118,12 +122,20 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
 
-    # Check if any other weight is non-zero while Energy_cost is zero
-    if weights_def[ObjComponent.ENERGY_COST]['w'] == 0:
-        other_weights_nonzero = [key for key, value in weights_def.items()
-                               if key != ObjComponent.ENERGY_COST and value['w'] != 0]
-        if other_weights_nonzero:
-            warnings.warn("Linear OPF can only consider energy cost by AC Generator power")
+    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
+        raise ValueError(
+            "SoC_deviation is quadratic and is not supported in linear OPF")
+
+    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
+    other_weights_nonzero = [
+        key for key, value in weights_def.items()
+        if key not in supported_l and value['w'] != 0
+    ]
+    if other_weights_nonzero:
+        warnings.warn(
+            "Linear OPF only supports Energy_cost and H2_sale; "
+            f"ignoring non-zero weights for {other_weights_nonzero}"
+        )
 
     model = pyo.ConcreteModel()
     model.name="""AC 'DC linear' OPF"""
@@ -325,12 +337,33 @@ def opf_update_param(model,grid):
     return model
 
 def opf_obj_l(model,grid,ObjRule):
+    """Linear OPF objective: Energy_cost and optional H2_sale."""
+    total = 0
 
-    if ObjRule[ObjComponent.ENERGY_COST]['w']==0:
-        return 0
-    AC= sum((model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+    if ObjRule[ObjComponent.ENERGY_COST]['w'] != 0:
+        total += sum(
+            (
+                model.PGi_gen[gen.genNumber] * grid.S_base * model.lf[gen.genNumber]
+                + model.np_gen[gen.genNumber] * gen.fc
+            )
+            for gen in grid.Generators
+        )
 
-    return AC
+    if ObjRule[ObjComponent.H2_SALE]['w'] != 0:
+        if not grid.H2:
+            raise ValueError(
+                "H2_sale weight > 0 requires grid.H2 / electrolysers in linear OPF")
+        # Minimise -price·Δm  ≡  maximise H₂ sale revenue (EUR for Δm in kg).
+        total += sum(
+            -float(el.h2_price) * (
+                el.b_h * model.P_electrolyser[el.electrolyserNumber]
+                * el.S_base * el.dt_hours
+                + el.c_h
+            )
+            for el in grid.electrolysers
+        )
+
+    return total
 
 
 def opf_obj_l_array_losses(model, grid, ObjRule):
