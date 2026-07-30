@@ -29,7 +29,6 @@ for before coding.
 |----------|------|
 | BESS / H₂ operation (NLP, shipped) | [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) |
 | BESS sizing (separate build) | [bess_sizing_ramp_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_sizing_ramp_plan.md) |
-| OPTYMADD integration (separate) | [optymadd_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/optymadd_integration_plan.md) |
 | Architecture map | [docs/architecture.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/architecture.md) |
 | PEI validation grid | [`PEI_grid.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_acdc/example_grids/PF/PEI_grid.py) |
 | PEI window OPF tests | [`test_pei_window_nl_opf_bess_h2.py`](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/pyflow_tests/test_pei_window_nl_opf_bess_h2.py) |
