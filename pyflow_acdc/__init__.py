@@ -112,6 +112,7 @@ __all__ = [
     'ts_dc_pf',
     'time_series_statistics',
     'update_grid_data',
+    'update_grid_for_pf',
 
     # Export
     'save_grid_to_file',
@@ -156,7 +157,7 @@ try:
         'ts_acdc_opf', 'results_ts_opf',
     ])
     try:
-        from .window_opf import (
+        from .NL_models.window_opf import (
             window_nl_opf, rolling_window_nl_opf, results_window_opf,
         )
         __all__.extend([
@@ -168,7 +169,7 @@ try:
 
     # ACDC_Static_TEP also requires OPF/pyomo
     try:
-        from .ACDC_Static_TEP import *
+        from .NL_models.ACDC_Static_TEP import *
         __all__.extend([
             'transmission_expansion',
             'multi_scenario_TEP', 'expand_elements_from_pd',
@@ -178,7 +179,7 @@ try:
             'comprehensive_sensitivity_analysis'
         ])
         try:
-            from .ACDC_sequential_STEP import *
+            from .NL_models.ACDC_sequential_STEP import *
             __all__.extend(['sequential_STEP', 'sequential_MS_STEP'])
         except ImportError:
             pass
@@ -196,7 +197,7 @@ except ImportError:
     HAS_OPF = False
 
 try:
-    from .ACDC_MultiPeriod_TEP import *
+    from .NL_models.ACDC_MultiPeriod_TEP import *
     __all__.extend([
         'multi_period_transmission_expansion',
         'multi_period_MS_TEP',
@@ -209,7 +210,7 @@ except ImportError:
     pass
 
 try:
-    from .ACDC_L_TEP import *
+    from .L_models.ACDC_L_TEP import *
     __all__.extend([
         'linear_transmission_expansion',
         'linear_multi_period_transmission_expansion',
@@ -255,7 +256,7 @@ except ImportError:
     HAS_DASH = False
 
 try:
-    from .AC_L_CSS_ortools import *
+    from .L_models.AC_L_CSS_ortools import *
     __all__.extend(['optimal_l_css_ortools'])
     HAS_AC_L_CSS_ORTOOLS = True
 except ImportError:

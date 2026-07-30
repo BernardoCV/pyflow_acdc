@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy, AcDcSide, LinkCost
+from ..constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD, PricingStrategy, AcDcSide, LinkCost
 
 
 __all__ = [
@@ -52,11 +52,11 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
     Examples
     --------
     >>> import pyomo.environ as pyo
-    >>> from pyflow_acdc.ACDC_OPF_NL_model import opf_create_nl_model_acdc
+    >>> from pyflow_acdc.NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc
     >>> model = pyo.ConcreteModel()
     >>> opf_create_nl_model_acdc(model, grid, PV_set=False, Price_Zones=False)
     """
-    from .ACDC_OPF import translate_pyf_opf
+    from ..ACDC_OPF import translate_pyf_opf
 
     if limit_flow_rate is True:
         limit_flow_rate = 1
@@ -101,7 +101,7 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
         price_zone_constraints(model,grid,Price_Zone_info)
     else:
         price_zone_parameters(model,grid,AC_info,DC_info,gen_info)
-        
+
     if grid.ESS:
         storage_constraints(model, grid, storage_info, window_block=window_block)
 
@@ -123,7 +123,7 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
 
 
 def Generation_variables(model,grid,gen_info,TEP):
-    from .ACDC_OPF import get_gen_p_min_eff
+    from ..ACDC_OPF import get_gen_p_min_eff
 
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     _,_,_,_,lista_gen = gen_AC_info
@@ -2261,7 +2261,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     "Price Zone equality constraints"
 
     def price_zone_price_formula(model,price_zone):
-        from .Classes import Price_Zone
+        from ..Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             return model.price_zone_price[price_zone]==2*model.price_zone_a[price_zone]*model.PN[price_zone]*grid.S_base+model.price_zone_b[price_zone]
         else :
@@ -2286,14 +2286,14 @@ def price_zone_constraints(model,grid,Price_Zone_info):
         return model.PN[price_zone] ==Pm_AC+Pm_DC
 
     def PZ_cost_of_generation(model,price_zone):
-        from .Classes import Price_Zone
+        from ..Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             return model.SocialCost[price_zone]== model.price_zone_a[price_zone]*(model.PN[price_zone]*grid.S_base)**2+model.price_zone_b[price_zone]*(model.PN[price_zone]*grid.S_base)
         else:
             return model.SocialCost[price_zone]==0
 
     def Price_link(model,price_zone):
-        from .Classes import Price_Zone
+        from ..Classes import Price_Zone
         if type(grid.Price_Zones[price_zone]) is Price_Zone:
             linked_price_zone=grid.Price_Zones[price_zone].linked_price_zone
             if linked_price_zone is not None:
@@ -2336,7 +2336,7 @@ def price_zone_constraints(model,grid,Price_Zone_info):
     model.price_zone_price_constraint = pyo.Constraint(model.M,rule=price_zone_price_formula)
     model.price_zone_price_link_ = pyo.Constraint(model.M,rule=Price_link)
 
-    from .Classes import MTDCPrice_Zone
+    from ..Classes import MTDCPrice_Zone
     mtdc_price_zone_ids = [m for m in model.M if isinstance(grid.Price_Zones[m], MTDCPrice_Zone)]
     if mtdc_price_zone_ids:
         model.price_zone_MTDC_link = pyo.ConstraintList()
@@ -2482,7 +2482,7 @@ def TEP_variables(model,grid,n_init_install=None):
         raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
 
     from .ACDC_Static_TEP import get_TEP_variables
-    from .ACDC_OPF import get_gen_p_min_eff
+    from ..ACDC_OPF import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 

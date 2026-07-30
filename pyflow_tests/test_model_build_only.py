@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 import pyflow_acdc as pyf
 
-from pyflow_acdc.ACDC_MultiPeriod_TEP import multi_period_transmission_expansion
-from pyflow_acdc.ACDC_Static_TEP import _prepare_TEP_model, transmission_expansion
+from pyflow_acdc.NL_models.ACDC_MultiPeriod_TEP import multi_period_transmission_expansion
+from pyflow_acdc.NL_models.ACDC_Static_TEP import _prepare_TEP_model, transmission_expansion
 from pyflow_acdc.Array_OPT import _create_master_problem_pyomo
 
 
@@ -99,7 +99,7 @@ def test_mp_tep_build_phase_runs_without_real_solver(monkeypatch):
             "time": 0.0,
         }
 
-    monkeypatch.setattr("pyflow_acdc.ACDC_MultiPeriod_TEP.pyomo_model_solve", _fake_solve)
+    monkeypatch.setattr("pyflow_acdc.NL_models.ACDC_MultiPeriod_TEP.pyomo_model_solve", _fake_solve)
 
     grid, _ = pyf.cases['case39'](TEP=True)
     model, model_results, timing_info, solver_stats = multi_period_transmission_expansion(
@@ -131,7 +131,7 @@ def test_static_tep_transmission_expansion_obj_scaling_branch(monkeypatch):
             "time": 0.0,
         }
 
-    monkeypatch.setattr("pyflow_acdc.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
+    monkeypatch.setattr("pyflow_acdc.NL_models.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
 
     grid, _ = pyf.cases['case39'](TEP=True)
     model, model_results, timing_info, solver_stats = transmission_expansion(
@@ -160,7 +160,7 @@ def test_static_tep_transmission_expansion_alpha_branch(monkeypatch):
             "time": 0.0,
         }
 
-    monkeypatch.setattr("pyflow_acdc.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
+    monkeypatch.setattr("pyflow_acdc.NL_models.ACDC_Static_TEP.pyomo_model_solve", _fake_solve)
 
     grid, _ = pyf.cases['case39'](TEP=True)
     model, model_results, timing_info, solver_stats = transmission_expansion(

@@ -26,7 +26,7 @@ def quick_fake_solve_context(opf=False, tep=False):
             acdc_opf.pyomo_model_solve = _fake_pyomo_solve
             patched.append((acdc_opf, old))
         if tep:
-            import pyflow_acdc.ACDC_Static_TEP as static_tep
+            import pyflow_acdc.NL_models.ACDC_Static_TEP as static_tep
 
             old = static_tep.pyomo_model_solve
             static_tep.pyomo_model_solve = _fake_pyomo_solve

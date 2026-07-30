@@ -11,9 +11,9 @@ constants  →  Classes  →  grid_creator / grid_modifications / grid_analysis
                   │
                   ├─→  ACDC_PF                      (power flow)
                   ├─→  pyomo_model_solve              (generic Pyomo solve)
-                  ├─→  ACDC_OPF (+ NL / L models)   (optimal power flow)
-                  ├─→  ACDC_*_TEP / Array_OPT        (planning / sizing)
-                  ├─→  Time_series(_clustering)      (time-series studies)
+                  ├─→  ACDC_OPF (+ NL_models / L_models)  (optimal power flow)
+                  ├─→  Array_OPT / ACDC_TEP_pymoo         (planning / sizing orchestration)
+                  ├─→  Time_series(_clustering)           (time-series studies)
                   └─→  Results_class / Export_files / Graph_* / Mapping  (output)
 ```
 
@@ -55,27 +55,24 @@ everything else builds on.
   array, and time-series drivers: `pyomo_model_solve`, solver log parsers,
   feasibility checks, `reset_to_initialize`, `export_solver_progress_to_excel`.
   Distinct from `solver_utils.py` (environment probe only).
-- **`ACDC_OPF_NL_model.py`** — Builds the non-linear Pyomo model (full AC/DC
-  physics, converters, price zones, optional TEP variables).
-- **`AC_OPF_L_model.py`** — Builds the linear (DC-style) Pyomo model with
-  McCormick linearisations for cable-type selection.
+- **`NL_models/`** — Nonlinear model builders and planning drivers:
+  `ACDC_OPF_NL_model` (full AC/DC Pyomo model, converters, price zones, TEP
+  variables, BESS / H₂), `ACDC_Static_TEP`, `ACDC_MultiPeriod_TEP`,
+  `ACDC_sequential_STEP`, and `window_opf` (coupled / rolling multi-hour NL OPF).
+- **`L_models/`** — Linearised model builders and drivers: `AC_OPF_L_model`
+  (McCormick cable-type selection; optional BESS P-only and electrolyser
+  inventory), `ACDC_L_TEP`, and `AC_L_CSS_ortools`.
 
 ## Planning and sizing
 
-- **`ACDC_Static_TEP.py`** — Static transmission-expansion planning and
-  multi-scenario TEP; sensitivity analyses.
-- **`ACDC_MultiPeriod_TEP.py`** — Multi-period (investment-horizon) TEP.
-- **`ACDC_sequential_STEP.py`** — Sequential static TEP runs over time.
 - **`ACDC_TEP_pymoo.py`** — Population-based (pymoo) outer TEP with OPF
-  subproblems.
+  subproblems (orchestration; uses `NL_models`).
 - **`Array_OPT.py`** — Offshore inter-array sizing orchestration: **route**
   MIP (``MIP_path_graph``, Pyomo or OR-Tools CP-SAT; optional joint cable types
   via ``enable_cable_types``) and **CSS** dispatch (``wind_farm_CSS``,
   ``sequential_CSS``). Owns spanning-tree / flow / ``ct_limit`` constraints.
   Install ``[OPF]`` for Pyomo CSS; ``[LINEAR_ARRAY]`` for OR-Tools MIP/CSS + HiGHS.
-- **`AC_L_CSS_ortools.py`** — OR-Tools ``linear_solver`` CSS only: cable type
-  per active CT line on a fixed topology; no routing. Used when
-  ``CSS_L_solver='ortools'``.
+  Uses both `NL_models` and `L_models`.
 - **`_tep_utils.py`** — Shared TEP economics (annuity/present-value factor).
 
 ## Time series

@@ -46,9 +46,6 @@ API Documentation
    api/grid
    api/csv_import
    api/grid_mod
-   api/storage
-   api/hydrogen
-   api/heat_pump
    api/cable_database
    api/grid_analysis
    api/results
@@ -68,6 +65,7 @@ API Documentation
    api/ts_mod
    api/clustering
    api/ts
+   api/window
    api/market_coef
 
 .. toctree::

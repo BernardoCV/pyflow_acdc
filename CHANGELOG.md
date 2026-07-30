@@ -33,8 +33,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``storage_window`` / ``hydrogen_window``.
 - **Myopic time-series OPF** with BESS / H₂: ``ts_acdc_opf`` carries SoC
   hour-to-hour; optional ``ObjRule['SoC_deviation']`` soft SoC reference;
-  H₂ as direct sale only (``ObjRule['H2_sale']``, ``TSType.H2_PRICE``) without
-  tank carry — use window/rolling for inventory + terminal mass.
+  H₂ inventory carries within ``H2_mass_max`` with out-of-opt
+  ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
+  ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
+  rolling keep hard SoC ini/final and optional ``H2_mass_final``.
+- **Linearised AC OPF** (``optimal_l_pf``): BESS (P-only, no Q / S-circle) and
+  electrolyser inventory / ``H2_sale``; raises if ``grid.DCmode``;
+  ``SoC_deviation`` is rejected (quadratic).
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
   ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``, and heat-pump
   ``TSType.HP_P_REF`` / ``HP_Q_REF`` / ``HP_E_MIN`` / ``HP_E_MAX``.
@@ -47,6 +52,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
   data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
   OPF.
+- **TS PF setpoints**: ``update_grid_for_pf`` applies prescribed PF setpoints
+  from time series in pu: ACDC converters (``conv_P_DC``, ``conv_P_AC``,
+  ``conv_Q_AC``), BESS (``storage_P`` net injection, ``storage_Q`` on AC), and
+  electrolyser (``h2_P`` load, ``h2_Q`` on AC). Safe to call for every series
+  (non-PF types no-op). ``h2_price`` stays a normal TS via ``update_grid_data``.
+  Accepted labels live in ``TS_PF_TYPES`` / ``TSType``; converter fields must
+  match DC ``type`` / ``AC_type``, and ``storage_Q`` / ``h2_Q`` require AC
+  (fail-fast on mismatch). ``ts_acdc_pf`` / ``ts_ac_pf`` / ``ts_dc_pf``
+  dispatch ``TS_PF_TYPES`` → ``update_grid_for_pf``, else → ``update_grid_data``.
+  Droop/P converters without a ``conv_P_DC`` series restore ``P_DC`` from
+  ``Pconv_save`` in ``ts_acdc_pf``.
 - **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
   ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets). Coverage
   reports and the README badge are maintained on Codecov.
@@ -64,6 +80,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
+- **Power flow known injections**: ``update_pq_ac`` / ``update_p_dc`` fold BESS
+  and H₂ operating fields into the PF known P/Q (same signs as NL OPF). Storage
+  contributes ``net_P_pu = P_discharge - P_charge`` (AC also ``Q``); electrolyser
+  ``P_electrolyser`` is a known load (AC also ``Q_electrolyser`` as injection).
+  Defaults remain zero until set / after OPF export.
 - **Window OPF parameter updates**: ``_modify_parameters(..., window_block=True)``
   skips rewriting ``SoC_prev`` / ``mass_H2_prev`` / ``E_heat_pump_prev`` so
   frame-to-frame inventory links are not overwritten by

@@ -90,7 +90,7 @@ Included in ``--docs`` (``DOCS_CASES``):
 ``test_docs_tep.py`` runs ``tep/`` (static :func:`~pyflow_acdc.transmission_expansion`
 and MS :func:`~pyflow_acdc.multi_scenario_TEP` on **ipopt**).
 ``test_docs_tep_mp.py`` runs ``tep_mp/`` (MP and MP+MS examples).
-``test_docs_L_models.py`` runs ``L_models/`` (linear OPF and linear TEP/REC; first
+``test_docs_L_models.py`` runs ``L_models/`` (linearised AC OPF and linear TEP/REC; first
 available LP/MIP solver, else ``build_only``).
 
 Not run by ``--docs`` (no runner, or long / optional solvers):

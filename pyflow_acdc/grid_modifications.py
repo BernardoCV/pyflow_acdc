@@ -39,6 +39,9 @@ from .constants import (
     LinkCost,
     TSType,
     TS_RENEWABLE_TYPES,
+    TS_CONV_PF_TYPES,
+    TS_STORAGE_PF_TYPES,
+    TS_H2_PF_TYPES,
 )
 from .grid_analysis import (
     pol2cart,
@@ -1675,6 +1678,7 @@ def add_electrolyser(
     Q_min_MVAR=0.0,
     Q_max_MVAR=0.0,
     dt_hours=1.0,
+    empty_tank_cycle=None,
     geometry=None,
 ):
     """Append an electrolyser to ``grid.electrolysers``.
@@ -1684,6 +1688,10 @@ def add_electrolyser(
 
     ``h2_price`` (EUR/kg, default 0) is used when ``ObjRule={'H2_sale': 1}``;
     optional ``TSType.H2_PRICE`` series overrides it per frame.
+
+    ``empty_tank_cycle`` (``None`` or int ``>= 1``) sets out-of-opt tank empties:
+    myopic never empties when ``None``, else every ``N`` hours; rolling empties
+    every window when ``None``, else at commit boundaries at/past each ``k·N``.
     """
     node = _look_up_node(grid, node, ac_or_dc="any")
 
@@ -1709,6 +1717,7 @@ def add_electrolyser(
             Q_max=Q_max_MVAR / s_base,
             S_base=s_base,
             dt_hours=dt_hours,
+            empty_tank_cycle=empty_tank_cycle,
         )
     else:
         electrolyser = Electrolyser(
@@ -1725,6 +1734,7 @@ def add_electrolyser(
             h2_price=h2_price,
             S_base=s_base,
             dt_hours=dt_hours,
+            empty_tank_cycle=empty_tank_cycle,
         )
 
     if geometry is not None:
@@ -1859,6 +1869,48 @@ def time_series_dict(grid, ts):
                 hp.TS_dict[typ] = ts.TS_num
                 break
 
+    elif typ in TS_CONV_PF_TYPES:
+        matched = False
+        for conv in grid.Converters_ACDC:
+            if ts.element_name == conv.name:
+                if not hasattr(conv, 'TS_dict') or conv.TS_dict is None:
+                    conv.TS_dict = {}
+                conv.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any ACDC converter"
+            )
+
+    elif typ in TS_STORAGE_PF_TYPES:
+        matched = False
+        for storage in grid.storage_elements:
+            if ts.element_name == storage.name:
+                if not hasattr(storage, 'TS_dict') or storage.TS_dict is None:
+                    storage.TS_dict = {}
+                storage.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any storage element"
+            )
+
+    elif typ in TS_H2_PF_TYPES:
+        matched = False
+        for el in grid.electrolysers:
+            if ts.element_name == el.name:
+                el.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
+            )
 
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
     """Attach investment-period time series to grid elements from a CSV file.
@@ -2357,6 +2409,13 @@ def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None
       :class:`~pyflow_acdc.Classes.Node_AC`, :class:`~pyflow_acdc.Classes.Node_DC`
       (updates ``PLi_factor``)
     - ``'price'`` — energy price on price zones or nodes
+    - ``'h2_price'`` — H₂ sale price on :class:`~pyflow_acdc.Classes.Electrolyser`
+      (normal OPF TS, not a PF setpoint)
+    - ``'storage_P'``, ``'storage_Q'`` — BESS PF setpoints (pu; ``storage_Q``
+      AC only) via :func:`~pyflow_acdc.update_grid_for_pf`
+    - ``'h2_P'``, ``'h2_Q'`` — electrolyser PF setpoints (pu; ``h2_Q`` AC only)
+    - ``'conv_P_DC'``, ``'conv_P_AC'``, ``'conv_Q_AC'`` — ACDC converter PF
+      setpoints (pu)
     - ``'WPP'``, ``'OWPP'``, ``'SF'``, ``'REN'``, ``'Solar'`` — renewable
       availability on :class:`~pyflow_acdc.Classes.Ren_source_zone` or
       :class:`~pyflow_acdc.Classes.Ren_Source`` (``PRGi_available``)

@@ -3,8 +3,8 @@ import json
 import tempfile
 import pandas as pd
 import pyomo.environ as pyo
-from .grid_analysis import analyse_grid, current_fuel_type_distribution
-from .grid_modifications import add_inv_series, add_gen_mix_limits
+from ..grid_analysis import analyse_grid, current_fuel_type_distribution
+from ..grid_modifications import add_inv_series, add_gen_mix_limits
 from .ACDC_Static_TEP import transmission_expansion, multi_scenario_TEP
 from .ACDC_MultiPeriod_TEP import (
     _fill_investment_decisions,
@@ -13,8 +13,8 @@ from .ACDC_MultiPeriod_TEP import (
     _calculate_decomision_period,
     _deactivate_non_pre_existing_loads
 )
-from .Graph_and_plot import save_network_svg
-from .constants import DataExportType
+from ..Graph_and_plot import save_network_svg
+from ..constants import DataExportType
 
 __all__ = ['export_results_to_csv', 'sequential_STEP', 'sequential_MS_STEP']
 
@@ -223,7 +223,7 @@ def _prepare_ms_clustering_reuse(grid, clustering_options, cache_json_path=None)
     if opts.get("precomputed_clusters") is not None or opts.get("precomputed_clusters_path") is not None:
         return opts
 
-    from .Time_series_clustering import cluster_analysis
+    from ..Time_series_clustering import cluster_analysis
 
     n_clusters, _ = cluster_analysis(grid, opts)
     payload = _build_cluster_cache_payload(grid, n_clusters)
@@ -335,7 +335,7 @@ def _run_sequential_core(
             model, model_res, timing_info, solver_stats, extra_run_data = period_solver(k)
 
             if export_steps:
-                from .Results_class import Results
+                from ..Results_class import Results
                 res = Results(grid)
                 res.pyomo_model_results(model, solver_stats=solver_stats, model_results=model_res, print_table=False)
                 res.all(
