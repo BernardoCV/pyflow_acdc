@@ -20,7 +20,7 @@ from .grid_analysis import analyse_grid, current_fuel_type_distribution
 from .Time_series import _modify_parameters, ts_acdc_opf, results_ts_opf
 from .Graph_and_plot import save_network_svg, create_geometries_from_layout
 from .Results_class import Results
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, PF_INNER_TOLERANCE, present_value_factor
+from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, PF_INNER_TOLERANCE, present_value_factor, DataExportType
 
 
 
@@ -1287,6 +1287,7 @@ def export_mp_tep_results_to_pyflow_acdc(
     pre_opt_fuel_type_distribution,
     export_last_opf_state=True,
     MS = False,
+    opf_export='nl',
 ):
 
 
@@ -1463,7 +1464,13 @@ def export_mp_tep_results_to_pyflow_acdc(
     if export_last_opf_state:
         last_i = max(model.inv_periods)
         _set_grid_to_multiperiod_state(grid, last_i,Price_Zones)
-        export_acdc_nl_model_to_pyflow_acdc(model.inv_model[last_i],grid,Price_Zones,TEP=True)
+        if opf_export == 'l':
+            from .AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc
+            export_acdc_l_model_to_pyflow_acdc(model.inv_model[last_i], grid)
+        elif opf_export == 'nl':
+            export_acdc_nl_model_to_pyflow_acdc(model.inv_model[last_i],grid,Price_Zones,TEP=True)
+        else:
+            raise ValueError(f"opf_export must be 'nl' or 'l', got {opf_export!r}")
 
     grid.MP_TEP_results = df
 
@@ -2019,7 +2026,7 @@ def run_opf_for_investment_period(
     res = Results(grid, decimals=decimals)
     if export_excel:
         all_kwargs = {
-            'export_type': 'excel',
+            'export_type': DataExportType.EXCEL,
             'print_table': print_table,
             'file_name': file_name or f"{getattr(grid, 'name', 'grid')}_period_{period_idx}",
             'export_location': export_location,

@@ -153,7 +153,7 @@ try:
     try:
         from .ACDC_Static_TEP import *
         __all__.extend([
-            'transmission_expansion', 'linear_transmission_expansion',
+            'transmission_expansion',
             'multi_scenario_TEP', 'expand_elements_from_pd',
             'repurpose_element_from_pd', 'update_attributes', 'expand_element',
             'export_TEP_multiScenario_results_to_excel',
@@ -187,6 +187,15 @@ try:
         'run_opf_for_investment_period',
         'run_ts_opf_for_investment_period',
         'run_opf_for_all_investment_periods',
+    ])
+except ImportError:
+    pass
+
+try:
+    from .ACDC_L_TEP import *
+    __all__.extend([
+        'linear_transmission_expansion',
+        'linear_multi_period_transmission_expansion',
     ])
 except ImportError:
     pass

@@ -41,7 +41,8 @@ from .ACDC_OPF import (
     export_acdc_nl_model_to_pyflow_acdc,
     calculate_objective,
 )
-from .ACDC_Static_TEP import transmission_expansion, linear_transmission_expansion
+from .ACDC_Static_TEP import transmission_expansion
+from .ACDC_L_TEP import linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
 from .constants import (
