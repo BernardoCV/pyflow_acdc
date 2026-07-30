@@ -6,7 +6,7 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 import time
 import matplotlib.pyplot as plt
-from .ACDC_OPF_NL_model import export_acdc_nl_model_to_pyflow_acdc
+from .NL_models.ACDC_OPF_NL_model import export_acdc_nl_model_to_pyflow_acdc
 from .pyomo_model_solve import pyomo_model_solve
 from .ACDC_OPF import opf_obj, obj_w_rule, calculate_objective
 from .grid_analysis import analyse_grid
@@ -204,7 +204,7 @@ class TEPOuterProblem(ElementwiseProblem):
         model.name = "TEP pymoo OPF"
 
         # Import the OPF builder
-        from .ACDC_OPF_NL_model import opf_create_nl_model_acdc
+        from .NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc
 
         # Build with TEP=False so investments are Params
         opf_create_nl_model_acdc(model, self.grid, PV_set=self.pv_set,

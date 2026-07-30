@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD
+from ..constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD
 
 
 __all__ = [
@@ -47,7 +47,7 @@ def opf_create_l_model_ac(model,grid,TEP=False):
     --------
     >>> opf_create_l_model_ac(model, grid, TEP=False)
     """
-    from .ACDC_OPF import translate_pyf_opf
+    from ..ACDC_OPF import translate_pyf_opf
 
     if grid.DCmode:
         raise ValueError(
@@ -211,7 +211,7 @@ def hydrogen_constraints_l(model, grid, hydrogen_info):
 
 
 def Generation_variables(model,grid,gen_info,TEP):
-    from .ACDC_OPF import get_gen_p_min_eff
+    from ..ACDC_OPF import get_gen_p_min_eff
 
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
@@ -514,7 +514,7 @@ def AC_constraints(model,grid,AC_info):
 
     mccormick_rs = [rs for rs in model.ren_sources if _rs_needs_mccormick(rs)]
     if mccormick_rs:
-        from .ACDC_Static_TEP import get_TEP_variables
+        from ..NL_models.ACDC_Static_TEP import get_TEP_variables
         _tep_rs = get_TEP_variables(grid)['ren_sources']
         np_rsgen_lb = {}
         np_rsgen_ub = {}
@@ -582,7 +582,7 @@ def AC_constraints(model,grid,AC_info):
 
 
     if grid.TEP_AC:
-        from .ACDC_Static_TEP import get_TEP_variables
+        from ..NL_models.ACDC_Static_TEP import get_TEP_variables
         _tep_vars = get_TEP_variables(grid)
         NP_lineAC_max = _tep_vars['ac_lines']['NP_lineAC_max']
 
@@ -976,7 +976,7 @@ def TEP_parameters(model,grid):
 
 
 
-    from .ACDC_Static_TEP import get_TEP_variables
+    from ..NL_models.ACDC_Static_TEP import get_TEP_variables
 
     tep_vars = get_TEP_variables(grid)
 
@@ -1005,8 +1005,8 @@ def TEP_parameters(model,grid):
 
 def TEP_variables(model,grid):
 
-    from .ACDC_Static_TEP import get_TEP_variables
-    from .ACDC_OPF import get_gen_p_min_eff
+    from ..NL_models.ACDC_Static_TEP import get_TEP_variables
+    from ..ACDC_OPF import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 

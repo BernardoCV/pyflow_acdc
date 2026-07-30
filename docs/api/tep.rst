@@ -5,7 +5,7 @@ This module provides functions for transmission expansion planning (TEP) analysi
 
 See :doc:`../usage_tep` for static TEP and multi-scenario (MS) TEP workflows.
 
-Functions are found in pyflow_acdc.ACDC_Static_TEP
+Functions are found in pyflow_acdc.NL_models.ACDC_Static_TEP
 
 Transmission Expansion Planning
 -------------------------------
@@ -159,7 +159,7 @@ Element Expansion Helpers
 Transmission Expansion Planning objectives
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: pyflow_acdc.ACDC_Static_TEP.tep_obj
+.. autofunction:: pyflow_acdc.NL_models.ACDC_Static_TEP.tep_obj
 
    Returns the objective function for the transmission expansion planning based on [1]_:
 

@@ -55,7 +55,7 @@ On AC buses the converter capability curve limits apparent power
 **pyflow-acdc implementation.** SoC is stored in **pu** (fraction of
 :attr:`~pyflow_acdc.Storage.E_max` in MWh). Charge/discharge decision variables
 are in **pu** of ``S_base``. The discrete SoC update implemented in
-:mod:`~pyflow_acdc.ACDC_OPF_NL_model` is:
+:mod:`~pyflow_acdc.NL_models.ACDC_OPF_NL_model` is:
 
 .. math::
     :label: eq:bess_soc_pyflow

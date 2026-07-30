@@ -33,16 +33,16 @@ try:
 except ImportError:
     ORTOOLS_AVAILABLE = False
 
-from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables
-from .AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
+from .NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables
+from .L_models.AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
 from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
 from .ACDC_OPF import (
     obj_w_rule,
     export_acdc_nl_model_to_pyflow_acdc,
     calculate_objective,
 )
-from .ACDC_Static_TEP import transmission_expansion
-from .ACDC_L_TEP import linear_transmission_expansion
+from .NL_models.ACDC_Static_TEP import transmission_expansion
+from .L_models.ACDC_L_TEP import linear_transmission_expansion
 
 from .Graph_and_plot import save_network_svg
 from .constants import (
@@ -498,7 +498,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
     if NL == CssMode.OPF:
         export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ, TEP=True)
     elif CSS_L_solver == MIPBackend.ORTOOLS.value:
-        from .AC_L_CSS_ortools import export_acdc_l_model_to_pyflow_acdc_ortools
+        from .L_models.AC_L_CSS_ortools import export_acdc_l_model_to_pyflow_acdc_ortools
         export_acdc_l_model_to_pyflow_acdc_ortools(
             model, grid, model_results['gen_vars'], model_results['ac_vars'],
             tee=tee, time_limit=time_limit)
@@ -2281,7 +2281,7 @@ def wind_farm_CSS(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,discount_rate=DEFAU
                 rs.min_gamma = 1.0
         try:
             if CSS_L_solver == MIPBackend.ORTOOLS.value:
-                from .AC_L_CSS_ortools import optimal_l_css_ortools
+                from .L_models.AC_L_CSS_ortools import optimal_l_css_ortools
                 model, model_results, timing_info, solver_stats = optimal_l_css_ortools(
                     grid, ObjRule=css_obj, NPV=NPV, n_years=n_years, Hy=Hy,
                     discount_rate=discount_rate, tee=tee, time_limit=time_limit)

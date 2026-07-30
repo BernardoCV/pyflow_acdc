@@ -4,7 +4,7 @@ Optimal Power Flow Module
 This module provides functions for AC/DC hybrid optimal power flow analysis [1]_.
 
 functions are found in ``pyflow_acdc.ACDC_OPF``, ``pyflow_acdc.pyomo_model_solve``,
-and ``pyflow_acdc.ACDC_OPF_NL_model``
+and ``pyflow_acdc.NL_models.ACDC_OPF_NL_model``
 
 AC/DC Hybrid Optimal Power Flow
 -------------------------------
@@ -24,7 +24,7 @@ Creating the OPF model
 ^^^^^^^^^^^^^^^^^^^^^^
 
 
-.. autofunction:: pyflow_acdc.ACDC_OPF_NL_model.opf_create_nl_model_acdc
+.. autofunction:: pyflow_acdc.NL_models.ACDC_OPF_NL_model.opf_create_nl_model_acdc
 
 **Variables**
 

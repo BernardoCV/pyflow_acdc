@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import pyflow_acdc as pyf
 
-from pyflow_acdc.window_opf import (
+from pyflow_acdc.NL_models.window_opf import (
     _rolling_commit_windows,
     _ts_inclusive_0based,
 )

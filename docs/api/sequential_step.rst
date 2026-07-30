@@ -12,7 +12,7 @@ See :doc:`../usage_mp_tep` for workflow examples using ``pyf.cases['case24_MP'](
 
 Requires OPF/pyomo (``pip install pyflow-acdc[OPF]``).
 
-Functions are found in ``pyflow_acdc.ACDC_sequential_STEP``.
+Functions are found in ``pyflow_acdc.NL_models.ACDC_sequential_STEP``.
 
 .. autofunction:: pyflow_acdc.sequential_STEP
 

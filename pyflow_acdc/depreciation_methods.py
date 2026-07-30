@@ -181,7 +181,7 @@ except ImportError:
 
 # --- Static TEP (requires pyomo) ------------------------------------------
 try:
-    from .ACDC_Static_TEP import (
+    from .NL_models.ACDC_Static_TEP import (
         expand_element,
         export_TEP_multiScenario_results_to_excel,
     )
@@ -199,7 +199,7 @@ except ImportError:
 
 # --- Array cable-string sizing backends -----------------------------------
 try:
-    from .AC_L_CSS_ortools import optimal_l_css_ortools
+    from .L_models.AC_L_CSS_ortools import optimal_l_css_ortools
     _register(optimal_l_css_ortools, 'Optimal_L_CSS_ortools')
 except ImportError:
     pass

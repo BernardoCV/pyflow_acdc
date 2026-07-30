@@ -44,7 +44,7 @@ __all__ = ['time_series_pf',
 
 try:
     import pyomo.environ as pyo
-    from .ACDC_OPF_NL_model import (
+    from .NL_models.ACDC_OPF_NL_model import (
         opf_create_nl_model_acdc,
         export_acdc_nl_model_to_pyflow_acdc)
 

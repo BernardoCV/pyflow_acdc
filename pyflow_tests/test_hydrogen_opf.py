@@ -193,7 +193,7 @@ def test_empty_tank_cycle_validation_and_myopic_helper():
 
 
 def test_rolling_empty_tank_cycle_boundary_selection():
-    from pyflow_acdc.window_opf import (
+    from pyflow_acdc.NL_models.window_opf import (
         _electrolysers_to_empty_after_rolling_commit,
         _rolling_h2_empty_targets,
     )

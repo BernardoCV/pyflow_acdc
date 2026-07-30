@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 
-from .ACDC_OPF import (
+from ..ACDC_OPF import (
     calculate_objective,
     fx_conv,
     obj_w_rule,
@@ -16,14 +16,14 @@ from .ACDC_OPF import (
     translate_pyf_opf,
 )
 from .ACDC_OPF_NL_model import export_acdc_nl_model_to_pyflow_acdc, opf_create_nl_model_acdc
-from .constants import AcDcSide
-from .grid_analysis import analyse_grid
-from .pyomo_model_solve import (
+from ..constants import AcDcSide
+from ..grid_analysis import analyse_grid
+from ..pyomo_model_solve import (
     build_only_solver_stats,
     pyomo_model_solve,
     reset_to_initialize,
 )
-from .Time_series import (
+from ..Time_series import (
     _calculate_line_loading_from_model,
     _modify_parameters,
     update_grid_data,

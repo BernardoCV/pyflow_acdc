@@ -10,8 +10,8 @@ import numpy as np
 import pyomo.environ as pyo
 import warnings
 
-from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
-from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
+from .NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
+from .L_models.AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
 from .grid_analysis import analyse_grid
 from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights, AcDcSide
 from .pyomo_model_solve import (
@@ -388,7 +388,7 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
     Parameters
     ----------
     model : pyomo.ConcreteModel
-        OPF model returned by :func:`~pyflow_acdc.ACDC_OPF_NL_model.opf_create_nl_model_acdc`.
+        OPF model returned by :func:`~pyflow_acdc.NL_models.ACDC_OPF_NL_model.opf_create_nl_model_acdc`.
     grid : Grid
         Network being optimised.
     weights_def : dict
