@@ -14,6 +14,7 @@ from .ACDC_MultiPeriod_TEP import (
     _deactivate_non_pre_existing_loads
 )
 from .Graph_and_plot import save_network_svg
+from .constants import DataExportType
 
 __all__ = ['export_results_to_csv', 'sequential_STEP', 'sequential_MS_STEP']
 
@@ -339,7 +340,7 @@ def _run_sequential_core(
                 res.pyomo_model_results(model, solver_stats=solver_stats, model_results=model_res, print_table=False)
                 res.all(
                     export_location=export_dir,
-                    export_type="excel",
+                    export_type=DataExportType.EXCEL,
                     file_name=f"{excel_prefix}_{k+1}",
                     print_table=False,
                 )

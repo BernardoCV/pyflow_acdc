@@ -96,6 +96,10 @@ For production solves use ``solver="bonmin"`` and
 ``ObjRule`` is ``{"Energy_cost": 1}``; ``n_years`` is ``10``. Check
 ``solver_stats["solution_found"]`` before exporting.
 
+**Linear MP TEP** — AC-only MILP counterpart
+(:func:`~pyflow_acdc.linear_multi_period_transmission_expansion`, default
+``solver="gurobi"``). Same CSV setup; see :doc:`api/L_models`.
+
 **Sequential STEP** — one static :func:`~pyflow_acdc.transmission_expansion`
 per period (grid state carried forward):
 

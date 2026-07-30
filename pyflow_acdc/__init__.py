@@ -168,7 +168,7 @@ try:
     try:
         from .ACDC_Static_TEP import *
         __all__.extend([
-            'transmission_expansion', 'linear_transmission_expansion',
+            'transmission_expansion',
             'multi_scenario_TEP', 'expand_elements_from_pd',
             'repurpose_element_from_pd', 'update_attributes', 'expand_element',
             'export_TEP_multiScenario_results_to_excel',
@@ -202,6 +202,15 @@ try:
         'run_opf_for_investment_period',
         'run_ts_opf_for_investment_period',
         'run_opf_for_all_investment_periods',
+    ])
+except ImportError:
+    pass
+
+try:
+    from .ACDC_L_TEP import *
+    __all__.extend([
+        'linear_transmission_expansion',
+        'linear_multi_period_transmission_expansion',
     ])
 except ImportError:
     pass
@@ -265,6 +274,14 @@ try:
     HAS_CLUSTERING = True
 except ImportError:
     HAS_CLUSTERING = False
+
+# SOCP stack — optional; requires [SOCP] extra (cvxpy)
+try:
+    from .ACDC_convex import socp_optimise, soc_window_optimisation, translate_pyf_socp
+    __all__.extend(['socp_optimise', 'soc_window_optimisation', 'translate_pyf_socp'])
+    HAS_SOCP = True
+except ImportError:
+    HAS_SOCP = False
 
 # Deprecated mixed-case aliases (snake_case is the default API).
 # Imported last so the legacy names resolve to the deprecation wrappers.
