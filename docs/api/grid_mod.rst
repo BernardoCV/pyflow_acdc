@@ -79,16 +79,26 @@ Add Renewable Source
 Add Battery Storage
 ^^^^^^^^^^^^^^^^^^^
 
-See :doc:`storage` and :doc:`../usage_storage` for the user guide.
+See :doc:`modelling_flexible_assets` for the BESS model. Coupled runs:
+:doc:`window` / :doc:`../usage_window_opf`.
 
 .. autofunction:: pyflow_acdc.add_storage
 
 Add Electrolyser
 ^^^^^^^^^^^^^^^^
 
-See :doc:`hydrogen` and :doc:`../usage_hydrogen` for the user guide.
+See :doc:`modelling_flexible_assets` for the electrolyser model. Coupled runs:
+:doc:`window` / :doc:`../usage_window_opf`.
 
 .. autofunction:: pyflow_acdc.add_electrolyser
+
+Add Heat Pump
+^^^^^^^^^^^^^
+
+See :doc:`modelling_flexible_assets` for the heat-pump model. Coupled runs:
+:doc:`window` / :doc:`../usage_window_opf`.
+
+.. autofunction:: pyflow_acdc.add_heat_pump
 
 Bulk Add Generators
 ^^^^^^^^^^^^^^^^^^^

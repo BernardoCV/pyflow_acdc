@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-from .constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD
+from ..constants import CT_SELECTION_THRESHOLD, BINARY_THRESHOLD
 
 
 __all__ = [
@@ -19,12 +19,20 @@ __all__ = [
 
 
 def opf_create_l_model_ac(model,grid,TEP=False):
-    """Populate ``model`` with the linear (DC-style) AC OPF formulation.
+    """Populate ``model`` with the linearised AC OPF formulation.
 
-    Adds the linear OPF variables and constraints (AC network with McCormick
+    Adds the linearised OPF variables and constraints (AC network with McCormick
     linearisations for cable-type selection and generation) onto the given
     Pyomo model, using data translated from ``grid``. Mutates ``model`` in
     place; does not add the objective or solve.
+
+    When ``grid.ESS`` / ``grid.H2``, also adds BESS (P-only, no Q / S-circle)
+    and electrolyser inventory (P load + mass balance).
+
+    Raises
+    ------
+    ValueError
+        If ``grid.DCmode`` is true (DC / hybrid grids are not supported yet).
 
     Parameters
     ----------
@@ -39,30 +47,171 @@ def opf_create_l_model_ac(model,grid,TEP=False):
     --------
     >>> opf_create_l_model_ac(model, grid, TEP=False)
     """
-    from .ACDC_OPF import translate_pyf_opf
+    from ..ACDC_OPF import translate_pyf_opf
 
+    if grid.DCmode:
+        raise ValueError(
+            "Linearised AC OPF is not ready for DC / hybrid grids (grid.DCmode is True)"
+        )
 
     opf_data = translate_pyf_opf(grid)
     AC_info = opf_data['AC_info']
     gen_info = opf_data['gen_info']
+    storage_info = opf_data['storage_info']
+    hydrogen_info = opf_data['hydrogen_info']
 
     Generation_variables(model,grid,gen_info,TEP)
 
-    AC_variables(model,grid,AC_info)
+    if grid.ESS:
+        storage_variables_l(model, grid, storage_info)
+    if grid.H2:
+        hydrogen_variables_l(model, grid, hydrogen_info)
 
+    AC_variables(model,grid,AC_info)
 
     if TEP:
         TEP_variables(model,grid)
     else:
         TEP_parameters(model,grid)
 
+    if grid.ESS:
+        storage_constraints_l(model, grid, storage_info)
+    if grid.H2:
+        hydrogen_constraints_l(model, grid, hydrogen_info)
 
     AC_constraints(model,grid,AC_info)
 
 
+def _ac_storage_info(storage_info):
+    lista_storage_ac, _, storage_ac_by_number, _ = storage_info
+    return lista_storage_ac, storage_ac_by_number
+
+
+def storage_variables_l(model, grid, storage_info):
+    """BESS for linear OPF: charge, discharge, SoC (no Q)."""
+    if storage_info is None:
+        raise ValueError("storage_info is required when grid.ESS is True")
+    lista_storage_ac, storage_ac = _ac_storage_info(storage_info)
+
+    model.storage_AC = pyo.Set(initialize=lista_storage_ac)
+
+    def P_storage_charge_bounds(model, s):
+        return (0, storage_ac[s].P_charge_max)
+
+    def P_storage_discharge_bounds(model, s):
+        return (0, storage_ac[s].P_discharge_max)
+
+    def soc_bounds(model, s):
+        st = storage_ac[s]
+        return (st.soc_min, st.soc_max)
+
+    model.P_storage_charge = pyo.Var(
+        model.storage_AC, bounds=P_storage_charge_bounds, initialize=0)
+    model.P_storage_discharge = pyo.Var(
+        model.storage_AC, bounds=P_storage_discharge_bounds, initialize=0)
+    model.SoC = pyo.Var(
+        model.storage_AC,
+        bounds=soc_bounds,
+        initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
+    )
+    model.SoC_prev = pyo.Param(
+        model.storage_AC,
+        initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
+        mutable=True,
+    )
+
+
+def storage_constraints_l(model, grid, storage_info):
+    """BESS SoC balance and |P_net| ≤ S_max for linear OPF."""
+    if storage_info is None:
+        raise ValueError("storage_info is required when grid.ESS is True")
+    lista_storage_ac, storage_ac = _ac_storage_info(storage_info)
+
+    def soc_balance_rule(model, s):
+        st = storage_ac[s]
+        scale = st.dt_hours * st.S_base / st.E_max
+        return model.SoC[s] == (
+            model.SoC_prev[s]
+            + scale * (
+                st.eta_charge * model.P_storage_charge[s]
+                - model.P_storage_discharge[s] / st.eta_discharge
+            )
+        )
+
+    model.storage_soc_balance_constraint = pyo.Constraint(
+        model.storage_AC, rule=soc_balance_rule)
+
+    def P_net_upper_rule(model, s):
+        st = storage_ac[s]
+        return (
+            model.P_storage_discharge[s] - model.P_storage_charge[s] <= st.S_max
+        )
+
+    def P_net_lower_rule(model, s):
+        st = storage_ac[s]
+        return (
+            model.P_storage_charge[s] - model.P_storage_discharge[s] <= st.S_max
+        )
+
+    model.P_storage_AC_net_upper_constraint = pyo.Constraint(
+        model.storage_AC, rule=P_net_upper_rule)
+    model.P_storage_AC_net_lower_constraint = pyo.Constraint(
+        model.storage_AC, rule=P_net_lower_rule)
+
+
+def hydrogen_variables_l(model, grid, hydrogen_info):
+    """Electrolyser for linear OPF: P load + mass inventory (no Q)."""
+    if hydrogen_info is None:
+        raise ValueError("hydrogen_info is required when grid.H2 is True")
+    lista_electrolyser, by_number = hydrogen_info
+
+    model.electrolyser = pyo.Set(initialize=lista_electrolyser)
+
+    def P_electrolyser_bounds(model, e):
+        el = by_number[e]
+        return (el.P_min, el.P_max)
+
+    def mass_H2_bounds(model, e):
+        el = by_number[e]
+        return (0, el.H2_mass_max)
+
+    model.P_electrolyser = pyo.Var(
+        model.electrolyser,
+        bounds=P_electrolyser_bounds,
+        initialize={
+            e: 0.5 * (by_number[e].P_min + by_number[e].P_max)
+            for e in lista_electrolyser
+        },
+    )
+    model.mass_H2 = pyo.Var(
+        model.electrolyser,
+        bounds=mass_H2_bounds,
+        initialize={e: by_number[e].H2_mass_initial for e in lista_electrolyser},
+    )
+    model.mass_H2_prev = pyo.Param(
+        model.electrolyser,
+        initialize={e: by_number[e].H2_mass_initial for e in lista_electrolyser},
+        mutable=True,
+    )
+
+
+def hydrogen_constraints_l(model, grid, hydrogen_info):
+    """H₂ mass balance for electrolysers in linear OPF."""
+    if hydrogen_info is None:
+        raise ValueError("hydrogen_info is required when grid.H2 is True")
+    lista_electrolyser, by_number = hydrogen_info
+
+    def mass_h2_balance_rule(model, e):
+        el = by_number[e]
+        h_prod = el.b_h * model.P_electrolyser[e] * el.S_base * el.dt_hours + el.c_h
+        return model.mass_H2[e] == model.mass_H2_prev[e] + h_prod
+
+    model.hydrogen_mass_h2_balance_constraint = pyo.Constraint(
+        model.electrolyser, rule=mass_h2_balance_rule)
+
 
 def Generation_variables(model,grid,gen_info,TEP):
-    from .ACDC_OPF import get_gen_p_min_eff
+    from ..ACDC_OPF import get_gen_p_min_eff
 
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
@@ -172,6 +321,26 @@ def AC_variables(model,grid,AC_info):
             return (None,None)
 
     model.PGi_opt = pyo.Var(model.nodes_AC,bounds=PGi_opt_bounds ,initialize=0)
+
+    if grid.ESS:
+        def Pstorage_bounds(model, node):
+            nAC = grid.nodes_AC[node]
+            if not nAC.connected_storage:
+                return (0, 0)
+            return (None, None)
+
+        model.PGi_storage = pyo.Var(
+            model.nodes_AC, bounds=Pstorage_bounds, initialize=0)
+
+    if grid.H2:
+        def Pelectrolyser_bounds(model, node):
+            nAC = grid.nodes_AC[node]
+            if not nAC.connected_electrolyser:
+                return (0, 0)
+            return (None, None)
+
+        model.PGi_electrolyser = pyo.Var(
+            model.nodes_AC, bounds=Pelectrolyser_bounds, initialize=0)
 
     def make_opt_bounds(attribute_name):
         def bounds_func(model, node):
@@ -283,6 +452,10 @@ def AC_constraints(model,grid,AC_info):
             for k in model.nodes_AC if grid.Ybus_AC[node, k] != 0
         )
         P_var = model.P_known_AC[node] + model.PGi_ren[node] + model.PGi_opt[node]
+        if grid.ESS:
+            P_var += model.PGi_storage[node]
+        if grid.H2:
+            P_var -= model.PGi_electrolyser[node]
 
         if grid.TEP_AC:
             P_sum += model.Pto_Exp[node]+model.Pfrom_Exp[node]
@@ -304,6 +477,31 @@ def AC_constraints(model,grid,AC_info):
 
     model.Gen_PAC_constraint = pyo.Constraint(model.nodes_AC, rule=Gen_PAC_rule)
 
+    if grid.ESS:
+        def Gen_Pstorage_rule(model, node):
+            nAC = grid.nodes_AC[node]
+            p_stor = sum(
+                model.P_storage_discharge[s.storageNumber]
+                - model.P_storage_charge[s.storageNumber]
+                for s in nAC.connected_storage
+            )
+            return model.PGi_storage[node] == p_stor
+
+        model.Gen_Pstorage_constraint = pyo.Constraint(
+            model.nodes_AC, rule=Gen_Pstorage_rule)
+
+    if grid.H2:
+        def Gen_Pelectrolyser_rule(model, node):
+            nAC = grid.nodes_AC[node]
+            p_el = sum(
+                model.P_electrolyser[e.electrolyserNumber]
+                for e in nAC.connected_electrolyser
+            )
+            return model.PGi_electrolyser[node] == p_el
+
+        model.Gen_Pelectrolyser_constraint = pyo.Constraint(
+            model.nodes_AC, rule=Gen_Pelectrolyser_rule)
+
     def _rs_gamma_lb(rs):
         ren_source = grid.RenSources[rs]
         if ren_source.curtailable:
@@ -316,7 +514,7 @@ def AC_constraints(model,grid,AC_info):
 
     mccormick_rs = [rs for rs in model.ren_sources if _rs_needs_mccormick(rs)]
     if mccormick_rs:
-        from .ACDC_Static_TEP import get_TEP_variables
+        from ..NL_models.ACDC_Static_TEP import get_TEP_variables
         _tep_rs = get_TEP_variables(grid)['ren_sources']
         np_rsgen_lb = {}
         np_rsgen_ub = {}
@@ -384,7 +582,7 @@ def AC_constraints(model,grid,AC_info):
 
 
     if grid.TEP_AC:
-        from .ACDC_Static_TEP import get_TEP_variables
+        from ..NL_models.ACDC_Static_TEP import get_TEP_variables
         _tep_vars = get_TEP_variables(grid)
         NP_lineAC_max = _tep_vars['ac_lines']['NP_lineAC_max']
 
@@ -778,7 +976,7 @@ def TEP_parameters(model,grid):
 
 
 
-    from .ACDC_Static_TEP import get_TEP_variables
+    from ..NL_models.ACDC_Static_TEP import get_TEP_variables
 
     tep_vars = get_TEP_variables(grid)
 
@@ -807,8 +1005,8 @@ def TEP_parameters(model,grid):
 
 def TEP_variables(model,grid):
 
-    from .ACDC_Static_TEP import get_TEP_variables
-    from .ACDC_OPF import get_gen_p_min_eff
+    from ..NL_models.ACDC_Static_TEP import get_TEP_variables
+    from ..ACDC_OPF import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 
@@ -917,8 +1115,8 @@ def export_acdc_l_model_to_pyflow_acdc(model,grid, solver_results=None, tee=Fals
     """Export a solved linear OPF Pyomo model back onto ``grid``.
 
     Called by :func:`~pyflow_acdc.optimal_l_pf` after solving. Updates generator
-    dispatch, AC angles, line flows, and optional TEP/REC/CT selections on
-    ``grid``.
+    dispatch, AC angles, line flows, optional AC BESS / electrolyser setpoints,
+    and optional TEP/REC/CT selections on ``grid``.
 
     Parameters
     ----------
@@ -992,6 +1190,29 @@ def export_acdc_l_model_to_pyflow_acdc(model,grid, solver_results=None, tee=Fals
     with ThreadPoolExecutor() as executor:
         executor.map(process_node_AC, grid.nodes_AC)
 
+    if grid.ESS:
+        P_charge_ac = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_storage_charge.items()}
+        P_discharge_ac = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_storage_discharge.items()}
+        soc_ac = {k: np.float64(pyo.value(v)) for k, v in model.SoC.items()}
+        for storage in grid.storage_elements:
+            s = storage.storageNumber
+            storage.P_charge = P_charge_ac[s]
+            storage.P_discharge = P_discharge_ac[s]
+            storage.Q = 0.0
+            storage.SoC = soc_ac[s]
+
+    if grid.H2:
+        P_e_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_electrolyser.items()}
+        mass_h2_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.mass_H2.items()}
+        for el in grid.electrolysers:
+            e = el.electrolyserNumber
+            el.P_electrolyser = P_e_values[e]
+            el.Q_electrolyser = 0.0
+            el.mass_H2 = mass_h2_values[e]
 
     B = np.imag(grid.Ybus_AC)
     Theta = grid.Theta_V_AC

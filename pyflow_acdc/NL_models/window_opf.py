@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 
-from .ACDC_OPF import (
+from ..ACDC_OPF import (
     calculate_objective,
     fx_conv,
     obj_w_rule,
@@ -16,14 +16,14 @@ from .ACDC_OPF import (
     translate_pyf_opf,
 )
 from .ACDC_OPF_NL_model import export_acdc_nl_model_to_pyflow_acdc, opf_create_nl_model_acdc
-from .constants import AcDcSide
-from .grid_analysis import analyse_grid
-from .pyomo_model_solve import (
+from ..constants import AcDcSide
+from ..grid_analysis import analyse_grid
+from ..pyomo_model_solve import (
     build_only_solver_stats,
     pyomo_model_solve,
     reset_to_initialize,
 )
-from .Time_series import (
+from ..Time_series import (
     _calculate_line_loading_from_model,
     _modify_parameters,
     update_grid_data,
@@ -151,6 +151,12 @@ def window_h2_constraints(
 
     ``h2_mass_initial`` and per-pin ``h2_mass_final_target`` are mutable
     ``Param``s (rolling keeps initial at 0; targets fixed for a given structure).
+
+    * One terminal frame (default / single pin): ``mass_H2[t] == scale ·
+      H2_mass_final`` (optional ``final_scale``).
+    * Several pins (future sight passes end of *x* and end of *x+1*): each
+      segment must produce ``>= H2_mass_final`` (incremental). Tank ub stays
+      ``H2_mass_max`` through the first pin, then ``n_pins · H2_mass_max``.
     """
     ordered = list(frames)
     el_ids = [el.electrolyserNumber for el in grid.electrolysers]
@@ -194,6 +200,13 @@ def window_h2_constraints(
                     f"{ordered[0]}…{ordered[-1]}"
                 )
 
+    incremental = len(term_frames) > 1
+    if incremental and final_scale is not None:
+        raise ValueError(
+            "final_scale is not used when multiple H₂ final frames are set "
+            "(incremental / future-sight pins)"
+        )
+
     if final_scale is not None:
         for t in term_frames:
             if t not in final_scale:
@@ -201,14 +214,55 @@ def window_h2_constraints(
                     f"final_scale missing frame={t}; have {sorted(final_scale)}"
                 )
 
-    # One Param per (frame, electrolyser) final pin used by this structure.
+    els_with_final = [
+        (e, el) for e, el in el_by_number.items() if el.H2_mass_final is not None
+    ]
+    if not els_with_final:
+        return
+
+    for e, el in els_with_final:
+        if el.H2_mass_final > el.H2_mass_max:
+            raise ValueError(
+                f"H2_mass_final={el.H2_mass_final} exceeds "
+                f"H2_mass_max={el.H2_mass_max} on {el.name!r}"
+            )
+
+    if incremental:
+        n_pins = len(term_frames)
+        first_pin = term_frames[0]
+        for t in ordered:
+            ub_scale = 1.0 if t <= first_pin else float(n_pins)
+            for e, el in els_with_final:
+                model.frame_model[t].mass_H2[e].setub(ub_scale * el.H2_mass_max)
+
+        pin_index = [(t_term, e) for t_term in term_frames for e, _ in els_with_final]
+        pin_init = {
+            (t_term, e): float(el.H2_mass_final)
+            for t_term in term_frames
+            for e, el in els_with_final
+        }
+        model.h2_mass_final_target = pyo.Param(
+            pin_index, mutable=True, initialize=pin_init
+        )
+        for i, t_term in enumerate(term_frames):
+            for e, el in els_with_final:
+                mass_end = model.frame_model[t_term].mass_H2[e]
+                if i == 0:
+                    mass_start = model.h2_mass_initial[e]
+                else:
+                    mass_start = model.frame_model[term_frames[i - 1]].mass_H2[e]
+                model.window_h2_constraint.add(
+                    mass_end - mass_start
+                    >= model.h2_mass_final_target[t_term, e]
+                )
+        return
+
+    # Single pin: mass[t] == scale * H2_mass_final
     pin_index = []
     pin_init = {}
     for t_term in term_frames:
         scale = 1.0 if final_scale is None else float(final_scale[t_term])
-        for e, el in el_by_number.items():
-            if el.H2_mass_final is None:
-                continue
+        for e, el in els_with_final:
             target = scale * el.H2_mass_final
             if target > el.H2_mass_max:
                 raise ValueError(
@@ -219,9 +273,6 @@ def window_h2_constraints(
             pin_index.append((t_term, e))
             pin_init[(t_term, e)] = float(target)
 
-    if not pin_index:
-        return
-
     model.h2_mass_final_target = pyo.Param(
         pin_index, mutable=True, initialize=pin_init
     )
@@ -230,6 +281,35 @@ def window_h2_constraints(
             model.frame_model[t_term].mass_H2[e]
             == model.h2_mass_final_target[t_term, e]
         )
+
+
+def window_heat_pump_constraints(model, grid, heat_pump_info, frames):
+    """Parent-level cumulative HP energy-state chain across ``frame_model`` blocks."""
+    ordered = list(frames)
+    hp_ids, heat_pump_by_number = heat_pump_info
+    if not hp_ids:
+        return
+
+    model.hp_energy_initial = pyo.Param(
+        hp_ids,
+        mutable=True,
+        initialize={h: float(heat_pump_by_number[h].E_state) for h in hp_ids},
+    )
+    model.window_heat_pump_constraint = pyo.ConstraintList()
+
+    for i, t in enumerate(ordered):
+        block = model.frame_model[t]
+        for h, hp in heat_pump_by_number.items():
+            delta = block.P_heat_pump[h] * hp.S_base * hp.dt_hours
+            if i == 0:
+                model.window_heat_pump_constraint.add(
+                    block.E_heat_pump[h] == model.hp_energy_initial[h] + delta
+                )
+            else:
+                t_prev = ordered[i - 1]
+                model.window_heat_pump_constraint.add(
+                    block.E_heat_pump[h] == model.frame_model[t_prev].E_heat_pump[h] + delta
+                )
 
 
 def _snapshot_var_values(model_obj):
@@ -263,6 +343,7 @@ def _create_frame_blocks(
     opf_data = translate_pyf_opf(grid, Price_Zones=price_zones)
     storage_info = opf_data['storage_info']
     hydrogen_info = opf_data['hydrogen_info']
+    heat_pump_info = opf_data['heat_pump_info']
 
     for i in frames:
         base_copy = base_model.clone()
@@ -270,13 +351,13 @@ def _create_frame_blocks(
         abs_t = ts_base + i
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
-        _modify_parameters(grid, model.frame_model[i], price_zones)
+        _modify_parameters(grid, model.frame_model[i], price_zones, window_block=True)
         obj_rule = opf_obj(model.frame_model[i], grid, weights_def, only_gen)
         model.frame_model[i].obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
         if grid.nn_DC != 0 and any(conv.OPF_fx for conv in grid.Converters_ACDC):
             fx_conv(model.frame_model[i], grid)
 
-    return storage_info, hydrogen_info
+    return storage_info, hydrogen_info, heat_pump_info
 
 
 def _update_window_frame_params(model, grid, frames, ts_base, price_zones):
@@ -285,7 +366,7 @@ def _update_window_frame_params(model, grid, frames, ts_base, price_zones):
         abs_t = ts_base + i
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
-        _modify_parameters(grid, model.frame_model[i], price_zones)
+        _modify_parameters(grid, model.frame_model[i], price_zones, window_block=True)
 
 
 def _set_window_state_params(model, grid):
@@ -302,6 +383,9 @@ def _set_window_state_params(model, grid):
             model.h2_mass_initial[el.electrolyserNumber].set_value(
                 float(el.H2_mass_initial)
             )
+    if hasattr(model, 'hp_energy_initial'):
+        for hp in grid.heat_pumps:
+            model.hp_energy_initial[hp.heatPumpNumber].set_value(float(hp.E_state))
 
 
 def export_window_opf_results(model, grid, frames, ts_base=0):
@@ -402,6 +486,33 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
             rows_pe.append(row_pe)
         results['hydrogen_mass_H2'] = pd.DataFrame(rows_m)
         results['hydrogen_P_e'] = pd.DataFrame(rows_pe)
+
+    if grid.heat_pumps:
+        rows_hp_p = []
+        rows_hp_q = []
+        rows_hp_e = []
+        if ordered:
+            row_e0 = {'frame': _abs_frame(ordered[0]) - 1}
+            for hp in grid.heat_pumps:
+                row_e0[hp.name] = np.float64(hp.E_state)
+            rows_hp_e.append(row_e0)
+        for t in ordered:
+            block = model.frame_model[t]
+            abs_t = _abs_frame(t)
+            row_p = {'frame': abs_t}
+            row_q = {'frame': abs_t}
+            row_e = {'frame': abs_t}
+            for hp in grid.heat_pumps:
+                h = hp.heatPumpNumber
+                row_p[hp.name] = np.float64(pyo.value(block.P_heat_pump[h])) * grid.S_base
+                row_q[hp.name] = np.float64(pyo.value(block.Q_heat_pump[h])) * grid.S_base
+                row_e[hp.name] = np.float64(pyo.value(block.E_heat_pump[h]))
+            rows_hp_p.append(row_p)
+            rows_hp_q.append(row_q)
+            rows_hp_e.append(row_e)
+        results['heat_pump_P'] = pd.DataFrame(rows_hp_p)
+        results['heat_pump_Q'] = pd.DataFrame(rows_hp_q)
+        results['heat_pump_energy_state'] = pd.DataFrame(rows_hp_e)
 
     if ordered and (grid.Generators or grid.Generators_DC):
         rows_gp = []
@@ -600,9 +711,9 @@ def window_nl_opf(
     grid.reset_run_flags()
     analyse_grid(grid)
 
-    if not grid.ESS and not grid.H2:
+    if not grid.ESS and not grid.H2 and not grid.HP:
         raise ValueError(
-            "window_nl_opf requires at least one storage or electrolyser element")
+            "window_nl_opf requires at least one storage, electrolyser, or heat-pump element")
 
     if not grid.Time_series:
         raise ValueError("window_nl_opf requires grid.Time_series")
@@ -656,7 +767,7 @@ def window_nl_opf(
         model.frame_model = pyo.Block(model.frames)
 
         t1 = time.perf_counter()
-        storage_info, hydrogen_info = _create_frame_blocks(
+        storage_info, hydrogen_info, heat_pump_info = _create_frame_blocks(
             model,
             grid,
             frames,
@@ -679,6 +790,8 @@ def window_nl_opf(
                 final_frames=h2_frames_local,
                 final_scale=h2_scale_local,
             )
+        if grid.HP:
+            window_heat_pump_constraints(model, grid, heat_pump_info, frames)
         obj_total = _sum_frame_objectives(model, frames)
         if obj_scaling != 1.0:
             obj_total = obj_total / obj_scaling
@@ -692,6 +805,7 @@ def window_nl_opf(
                 'initial_values': initial_values,
                 'storage_info': storage_info,
                 'hydrogen_info': hydrogen_info,
+                'heat_pump_info': heat_pump_info,
                 'price_zones': price_zones,
                 'weights_def': weights_def,
             }
@@ -699,6 +813,7 @@ def window_nl_opf(
         model = cache_entry['model']
         storage_info = cache_entry['storage_info']
         hydrogen_info = cache_entry['hydrogen_info']
+        heat_pump_info = cache_entry.get('heat_pump_info')
         price_zones = cache_entry['price_zones']
         weights_def = cache_entry['weights_def']
         t1 = time.perf_counter()
@@ -745,7 +860,7 @@ def window_nl_opf(
         last_abs = ts_base + last_local
         for ts in grid.Time_series:
             update_grid_data(grid, ts, last_abs, price_zone_restrictions=price_zones)
-        _modify_parameters(grid, model.frame_model[last_local], price_zones)
+        _modify_parameters(grid, model.frame_model[last_local], price_zones, window_block=True)
         export_acdc_nl_model_to_pyflow_acdc(
             model.frame_model[last_local], grid, price_zones)
 
@@ -842,11 +957,42 @@ def _carry_state_from_results(grid, results, commit_end):
             st.soc_initial = float(row.iloc[0][st.name])
 
 
-def _empty_h2_tank(grid):
-    """Assume H₂ is removed at window end; next window starts empty."""
-    for el in (getattr(grid, 'electrolysers', None) or []):
-        el.H2_mass_initial = 0.0
-        el.mass_H2 = 0.0
+def _empty_h2_tank(grid, electrolysers=None):
+    """Reset selected (or all) H₂ tanks between solves — not an OPF constraint."""
+    els = electrolysers if electrolysers is not None else grid.electrolysers
+    for el in els:
+        el.empty_tank()
+
+
+def _rolling_h2_empty_targets(electrolysers):
+    """Next 1-based hour targets for ``empty_tank_cycle`` (``None`` → always)."""
+    targets = {}
+    for el in electrolysers:
+        n = el.empty_tank_cycle
+        targets[el.electrolyserNumber] = None if n is None else int(n)
+    return targets
+
+
+def _electrolysers_to_empty_after_rolling_commit(electrolysers, commit_end_1based, targets):
+    """Return electrolysers to empty after a rolling commit ending at hour ``h``.
+
+    ``empty_tank_cycle is None`` → every window boundary.
+    Otherwise empty at the first commit boundary with ``h >= k·N`` (ceil to the
+    next window end at or past each cycle multiple), then advance the target.
+    """
+    to_empty = []
+    for el in electrolysers:
+        e = el.electrolyserNumber
+        next_t = targets[e]
+        if next_t is None:
+            to_empty.append(el)
+            continue
+        if commit_end_1based < next_t:
+            continue
+        to_empty.append(el)
+        n = el.empty_tank_cycle
+        targets[e] = ((commit_end_1based // n) + 1) * n
+    return to_empty
 
 
 def rolling_window_nl_opf(
@@ -881,9 +1027,18 @@ def rolling_window_nl_opf(
     ``hard``). Short last windows and future-sight ``2X`` solves use separate
     cached models.
 
-    Each window starts from the previous terminal SoC. The H₂ tank is assumed
-    **emptied at every commit-window end** (next window starts at
-    ``H2_mass_initial = 0``), whether the goal is a mass target or sale-only.
+    Each window starts from the previous terminal SoC. H₂ tank empties are
+    **out-of-opt** (between solves), gated by each electrolyser's
+    ``empty_tank_cycle``:
+
+    * ``None`` (default) — empty at **every** commit-window boundary (next
+      window starts at ``H2_mass_initial = 0``).
+    * positive ``N`` — empty at the first commit boundary whose 1-based end
+      hour is ``>= k·N`` (window end at or past each cycle multiple); inventory
+      otherwise carries across windows.
+
+    Whether the goal is a mass target or sale-only does not change the empty
+    policy above.
 
     Terminal SoC is controlled by rolling via ``enforce_soc_final`` on each
     :func:`window_nl_opf` call (terminals always sit on that solve's last frame):
@@ -897,10 +1052,12 @@ def rolling_window_nl_opf(
 
     H₂ mass target (``H2_mass_final``) and H₂ sale (``ObjRule['H2_sale']`` with
     ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target,
-    each commit window regenerates ``H2_mass_final`` from an empty tank. Under
-    future sight the continuous *x*+*x+1* solve pins ``H2_mass_final`` at end of
-    *x* and ``2 · H2_mass_final`` at end of *x+1* (inventory carries only inside
-    that solve); ``H2_mass_max`` must be at least ``2 · H2_mass_final``.
+    each commit window regenerates ``H2_mass_final`` from the carried (or
+    emptied) tank. Under future sight the continuous *x*+*x+1* solve requires
+    **at least** ``H2_mass_final`` production in *x* and again in *x+1*
+    (incremental, not a cumulative ``2 · H2_mass_final`` absolute pin). Tank
+    capacity stays ``H2_mass_max`` through end of *x*, then
+    ``2 · H2_mass_max`` for the foresight half so both segments can fit.
 
     Parameters
     ----------
@@ -954,12 +1111,14 @@ def rolling_window_nl_opf(
     commits = _rolling_commit_windows(idx0, idx1, window_size)
     n_win = len(commits)
 
-    storage = list(getattr(grid, 'storage_elements', None) or [])
+    storage = list(grid.storage_elements)
+    electrolysers = list(grid.electrolysers)
     orig_soc_final = {st.name: st.soc_final for st in storage}
     enforce_h2_mass = any(
         el.H2_mass_final is not None
-        for el in (getattr(grid, 'electrolysers', None) or [])
+        for el in electrolysers
     )
+    h2_empty_targets = _rolling_h2_empty_targets(electrolysers)
 
     if grid.ESS and any(v is None for v in orig_soc_final.values()):
         missing = [n for n, v in orig_soc_final.items() if v is None]
@@ -987,11 +1146,6 @@ def rolling_window_nl_opf(
     for k, (c_start, c_end) in enumerate(commits):
         t_win0 = time.perf_counter()
         wall_start = datetime.now(timezone.utc).isoformat()
-        if print_step:
-            print(
-                f"[{wall_start}] Rolling window {k + 1}/{n_win} "
-                f"(frames {c_start}–{c_end})"
-            )
         is_last = k == n_win - 1
         use_foresight = (
             soc_final_mode == 'future_sight' and not is_last
@@ -1001,11 +1155,11 @@ def rolling_window_nl_opf(
             solve_start, solve_end = c_start, next_end
             force_soc = True
             if enforce_h2_mass:
+                # Two pins → incremental ≥ H2_mass_final per half (see window_h2).
                 h2_frames = [c_end, next_end]
-                h2_scale = {c_end: 1.0, next_end: 2.0}
             else:
                 h2_frames = None
-                h2_scale = None
+            h2_scale = None
         else:
             solve_start, solve_end = c_start, c_end
             if soc_final_mode == 'future_sight':
@@ -1014,6 +1168,14 @@ def rolling_window_nl_opf(
                 force_soc = ((k + 1) % soc_final_every_m == 0) or is_last
             h2_frames = None  # last frame of this solve
             h2_scale = None
+        if print_step:
+            step_msg = (
+                f"[{wall_start}] Rolling window {k + 1}/{n_win} "
+                f"(frames {c_start}–{c_end})"
+            )
+            if use_foresight:
+                step_msg += f" + future-sight ({c_end + 1}–{next_end})"
+            print(step_msg)
         t_prepare = time.perf_counter() - t_win0
 
         t_opf0 = time.perf_counter()
@@ -1073,9 +1235,13 @@ def rolling_window_nl_opf(
             _carry_state_from_results(grid, full, c_end)
             t_carry = time.perf_counter() - t_c0
             timing_acc['carry'] += t_carry
-            # Tank emptied at commit-window end (sale or offtake).
+            # Out-of-opt tank empty (empty_tank_cycle); None → every boundary.
             t_e0 = time.perf_counter()
-            _empty_h2_tank(grid)
+            to_empty = _electrolysers_to_empty_after_rolling_commit(
+                electrolysers, c_end + 1, h2_empty_targets
+            )
+            if to_empty:
+                _empty_h2_tank(grid, to_empty)
             t_empty = time.perf_counter() - t_e0
             timing_acc['empty_h2'] += t_empty
 

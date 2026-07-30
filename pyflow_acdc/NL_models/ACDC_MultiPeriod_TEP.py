@@ -7,8 +7,8 @@ import os
 import copy
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables,export_acdc_nl_model_to_pyflow_acdc
-from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
-from .ACDC_OPF import opf_obj, obj_w_rule, calculate_objective_from_model, optimal_pf
+from ..pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from ..ACDC_OPF import opf_obj, obj_w_rule, calculate_objective_from_model, optimal_pf
 from .ACDC_Static_TEP import (
     get_TEP_variables,
     _initialize_MS_STEP_sets_model,
@@ -16,11 +16,11 @@ from .ACDC_Static_TEP import (
     update_grid_scenario_frame,
     export_acdc_tep_ms_to_pyflow_acdc,
 )
-from .grid_analysis import analyse_grid, current_fuel_type_distribution
-from .Time_series import _modify_parameters, ts_acdc_opf, results_ts_opf
-from .Graph_and_plot import save_network_svg, create_geometries_from_layout
-from .Results_class import Results
-from .constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, PF_INNER_TOLERANCE, present_value_factor, DataExportType
+from ..grid_analysis import analyse_grid, current_fuel_type_distribution
+from ..Time_series import _modify_parameters, ts_acdc_opf, results_ts_opf
+from ..Graph_and_plot import save_network_svg, create_geometries_from_layout
+from ..Results_class import Results
+from ..constants import HOURS_PER_YEAR, DEFAULT_DISCOUNT_RATE, PF_INNER_TOLERANCE, present_value_factor, DataExportType
 
 
 
@@ -1465,7 +1465,7 @@ def export_mp_tep_results_to_pyflow_acdc(
         last_i = max(model.inv_periods)
         _set_grid_to_multiperiod_state(grid, last_i,Price_Zones)
         if opf_export == 'l':
-            from .AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc
+            from ..L_models.AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc
             export_acdc_l_model_to_pyflow_acdc(model.inv_model[last_i], grid)
         elif opf_export == 'nl':
             export_acdc_nl_model_to_pyflow_acdc(model.inv_model[last_i],grid,Price_Zones,TEP=True)
@@ -1484,7 +1484,7 @@ def _resolve_mp_ms_clustering(grid, clustering_options, tee=False):
             raise ValueError("Time series is empty; cannot build scenario frames.")
         return n_clusters, False
 
-    from .Time_series_clustering import cluster_analysis
+    from ..Time_series_clustering import cluster_analysis
     try:
         n_clusters, clustering = cluster_analysis(grid, clustering_options)
     except Exception as exc:
@@ -2035,7 +2035,7 @@ def run_opf_for_investment_period(
         res.all(**all_kwargs)
 
     if save_grid_pkl:
-        from .Export_files import save_pickle
+        from ..Export_files import save_pickle
 
         base_name = file_name or f"{getattr(grid, 'name', 'grid')}_period_{period_idx}"
         # Match Excel naming convention in Results.all():
@@ -2191,14 +2191,14 @@ def run_ts_opf_for_investment_period(
         results_ts_opf(grid, excel_file_path=excel_path, times=times)
 
     if save_grid_pkl:
-        from .Export_files import save_pickle
+        from ..Export_files import save_pickle
 
         pkl_path = os.path.join(export_location, f"{base_name}_results.pkl")
         save_pickle(grid, pkl_path, compress=True)
 
     if plot_ts:
         try:
-            from .Graph_and_plot import plot_TS_res
+            from ..Graph_and_plot import plot_TS_res
 
             ts_svg_dir = os.path.join(export_location, f"ts_svg_period_{period_tag}")
             os.makedirs(ts_svg_dir, exist_ok=True)

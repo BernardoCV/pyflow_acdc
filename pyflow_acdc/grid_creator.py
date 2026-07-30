@@ -1518,6 +1518,8 @@ def _migrate_legacy_grid_attrs(grid):
         grid.storage_elements = []
     if not hasattr(grid, 'electrolysers'):
         grid.electrolysers = []
+    if not hasattr(grid, 'heat_pumps'):
+        grid.heat_pumps = []
     if not hasattr(grid, 'ts_timestamps'):
         grid.ts_timestamps = None
     for node in grid.nodes_AC + grid.nodes_DC:
@@ -1525,6 +1527,8 @@ def _migrate_legacy_grid_attrs(grid):
             node.connected_storage = []
         if not hasattr(node, 'connected_electrolyser'):
             node.connected_electrolyser = []
+        if not hasattr(node, 'connected_heat_pumps'):
+            node.connected_heat_pumps = []
     for line in (
         grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
         + grid.lines_AC_tf + grid.lines_AC_ct + grid.lines_DC

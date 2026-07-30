@@ -11,12 +11,12 @@ import pandas as pd
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from .grid_analysis import analyse_grid
-from .constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, present_value_factor, TSType, TS_RENEWABLE_TYPES
+from ..grid_analysis import analyse_grid
+from ..constants import HOURS_PER_YEAR, BINARY_THRESHOLD, MAX_RATING_PLACEHOLDER, DEFAULT_DISCOUNT_RATE, present_value_factor, TSType, TS_RENEWABLE_TYPES
 
 from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, TEP_variables
-from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
-from .ACDC_OPF import (
+from ..pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
+from ..ACDC_OPF import (
     opf_obj,
     obj_w_rule,
     export_acdc_nl_model_to_pyflow_acdc,
@@ -25,7 +25,7 @@ from .ACDC_OPF import (
     calculate_objective_from_model,
 )
 
-from .Graph_and_plot import save_network_svg
+from ..Graph_and_plot import save_network_svg
 
 
 __all__ = [
@@ -258,7 +258,7 @@ def _rebuild_expand_element_index(grid):
     return name_index
 
 def repurpose_element_from_pd(grid,rec_elements):
-    from .grid_modifications import change_line_AC_to_reconducting
+    from ..grid_modifications import change_line_AC_to_reconducting
 
     # Normalize CSV headers to lowercase so lookups are case-insensitive.
     rec_elements = rec_elements.rename(columns=lambda c: str(c).strip().lower())
@@ -431,7 +431,7 @@ def expand_element(
 
     group, element = element_data
     if group == "line_ac":
-        from .grid_modifications import change_line_AC_to_expandable
+        from ..grid_modifications import change_line_AC_to_expandable
         element = change_line_AC_to_expandable(grid, name, update_grid)
         element.np_line_opf = True
     elif group == "line_dc":
@@ -451,19 +451,19 @@ def expand_element(
         allow_planned_decrease=allow_planned_decrease
     )
 def base_cost_calculation(element):
-    from .Classes import Exp_Line_AC
+    from ..Classes import Exp_Line_AC
     if isinstance(element, Exp_Line_AC):
         element.base_cost= element.cost_perMVAkm*element.Length_km*element.MW_rating
 
-    from .Classes import Line_DC
+    from ..Classes import Line_DC
     if isinstance(element, Line_DC):
         element.base_cost= element.cost_perMWkm*element.Length_km*element.MW_rating
 
-    from .Classes import AC_DC_converter
+    from ..Classes import AC_DC_converter
     if isinstance(element, AC_DC_converter):
         element.base_cost= element.cost_perMVA*element.MVA_max
 
-    from .Classes import Gen_AC
+    from ..Classes import Gen_AC
     if isinstance(element, Gen_AC):
         if element.Max_S is not None:
             element.base_cost= element.cost_perMVA*element.Max_S
@@ -471,7 +471,7 @@ def base_cost_calculation(element):
             element.base_cost= element.cost_perMVA*element.Max_pow_gen
         else:
             element.base_cost= element.cost_perMVA*element.Max_pow_genR
-    from .Classes import Ren_Source
+    from ..Classes import Ren_Source
     if isinstance(element, Ren_Source):
         element.base_cost= element.cost_perMVA*element.Max_S
 
@@ -1452,7 +1452,7 @@ def _create_scenarios(
     limit_flow_rate,
 ):
     """Build one OPF sub-model per scenario frame and return scenario weights."""
-    from .Time_series import _modify_parameters
+    from ..Time_series import _modify_parameters
 
     w = {}
 
@@ -1557,7 +1557,7 @@ def multi_scenario_TEP(
     if tee:
         print('Trying clustering')
     try:
-        from .Time_series_clustering import cluster_analysis
+        from ..Time_series_clustering import cluster_analysis
         n_clusters,clustering = cluster_analysis(grid,clustering_options)
         if ('print_details' in clustering_options and clustering_options['print_details']) or tee:
             print('Clustering done')
@@ -1809,7 +1809,7 @@ def get_price_zone_data(t, model, grid,n_clusters,clustering):
         nM = m.price_zone_num
         row_data_price[m.name] = np.round(np.float64(pyo.value(model.scenario_model[t].price_zone_price[nM])), decimals=2)
 
-        from .Classes import Price_Zone
+        from ..Classes import Price_Zone
         gen=0
         for node in m.nodes_AC:
             nAC=node.nodeNumber

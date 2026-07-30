@@ -243,7 +243,7 @@ if __name__ == "__main__":
     
     grid, _res = NS_MTDC_2025(tee=True)
     from importlib import import_module
-    mp_module = import_module("pyflow_acdc.ACDC_MultiPeriod_TEP")
+    mp_module = import_module("pyflow_acdc.NL_models.ACDC_MultiPeriod_TEP")
     # Keep all investment-decision vectors aligned across keys (Load/curvature/import_expand/etc).
     n_inv_periods = mp_module._fill_investment_decisions(grid)
 
