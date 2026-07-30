@@ -40,6 +40,8 @@ from .constants import (
     TSType,
     TS_RENEWABLE_TYPES,
     TS_CONV_PF_TYPES,
+    TS_STORAGE_PF_TYPES,
+    TS_H2_PF_TYPES,
 )
 from .grid_analysis import (
     pol2cart,
@@ -1819,6 +1821,34 @@ def time_series_dict(grid, ts):
                 f"does not match any ACDC converter"
             )
 
+    elif typ in TS_STORAGE_PF_TYPES:
+        matched = False
+        for storage in grid.storage_elements:
+            if ts.element_name == storage.name:
+                if not hasattr(storage, 'TS_dict') or storage.TS_dict is None:
+                    storage.TS_dict = {}
+                storage.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any storage element"
+            )
+
+    elif typ in TS_H2_PF_TYPES:
+        matched = False
+        for el in grid.electrolysers:
+            if ts.element_name == el.name:
+                el.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
+            )
+
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
     """Attach investment-period time series to grid elements from a CSV file.
 
@@ -2316,6 +2346,13 @@ def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None
       :class:`~pyflow_acdc.Classes.Node_AC`, :class:`~pyflow_acdc.Classes.Node_DC`
       (updates ``PLi_factor``)
     - ``'price'`` — energy price on price zones or nodes
+    - ``'h2_price'`` — H₂ sale price on :class:`~pyflow_acdc.Classes.Electrolyser`
+      (normal OPF TS, not a PF setpoint)
+    - ``'storage_P'``, ``'storage_Q'`` — BESS PF setpoints (pu; ``storage_Q``
+      AC only) via :func:`~pyflow_acdc.update_grid_for_pf`
+    - ``'h2_P'``, ``'h2_Q'`` — electrolyser PF setpoints (pu; ``h2_Q`` AC only)
+    - ``'conv_P_DC'``, ``'conv_P_AC'``, ``'conv_Q_AC'`` — ACDC converter PF
+      setpoints (pu)
     - ``'WPP'``, ``'OWPP'``, ``'SF'``, ``'REN'``, ``'Solar'`` — renewable
       availability on :class:`~pyflow_acdc.Classes.Ren_source_zone` or
       :class:`~pyflow_acdc.Classes.Ren_Source`` (``PRGi_available``)

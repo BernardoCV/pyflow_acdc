@@ -38,17 +38,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
   data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
   OPF.
-- **TS PF converter setpoints**: ``update_grid_for_pf`` applies prescribed ACDC
-  converter setpoints from time series (``conv_P_DC``, ``conv_P_AC``,
-  ``conv_Q_AC``, values in pu). Safe to call for every series (non-PF types
-  no-op); ownership of PF setpoints stays here for future BESS/H₂ types.
-  Which converter fields are accepted depends on DC ``type`` / ``AC_type`` via
-  ``known_converter_pf_setpoints`` (fail-fast on mismatch). ``ts_acdc_pf``:
+- **TS PF setpoints**: ``update_grid_for_pf`` applies prescribed PF setpoints
+  from time series in pu: ACDC converters (``conv_P_DC``, ``conv_P_AC``,
+  ``conv_Q_AC``), BESS (``storage_P`` net injection, ``storage_Q`` on AC), and
+  electrolyser (``h2_P`` load, ``h2_Q`` on AC). Safe to call for every series
+  (non-PF types no-op). ``h2_price`` stays a normal TS via ``update_grid_data``.
+  Accepted labels live in ``TS_PF_TYPES`` / ``TSType``; converter fields must
+  match DC ``type`` / ``AC_type``, and ``storage_Q`` / ``h2_Q`` require AC
+  (fail-fast on mismatch). ``ts_acdc_pf`` / ``ts_ac_pf`` / ``ts_dc_pf``
+  dispatch ``TS_PF_TYPES`` → ``update_grid_for_pf``, else → ``update_grid_data``.
   Droop/P converters without a ``conv_P_DC`` series restore ``P_DC`` from
-  ``Pconv_save``; with a series, only the TS applies. Converter PF TS dispatch
-  lives in ``ts_acdc_pf`` only (``ts_ac_pf`` / ``ts_dc_pf`` have no ACDC
-  converters). Each hybrid series is dispatched once: ``TS_CONV_PF_TYPES`` →
-  ``update_grid_for_pf``, else → ``update_grid_data``.
+  ``Pconv_save`` in ``ts_acdc_pf``.
 - **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
   ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets). Coverage
   reports and the README badge are maintained on Codecov.

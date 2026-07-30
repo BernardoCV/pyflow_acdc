@@ -111,7 +111,6 @@ __all__ = [
     'time_series_statistics',
     'update_grid_data',
     'update_grid_for_pf',
-    'known_converter_pf_setpoints',
 
     # Export
     'save_grid_to_file',
