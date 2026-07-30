@@ -133,6 +133,53 @@ class LinkCost(str, Enum):
     LINEAR = 'linear'
 
 
+class DataExportType(str, Enum):
+    """How :class:`~pyflow_acdc.Results_class.Results` writes tables to disk.
+
+    ``XLSX`` is accepted as an alias of ``EXCEL`` (same workbook export path).
+    """
+    CSV = 'csv'
+    EXCEL = 'excel'
+    XLSX = 'xlsx'
+
+
+def coerce_data_export_type(value):
+    """Return a :class:`DataExportType`; map ``xlsx`` → ``EXCEL``.
+
+    Parameters
+    ----------
+    value : DataExportType or str
+        Export-type flag from Results / callers.
+
+    Returns
+    -------
+    DataExportType
+        Canonical member (``XLSX`` is returned as ``EXCEL``).
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is not a known export type.
+    TypeError
+        If ``value`` is neither ``str`` nor :class:`DataExportType`.
+    """
+    if isinstance(value, DataExportType):
+        return DataExportType.EXCEL if value is DataExportType.XLSX else value
+    if not isinstance(value, str):
+        raise TypeError(
+            f"export_type must be str or DataExportType, got {type(value).__name__}"
+        )
+    key = value.strip().lower()
+    try:
+        member = DataExportType(key)
+    except ValueError as exc:
+        allowed = ', '.join(repr(m.value) for m in DataExportType)
+        raise ValueError(
+            f"Unknown export_type {value!r}; expected one of: {allowed}"
+        ) from exc
+    return DataExportType.EXCEL if member is DataExportType.XLSX else member
+
+
 class TSType(str, Enum):
     """`TimeSeries.type` labels recognised by the TS dispatch logic.
 

@@ -23,7 +23,6 @@ https://doi.org/10.1016/j.est.2024.114631.
 |----------|------|
 | BESS operation (already shipped) | [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/bess_integration_plan.md) |
 | Mario convex SOCP (separate) | [convex_acdc_socp_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/convex_acdc_socp_plan.md) |
-| OPTYMADD integration (separate) | [optymadd_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/plans/optymadd_integration_plan.md) |
 | Architecture map | [docs/architecture.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/architecture.md) |
 | Storage user guide | [docs/usage_storage.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/mario_integration/docs/usage_storage.rst) |
 

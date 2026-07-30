@@ -176,7 +176,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0,build_only=False):
+def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0,build_only=False,export_if_feasible=False):
     """Build and solve the non-linear AC/DC OPF for ``grid``.
 
     Constructs the full non-linear Pyomo model (AC/DC physics, converters,
@@ -208,6 +208,10 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     build_only : bool, optional
         Build the Pyomo model, skip the solver, and export initializer values
         onto ``grid`` so :class:`~pyflow_acdc.Results_class.Results` can run.
+    export_if_feasible : bool, optional
+        If True, export the solution onto ``grid`` only when a feasible
+        solution was found (or ``build_only``). Default False keeps the usual
+        always-export behaviour for user-facing OPF calls.
 
     Returns
     -------
@@ -259,18 +263,22 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     else:
         model_res, solver_stats = pyomo_model_solve(model, grid, solver, tee, callback=callback)
 
+    solution_found = bool(solver_stats and solver_stats.get("solution_found", False))
+    do_export = build_only or (not export_if_feasible) or solution_found
+
     t1 = time.perf_counter()
-    export_acdc_nl_model_to_pyflow_acdc(model, grid, Price_Zones)
+    if do_export:
+        export_acdc_nl_model_to_pyflow_acdc(model, grid, Price_Zones)
 
-    for obj in weights_def:
-        weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
+        for obj in weights_def:
+            weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
 
+        grid.OPF_run=True
+        grid.OPF_obj=weights_def
     t2 = time.perf_counter()
     t_modelexport = t2-t1
 
 
-    grid.OPF_run=True
-    grid.OPF_obj=weights_def
     timing_info = {
         "create": t_modelcreate,
         "solve": solver_stats["time"],
