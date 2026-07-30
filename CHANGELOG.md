@@ -55,6 +55,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
+- **Power flow known injections**: ``update_pq_ac`` / ``update_p_dc`` fold BESS
+  and H₂ operating fields into the PF known P/Q (same signs as NL OPF). Storage
+  contributes ``net_P_pu = P_discharge - P_charge`` (AC also ``Q``); electrolyser
+  ``P_electrolyser`` is a known load (AC also ``Q_electrolyser`` as injection).
+  Defaults remain zero until set / after OPF export.
 - **Window OPF parameter updates**: ``_modify_parameters(..., window_block=True)``
   skips rewriting ``SoC_prev`` / ``mass_H2_prev`` so frame-to-frame inventory
   links are not overwritten by ``soc_initial`` / ``H2_mass_initial``.
