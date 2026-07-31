@@ -71,6 +71,15 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
+- **Rolling foresight**: ``rolling_window_nl_opf`` takes ``future_sight`` in
+  ``[0, 1]`` (default ``0``) instead of ``soc_final_mode='future_sight'``.
+  Steps are ``ceil(future_sight · window_size)`` (clamped to remaining hours);
+  SoC final is enforced at the foresight end; with ``H2_mass_final``, the
+  foresight segment requires ``≥ future_sight · H2_mass_final`` (raw fraction).
+  Docs: ``usage_window_opf`` / ``api/window``.
+- **Pickle load migration**: ``_migrate_legacy_grid_attrs`` backfills node
+  ``_price`` / ``_qf`` / ``_lf`` and gen ``link_cost`` (from legacy ``price`` /
+  ``price_link``) so pre-property wind-farm pickles load cleanly.
 - **Power flow known injections**: ``update_pq_ac`` / ``update_p_dc`` fold BESS
   and H₂ operating fields into the PF known P/Q (same signs as NL OPF). Storage
   contributes ``net_P_pu = P_discharge - P_charge`` (AC also ``Q``); electrolyser

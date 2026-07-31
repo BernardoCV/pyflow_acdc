@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Coupled window NL OPF with BESS and electrolyser (frame blocks + parent links)."""
 
+import math
 import time
 from datetime import datetime, timezone
 
@@ -154,9 +155,10 @@ def window_h2_constraints(
 
     * One terminal frame (default / single pin): ``mass_H2[t] == scale ·
       H2_mass_final`` (optional ``final_scale``).
-    * Several pins (future sight passes end of *x* and end of *x+1*): each
-      segment must produce ``>= H2_mass_final`` (incremental). Tank ub stays
-      ``H2_mass_max`` through the first pin, then ``n_pins · H2_mass_max``.
+    * Several pins (future sight: end of commit and end of foresight): each
+      segment must produce ``>= scale · H2_mass_final`` (incremental; default
+      scale ``1``). Tank ub stays ``scale₀ · H2_mass_max`` through the first
+      pin, then ``(Σ scales) · H2_mass_max``.
     """
     ordered = list(frames)
     el_ids = [el.electrolyserNumber for el in grid.electrolysers]
@@ -200,19 +202,20 @@ def window_h2_constraints(
                     f"{ordered[0]}…{ordered[-1]}"
                 )
 
-    incremental = len(term_frames) > 1
-    if incremental and final_scale is not None:
-        raise ValueError(
-            "final_scale is not used when multiple H₂ final frames are set "
-            "(incremental / future-sight pins)"
-        )
-
     if final_scale is not None:
         for t in term_frames:
             if t not in final_scale:
                 raise ValueError(
                     f"final_scale missing frame={t}; have {sorted(final_scale)}"
                 )
+
+    pin_scales = [
+        1.0 if final_scale is None else float(final_scale[t_term])
+        for t_term in term_frames
+    ]
+    for scale in pin_scales:
+        if scale < 0:
+            raise ValueError(f"H₂ final_scale values must be >= 0, got {scale}")
 
     els_with_final = [
         (e, el) for e, el in el_by_number.items() if el.H2_mass_final is not None
@@ -227,18 +230,20 @@ def window_h2_constraints(
                 f"H2_mass_max={el.H2_mass_max} on {el.name!r}"
             )
 
+    incremental = len(term_frames) > 1
     if incremental:
-        n_pins = len(term_frames)
         first_pin = term_frames[0]
+        first_scale = pin_scales[0]
+        total_scale = sum(pin_scales)
         for t in ordered:
-            ub_scale = 1.0 if t <= first_pin else float(n_pins)
+            ub_scale = first_scale if t <= first_pin else total_scale
             for e, el in els_with_final:
                 model.frame_model[t].mass_H2[e].setub(ub_scale * el.H2_mass_max)
 
         pin_index = [(t_term, e) for t_term in term_frames for e, _ in els_with_final]
         pin_init = {
-            (t_term, e): float(el.H2_mass_final)
-            for t_term in term_frames
+            (t_term, e): float(el.H2_mass_final) * pin_scales[i]
+            for i, t_term in enumerate(term_frames)
             for e, el in els_with_final
         }
         model.h2_mass_final_target = pyo.Param(
@@ -260,8 +265,7 @@ def window_h2_constraints(
     # Single pin: mass[t] == scale * H2_mass_final
     pin_index = []
     pin_init = {}
-    for t_term in term_frames:
-        scale = 1.0 if final_scale is None else float(final_scale[t_term])
+    for t_term, scale in zip(term_frames, pin_scales):
         for e, el in els_with_final:
             target = scale * el.H2_mass_final
             if target > el.H2_mass_max:
@@ -938,6 +942,7 @@ def rolling_window_nl_opf(
     window_size=24,
     soc_final_mode='every_m',
     soc_final_every_m=1,
+    future_sight=0.0,
     ObjRule=None,
     PV_set=False,
     OnlyGen=True,
@@ -960,7 +965,7 @@ def rolling_window_nl_opf(
     Equal-length windows reuse one Pyomo model (local frames ``0…n-1``): TS and
     SoC/H₂ state ``Param``s are updated each roll (constraints stay put).
     ``warm_start_mode`` matches :func:`~pyflow_acdc.ts_acdc_opf` (``roll`` /
-    ``hard``). Short last windows and future-sight ``2X`` solves use separate
+    ``hard``). Short last windows and foresight solves use separate
     cached models.
 
     Each window starts from the previous terminal SoC. H₂ tank empties are
@@ -976,24 +981,26 @@ def rolling_window_nl_opf(
     Whether the goal is a mass target or sale-only does not change the empty
     policy above.
 
-    Terminal SoC is controlled by rolling via ``enforce_soc_final`` on each
-    :func:`window_nl_opf` call (terminals always sit on that solve's last frame):
+    Terminal SoC / foresight:
 
-    * ``soc_final_mode='every_m'`` — windows ``1…m-1`` run with
+    * ``future_sight`` in ``(0, 1]`` — extend the solve by
+      ``ceil(future_sight · window_size)`` frames into the next commit
+      (clamped to remaining hours). Enforce ``soc_final`` on that foresight
+      end; keep only the commit. With a mass target, commit must produce
+      ``>= H2_mass_final`` and the foresight segment ``>= future_sight ·
+      H2_mass_final`` (raw fraction). Last window has no foresight and still
+      enforces ``soc_final``.
+    * ``future_sight == 0`` — no foresight. Terminal SoC follows
+      ``soc_final_mode='every_m'``: windows ``1…m-1`` run with
       ``enforce_soc_final=False``; window ``m`` (and ``2m``, …) and the last
       window use ``True``.
-    * ``soc_final_mode='future_sight'`` — optimise *x*+*x+1* as one
-      ``window_nl_opf``, enforce SoC on that solve's last frame (end of *x+1*),
-      keep only *x*. The last window has no foresight and enforces ``soc_final``.
 
     H₂ mass target (``H2_mass_final``) and H₂ sale (``ObjRule['H2_sale']`` with
-    ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target,
-    each commit window regenerates ``H2_mass_final`` from the carried (or
-    emptied) tank. Under future sight the continuous *x*+*x+1* solve requires
-    **at least** ``H2_mass_final`` production in *x* and again in *x+1*
-    (incremental, not a cumulative ``2 · H2_mass_final`` absolute pin). Tank
-    capacity stays ``H2_mass_max`` through end of *x*, then
-    ``2 · H2_mass_max`` for the foresight half so both segments can fit.
+    ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target and
+    no foresight, each commit regenerates ``H2_mass_final`` from the carried
+    (or emptied) tank. Under foresight, tank ub stays ``H2_mass_max`` through
+    end of the commit, then ``(1 + future_sight) · H2_mass_max`` for the
+    foresight segment.
 
     Parameters
     ----------
@@ -1001,10 +1008,13 @@ def rolling_window_nl_opf(
         1-based inclusive hours (same as ``ts_acdc_opf``).
     window_size : int, optional
         Commit frames per window (except possibly the last).
-    soc_final_mode : {'every_m', 'future_sight'}, optional
-        Terminal-SoC policy.
+    soc_final_mode : {'every_m'}, optional
+        Terminal-SoC policy when ``future_sight == 0``.
     soc_final_every_m : int, optional
         Used when ``soc_final_mode='every_m'`` (must be >= 1).
+    future_sight : float, optional
+        Foresight fraction in ``[0, 1]`` (default ``0`` = off). Steps are
+        ``ceil(future_sight * window_size)``.
     print_step : bool, optional
         If True, print ``Rolling window k/n (frames …)`` before each window.
     warm_start_mode : {'roll', 'hard'}, optional
@@ -1024,12 +1034,15 @@ def rolling_window_nl_opf(
         ``wall_end``. Each ``window_stats[i]['timing']`` has the same per-window
         breakdown plus wall timestamps.
     """
-    if soc_final_mode not in ('every_m', 'future_sight'):
+    if soc_final_mode not in ('every_m',):
         raise ValueError(
-            f"soc_final_mode must be 'every_m' or 'future_sight', got {soc_final_mode!r}"
+            f"soc_final_mode must be 'every_m', got {soc_final_mode!r}"
         )
     if soc_final_every_m < 1:
         raise ValueError(f"soc_final_every_m must be >= 1, got {soc_final_every_m}")
+    future_sight = float(future_sight)
+    if not (0.0 <= future_sight <= 1.0):
+        raise ValueError(f"future_sight must be in [0, 1], got {future_sight}")
     warm_start_mode = str(warm_start_mode).lower()
     if warm_start_mode not in ('roll', 'hard'):
         raise ValueError("warm_start_mode must be either 'roll' or 'hard'")
@@ -1083,23 +1096,28 @@ def rolling_window_nl_opf(
         t_win0 = time.perf_counter()
         wall_start = datetime.now(timezone.utc).isoformat()
         is_last = k == n_win - 1
-        use_foresight = (
-            soc_final_mode == 'future_sight' and not is_last
-        )
+        available = idx1 - c_end
+        foresight_steps = 0
+        if future_sight > 0.0 and not is_last and available > 0:
+            foresight_steps = min(
+                math.ceil(future_sight * window_size),
+                available,
+            )
+        use_foresight = foresight_steps > 0
         if use_foresight:
-            _, next_end = commits[k + 1]
-            solve_start, solve_end = c_start, next_end
+            foresight_end = c_end + foresight_steps
+            solve_start, solve_end = c_start, foresight_end
             force_soc = True
             if enforce_h2_mass:
-                # Two pins → incremental ≥ H2_mass_final per half (see window_h2).
-                h2_frames = [c_end, next_end]
+                h2_frames = [c_end, foresight_end]
+                h2_scale = {c_end: 1.0, foresight_end: future_sight}
             else:
                 h2_frames = None
-            h2_scale = None
+                h2_scale = None
         else:
             solve_start, solve_end = c_start, c_end
-            if soc_final_mode == 'future_sight':
-                force_soc = True  # last window
+            if future_sight > 0.0:
+                force_soc = True  # last window (or no remaining foresight hours)
             else:
                 force_soc = ((k + 1) % soc_final_every_m == 0) or is_last
             h2_frames = None  # last frame of this solve
@@ -1110,7 +1128,10 @@ def rolling_window_nl_opf(
                 f"(frames {c_start}–{c_end})"
             )
             if use_foresight:
-                step_msg += f" + future-sight ({c_end + 1}–{next_end})"
+                step_msg += (
+                    f" + future-sight {future_sight:g} "
+                    f"({c_end + 1}–{foresight_end}, {foresight_steps} steps)"
+                )
             print(step_msg)
         t_prepare = time.perf_counter() - t_win0
 
@@ -1202,7 +1223,8 @@ def rolling_window_nl_opf(
             'commit': (c_start, c_end),
             'solve': (solve_start, solve_end),
             'force_soc': force_soc,
-            'future_sight': use_foresight,
+            'future_sight': future_sight if use_foresight else 0.0,
+            'foresight_steps': foresight_steps,
             'h2_final_frames': h2_frames,
             'h2_final_scale': h2_scale,
             'warm_start_mode': warm_start_mode,
@@ -1232,6 +1254,7 @@ def rolling_window_nl_opf(
         'commits': list(commits),
         'start_frame': idx0,
         'end_frame': idx1,
+        'future_sight': future_sight,
     }
     timing_acc['windows'] = n_win
     timing_acc['frames'] = idx1 - idx0 + 1
