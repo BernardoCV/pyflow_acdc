@@ -1,45 +1,60 @@
 Linear Models (OPF and TEP)
 ===========================
 
-Linearised AC counterparts of the :doc:`OPF <opf>` and :doc:`TEP <tep>`
-modules. [1]_ They trade full AC accuracy for speed and LP/MILP-solvability,
-making them suitable for fast studies, large sweeps, and the Pyomo backend of
-:func:`~pyflow_acdc.wind_farm_CSS`.
+Linearised AC(/DC) counterparts of the :doc:`OPF <opf>` and :doc:`TEP <tep>`
+modules. [1]_ They trade full AC (and nonlinear DC/converter) accuracy for
+speed and LP/MILP-solvability, making them suitable for fast studies, large
+sweeps, and the Pyomo backend of :func:`~pyflow_acdc.wind_farm_CSS`.
 
-Model construction lives in ``pyflow_acdc.L_models.AC_OPF_L_model``; the drivers
-(:func:`~pyflow_acdc.optimal_l_pf`,
-:func:`~pyflow_acdc.linear_transmission_expansion`, and
+**Not SOCP.** This stack is an **LP** linearization of the existing NL OPF
+(Bθ AC; fixed-``V_ini`` DC; thin converter ``a + b·Ps``). Second-order cone /
+CCP formulations are out of scope (see the convex SOCP plan if present). Prefer
+:func:`~pyflow_acdc.optimal_pf` / :doc:`window` when you need full NL physics.
+
+Model construction lives in ``pyflow_acdc.L_models.AC_OPF_L_model``; operational
+drivers are :func:`~pyflow_acdc.optimal_l_pf`,
+:func:`~pyflow_acdc.window_l_opf` / :func:`~pyflow_acdc.rolling_window_l_opf`,
+and myopic :func:`~pyflow_acdc.ts_acdc_l_opf` (:doc:`ts`). TEP drivers
+(:func:`~pyflow_acdc.linear_transmission_expansion`,
 :func:`~pyflow_acdc.linear_multi_period_transmission_expansion`) live in
-``pyflow_acdc.ACDC_OPF`` and ``pyflow_acdc.L_models.ACDC_L_TEP``. Both TEP drivers accept
-``build_only=True`` to build the Pyomo model and export initializer values without
-a solver (used by the doc tests when no LP/MIP solver is installed).
+``pyflow_acdc.L_models.ACDC_L_TEP`` (**AC-only** investment layer for now;
+hybrid ``TEP=True`` raises). Drivers accept ``build_only=True`` to build and
+export initializer values without a solver.
 
-Linearised AC Optimal Power Flow
---------------------------------
+Linearised AC(/DC) Optimal Power Flow
+-------------------------------------
 
-Sets up and solves the linearised AC OPF: it creates the
+Sets up and solves the linearised OPF: it creates the
 :ref:`linear model <L_model_creation>`, minimises the weighted objective, solves
 with a Pyomo LP solver, and exports the solution back to the ``grid``. Supported
 objective terms are generator ``Energy_cost`` and optional ``H2_sale``.
 When ``grid.ESS`` / ``grid.H2``, BESS (P-only) and electrolysers are included.
-DC / hybrid grids (``grid.DCmode``) raise ``ValueError`` (AC networks only for
-now). ``SoC_deviation`` is not supported (quadratic).
+Hybrid grids use ``grid.ACmode`` / ``grid.DCmode``: AC Bθ plus linearized DC
+flows and thin converters; ``fx_conv`` PDC/PQ/PV apply (Q fix skipped — no
+``Q_conv_s_AC``). ``SoC_deviation`` is not supported (quadratic).
 
 .. autofunction:: pyflow_acdc.optimal_l_pf
 
-   Example on ``case24_OPF`` (LP; solved with the first available LP solver from
-   ``PYOMO_LINEAR_SOLVERS``, otherwise ``build_only``):
+   Example on ``case24_OPF`` (AC-only LP; solved with the first available LP
+   solver from ``PYOMO_LINEAR_SOLVERS``, otherwise ``build_only``):
 
    .. literalinclude:: ../../pyflow_tests/doc_examples/L_models/03_linear_opf.py
+      :language: python
+      :lines: 2-
+
+   Hybrid AC/DC on ``case39_acdc``:
+
+   .. literalinclude:: ../../pyflow_tests/doc_examples/L_models/05_hybrid_linear_opf.py
       :language: python
       :lines: 2-
 
 Linear coupled window
 ---------------------
 
-AC-only multi-hour linear OPF with linked BESS SoC and H₂ inventory (same
-indexing as the nonlinear window). Lives in ``pyflow_acdc.L_models.window_l_opf``.
-BESS remains P-only. See also :doc:`../usage_window_opf`.
+Multi-hour linear OPF with linked BESS SoC and H₂ inventory (same indexing as
+the nonlinear window). Lives in ``pyflow_acdc.L_models.window_l_opf``.
+Accepts AC-only and hybrid grids; BESS remains P-only. See also
+:doc:`../usage_window_opf`.
 
 .. autofunction:: pyflow_acdc.window_l_opf
 
@@ -101,12 +116,12 @@ Creating the Linear model
 
 **Variables**
 
-The linear model includes variables for:
+The linear model includes variables for (gated by ``grid.ACmode`` /
+``grid.DCmode``):
 
-- AC node angles
-- Generator active power
-- Renewable generation via availability and curtailment factors
-- AC line active power flows
+- AC node angles; AC generator / renewable active power; AC line P flows
+- When ``DCmode``: DC voltages, linearized DC line flows, thin converter
+  ``P_conv_s_AC`` / DC converter injections
 - Optional BESS charge / discharge / SoC (when ``grid.ESS``; P-only, no Q)
 - Optional electrolyser power / H₂ mass (when ``grid.H2``; no Q)
 
@@ -116,15 +131,17 @@ The model enforces constraints for:
 
 - AC nodal active power balance (linearized), including storage injection and
   electrolyser load when present
-- Generator aggregation at nodes
-- Renewable injection aggregation at nodes
-- Optional storage SoC balance and ``|P_net| ≤ S_max``
+- When ``DCmode``: linearized DC nodal balance and ``PDC_from`` / ``PDC_to``;
+  converter ``np·Ps + P_DC + np·(a + b·Ps) = 0``
+- Generator / renewable aggregation at nodes
+- Optional storage SoC balance and ``|P_net| ≤ P_max``
 - Optional electrolyser mass balance
 - AC branch linearized power flow equations
 - Thermal limits (including linear big-M formulations for REC/CT states)
 - Slack angle constraints
 - Optional array network-flow conservation and investment-linking
-- Optional investment bounds for generators and lines (if ``TEP=True``)
+- Optional investment bounds for generators and lines (if ``TEP=True``;
+  AC-only — hybrid TEP not wired yet)
 
 TEP/REC/CT Parameters and Variables
 -----------------------------------
@@ -227,11 +244,12 @@ Exporting Results
 .. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.export_acdc_l_model_to_pyflow_acdc
 
    Exports the Pyomo solution back to the ``grid`` (internal helper; called by
-   :func:`~pyflow_acdc.optimal_l_pf` and
+   :func:`~pyflow_acdc.optimal_l_pf`, linear window / TS drivers, and
    :func:`~pyflow_acdc.linear_transmission_expansion`):
 
    - Generator dispatch and renewable gamma
-   - AC node angles and injections
+   - AC node angles and injections; when hybrid, DC voltages / flows and
+     converter P exports
    - AC line flows and losses (linearized, zero reactive)
    - TEP/REC/CT selections and flows (including optional array network-flow)
    - Optional post-processing for time-limit cases (oversizing analysis and fixes)

@@ -33,6 +33,7 @@ __all__ = [
     'opf_line_res',
     'opf_price_price_zone',
     'opf_step_results',
+    'opf_step_results_l',
     'fx_conv',
     'export_solver_progress_to_excel',
     'reset_to_initialize',
@@ -152,6 +153,9 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     """
     """
+    if grid.DCmode and any(conv.OPF_fx for conv in grid.Converters_ACDC):
+        fx_conv(model, grid)
+
     t3 = time.perf_counter()
     if build_only:
         model_res, solver_stats = build_only_solver_stats(solver, model)
@@ -290,24 +294,29 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
 
 def fx_conv(model,grid):
     def fx_PDC(model,conv):
-        if grid.Converters_ACDC[conv].OPF_fx==True and grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PDC:
-            return model.P_conv_DC[conv.Node_DC.nodeNumber]==grid.Converters_ACDC[conv].P_DC
-        else:
-            return pyo.Constraint.Skip
-    def fx_PAC(model,conv):
-        if grid.Converters_ACDC[conv].OPF_fx==True and (grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PQ or grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PV):
-            return model.P_conv_s_AC[conv]==grid.Converters_ACDC[conv].P_AC
-        else:
-            return pyo.Constraint.Skip
-    def fx_QAC(model,conv):
-        if grid.Converters_ACDC[conv].OPF_fx==True and grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PQ:
-            return model.Q_conv_s_AC[conv]==grid.Converters_ACDC[conv].Q_AC
-        else:
-            return pyo.Constraint.Skip
+        element = grid.Converters_ACDC[conv]
+        if element.OPF_fx and element.OPF_fx_type == ConverterOpfFxType.PDC:
+            return model.P_conv_DC[element.Node_DC.nodeNumber] == element.P_DC
+        return pyo.Constraint.Skip
 
-    model.Conv_fx_pdc=pyo.Constraint(model.conv,rule=fx_PDC)
-    model.Conv_fx_pac=pyo.Constraint(model.conv,rule=fx_PAC)
-    model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
+    def fx_PAC(model,conv):
+        element = grid.Converters_ACDC[conv]
+        if element.OPF_fx and element.OPF_fx_type in (
+                ConverterOpfFxType.PQ, ConverterOpfFxType.PV):
+            return model.P_conv_s_AC[conv] == element.P_AC
+        return pyo.Constraint.Skip
+
+    def fx_QAC(model,conv):
+        element = grid.Converters_ACDC[conv]
+        if not hasattr(model, 'Q_conv_s_AC'):
+            return pyo.Constraint.Skip
+        if element.OPF_fx and element.OPF_fx_type == ConverterOpfFxType.PQ:
+            return model.Q_conv_s_AC[conv] == element.Q_AC
+        return pyo.Constraint.Skip
+
+    model.Conv_fx_pdc = pyo.Constraint(model.conv, rule=fx_PDC)
+    model.Conv_fx_pac = pyo.Constraint(model.conv, rule=fx_PAC)
+    model.Conv_fx_qac = pyo.Constraint(model.conv, rule=fx_QAC)
 
 
 
@@ -1088,6 +1097,78 @@ def opf_step_results(model,grid):
                 opt_res_Loading_conv)
 
 
+def opf_step_results_l(model, grid):
+    """TS step reporting for linear OPF (P-only; converter Q = 0)."""
+    opt_res_P_conv_DC = {}
+    opt_res_P_conv_AC = {}
+    opt_res_Q_conv_AC = {}
+    opt_res_Loading_conv = {}
+    opt_P_load = {}
+    opt_res_P_extGrid = {}
+    opt_res_Q_extGrid = {}
+    opt_res_curtailment = {}
+
+    if grid.ACmode and grid.DCmode:
+        P_conv_s_AC_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_conv_s_AC.items()}
+
+        def process_converter(conv):
+            nconv = conv.ConvNumber
+            name = conv.name
+            Ps = P_conv_s_AC_values[nconv]
+            loss_pu = float(conv.a_conv) + float(conv.b_conv) * Ps
+            pac = Ps * conv.np_conv
+            pdc = -(pac + loss_pu * conv.np_conv)
+            opt_res_P_conv_AC[name] = pac
+            opt_res_Q_conv_AC[name] = 0.0
+            opt_res_P_conv_DC[name] = pdc
+            if conv.np_conv == 0:
+                opt_res_Loading_conv[name] = 0
+            else:
+                opt_res_Loading_conv[name] = (
+                    max(abs(pac), abs(pdc)) * grid.S_base
+                    / (conv.MVA_max * conv.np_conv)
+                )
+
+        with ThreadPoolExecutor() as executor:
+            executor.map(process_converter, grid.Converters_ACDC)
+
+    if grid.ACmode:
+        Pload_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_known_AC.items()}
+        PGen_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.PGi_gen.items()}
+        for node in grid.nodes_AC:
+            opt_P_load[node.name] = -Pload_values[node.nodeNumber]
+        for gen in grid.Generators:
+            opt_res_P_extGrid[gen.name] = PGen_values[gen.genNumber]
+            opt_res_Q_extGrid[gen.name] = 0.0
+
+    if grid.DCmode and grid.Generators_DC:
+        PGen_DC_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.PGi_gen_DC.items()}
+        for gen in grid.Generators_DC:
+            opt_res_P_extGrid[gen.name] = PGen_DC_values[gen.genNumber_DC]
+            opt_res_Q_extGrid[gen.name] = 0.0
+
+    gamma_values = {k: np.float64(pyo.value(v)) for k, v in model.gamma.items()}
+    Pren_values = {
+        k: np.float64(pyo.value(v)) for k, v in model.P_renSource.items()}
+    for rs in grid.RenSources:
+        name = rs.name
+        gamma = gamma_values[rs.rsNumber]
+        opt_res_curtailment[name] = (
+            1 - gamma if rs.np_rsgen > 0 else 0)
+        rs_multiplicity = np.float64(pyo.value(model.np_rsgen[rs.rsNumber]))
+        opt_res_P_extGrid[f'RenSource_{name}'] = (
+            Pren_values[rs.rsNumber] * gamma * rs_multiplicity)
+        opt_res_Q_extGrid[f'RenSource_{name}'] = 0.0
+
+    return (
+        opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,
+        opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,
+        opt_res_Loading_conv,
+    )
 
 
 def calculate_objective(grid,obj,OnlyGen=True):

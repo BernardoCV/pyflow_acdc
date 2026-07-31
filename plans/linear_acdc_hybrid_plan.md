@@ -72,8 +72,8 @@ Mirror NL **block structure and variable names** where practical so window paren
 - [x] Living plan file `plans/linear_acdc_hybrid_plan.md` (this file).
 - [x] Lock: LP first → optional QP later; H2 DC `V(V−V)G` / `PDC_from`/`to`; expand existing L builder (no new file); hybrid TEP in scope; NL-only physics.
 - [x] Phase 1 snapshot LP: `opf_create_l_model_acdc` hybrid flags + DC linearization + thin converter + export + tests.
-- [ ] Document public surface when coding starts: extend `optimal_l_pf` (no more hard AC-only when hybrid ready), `window_l_opf` / `rolling_window_l_opf`, new myopic `ts_acdc_l_opf` (or clearly named twin of `ts_acdc_opf`).
-- [ ] Cross-link architecture / `api/L_models`; explicit “not SOCP” note.
+- [x] Document public surface: `optimal_l_pf`, `window_l_opf` / `rolling_window_l_opf`, myopic `ts_acdc_l_opf`.
+- [x] Cross-link architecture / `api/L_models`; explicit “not SOCP” note.
 
 ### Phase 1 — Expand L model builder (snapshot, **LP**)
 
@@ -90,12 +90,12 @@ Mirror NL **block structure and variable names** where practical so window paren
 
 ### Phase 2 — Converter richness + `fx_conv` (**still LP**)
 
-- Flesh converter LP to match NL topology branches as far as allowed; document each approximation vs NL.
-- Port `fx_conv` behavior for linear models.
-- LP loss stand-in if not done in Phase 1 (`a` / `|P|`).
-- Tests: fixed PDC/PQ modes; S-limit outer approx smoke; HiGHS LP preferred when available.
+- [ ] **Deferred:** flesh converter LP to match NL topology branches / S-limit outer approx (not blocking Phase 3).
+- [x] Port `fx_conv` for linear models (`optimal_l_pf` calls same `fx_conv`; ``fx_QAC`` skips if no ``Q_conv_s_AC``).
+- [x] LP loss stand-in from Phase 1 (`a` + `b·Ps`).
+- [x] Tests: fixed PDC/PQ `build_only` in `test_hybrid_l_opf.py` (S-limit outer approx deferred with rich conv).
 
-**Exit:** Hybrid snapshot with fx modes + documented LP linearization table (incl. DC H2 map).
+**Exit (partial):** Hybrid snapshot with `fx_conv` PDC/PQ/PV; rich converter LP deferred.
 
 ### Phase 2b — Optional QP (later)
 
@@ -104,26 +104,26 @@ Mirror NL **block structure and variable names** where practical so window paren
 
 ### Phase 3 — Window + rolling hybrid
 
-- `L_models/window_l_opf.py`: drop DCmode raise; build frames via `opf_create_l_model_acdc(..., window_block=True)` (hybrid via grid flags); reuse NL parent `window_soc_constraints` / `window_h2_constraints` / `export_window_opf_results`.
-- Extend `_modify_l_window_parameters` for DC known-P / prices / converter-relevant mutable params.
-- Rolling / `future_sight` unchanged at driver level.
-- Tests: hybrid `build_only` window + rolling foresight half; PEI optional later (heavy).
+- [x] `L_models/window_l_opf.py`: drop DCmode raise; build frames via `opf_create_l_model_acdc(..., window_block=True)` (hybrid via grid flags); reuse NL parent `window_soc_constraints` / `window_h2_constraints` / `export_window_opf_results`.
+- [x] Shared `_modify_parameters_l` (Time_series) for AC + DC known-P / `lf` / ESS–H₂ state; frames call `fx_conv` when any `OPF_fx`.
+- [x] Rolling / `future_sight` unchanged at driver level.
+- [x] Tests: hybrid `build_only` window + rolling foresight half (`test_window_l_opf.py`); PEI optional later (heavy).
 
 **Exit:** `window_l_opf` / `rolling_window_l_opf` accept hybrid grids.
 
 ### Phase 4 — Myopic linear TS
 
-- Add linear twin of `ts_acdc_opf` (carry SoC / `mass_H2_prev`, `empty_tank_cycle`, warm-start), using the same L builder per hour.
-- Soft `SoC_deviation` remains **rejected** (quadratic) unless a later LP-safe surrogate is explicitly added—default: reject like snapshot.
-- Tests: short hybrid TS carry; docs in `usage_window_opf` / `api/ts` / `api/L_models`.
+- [x] Add `ts_acdc_l_opf` twin of `ts_acdc_opf` (carry SoC / `mass_H2_prev`, `empty_tank_cycle`, warm-start), using L builder + `opf_step_results_l` / `opf_obj_l`.
+- [x] Soft `SoC_deviation` remains **rejected** (quadratic) via `check_linear_opf_weights`.
+- [x] Tests: short AC + hybrid TS `build_only` + storage rows (`test_ts_acdc_l_opf.py`); docs deferred to Phase 5.
 
 **Exit:** Myopic linear hybrid TS path mirrored to NL.
 
 ### Phase 5 — Docs, changelog, polish
 
-- `docs/api/L_models.rst`, `usage_window_opf.rst`, architecture note: hybrid LP vs NL vs SOCP.
-- CHANGELOG; doc example on small hybrid case (`build_only`).
-- Align hybrid TEP docs with existing AC linear TEP usage where applicable.
+- [x] `docs/api/L_models.rst`, `usage_window_opf.rst`, `api/ts.rst`, architecture: hybrid LP vs NL vs SOCP.
+- [x] CHANGELOG; doc example `doc_examples/L_models/05_hybrid_linear_opf.py`.
+- [x] Note hybrid TEP still unwired (AC linear TEP unchanged).
 
 ## Implementation order (dependencies)
 

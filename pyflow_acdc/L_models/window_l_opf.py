@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Coupled linear AC window OPF (frame blocks + parent SoC / H₂ links).
+"""Coupled linear AC(/DC) window OPF (frame blocks + parent SoC / H₂ links).
 
-AC-only counterpart of :mod:`pyflow_acdc.NL_models.window_opf`. Uses
+Linear counterpart of :mod:`pyflow_acdc.NL_models.window_opf`. Uses
 :func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_acdc` per frame
-(BESS P-only, no Q / S-circle). Raises if ``grid.DCmode``.
+(BESS P-only; hybrid via ``grid.ACmode`` / ``grid.DCmode``).
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import pyomo.environ as pyo
 from ..ACDC_OPF import (
     calculate_objective,
     check_linear_opf_weights,
+    fx_conv,
     obj_w_rule,
     opf_obj_l,
     translate_pyf_opf,
@@ -43,41 +44,10 @@ from ..pyomo_model_solve import (
     pyomo_model_solve,
     reset_to_initialize,
 )
-from ..Time_series import update_grid_data
+from ..Time_series import _modify_parameters_l, update_grid_data
 from .AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc, opf_create_l_model_acdc
 
 __all__ = ['window_l_opf', 'rolling_window_l_opf']
-
-
-def _modify_l_window_parameters(grid, model, price_zones):
-    """Update mutable linear-frame Params from current grid TS state."""
-    opf_data = translate_pyf_opf(grid, Price_Zones=price_zones)
-    AC_info = opf_data['AC_info']
-    gen_info = opf_data['gen_info']
-    _, AC_nodes_info, _, _, _, _ = AC_info
-    gen_AC_info, _, gen_rs_info = gen_info
-    lf, _, _, _, _ = gen_AC_info
-    P_renSource, _, _ = gen_rs_info
-    _, _, _, _, P_know, _, _ = AC_nodes_info
-
-    for idx, val in P_renSource.items():
-        model.P_renSource[idx].set_value(val)
-    for idx, val in P_know.items():
-        model.P_known_AC[idx].set_value(val)
-    for idx, val in lf.items():
-        model.lf[idx].set_value(val)
-    for gen in grid.Generators:
-        if not gen.is_ext_grid:
-            continue
-        g = gen.genNumber
-        np_gen_value = pyo.value(model.np_gen[g])
-        pmax_eff = gen.Max_pow_gen * np_gen_value
-        if gen.allow_sell:
-            pmin_eff = -(pmax_eff - gen.p_load_eff)
-        else:
-            pmin_eff = 0
-        model.PGi_gen[g].setlb(pmin_eff)
-        model.PGi_gen[g].setub(pmax_eff)
 
 
 def _create_l_frame_blocks(model, grid, frames, price_zones, weights_def, ts_base):
@@ -94,9 +64,11 @@ def _create_l_frame_blocks(model, grid, frames, price_zones, weights_def, ts_bas
         abs_t = ts_base + i
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
-        _modify_l_window_parameters(grid, model.frame_model[i], price_zones)
+        _modify_parameters_l(grid, model.frame_model[i], price_zones, window_block=True)
         obj_rule = opf_obj_l(model.frame_model[i], grid, weights_def)
         model.frame_model[i].obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
+        if grid.DCmode and any(conv.OPF_fx for conv in grid.Converters_ACDC):
+            fx_conv(model.frame_model[i], grid)
 
     return storage_info, hydrogen_info
 
@@ -106,7 +78,7 @@ def _update_l_window_frame_params(model, grid, frames, ts_base, price_zones):
         abs_t = ts_base + i
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
-        _modify_l_window_parameters(grid, model.frame_model[i], price_zones)
+        _modify_parameters_l(grid, model.frame_model[i], price_zones, window_block=True)
 
 
 def window_l_opf(
@@ -128,11 +100,11 @@ def window_l_opf(
     _reuse=None,
     warm_start_mode='roll',
 ):
-    """Build and solve a coupled linear AC OPF over frames ``start…end``.
+    """Build and solve a coupled linear AC(/DC) OPF over frames ``start…end``.
 
     Inclusive **0-based** absolute TS indices (same as
-    :func:`~pyflow_acdc.window_nl_opf`). AC networks only (raises on
-    ``grid.DCmode``). BESS is P-only; no Q / S-circle.
+    :func:`~pyflow_acdc.window_nl_opf`). Hybrid via ``grid.ACmode`` /
+    ``grid.DCmode``. BESS is P-only; no Q / S-circle.
 
     Rolling may pass ``_reuse`` and ``warm_start_mode`` ``'roll'`` / ``'hard'``.
     """
@@ -143,10 +115,6 @@ def window_l_opf(
     grid.reset_run_flags()
     analyse_grid(grid)
 
-    if grid.DCmode:
-        raise ValueError(
-            "Linear window OPF is not ready for DC / hybrid grids (grid.DCmode is True)"
-        )
     if not grid.ESS and not grid.H2:
         raise ValueError(
             "window_l_opf requires at least one storage or electrolyser element"
@@ -285,7 +253,8 @@ def window_l_opf(
         last_abs = ts_base + last_local
         for ts in grid.Time_series:
             update_grid_data(grid, ts, last_abs, price_zone_restrictions=price_zones)
-        _modify_l_window_parameters(grid, model.frame_model[last_local], price_zones)
+        _modify_parameters_l(
+            grid, model.frame_model[last_local], price_zones, window_block=True)
         export_acdc_l_model_to_pyflow_acdc(model.frame_model[last_local], grid)
 
     for obj in weights_def:
@@ -324,11 +293,11 @@ def rolling_window_l_opf(
     print_step=False,
     warm_start_mode='roll',
 ):
-    """Chain :func:`window_l_opf` over a TS horizon (AC-only linear).
+    """Chain :func:`window_l_opf` over a TS horizon (linear AC(/DC) hybrid).
 
     Same indexing and ``future_sight`` semantics as
     :func:`~pyflow_acdc.rolling_window_nl_opf` (1-based inclusive ``start`` /
-    ``end``). Raises if ``grid.DCmode``.
+    ``end``).
     """
     if soc_final_mode not in ('every_m',):
         raise ValueError(
@@ -344,11 +313,6 @@ def rolling_window_l_opf(
         raise ValueError("warm_start_mode must be either 'roll' or 'hard'")
 
     analyse_grid(grid)
-    if grid.DCmode:
-        raise ValueError(
-            "Linear rolling window OPF is not ready for DC / hybrid grids "
-            "(grid.DCmode is True)"
-        )
     if not grid.ESS and not grid.H2:
         raise ValueError(
             "rolling_window_l_opf requires at least one storage or electrolyser"

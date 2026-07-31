@@ -136,10 +136,13 @@ Sequential :func:`~pyflow_acdc.ts_acdc_opf` carries SoC / H₂ hour-to-hour
 without a coupled horizon. Use ``ObjRule['SoC_deviation']`` /
 ``ObjRule['H2_sale']`` there — see :doc:`api/ts` and :ref:`obj_functions`.
 
-Related: linear AC window
--------------------------
+Linear twin: :func:`~pyflow_acdc.ts_acdc_l_opf` (``Energy_cost`` /
+``H2_sale`` only; same SoC / H₂ carry).
 
-For **AC-only** grids, :func:`~pyflow_acdc.window_l_opf` /
-:func:`~pyflow_acdc.rolling_window_l_opf` mirror the coupled / rolling API
-with the linearised AC model (BESS P-only; raises on ``grid.DCmode``). Same
-``future_sight`` semantics. See :doc:`api/L_models`.
+Related: linear AC(/DC) window
+------------------------------
+
+:func:`~pyflow_acdc.window_l_opf` / :func:`~pyflow_acdc.rolling_window_l_opf`
+mirror the coupled / rolling API with the linearised AC(/DC) model (BESS
+P-only; hybrid via ``grid.ACmode`` / ``grid.DCmode``). Same ``future_sight``
+semantics. LP — not SOCP. See :doc:`api/L_models`.

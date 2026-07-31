@@ -152,7 +152,7 @@ try:
     __all__.extend([
         'optimal_pf', 'optimal_l_pf', 'pyomo_model_solve', 'opf_obj', 'opf_line_res',
         'opf_price_price_zone', 'translate_pyf_opf',
-        'ts_acdc_opf', 'results_ts_opf',
+        'ts_acdc_opf', 'ts_acdc_l_opf', 'results_ts_opf',
     ])
     try:
         from .NL_models.window_opf import (

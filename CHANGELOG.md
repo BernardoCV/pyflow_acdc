@@ -12,11 +12,16 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **Linear AC window OPF**: ``window_l_opf`` / ``rolling_window_l_opf`` in
-  ``L_models/window_l_opf.py`` — coupled multi-hour linear AC OPF with BESS
-  (P-only) and H₂ inventory; same ``future_sight`` / rolling semantics as the
-  NL window; raises on ``grid.DCmode``. Docs: ``api/L_models``,
-  ``usage_window_opf``.
+- **Linear AC(/DC) hybrid OPF stack (LP)**: ``optimal_l_pf``,
+  ``window_l_opf`` / ``rolling_window_l_opf``, and myopic ``ts_acdc_l_opf``
+  mirror the NL operational surface on AC-only and hybrid grids
+  (``ACmode`` / ``DCmode``). Builder ``opf_create_l_model_acdc`` adds
+  linearized DC PF at ``V_ini``, thin converter link
+  ``np·Ps + P_DC + np·(a + b·Ps) = 0``, and ``fx_conv`` PDC/PQ/PV (Q fix
+  skipped when the linear model has no ``Q_conv_s_AC``). BESS remains P-only;
+  ``SoC_deviation`` stays rejected (quadratic). Hybrid ``TEP=True`` still
+  raises. Docs: ``api/L_models``, ``api/ts``, ``usage_window_opf``,
+  ``architecture``; example ``doc_examples/L_models/05_hybrid_linear_opf.py``.
 - **Battery storage (BESS)**: ``Storage`` class, ``add_storage``, and NL OPF
   SoC dynamics / S-circle on AC or DC buses when ``grid.ESS``. Snapshot
   results via ``Results.ext_storage``; docs ``usage_storage`` / ``api/storage``.
@@ -34,9 +39,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
   ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
   rolling keep hard SoC ini/final and optional ``H2_mass_final``.
-- **Linearised AC OPF** (``optimal_l_pf``): BESS (P-only, no Q / S-circle) and
-  electrolyser inventory / ``H2_sale``; raises if ``grid.DCmode``;
-  ``SoC_deviation`` is rejected (quadratic).
+  Linear twin: ``ts_acdc_l_opf`` (same carry / warm-start; ``Energy_cost`` /
+  ``H2_sale`` only).
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
   ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``.
 - **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /
@@ -78,11 +82,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 ### Changed
 - **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same
   module; aligns with NL ``opf_create_nl_model_acdc`` naming ahead of hybrid LP).
-- **Linear hybrid OPF (Phase 1, LP)**: ``opf_create_l_model_acdc`` follows
-  ``ACmode`` / ``DCmode`` flags; linearized DC ``V(V−V)G`` / ``PDC_from`` /
-  ``PDC_to`` at ``V_ini``; converter link ``np·Ps + P_DC + np·(a + b·Ps) = 0``;
-  ``optimal_l_pf`` / export extended for hybrid. Hybrid ``TEP=True`` still
-  raises until TEP hooks are wired.
+- **Linear hybrid OPF (LP)**: ``opf_create_l_model_acdc`` follows
+  ``ACmode`` / ``DCmode``; linearized DC ``V(V−V)G`` / ``PDC_from`` /
+  ``PDC_to`` at ``V_ini``; thin converter loss ``a + b·Ps``; ``fx_conv`` on
+  snapshot / window / TS linear drivers; window and ``ts_acdc_l_opf`` accept
+  hybrid grids. Richer converter LP / S-limit outer approx deferred. Hybrid
+  ``TEP=True`` still raises until TEP hooks are wired.
 - **Rolling foresight**: ``rolling_window_nl_opf`` takes ``future_sight`` in
   ``[0, 1]`` (default ``0``) instead of ``soc_final_mode='future_sight'``.
   Steps are ``ceil(future_sight · window_size)`` (clamped to remaining hours);

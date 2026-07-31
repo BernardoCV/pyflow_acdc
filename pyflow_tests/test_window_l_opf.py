@@ -2,7 +2,6 @@
 """Linear AC window / rolling window OPF (build_only)."""
 
 import pandas as pd
-import pytest
 import pyflow_acdc as pyf
 
 
@@ -62,17 +61,60 @@ def test_window_l_opf_build_only():
     assert (q.drop(columns=["frame"]) == 0).all().all()
 
 
-def test_window_l_opf_rejects_dc_grid():
+def test_window_l_opf_hybrid_build_only():
+    """Hybrid AC/DC linear window OPF builds (Phase 3)."""
     grid, _ = pyf.cases["case39_acdc"]()
     pyf.add_storage(
         grid, "30", E_max_MWh=10.0, P_charge_MW=5.0, P_discharge_MW=5.0,
         eta_charge=0.9, eta_discharge=0.9, soc_initial=0.5, soc_final=0.5,
     )
     pyf.add_TimeSeries(
-        grid, pd.DataFrame({"load": [1.0, 1.0]}), associated="30", TS_type="Load",
+        grid,
+        pd.DataFrame({"load": [0.95, 1.0, 1.05, 0.98]}),
+        associated="30",
+        TS_type="Load",
     )
-    with pytest.raises(ValueError, match="not ready for DC"):
-        pyf.window_l_opf(grid, start=0, end=1, build_only=True)
+    model, _, timing, stats = pyf.window_l_opf(
+        grid,
+        start=0,
+        end=3,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+    assert grid.DCmode and grid.ACmode
+    assert stats["termination_condition"] == "build_only"
+    assert timing["create"] >= 0
+    assert hasattr(model, "window_soc_constraint")
+    assert hasattr(model.frame_model[0], "V_DC")
+    assert hasattr(model.frame_model[0], "PDC_from")
+    assert "storage_soc" in grid.window_opf_results
+
+
+def test_rolling_window_l_opf_hybrid_future_sight_build_only():
+    """Hybrid rolling linear window with foresight half (Phase 3)."""
+    grid, _ = pyf.cases["case39_acdc"]()
+    pyf.add_storage(
+        grid, "30", E_max_MWh=10.0, P_charge_MW=5.0, P_discharge_MW=5.0,
+        eta_charge=0.9, eta_discharge=0.9, soc_initial=0.5, soc_final=0.5,
+    )
+    factors = [0.9 + 0.02 * (i % 5) for i in range(10)]
+    pyf.add_TimeSeries(
+        grid, pd.DataFrame({"load": factors}), associated="30", TS_type="Load",
+    )
+    _, _, _, stats = pyf.rolling_window_l_opf(
+        grid,
+        start=1,
+        end=10,
+        window_size=4,
+        future_sight=0.5,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+    assert grid.DCmode and grid.ACmode
+    assert grid.rolling_window_opf_run is True
+    assert grid.rolling_window_info.get("linear") is True
+    assert stats[0]["future_sight"] == 0.5
+    assert stats[0]["foresight_steps"] == 2
 
 
 def test_rolling_window_l_opf_every_m_build_only():

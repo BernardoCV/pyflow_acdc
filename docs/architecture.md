@@ -48,9 +48,10 @@ everything else builds on.
   `dc_power_flow`, `acdc_sequential` (aliases `Power_flow`, etc. remain for
   backward compatibility). Pure Numpy no pyomo needed.
 - **`ACDC_OPF.py`** — OPF orchestration: `optimal_pf` / `optimal_l_pf`,
-  objective assembly (`obj_w_rule`, `opf_obj`), result translation back onto the
-  `Grid` (`translate_pyf_opf`, `opf_line_res`, …). Calls
-  `pyomo_model_solve` for the actual solve.
+  objective assembly (`obj_w_rule`, `opf_obj` / `opf_obj_l`), `fx_conv`,
+  result translation back onto the `Grid` (`translate_pyf_opf`,
+  `opf_line_res`, `opf_step_results_l`, …). Calls `pyomo_model_solve` for
+  the actual solve.
 - **`pyomo_model_solve.py`** — Generic Pyomo solve layer shared by OPF, TEP,
   array, and time-series drivers: `pyomo_model_solve`, solver log parsers,
   feasibility checks, `reset_to_initialize`, `export_solver_progress_to_excel`.
@@ -59,9 +60,11 @@ everything else builds on.
   `ACDC_OPF_NL_model` (full AC/DC Pyomo model, converters, price zones, TEP
   variables, BESS / H₂), `ACDC_Static_TEP`, `ACDC_MultiPeriod_TEP`,
   `ACDC_sequential_STEP`, and `window_opf` (coupled / rolling multi-hour NL OPF).
-- **`L_models/`** — Linearised model builders and drivers: `AC_OPF_L_model`
-  (McCormick cable-type selection; optional BESS P-only and electrolyser
-  inventory), `ACDC_L_TEP`, and `AC_L_CSS_ortools`.
+- **`L_models/`** — Linearised (LP/MILP) model builders and drivers — **not
+  SOCP**: `AC_OPF_L_model` (AC Bθ; optional hybrid DC linearization + thin
+  converters; McCormick cable-type selection; BESS P-only / electrolyser),
+  `window_l_opf` (coupled / rolling), `ACDC_L_TEP` (AC investment), and
+  `AC_L_CSS_ortools`. Myopic linear TS lives in `Time_series.ts_acdc_l_opf`.
 
 ## Planning and sizing
 
@@ -78,7 +81,8 @@ everything else builds on.
 ## Time series
 
 - **`Time_series.py`** — Time-series power flow / OPF drivers and result
-  aggregation.
+  aggregation (`ts_acdc_opf` NL myopic; `ts_acdc_l_opf` linear myopic twin;
+  shared parameter update / SoC–H₂ carry helpers).
 - **`Time_series_clustering.py`** — Representative-period clustering of
   time-series inputs.
 - **`Market_Coeff.py`** — Price-zone quadratic cost curves from EPEX order books

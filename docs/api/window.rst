@@ -35,8 +35,9 @@ Rolling window
    foresight end; proportional H₂ mass on the foresight segment). See
    :doc:`../usage_window_opf`.
 
-Linear AC window
-----------------
+Linear AC(/DC) window
+---------------------
 
-AC-only linear counterparts (:func:`~pyflow_acdc.window_l_opf`,
-:func:`~pyflow_acdc.rolling_window_l_opf`) live under :doc:`L_models`.
+Linear counterparts (:func:`~pyflow_acdc.window_l_opf`,
+:func:`~pyflow_acdc.rolling_window_l_opf`) live under :doc:`L_models`
+(AC-only and hybrid LP; BESS P-only).
