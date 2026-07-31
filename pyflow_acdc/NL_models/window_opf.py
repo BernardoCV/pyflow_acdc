@@ -536,6 +536,8 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
         and grid.DCmode
         and grid.Converters_ACDC
     ):
+        # NL has Q_conv_s_AC / P_conv_c_AC / P_conv_loss; linear has P-only Ps.
+        linear_conv = not hasattr(model.frame_model[ordered[0]], 'Q_conv_s_AC')
         rows_conv = []
         for t in ordered:
             block = model.frame_model[t]
@@ -544,31 +546,46 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
                 k: np.float64(pyo.value(v))
                 for k, v in block.P_conv_s_AC.items()
             }
-            q_s = {
-                k: np.float64(pyo.value(v))
-                for k, v in block.Q_conv_s_AC.items()
-            }
-            p_c = {
-                k: np.float64(pyo.value(v))
-                for k, v in block.P_conv_c_AC.items()
-            }
-            p_loss = {
-                k: np.float64(pyo.value(v))
-                for k, v in block.P_conv_loss.items()
-            }
-            for conv in grid.Converters_ACDC:
-                n = conv.ConvNumber
-                p_ac = p_s[n] * conv.np_conv
-                q_ac = q_s[n] * conv.np_conv
-                p_dc = -(p_c[n] + p_loss[n]) * conv.np_conv
-                if conv.np_conv == 0:
-                    row_conv[conv.name] = 0.0
-                else:
-                    s_ac = np.sqrt(p_ac**2 + q_ac**2)
-                    row_conv[conv.name] = (
-                        max(s_ac, abs(p_dc)) * grid.S_base
-                        / (conv.MVA_max * conv.np_conv)
-                    )
+            if linear_conv:
+                for conv in grid.Converters_ACDC:
+                    n = conv.ConvNumber
+                    ps = p_s[n]
+                    loss_pu = float(conv.a_conv) + float(conv.b_conv) * ps
+                    p_ac = ps * conv.np_conv
+                    p_dc = -(p_ac + loss_pu * conv.np_conv)
+                    if conv.np_conv == 0:
+                        row_conv[conv.name] = 0.0
+                    else:
+                        row_conv[conv.name] = (
+                            max(abs(p_ac), abs(p_dc)) * grid.S_base
+                            / (conv.MVA_max * conv.np_conv)
+                        )
+            else:
+                q_s = {
+                    k: np.float64(pyo.value(v))
+                    for k, v in block.Q_conv_s_AC.items()
+                }
+                p_c = {
+                    k: np.float64(pyo.value(v))
+                    for k, v in block.P_conv_c_AC.items()
+                }
+                p_loss = {
+                    k: np.float64(pyo.value(v))
+                    for k, v in block.P_conv_loss.items()
+                }
+                for conv in grid.Converters_ACDC:
+                    n = conv.ConvNumber
+                    p_ac = p_s[n] * conv.np_conv
+                    q_ac = q_s[n] * conv.np_conv
+                    p_dc = -(p_c[n] + p_loss[n]) * conv.np_conv
+                    if conv.np_conv == 0:
+                        row_conv[conv.name] = 0.0
+                    else:
+                        s_ac = np.sqrt(p_ac**2 + q_ac**2)
+                        row_conv[conv.name] = (
+                            max(s_ac, abs(p_dc)) * grid.S_base
+                            / (conv.MVA_max * conv.np_conv)
+                        )
             rows_conv.append(row_conv)
         results['converter_loading'] = pd.DataFrame(rows_conv)
 
