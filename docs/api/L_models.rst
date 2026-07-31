@@ -97,7 +97,7 @@ setup; the linear driver reuses the same investment series.
 Creating the Linear model
 -------------------------
 
-.. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_ac
+.. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_acdc
 
 **Variables**
 
@@ -129,7 +129,7 @@ The model enforces constraints for:
 TEP/REC/CT Parameters and Variables
 -----------------------------------
 
-When ``TEP=True``, :func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_ac` adds
+When ``TEP=True``, :func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_acdc` adds
 the investment layer used by :func:`~pyflow_acdc.linear_transmission_expansion`
 and :func:`~pyflow_acdc.wind_farm_CSS`.
 

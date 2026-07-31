@@ -49,21 +49,22 @@ def test_linear_opf_bess_h2_builds():
     )
 
     assert stats["termination_condition"] == "build_only"
-    assert hasattr(model, "storage_AC")
+    assert hasattr(model, "storage")
     assert hasattr(model, "P_storage_charge")
     assert hasattr(model, "SoC")
-    assert hasattr(model, "P_storage_AC_net_upper_constraint")
+    assert hasattr(model, "P_storage_net_upper_constraint")
     assert hasattr(model, "Gen_Pstorage_constraint")
-    assert not hasattr(model, "Q_storage")
+    assert hasattr(model, "Q_storage")
+    assert model.Q_storage[next(iter(model.storage))].bounds == (0, 0)
 
     assert hasattr(model, "electrolyser")
     assert hasattr(model, "P_electrolyser")
     assert hasattr(model, "mass_H2")
-    assert hasattr(model, "hydrogen_mass_h2_balance_constraint")
+    assert hasattr(model, "mass_H2_balance_constraint")
     assert hasattr(model, "Gen_Pelectrolyser_constraint")
     assert not hasattr(model, "Q_electrolyser")
 
-    assert len(model.storage_AC) == 1
+    assert len(model.storage) == 1
     assert len(model.electrolyser) == 1
 
     st = grid.storage_elements[0]
@@ -72,11 +73,16 @@ def test_linear_opf_bess_h2_builds():
     assert el.Q_electrolyser == 0.0
 
 
-def test_linear_opf_dc_grid_rejected():
+def test_linear_opf_hybrid_grid_builds():
+    """Hybrid AC/DC grids are accepted by linear OPF (Phase-1 LP)."""
     require_pyomo()
     grid, _ = pyf.cases["case39_acdc"]()
-    with pytest.raises(ValueError, match="not ready for DC"):
-        pyf.optimal_l_pf(grid, ObjRule={"Energy_cost": 1}, build_only=True)
+    model, _, _, stats = pyf.optimal_l_pf(
+        grid, ObjRule={"Energy_cost": 1}, build_only=True
+    )
+    assert stats["termination_condition"] == "build_only"
+    assert hasattr(model, "V_DC")
+    assert hasattr(model, "P_conv_s_AC")
 
 
 def test_linear_opf_soc_deviation_rejected():

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 
-from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
+from .AC_OPF_L_model import opf_create_l_model_acdc, export_acdc_l_model_to_pyflow_acdc
 from ..ACDC_OPF import (
     opf_obj_l,
     opf_obj_l_array_losses,
@@ -254,7 +254,7 @@ def linear_transmission_expansion(
     model = pyo.ConcreteModel()
     model.name = "TEP MTDC linear AC OPF"
 
-    opf_create_l_model_ac(model, grid, TEP=True)
+    opf_create_l_model_acdc(model, grid, TEP=True)
     _TEP_install_variables(model, grid)
     _TEP_install_constraints(model, grid)
 
@@ -477,7 +477,7 @@ def linear_multi_period_transmission_expansion(
     model.inv_model = pyo.Block(model.inv_periods)
 
     base_model = pyo.ConcreteModel()
-    opf_create_l_model_ac(base_model, grid, TEP=True)
+    opf_create_l_model_acdc(base_model, grid, TEP=True)
 
     for element in grid.Generators + grid.lines_AC_exp + grid.lines_DC + grid.Converters_ACDC + grid.RenSources:
         _calculate_decomision_period(element, n_years)

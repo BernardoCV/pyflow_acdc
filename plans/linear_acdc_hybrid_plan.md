@@ -14,8 +14,8 @@ Living implementation plan for a full linear AC/DC hybrid OPF stack that **mirro
 | H1b | Converter loss | **LP stage:** constant `a` and/or linear `|P|` aux (optional). **QP stage (later):** P-only epigraph `P_loss ≥ a + c_eff · P_c²` with `U` fixed (NL `(P²+Q²)/U²` → drop Q). MMC / `sqrt` deferred. |
 | H2 | DC network | **Linearize NL `DC_constraints`**: replace `V_i(V_i−V_k)G` nodal sum and `PDC_from` / `PDC_to` with a fixed-operating-point linear map (use node `V_ini` as `V_ref`). Keep thermal bounds, DC gens/ren/storage/H₂ / converter injections with **same signs** as NL. |
 | H3 | Module mirror | Full operational OPF surface: **snapshot + window + rolling + myopic TS**, AC and DC BESS/H₂ — only what NL already does. |
-| H4 | Out of scope | Linear hybrid **TEP**, CSS, SOCP/CCP, BESS sizing; features beyond current NL. |
-| H5 | Layout | New builder `pyflow_acdc/L_models/ACDC_OPF_L_model.py`; keep `AC_OPF_L_model.py` as AC-only core reused by hybrid. |
+| H4 | Out of scope | SOCP/CCP, BESS sizing; features beyond current NL. **Linear hybrid TEP is in scope** (extend existing AC linear TEP with DC/conv when `TEP=True`, same flag pattern as NL). |
+| H5 | Layout | **No new builder file.** Expand `L_models/AC_OPF_L_model.py` with `grid.ACmode` / `grid.DCmode` (and related) flags like `opf_create_nl_model_acdc`: single entry `opf_create_l_model_acdc` builds AC-only, DC+AC hybrid, or DC pieces as flagged. Keep `export_acdc_l_model_to_pyflow_acdc` in the same module, extended for DC/conv. |
 | H6 | Scope rule | Linearize **only** what `NL_models/ACDC_OPF_NL_model.py` already models; no extra devices/constraints. |
 
 ```mermaid
@@ -27,35 +27,34 @@ flowchart TB
     tsL[ts_acdc_l_opf or ts path in Time_series]
   end
   subgraph builders [L_models]
-    acOnly[AC_OPF_L_model AC Bθ]
-    hybrid[ACDC_OPF_L_model DC + Conv + AC]
+    lModel["AC_OPF_L_model\n(AC / DC / Conv via grid flags)"]
   end
-  optL --> hybrid
-  winL --> hybrid
-  rollL --> hybrid
-  tsL --> hybrid
-  hybrid --> acOnly
+  optL --> lModel
+  winL --> lModel
+  rollL --> lModel
+  tsL --> lModel
 ```
 
 ## Current baseline (already shipped)
 
-- AC-only LP: `opf_create_l_model_ac` raises on `grid.DCmode` (`L_models/AC_OPF_L_model.py`).
+- AC-only LP: `opf_create_l_model_acdc` raises on `grid.DCmode` (`L_models/AC_OPF_L_model.py`) until hybrid flags are wired.
 - AC window/rolling: `L_models/window_l_opf.py`.
-- NL hybrid reference: `NL_models/ACDC_OPF_NL_model.py` (`DC_*`, `Converter_*`, DC BESS/H₂).
+- AC linear TEP already exists in the same L stack / `ACDC_L_TEP` paths.
+- NL hybrid reference: `NL_models/ACDC_OPF_NL_model.py` (`DC_*`, `Converter_*`, DC BESS/H₂, `TEP` flag).
 
 ## Linearization principles (NL → LP, then optional QP)
 
 Mirror NL **block structure and variable names** where practical so window parent links / export / `fx_conv` stay familiar.
 
-**AC:** reuse existing Bθ / known-P injection model from `AC_OPF_L_model`.
+**AC:** existing Bθ / known-P injection model in `AC_OPF_L_model` (gated by `grid.ACmode`).
 
-**DC lines/nodes (H2 — explicit):** from NL `DC_constraints` / line equalities:
+**DC lines/nodes (H2 — explicit):** from NL `DC_constraints` / line equalities (gated by `grid.DCmode`):
 
 - Nodal: `P_sum += pol * V_i * (V_i − V_k) * G * NumLines…` → linearize at `V_ref,i = V_ini` (e.g. `pol * V_ref,i * (V_i − V_k) * G * …`, or equivalent `G·V_ref` conductance form). Document the exact map in code comments / linearization table.
 - Lines: NL `PDC_from = (V_f − V_t) * G * V_f * pol` and `PDC_to = (V_t − V_f) * G * V_t * pol` → same fixed-point linearization; keep `PDC_line_loss = PDC_from + PDC_to`.
 - Keep `P_known_DC`, ren/gen/storage/H₂/converter/DCDC injections and signs identical to NL.
 
-**Converters (LP first):**
+**Converters (LP first, when `ACmode` and `DCmode`):**
 
 - Keep sets/modes (direct / filter / TF+filter) and vars: `P/Q_conv_s`, `P/Q_conv_c`, `P_conv_DC`, `P_conv_loss`, internal `U`/`θ` **or** reduced equivalents with voltages fixed to `V_ini` for linearity.
 - **Loss:** LP-safe first (`a` and/or `b·|P|`); QP epigraph later (H1b).
@@ -64,27 +63,28 @@ Mirror NL **block structure and variable names** where practical so window paren
 
 **BESS/H₂:** AC as today (P-only); DC charge/discharge/SoC and H₂ mass as NL (`PGi_storage_DC`, `PGi_electrolyser_DC`); no DC Q; window parent SoC/H₂ links already side-aware in `NL_models/window_opf.py`.
 
+**TEP:** when `TEP=True`, extend existing linear AC TEP parameters/variables with DC line / converter `np_*` as in NL `TEP_parameters` / `TEP_variables` — no separate hybrid TEP builder file for the snapshot OPF path.
+
 ## Phases
 
 ### Phase 0 — Plan + API contract
 
 - [x] Living plan file `plans/linear_acdc_hybrid_plan.md` (this file).
-- [x] Lock: LP first → optional QP later; H2 DC `V(V−V)G` / `PDC_from`/`to` linearization; NL-only scope.
+- [x] Lock: LP first → optional QP later; H2 DC `V(V−V)G` / `PDC_from`/`to`; expand existing L builder (no new file); hybrid TEP in scope; NL-only physics.
+- [x] Phase 1 snapshot LP: `opf_create_l_model_acdc` hybrid flags + DC linearization + thin converter + export + tests.
 - [ ] Document public surface when coding starts: extend `optimal_l_pf` (no more hard AC-only when hybrid ready), `window_l_opf` / `rolling_window_l_opf`, new myopic `ts_acdc_l_opf` (or clearly named twin of `ts_acdc_opf`).
 - [ ] Cross-link architecture / `api/L_models`; explicit “not SOCP” note.
 
-### Phase 1 — Hybrid model builder (snapshot, **LP**)
+### Phase 1 — Expand L model builder (snapshot, **LP**)
 
-**File:** `L_models/ACDC_OPF_L_model.py`
+**File:** `L_models/AC_OPF_L_model.py` (same entry as today)
 
-- `opf_create_l_model_acdc(model, grid, ...)`:
-  - If not `DCmode`: delegate to `opf_create_l_model_ac`.
-  - If hybrid: AC block + `DC_variables_l` / `DC_constraints_l` + `Converter_variables_l` / `Converter_constraints_l` + storage/H₂ both sides.
-- **DC (H2):** implement linearized nodal `V(V−V)G` and `PDC_from` / `PDC_to` (and loss identity) from NL `DC_constraints`.
-- Thin converter: topology + power balance + LP S/P boxes; loss LP-simple or deferred.
-- `export_acdc_l_model_to_pyflow_acdc` extended for DC nodes/lines/converters (or hybrid export sibling).
-- Wire `ACDC_OPF.optimal_l_pf`: call hybrid builder; remove/replace “raise if DCmode” with builder dispatch; keep `SoC_deviation` reject; `opf_obj_l` gains DC gen energy cost if missing.
-- Tests: `case39_acdc` / small hybrid `build_only` + optional LP solve; AC-only regression unchanged.
+- [x] Drop hard `raise` on `grid.DCmode`; structure like NL with `ACmode` / `DCmode`.
+- [x] **DC (H2):** linearized nodal `V(V−V)G` and `PDC_from` / `PDC_to` (and loss identity).
+- [x] Thin converter: one link ``np·Ps + P_DC + np·(a + b·Ps) = 0`` (+ AC nodal aggregate).
+- [x] Extend `export_acdc_l_model_to_pyflow_acdc` for DC nodes/lines/converters.
+- [x] Wire `optimal_l_pf` / `opf_obj_l` (DC gen energy cost); hybrid `TEP=True` raises until later.
+- [x] Tests: `test_hybrid_l_opf.py` + update former DC-reject test.
 
 **Exit:** `optimal_l_pf` on AC-only and on a hybrid grid (`build_only`); converter + linearized DC flows export onto grid.
 
@@ -104,7 +104,7 @@ Mirror NL **block structure and variable names** where practical so window paren
 
 ### Phase 3 — Window + rolling hybrid
 
-- `L_models/window_l_opf.py`: drop DCmode raise; build frames via `opf_create_l_model_acdc(..., window_block=True)`; reuse NL parent `window_soc_constraints` / `window_h2_constraints` / `export_window_opf_results` (already patched for P-only Q).
+- `L_models/window_l_opf.py`: drop DCmode raise; build frames via `opf_create_l_model_acdc(..., window_block=True)` (hybrid via grid flags); reuse NL parent `window_soc_constraints` / `window_h2_constraints` / `export_window_opf_results`.
 - Extend `_modify_l_window_parameters` for DC known-P / prices / converter-relevant mutable params.
 - Rolling / `future_sight` unchanged at driver level.
 - Tests: hybrid `build_only` window + rolling foresight half; PEI optional later (heavy).
@@ -113,7 +113,7 @@ Mirror NL **block structure and variable names** where practical so window paren
 
 ### Phase 4 — Myopic linear TS
 
-- Add linear twin of `ts_acdc_opf` (carry SoC / `mass_H2_prev`, `empty_tank_cycle`, warm-start), using hybrid L builder per hour.
+- Add linear twin of `ts_acdc_opf` (carry SoC / `mass_H2_prev`, `empty_tank_cycle`, warm-start), using the same L builder per hour.
 - Soft `SoC_deviation` remains **rejected** (quadratic) unless a later LP-safe surrogate is explicitly added—default: reject like snapshot.
 - Tests: short hybrid TS carry; docs in `usage_window_opf` / `api/ts` / `api/L_models`.
 
@@ -123,13 +123,13 @@ Mirror NL **block structure and variable names** where practical so window paren
 
 - `docs/api/L_models.rst`, `usage_window_opf.rst`, architecture note: hybrid LP vs NL vs SOCP.
 - CHANGELOG; doc example on small hybrid case (`build_only`).
-- Clean unused DC unpacks in AC-only module if still dead.
+- Align hybrid TEP docs with existing AC linear TEP usage where applicable.
 
 ## Implementation order (dependencies)
 
 ```mermaid
 flowchart LR
-  P0[Phase0 plan_API] --> P1[Phase1 LP builder_snapshot]
+  P0[Phase0 plan_API] --> P1[Phase1 LP expand builder]
   P1 --> P2[Phase2 LP rich_conv_fx]
   P2 --> P2b[Phase2b optional QP]
   P1 --> P3[Phase3 window_rolling]
@@ -148,5 +148,5 @@ flowchart LR
 
 - No changes to NL builders except shared export helpers if needed.
 - No SOCP lifting / CCP / robust (convex plan).
-- No linear hybrid TEP in this plan (follow-up if needed).
-- No features beyond current NL operational OPF.
+- No new `ACDC_OPF_L_model.py` module — expand existing L builder only.
+- No features beyond current NL operational OPF (plus linear hybrid TEP via existing `TEP` flag).

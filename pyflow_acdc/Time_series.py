@@ -1103,14 +1103,9 @@ def _modify_parameters(grid,model,Price_Zones,window_block=False):
     if grid.ESS:
         for storage in grid.storage_elements:
             s = storage.storageNumber
-            if storage.connected == AcDcSide.AC:
-                if not window_block:
-                    model.SoC_prev[s].set_value(float(storage.soc_initial))
-                model.soc_ref[s].set_value(float(storage.soc_ref))
-            else:
-                if not window_block:
-                    model.SoC_prev_DC[s].set_value(float(storage.soc_initial))
-                model.soc_ref_DC[s].set_value(float(storage.soc_ref))
+            if not window_block:
+                model.SoC_prev[s].set_value(float(storage.soc_initial))
+            model.soc_ref[s].set_value(float(storage.soc_ref))
 
     if grid.H2 and not window_block:
         for el in grid.electrolysers:
@@ -1124,17 +1119,11 @@ def _carry_storage_h2_state_from_model(grid, model):
     if grid.ESS:
         for storage in grid.storage_elements:
             s = storage.storageNumber
-            if storage.connected == AcDcSide.AC:
-                soc = float(pyo.value(model.SoC[s]))
-                model.SoC_prev[s].set_value(soc)
-                storage.P_charge = float(pyo.value(model.P_storage_charge[s]))
-                storage.P_discharge = float(pyo.value(model.P_storage_discharge[s]))
-                storage.Q = float(pyo.value(model.Q_storage[s]))
-            else:
-                soc = float(pyo.value(model.SoC_DC[s]))
-                model.SoC_prev_DC[s].set_value(soc)
-                storage.P_charge = float(pyo.value(model.P_storage_charge_DC[s]))
-                storage.P_discharge = float(pyo.value(model.P_storage_discharge_DC[s]))
+            soc = float(pyo.value(model.SoC[s]))
+            model.SoC_prev[s].set_value(soc)
+            storage.P_charge = float(pyo.value(model.P_storage_charge[s]))
+            storage.P_discharge = float(pyo.value(model.P_storage_discharge[s]))
+            storage.Q = float(pyo.value(model.Q_storage[s]))
             storage.SoC = soc
             storage.soc_initial = soc
 

@@ -2,7 +2,7 @@
 """Coupled linear AC window OPF (frame blocks + parent SoC / H₂ links).
 
 AC-only counterpart of :mod:`pyflow_acdc.NL_models.window_opf`. Uses
-:func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_ac` per frame
+:func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_acdc` per frame
 (BESS P-only, no Q / S-circle). Raises if ``grid.DCmode``.
 """
 
@@ -44,7 +44,7 @@ from ..pyomo_model_solve import (
     reset_to_initialize,
 )
 from ..Time_series import update_grid_data
-from .AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc, opf_create_l_model_ac
+from .AC_OPF_L_model import export_acdc_l_model_to_pyflow_acdc, opf_create_l_model_acdc
 
 __all__ = ['window_l_opf', 'rolling_window_l_opf']
 
@@ -82,7 +82,7 @@ def _modify_l_window_parameters(grid, model, price_zones):
 
 def _create_l_frame_blocks(model, grid, frames, price_zones, weights_def, ts_base):
     base_model = pyo.ConcreteModel()
-    opf_create_l_model_ac(base_model, grid, TEP=False, window_block=True)
+    opf_create_l_model_acdc(base_model, grid, TEP=False, window_block=True)
 
     opf_data = translate_pyf_opf(grid, Price_Zones=price_zones)
     storage_info = opf_data['storage_info']

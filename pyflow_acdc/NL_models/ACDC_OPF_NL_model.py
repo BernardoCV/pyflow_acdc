@@ -215,189 +215,136 @@ def Generation_variables(model,grid,gen_info,TEP):
 
 
 def storage_variables(model, grid, storage_info, window_block=False):
-    """BESS element variables (charge, discharge, SoC, Q on AC only)."""
+    """BESS element variables (one set; Q fixed at 0 on DC like electrolysers)."""
     if storage_info is None:
         raise ValueError("storage_info is required when grid.ESS is True")
-    lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number = storage_info
-    if not lista_storage_ac and not lista_storage_dc:
+    storage_lim, storage_soc, storage_phys, lista_storage = storage_info
+    P_charge_max, P_discharge_max, _P_max_st, S_max_st = storage_lim
+    soc_min_st, soc_max_st, soc_initial, soc_ref_map, _soc_final = storage_soc
+    _eta_c, _eta_d, _E_max, _dt, _S_base, connected_st = storage_phys
+    if not lista_storage:
         raise ValueError("storage_info is empty but grid.ESS is True")
-    storage_ac = storage_ac_by_number
-    storage_dc = storage_dc_by_number
 
-    if lista_storage_ac:
-        model.storage_AC = pyo.Set(initialize=lista_storage_ac)
+    model.storage = pyo.Set(initialize=lista_storage)
 
-        def P_storage_charge_bounds(model, s):
-            return (0, storage_ac[s].P_charge_max)
+    def P_storage_charge_bounds(model, s):
+        return (0, P_charge_max[s])
 
-        def P_storage_discharge_bounds(model, s):
-            return (0, storage_ac[s].P_discharge_max)
+    def P_storage_discharge_bounds(model, s):
+        return (0, P_discharge_max[s])
 
-        def soc_bounds(model, s):
-            st = storage_ac[s]
-            return (st.soc_min, st.soc_max)
+    def soc_bounds(model, s):
+        return (soc_min_st[s], soc_max_st[s])
 
-        def Q_storage_bounds(model, s):
-            st = storage_ac[s]
-            return (-st.S_max, st.S_max)
+    def Q_storage_bounds(model, s):
+        if connected_st[s] == AcDcSide.DC:
+            return (0, 0)
+        return (-S_max_st[s], S_max_st[s])
 
-        model.P_storage_charge = pyo.Var(
-            model.storage_AC, bounds=P_storage_charge_bounds, initialize=0)
-        model.P_storage_discharge = pyo.Var(
-            model.storage_AC, bounds=P_storage_discharge_bounds, initialize=0)
-        model.Q_storage = pyo.Var(model.storage_AC, bounds=Q_storage_bounds, initialize=0)
-        model.SoC = pyo.Var(
-            model.storage_AC,
-            bounds=soc_bounds,
-            initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
-        )
-        model.soc_ref = pyo.Param(
-            model.storage_AC,
-            initialize={s: storage_ac[s].soc_ref for s in lista_storage_ac},
+    model.P_storage_charge = pyo.Var(
+        model.storage, bounds=P_storage_charge_bounds, initialize=0)
+    model.P_storage_discharge = pyo.Var(
+        model.storage, bounds=P_storage_discharge_bounds, initialize=0)
+    model.Q_storage = pyo.Var(model.storage, bounds=Q_storage_bounds, initialize=0)
+    model.SoC = pyo.Var(
+        model.storage,
+        bounds=soc_bounds,
+        initialize={s: soc_initial[s] for s in lista_storage},
+    )
+    model.soc_ref = pyo.Param(
+        model.storage,
+        initialize={s: soc_ref_map[s] for s in lista_storage},
+        mutable=True,
+    )
+    if not window_block:
+        model.SoC_prev = pyo.Param(
+            model.storage,
+            initialize={s: soc_initial[s] for s in lista_storage},
             mutable=True,
         )
-        if not window_block:
-            model.SoC_prev = pyo.Param(
-                model.storage_AC,
-                initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
-                mutable=True,
-            )
-
-    if lista_storage_dc:
-        model.storage_DC = pyo.Set(initialize=lista_storage_dc)
-
-        def P_storage_charge_DC_bounds(model, s):
-            return (0, storage_dc[s].P_charge_max)
-
-        def P_storage_discharge_DC_bounds(model, s):
-            return (0, storage_dc[s].P_discharge_max)
-
-        def soc_DC_bounds(model, s):
-            st = storage_dc[s]
-            return (st.soc_min, st.soc_max)
-
-        model.P_storage_charge_DC = pyo.Var(
-            model.storage_DC, bounds=P_storage_charge_DC_bounds, initialize=0)
-        model.P_storage_discharge_DC = pyo.Var(
-            model.storage_DC, bounds=P_storage_discharge_DC_bounds, initialize=0)
-        model.SoC_DC = pyo.Var(
-            model.storage_DC,
-            bounds=soc_DC_bounds,
-            initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
-        )
-        model.soc_ref_DC = pyo.Param(
-            model.storage_DC,
-            initialize={s: storage_dc[s].soc_ref for s in lista_storage_dc},
-            mutable=True,
-        )
-        if not window_block:
-            model.SoC_prev_DC = pyo.Param(
-                model.storage_DC,
-                initialize={s: storage_dc[s].soc_initial for s in lista_storage_dc},
-                mutable=True,
-            )
 
 
 def storage_constraints(model, grid, storage_info, window_block=False):
     """BESS SoC balance (snapshot only), and element-level power limits."""
     if storage_info is None:
         raise ValueError("storage_info is required when grid.ESS is True")
-    _, _, storage_ac_by_number, storage_dc_by_number = storage_info
-    storage_ac = storage_ac_by_number
-    storage_dc = storage_dc_by_number
+    storage_lim, _storage_soc, storage_phys, _lista = storage_info
+    _Pc, _Pd, P_max_st, S_max_st = storage_lim
+    eta_charge, eta_discharge, E_max_st, dt_hours_st, S_base_st, connected_st = (
+        storage_phys)
 
-    if storage_ac:
-        if not window_block:
-            def soc_balance_rule(model, s):
-                st = storage_ac[s]
-                scale = st.dt_hours * st.S_base / st.E_max
-                return model.SoC[s] == (
-                    model.SoC_prev[s]
-                    + scale * (
-                        st.eta_charge * model.P_storage_charge[s]
-                        - model.P_storage_discharge[s] / st.eta_discharge
-                    )
+    if not window_block:
+        def soc_balance_rule(model, s):
+            scale = dt_hours_st[s] * S_base_st[s] / E_max_st[s]
+            return model.SoC[s] == (
+                model.SoC_prev[s]
+                + scale * (
+                    eta_charge[s] * model.P_storage_charge[s]
+                    - model.P_storage_discharge[s] / eta_discharge[s]
                 )
-
-            model.storage_soc_balance_constraint = pyo.Constraint(
-                model.storage_AC, rule=soc_balance_rule)
-
-        # G6: charge and discharge are separate vars; overlap is allowed for now.
-        def S_storage_AC_limit_rule(model, s):
-            st = storage_ac[s]
-            p_net = model.P_storage_discharge[s] - model.P_storage_charge[s]
-            return p_net ** 2 + model.Q_storage[s] ** 2 <= st.S_max ** 2
-
-        model.S_storage_AC_limit_constraint = pyo.Constraint(
-            model.storage_AC, rule=S_storage_AC_limit_rule)
-
-    if storage_dc:
-        if not window_block:
-            def soc_balance_DC_rule(model, s):
-                st = storage_dc[s]
-                scale = st.dt_hours * st.S_base / st.E_max
-                return model.SoC_DC[s] == (
-                    model.SoC_prev_DC[s]
-                    + scale * (
-                        st.eta_charge * model.P_storage_charge_DC[s]
-                        - model.P_storage_discharge_DC[s] / st.eta_discharge
-                    )
-                )
-
-            model.storage_soc_balance_DC_constraint = pyo.Constraint(
-                model.storage_DC, rule=soc_balance_DC_rule)
-
-        # G6: separate charge/discharge vars; overlap allowed for now.
-        def P_storage_DC_net_upper_rule(model, s):
-            st = storage_dc[s]
-            return (
-                model.P_storage_discharge_DC[s] - model.P_storage_charge_DC[s]
-                <= st.P_max
             )
 
-        def P_storage_DC_net_lower_rule(model, s):
-            st = storage_dc[s]
-            return (
-                model.P_storage_charge_DC[s] - model.P_storage_discharge_DC[s]
-                <= st.P_max
-            )
+        model.storage_soc_balance_constraint = pyo.Constraint(
+            model.storage, rule=soc_balance_rule)
 
-        model.P_storage_DC_net_upper_constraint = pyo.Constraint(
-            model.storage_DC, rule=P_storage_DC_net_upper_rule)
-        model.P_storage_DC_net_lower_constraint = pyo.Constraint(
-            model.storage_DC, rule=P_storage_DC_net_lower_rule)
+    # G6: charge and discharge are separate vars; overlap is allowed for now.
+    def S_storage_AC_limit_rule(model, s):
+        if connected_st[s] != AcDcSide.AC:
+            return pyo.Constraint.Skip
+        p_net = model.P_storage_discharge[s] - model.P_storage_charge[s]
+        return p_net ** 2 + model.Q_storage[s] ** 2 <= S_max_st[s] ** 2
+
+    def P_storage_DC_net_upper_rule(model, s):
+        if connected_st[s] != AcDcSide.DC:
+            return pyo.Constraint.Skip
+        return (
+            model.P_storage_discharge[s] - model.P_storage_charge[s] <= P_max_st[s]
+        )
+
+    def P_storage_DC_net_lower_rule(model, s):
+        if connected_st[s] != AcDcSide.DC:
+            return pyo.Constraint.Skip
+        return (
+            model.P_storage_charge[s] - model.P_storage_discharge[s] <= P_max_st[s]
+        )
+
+    model.S_storage_AC_limit_constraint = pyo.Constraint(
+        model.storage, rule=S_storage_AC_limit_rule)
+    model.P_storage_DC_net_upper_constraint = pyo.Constraint(
+        model.storage, rule=P_storage_DC_net_upper_rule)
+    model.P_storage_DC_net_lower_constraint = pyo.Constraint(
+        model.storage, rule=P_storage_DC_net_lower_rule)
 
 
 def hydrogen_variables(model, grid, hydrogen_info, window_block=False):
     """Electrolyser power, optional AC Q, and H₂ mass inventory [kg]."""
     if hydrogen_info is None:
         raise ValueError("hydrogen_info is required when grid.H2 is True")
-    lista_electrolyser, electrolyser_by_number = hydrogen_info
+    hydrogen_lim, hydrogen_state, hydrogen_phys, lista_electrolyser = hydrogen_info
+    P_min_el, P_max_el, Q_min_el, Q_max_el, H2_mass_max = hydrogen_lim
+    H2_mass_initial, _H2_mass_final = hydrogen_state
+    _b_h, _c_h, _S_base, _dt, connected_el = hydrogen_phys
     if not lista_electrolyser:
         raise ValueError("hydrogen_info is empty but grid.H2 is True")
 
     model.electrolyser = pyo.Set(initialize=lista_electrolyser)
 
     def P_electrolyser_bounds(model, e):
-        el = electrolyser_by_number[e]
-        return (el.P_min, el.P_max)
+        return (P_min_el[e], P_max_el[e])
 
     def Q_electrolyser_bounds(model, e):
-        el = electrolyser_by_number[e]
-        if el.connected == AcDcSide.DC:
+        if connected_el[e] == AcDcSide.DC:
             return (0, 0)
-        return (el.Q_min, el.Q_max)
+        return (Q_min_el[e], Q_max_el[e])
 
     def mass_H2_bounds(model, e):
-        el = electrolyser_by_number[e]
-        return (0, el.H2_mass_max)
+        return (0, H2_mass_max[e])
 
     model.P_electrolyser = pyo.Var(
         model.electrolyser,
         bounds=P_electrolyser_bounds,
         initialize={
-            e: 0.5 * (electrolyser_by_number[e].P_min + electrolyser_by_number[e].P_max)
-            for e in lista_electrolyser
+            e: 0.5 * (P_min_el[e] + P_max_el[e]) for e in lista_electrolyser
         },
     )
     model.Q_electrolyser = pyo.Var(
@@ -405,12 +352,12 @@ def hydrogen_variables(model, grid, hydrogen_info, window_block=False):
     model.mass_H2 = pyo.Var(
         model.electrolyser,
         bounds=mass_H2_bounds,
-        initialize={e: electrolyser_by_number[e].H2_mass_initial for e in lista_electrolyser},
+        initialize={e: H2_mass_initial[e] for e in lista_electrolyser},
     )
     if not window_block:
         model.mass_H2_prev = pyo.Param(
             model.electrolyser,
-            initialize={e: electrolyser_by_number[e].H2_mass_initial for e in lista_electrolyser},
+            initialize={e: H2_mass_initial[e] for e in lista_electrolyser},
             mutable=True,
         )
 
@@ -421,13 +368,13 @@ def hydrogen_constraints(model, grid, hydrogen_info, window_block=False):
         return
     if hydrogen_info is None:
         raise ValueError("hydrogen_info is required when grid.H2 is True")
-    lista_electrolyser, electrolyser_by_number = hydrogen_info
+    _lim, _state, hydrogen_phys, lista_electrolyser = hydrogen_info
+    b_h, c_h, S_base_el, dt_hours_el, _connected = hydrogen_phys
     if not lista_electrolyser:
         raise ValueError("hydrogen_info is empty but grid.H2 is True")
 
     def mass_h2_balance_rule(model, e):
-        el = electrolyser_by_number[e]
-        h_prod = el.b_h * model.P_electrolyser[e] * el.S_base * el.dt_hours + el.c_h
+        h_prod = b_h[e] * model.P_electrolyser[e] * S_base_el[e] * dt_hours_el[e] + c_h[e]
         return model.mass_H2[e] == model.mass_H2_prev[e] + h_prod
 
     model.hydrogen_mass_h2_balance_constraint = pyo.Constraint(
@@ -1504,8 +1451,8 @@ def DC_constraints(model,grid,TEP=False):
         def Gen_Pstorage_DC_rule(model, node):
             nDC = grid.nodes_DC[node]
             p_stor = sum(
-                model.P_storage_discharge_DC[s.storageNumber]
-                - model.P_storage_charge_DC[s.storageNumber]
+                model.P_storage_discharge[s.storageNumber]
+                - model.P_storage_charge[s.storageNumber]
                 for s in nDC.connected_storage
             )
             return model.PGi_storage_DC[node] == p_stor
@@ -2548,32 +2495,20 @@ def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
         executor.map(process_element, elements)
 
     if grid.storage_elements:
-        if hasattr(model, 'P_storage_charge'):
-            P_charge_ac = {
-                k: np.float64(pyo.value(v)) for k, v in model.P_storage_charge.items()}
-            P_discharge_ac = {
-                k: np.float64(pyo.value(v)) for k, v in model.P_storage_discharge.items()}
-            Q_storage_ac = {
-                k: np.float64(pyo.value(v)) for k, v in model.Q_storage.items()}
-            soc_ac = {k: np.float64(pyo.value(v)) for k, v in model.SoC.items()}
-        if hasattr(model, 'P_storage_charge_DC'):
-            P_charge_dc = {
-                k: np.float64(pyo.value(v)) for k, v in model.P_storage_charge_DC.items()}
-            P_discharge_dc = {
-                k: np.float64(pyo.value(v)) for k, v in model.P_storage_discharge_DC.items()}
-            soc_dc = {k: np.float64(pyo.value(v)) for k, v in model.SoC_DC.items()}
+        P_charge = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_storage_charge.items()}
+        P_discharge = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_storage_discharge.items()}
+        Q_storage = {
+            k: np.float64(pyo.value(v)) for k, v in model.Q_storage.items()}
+        soc = {k: np.float64(pyo.value(v)) for k, v in model.SoC.items()}
 
         for storage in grid.storage_elements:
             s = storage.storageNumber
-            if storage.connected == AcDcSide.AC:
-                storage.P_charge = P_charge_ac[s]
-                storage.P_discharge = P_discharge_ac[s]
-                storage.Q = Q_storage_ac[s]
-                storage.SoC = soc_ac[s]
-            else:
-                storage.P_charge = P_charge_dc[s]
-                storage.P_discharge = P_discharge_dc[s]
-                storage.SoC = soc_dc[s]
+            storage.P_charge = P_charge[s]
+            storage.P_discharge = P_discharge[s]
+            storage.Q = Q_storage[s]
+            storage.SoC = soc[s]
 
     if grid.electrolysers:
         P_e_values = {

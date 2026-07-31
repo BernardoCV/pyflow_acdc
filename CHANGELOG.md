@@ -76,6 +76,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
+- **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same
+  module; aligns with NL ``opf_create_nl_model_acdc`` naming ahead of hybrid LP).
+- **Linear hybrid OPF (Phase 1, LP)**: ``opf_create_l_model_acdc`` follows
+  ``ACmode`` / ``DCmode`` flags; linearized DC ``V(V−V)G`` / ``PDC_from`` /
+  ``PDC_to`` at ``V_ini``; converter link ``np·Ps + P_DC + np·(a + b·Ps) = 0``;
+  ``optimal_l_pf`` / export extended for hybrid. Hybrid ``TEP=True`` still
+  raises until TEP hooks are wired.
 - **Rolling foresight**: ``rolling_window_nl_opf`` takes ``future_sight`` in
   ``[0, 1]`` (default ``0``) instead of ``soc_final_mode='future_sight'``.
   Steps are ``ceil(future_sight · window_size)`` (clamped to remaining hours);
