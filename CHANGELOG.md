@@ -12,6 +12,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Linear AC window OPF**: ``window_l_opf`` / ``rolling_window_l_opf`` in
+  ``L_models/window_l_opf.py`` — coupled multi-hour linear AC OPF with BESS
+  (P-only) and H₂ inventory; same ``future_sight`` / rolling semantics as the
+  NL window; raises on ``grid.DCmode``. Docs: ``api/L_models``,
+  ``usage_window_opf``.
 - **Battery storage (BESS)**: ``Storage`` class, ``add_storage``, and NL OPF
   SoC dynamics / S-circle on AC or DC buses when ``grid.ESS``. Snapshot
   results via ``Results.ext_storage``; docs ``usage_storage`` / ``api/storage``.

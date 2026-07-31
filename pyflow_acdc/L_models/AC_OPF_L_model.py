@@ -18,7 +18,7 @@ __all__ = [
 ]
 
 
-def opf_create_l_model_ac(model,grid,TEP=False):
+def opf_create_l_model_ac(model,grid,TEP=False,window_block=False):
     """Populate ``model`` with the linearised AC OPF formulation.
 
     Adds the linearised OPF variables and constraints (AC network with McCormick
@@ -42,6 +42,9 @@ def opf_create_l_model_ac(model,grid,TEP=False):
         Source of network data.
     TEP : bool, optional
         Add transmission-expansion (cable-type selection) variables.
+    window_block : bool, optional
+        If True, omit in-block SoC / H₂ ``*_prev`` balance (parent window
+        links own inventory). Used by :func:`~pyflow_acdc.window_l_opf`.
 
     Examples
     --------
@@ -63,9 +66,9 @@ def opf_create_l_model_ac(model,grid,TEP=False):
     Generation_variables(model,grid,gen_info,TEP)
 
     if grid.ESS:
-        storage_variables_l(model, grid, storage_info)
+        storage_variables_l(model, grid, storage_info, window_block=window_block)
     if grid.H2:
-        hydrogen_variables_l(model, grid, hydrogen_info)
+        hydrogen_variables_l(model, grid, hydrogen_info, window_block=window_block)
 
     AC_variables(model,grid,AC_info)
 
@@ -75,9 +78,9 @@ def opf_create_l_model_ac(model,grid,TEP=False):
         TEP_parameters(model,grid)
 
     if grid.ESS:
-        storage_constraints_l(model, grid, storage_info)
+        storage_constraints_l(model, grid, storage_info, window_block=window_block)
     if grid.H2:
-        hydrogen_constraints_l(model, grid, hydrogen_info)
+        hydrogen_constraints_l(model, grid, hydrogen_info, window_block=window_block)
 
     AC_constraints(model,grid,AC_info)
 
@@ -87,7 +90,7 @@ def _ac_storage_info(storage_info):
     return lista_storage_ac, storage_ac_by_number
 
 
-def storage_variables_l(model, grid, storage_info):
+def storage_variables_l(model, grid, storage_info, window_block=False):
     """BESS for linear OPF: charge, discharge, SoC (no Q)."""
     if storage_info is None:
         raise ValueError("storage_info is required when grid.ESS is True")
@@ -114,32 +117,34 @@ def storage_variables_l(model, grid, storage_info):
         bounds=soc_bounds,
         initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
     )
-    model.SoC_prev = pyo.Param(
-        model.storage_AC,
-        initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
-        mutable=True,
-    )
+    if not window_block:
+        model.SoC_prev = pyo.Param(
+            model.storage_AC,
+            initialize={s: storage_ac[s].soc_initial for s in lista_storage_ac},
+            mutable=True,
+        )
 
 
-def storage_constraints_l(model, grid, storage_info):
+def storage_constraints_l(model, grid, storage_info, window_block=False):
     """BESS SoC balance and |P_net| ≤ S_max for linear OPF."""
     if storage_info is None:
         raise ValueError("storage_info is required when grid.ESS is True")
     lista_storage_ac, storage_ac = _ac_storage_info(storage_info)
 
-    def soc_balance_rule(model, s):
-        st = storage_ac[s]
-        scale = st.dt_hours * st.S_base / st.E_max
-        return model.SoC[s] == (
-            model.SoC_prev[s]
-            + scale * (
-                st.eta_charge * model.P_storage_charge[s]
-                - model.P_storage_discharge[s] / st.eta_discharge
+    if not window_block:
+        def soc_balance_rule(model, s):
+            st = storage_ac[s]
+            scale = st.dt_hours * st.S_base / st.E_max
+            return model.SoC[s] == (
+                model.SoC_prev[s]
+                + scale * (
+                    st.eta_charge * model.P_storage_charge[s]
+                    - model.P_storage_discharge[s] / st.eta_discharge
+                )
             )
-        )
 
-    model.storage_soc_balance_constraint = pyo.Constraint(
-        model.storage_AC, rule=soc_balance_rule)
+        model.storage_soc_balance_constraint = pyo.Constraint(
+            model.storage_AC, rule=soc_balance_rule)
 
     def P_net_upper_rule(model, s):
         st = storage_ac[s]
@@ -159,7 +164,7 @@ def storage_constraints_l(model, grid, storage_info):
         model.storage_AC, rule=P_net_lower_rule)
 
 
-def hydrogen_variables_l(model, grid, hydrogen_info):
+def hydrogen_variables_l(model, grid, hydrogen_info, window_block=False):
     """Electrolyser for linear OPF: P load + mass inventory (no Q)."""
     if hydrogen_info is None:
         raise ValueError("hydrogen_info is required when grid.H2 is True")
@@ -188,15 +193,18 @@ def hydrogen_variables_l(model, grid, hydrogen_info):
         bounds=mass_H2_bounds,
         initialize={e: by_number[e].H2_mass_initial for e in lista_electrolyser},
     )
-    model.mass_H2_prev = pyo.Param(
-        model.electrolyser,
-        initialize={e: by_number[e].H2_mass_initial for e in lista_electrolyser},
-        mutable=True,
-    )
+    if not window_block:
+        model.mass_H2_prev = pyo.Param(
+            model.electrolyser,
+            initialize={e: by_number[e].H2_mass_initial for e in lista_electrolyser},
+            mutable=True,
+        )
 
 
-def hydrogen_constraints_l(model, grid, hydrogen_info):
+def hydrogen_constraints_l(model, grid, hydrogen_info, window_block=False):
     """H₂ mass balance for electrolysers in linear OPF."""
+    if window_block:
+        return
     if hydrogen_info is None:
         raise ValueError("hydrogen_info is required when grid.H2 is True")
     lista_electrolyser, by_number = hydrogen_info

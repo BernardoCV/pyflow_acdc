@@ -10,18 +10,17 @@ from __future__ import annotations
 
 import math
 import time
-import warnings
 from datetime import datetime, timezone
 
 import pyomo.environ as pyo
 
 from ..ACDC_OPF import (
     calculate_objective,
+    check_linear_opf_weights,
     obj_w_rule,
     opf_obj_l,
     translate_pyf_opf,
 )
-from ..constants import ObjComponent
 from ..grid_analysis import analyse_grid
 from ..NL_models.window_opf import (
     _concat_rolling_results,
@@ -67,24 +66,18 @@ def _modify_l_window_parameters(grid, model, price_zones):
         model.P_known_AC[idx].set_value(val)
     for idx, val in lf.items():
         model.lf[idx].set_value(val)
-    if hasattr(model, 'P_load_eff'):
-        for gen in grid.Generators:
-            model.P_load_eff[gen.genNumber].set_value(gen.p_load_eff)
-    if hasattr(model, 'PGi_gen') and not hasattr(model, 'PGi_lower_bound'):
-        for gen in grid.Generators:
-            if not getattr(gen, 'is_ext_grid', False):
-                continue
-            g = gen.genNumber
-            np_gen_value = (
-                pyo.value(model.np_gen[g]) if hasattr(model, 'np_gen') else gen.np_gen
-            )
-            pmax_eff = gen.Max_pow_gen * np_gen_value
-            if getattr(gen, 'allow_sell', True):
-                pmin_eff = -(pmax_eff - gen.p_load_eff)
-            else:
-                pmin_eff = 0
-            model.PGi_gen[g].setlb(pmin_eff)
-            model.PGi_gen[g].setub(pmax_eff)
+    for gen in grid.Generators:
+        if not gen.is_ext_grid:
+            continue
+        g = gen.genNumber
+        np_gen_value = pyo.value(model.np_gen[g])
+        pmax_eff = gen.Max_pow_gen * np_gen_value
+        if gen.allow_sell:
+            pmin_eff = -(pmax_eff - gen.p_load_eff)
+        else:
+            pmin_eff = 0
+        model.PGi_gen[g].setlb(pmin_eff)
+        model.PGi_gen[g].setub(pmax_eff)
 
 
 def _create_l_frame_blocks(model, grid, frames, price_zones, weights_def, ts_base):
@@ -114,23 +107,6 @@ def _update_l_window_frame_params(model, grid, frames, ts_base, price_zones):
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
         _modify_l_window_parameters(grid, model.frame_model[i], price_zones)
-
-
-def _check_linear_window_weights(weights_def):
-    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
-        raise ValueError(
-            "SoC_deviation is quadratic and is not supported in linear window OPF"
-        )
-    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
-    other_weights_nonzero = [
-        key for key, value in weights_def.items()
-        if key not in supported_l and value['w'] != 0
-    ]
-    if other_weights_nonzero:
-        warnings.warn(
-            "Linear window OPF only supports Energy_cost and H2_sale; "
-            f"ignoring non-zero weights for {other_weights_nonzero}"
-        )
 
 
 def window_l_opf(
@@ -190,7 +166,7 @@ def window_l_opf(
         )
 
     weights_def, price_zones = obj_w_rule(grid, ObjRule, OnlyGen)
-    _check_linear_window_weights(weights_def)
+    check_linear_opf_weights(weights_def)
 
     ts_base = start
     n_local = end - start + 1

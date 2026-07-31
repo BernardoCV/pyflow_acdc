@@ -28,6 +28,8 @@ __all__ = [
     'pyomo_model_solve',
     'opf_update_param',
     'opf_obj',
+    'opf_obj_l',
+    'check_linear_opf_weights',
     'opf_line_res',
     'opf_price_price_zone',
     'opf_step_results',
@@ -122,20 +124,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
 
-    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
-        raise ValueError(
-            "SoC_deviation is quadratic and is not supported in linear OPF")
-
-    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
-    other_weights_nonzero = [
-        key for key, value in weights_def.items()
-        if key not in supported_l and value['w'] != 0
-    ]
-    if other_weights_nonzero:
-        warnings.warn(
-            "Linear OPF only supports Energy_cost and H2_sale; "
-            f"ignoring non-zero weights for {other_weights_nonzero}"
-        )
+    check_linear_opf_weights(weights_def)
 
     model = pyo.ConcreteModel()
     model.name="""AC 'DC linear' OPF"""
@@ -364,6 +353,29 @@ def opf_obj_l(model,grid,ObjRule):
         )
 
     return total
+
+
+def check_linear_opf_weights(weights_def):
+    """Validate ObjRule weights for linear OPF / linear window drivers.
+
+    Raises if ``SoC_deviation`` is weighted (quadratic). Warns on other
+    non-zero weights outside ``Energy_cost`` / ``H2_sale`` (they are ignored
+    by :func:`opf_obj_l`).
+    """
+    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
+        raise ValueError(
+            "SoC_deviation is quadratic and is not supported in linear OPF"
+        )
+    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
+    other_weights_nonzero = [
+        key for key, value in weights_def.items()
+        if key not in supported_l and value['w'] != 0
+    ]
+    if other_weights_nonzero:
+        warnings.warn(
+            "Linear OPF only supports Energy_cost and H2_sale; "
+            f"ignoring non-zero weights for {other_weights_nonzero}"
+        )
 
 
 def opf_obj_l_array_losses(model, grid, ObjRule):

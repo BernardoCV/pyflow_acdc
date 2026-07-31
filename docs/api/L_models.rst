@@ -34,6 +34,21 @@ now). ``SoC_deviation`` is not supported (quadratic).
       :language: python
       :lines: 2-
 
+Linear coupled window
+---------------------
+
+AC-only multi-hour linear OPF with linked BESS SoC and H₂ inventory (same
+indexing as the nonlinear window). Lives in ``pyflow_acdc.L_models.window_l_opf``.
+BESS remains P-only. See also :doc:`../usage_window_opf`.
+
+.. autofunction:: pyflow_acdc.window_l_opf
+
+.. autofunction:: pyflow_acdc.rolling_window_l_opf
+
+   ``future_sight`` in ``[0, 1]`` matches
+   :func:`~pyflow_acdc.rolling_window_nl_opf` (ceil steps; proportional H₂ on
+   the foresight segment).
+
 Linear Transmission Expansion Planning
 --------------------------------------
 

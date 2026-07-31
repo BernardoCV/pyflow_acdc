@@ -163,6 +163,11 @@ try:
         ])
     except ImportError:
         pass
+    try:
+        from .L_models.window_l_opf import window_l_opf, rolling_window_l_opf
+        __all__.extend(['window_l_opf', 'rolling_window_l_opf'])
+    except ImportError:
+        pass
     HAS_OPF = True
 
     # ACDC_Static_TEP also requires OPF/pyomo

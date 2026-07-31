@@ -34,3 +34,9 @@ Rolling window
    by ``ceil(future_sight · window_size)`` foresight frames (SoC final at the
    foresight end; proportional H₂ mass on the foresight segment). See
    :doc:`../usage_window_opf`.
+
+Linear AC window
+----------------
+
+AC-only linear counterparts (:func:`~pyflow_acdc.window_l_opf`,
+:func:`~pyflow_acdc.rolling_window_l_opf`) live under :doc:`L_models`.

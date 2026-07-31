@@ -511,9 +511,14 @@ def _calculate_line_loading_from_model(grid,model,idx):
         keys = sorted(model.PAC_from.keys())
 
         PAC_from = np.array([np.float64(pyo.value(model.PAC_from[k])) for k in keys])
-        QAC_from = np.array([np.float64(pyo.value(model.QAC_from[k])) for k in keys])
         PAC_to = np.array([np.float64(pyo.value(model.PAC_to[k])) for k in keys])
-        QAC_to = np.array([np.float64(pyo.value(model.QAC_to[k])) for k in keys])
+        if hasattr(model, 'QAC_from'):
+            QAC_from = np.array([np.float64(pyo.value(model.QAC_from[k])) for k in keys])
+            QAC_to = np.array([np.float64(pyo.value(model.QAC_to[k])) for k in keys])
+        else:
+            # Linear AC OPF has P-only line flows (no Q).
+            QAC_from = np.zeros_like(PAC_from)
+            QAC_to = np.zeros_like(PAC_to)
 
         S_from   =np.sqrt(PAC_from**2+QAC_from**2)
         S_to     =np.sqrt(PAC_to**2+QAC_to**2)

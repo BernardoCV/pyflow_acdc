@@ -398,7 +398,12 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
                 row_soc[name] = np.float64(pyo.value(block.SoC[s]))
                 pc = np.float64(pyo.value(block.P_storage_charge[s])) * grid.S_base
                 pd_ = np.float64(pyo.value(block.P_storage_discharge[s])) * grid.S_base
-                row_q[name] = np.float64(pyo.value(block.Q_storage[s])) * grid.S_base
+                if hasattr(block, 'Q_storage'):
+                    row_q[name] = (
+                        np.float64(pyo.value(block.Q_storage[s])) * grid.S_base
+                    )
+                else:
+                    row_q[name] = 0.0
             else:
                 row_soc[name] = np.float64(pyo.value(block.SoC_DC[s]))
                 pc = np.float64(pyo.value(block.P_storage_charge_DC[s])) * grid.S_base
