@@ -22,7 +22,10 @@ from .Classes import (
 )
 from .grid_analysis import cable_parameters, converter_parameters
 from .grid_modifications import add_gen
-from .constants import SQRT_3, MAX_RATING_PLACEHOLDER, DEFAULT_V_MIN_DC, DEFAULT_V_MAX_DC, DataInput
+from .constants import (
+    SQRT_3, MAX_RATING_PLACEHOLDER, DEFAULT_V_MIN_DC, DEFAULT_V_MAX_DC, DataInput,
+    LinkCost,
+)
 
 import pickle
 import gzip
@@ -1510,6 +1513,29 @@ def _migrate_legacy_converter_impedance(conv):
             setattr(conv, new, getattr(conv, old))
 
 
+def _migrate_legacy_node_price_attrs(node):
+    """Backfill ``_price``/``_qf``/``_lf`` after pre-property pickles."""
+    d = node.__dict__
+    for public, private, default in (
+        ('price', '_price', 0.0),
+        ('qf', '_qf', 0.0),
+        ('lf', '_lf', 0.0),
+    ):
+        legacy = d.pop(public, None)
+        if private not in d:
+            d[private] = default if legacy is None else legacy
+
+
+def _migrate_legacy_gen_link_cost(gen):
+    """Map pre-``link_cost`` pickles (``price_link`` bool) onto ``LinkCost``."""
+    d = gen.__dict__
+    if 'link_cost' in d:
+        d.pop('price_link', None)
+        return
+    legacy_pl = d.pop('price_link', False)
+    gen.link_cost = LinkCost.LINEAR if legacy_pl else LinkCost.NONE
+
+
 def _migrate_legacy_grid_attrs(grid):
     """Apply pickle attribute renames once after deserialization."""
     if not hasattr(grid, 'S_base_ref'):
@@ -1518,6 +1544,8 @@ def _migrate_legacy_grid_attrs(grid):
         grid.storage_elements = []
     if not hasattr(grid, 'electrolysers'):
         grid.electrolysers = []
+    if not hasattr(grid, 'heat_pumps'):
+        grid.heat_pumps = []
     if not hasattr(grid, 'ts_timestamps'):
         grid.ts_timestamps = None
     for node in grid.nodes_AC + grid.nodes_DC:
@@ -1525,6 +1553,11 @@ def _migrate_legacy_grid_attrs(grid):
             node.connected_storage = []
         if not hasattr(node, 'connected_electrolyser'):
             node.connected_electrolyser = []
+        if not hasattr(node, 'connected_heat_pumps'):
+            node.connected_heat_pumps = []
+        _migrate_legacy_node_price_attrs(node)
+    for gen in grid.Generators + grid.Generators_DC:
+        _migrate_legacy_gen_link_cost(gen)
     for line in (
         grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
         + grid.lines_AC_tf + grid.lines_AC_ct + grid.lines_DC

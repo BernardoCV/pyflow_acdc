@@ -6,7 +6,7 @@ inventory across frames — unlike myopic :func:`~pyflow_acdc.ts_acdc_opf`,
 which solves hour-by-hour.
 
 API reference: :doc:`api/window`. Element models:
-:doc:`api/modelling_storage_hydrogen`. Dash: :doc:`api/dash`.
+:doc:`api/modelling_flexible_assets`. Dash: :doc:`api/dash`.
 
 Requires ``ipopt`` and ``pip install "pyflow-acdc[OPF]"`` (add ``Dash`` for
 interactive plots).
@@ -34,7 +34,7 @@ Load with case flags ``storage``, ``hydrogen``, and
 Attach operation-only storage and hydrogen with
 :func:`~pyflow_acdc.add_storage` / :func:`~pyflow_acdc.add_electrolyser`
 (or enable them on the PEI case). Modelling details:
-:doc:`api/modelling_storage_hydrogen`.
+:doc:`api/modelling_flexible_assets`.
 
 ``window_nl_opf`` requires ``grid.ESS`` or ``grid.H2`` (and time series).
 
@@ -83,13 +83,27 @@ SoC carries between commits. H₂ tank empties follow each electrolyser's
 - ``N`` → empty at the first commit end hour ``>= k·N``
 
 Optional ``H2_mass_final`` is enforced on the terminal frame of each
-coupled solve when set::
+coupled solve when set.
+
+**Foresight** (``future_sight`` in ``[0, 1]``, default ``0``):
+
+- ``0`` — commit-only solves; terminal SoC follows ``soc_final_mode='every_m'``
+  / ``soc_final_every_m``.
+- ``(0, 1]`` — each commit (except the last) is solved together with
+  ``ceil(future_sight · window_size)`` foresight hours into the next commit
+  (clamped to remaining series). SoC final is enforced at the foresight end;
+  only the commit frames are kept. With a mass target, the commit must produce
+  ``≥ H2_mass_final`` and the foresight segment
+  ``≥ future_sight · H2_mass_final`` (raw fraction).
+
+::
 
     pyf.rolling_window_nl_opf(
         grid,
         start=1,
         end=48,
         window_size=24,
+        future_sight=0.5,  # half-window foresight; use 1.0 for a full next window
         ObjRule={"Energy_cost": 1},
         solver="ipopt",
     )
@@ -121,3 +135,14 @@ Related: myopic TS
 Sequential :func:`~pyflow_acdc.ts_acdc_opf` carries SoC / H₂ hour-to-hour
 without a coupled horizon. Use ``ObjRule['SoC_deviation']`` /
 ``ObjRule['H2_sale']`` there — see :doc:`api/ts` and :ref:`obj_functions`.
+
+Linear twin: :func:`~pyflow_acdc.ts_acdc_l_opf` (``Energy_cost`` /
+``H2_sale`` only; same SoC / H₂ carry).
+
+Related: linear AC(/DC) window
+------------------------------
+
+:func:`~pyflow_acdc.window_l_opf` / :func:`~pyflow_acdc.rolling_window_l_opf`
+mirror the coupled / rolling API with the linearised AC(/DC) model (BESS
+P-only; hybrid via ``grid.ACmode`` / ``grid.DCmode``). Same ``future_sight``
+semantics. LP — not SOCP. See :doc:`api/L_models`.

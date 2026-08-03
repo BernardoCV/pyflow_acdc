@@ -51,15 +51,24 @@ try:
     from .ACDC_OPF import (
         pyomo_model_solve,
         opf_obj,
+        opf_obj_l,
         opf_step_results,
+        opf_step_results_l,
         pack_variables,
         translate_pyf_opf,
         reset_to_initialize,
-        calculate_objective
+        calculate_objective,
+        check_linear_opf_weights,
+        fx_conv,
+        obj_w_rule,
+    )
+    from .L_models.AC_OPF_L_model import (
+        opf_create_l_model_acdc,
+        export_acdc_l_model_to_pyflow_acdc,
     )
     pyomo_imp= True
     # Add OPF-dependent functions to __all__ only if pyomo is available
-    __all__.extend(['ts_acdc_opf', 'results_ts_opf'])
+    __all__.extend(['ts_acdc_opf', 'ts_acdc_l_opf', 'results_ts_opf'])
 
 except ImportError:
     pyomo_imp= False
@@ -191,6 +200,10 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
     Converter / BESS / H₂ PF setpoint series (``conv_P_DC``, ``storage_P``,
     ``h2_P``, etc.) are not handled here — use :func:`update_grid_for_pf`
     after any Droop/P ``P_DC`` reset so prescribed setpoints win.
+
+    Heat-pump series (``hp_P_ref``, ``hp_Q_ref``, ``hp_E_min``, ``hp_E_max``)
+    remain here (like ``h2_price``): they update element attributes for OPF and
+    for PF nodal loads (``P_ref`` / ``Q_ref`` via :meth:`Grid.update_pq_ac`).
     """
     typ = ts.type
     if typ in TS_PF_TYPES:
@@ -284,6 +297,28 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
             )
         el.h2_price = ts_data[idx]
 
+    elif typ in (TSType.HP_P_REF, TSType.HP_Q_REF, TSType.HP_E_MIN, TSType.HP_E_MAX):
+        grid.heat_pumps_dict = {hp.name: hp for hp in grid.heat_pumps}
+        hp = grid.heat_pumps_dict.get(ts.element_name, None)
+        if hp is None:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any heat pump"
+            )
+        if typ == TSType.HP_P_REF:
+            hp.P_ref = float(ts_data[idx])
+        elif typ == TSType.HP_Q_REF:
+            hp.Q_ref = float(ts_data[idx])
+        elif typ == TSType.HP_E_MIN:
+            hp.E_min = float(ts_data[idx])
+        else:
+            hp.E_max = float(ts_data[idx])
+        if hp.E_min > hp.E_max:
+            raise ValueError(
+                f"Heat pump {hp.name!r}: E_min ({hp.E_min}) > E_max ({hp.E_max}) "
+                f"after applying {typ} at idx={idx}"
+            )
+
 
 def update_grid_for_pf(grid, ts, idx, use_clusters=False, n_clusters=None):
     """Apply one PF-setpoint time-series sample when ``ts`` is a PF setpoint type.
@@ -292,12 +327,16 @@ def update_grid_for_pf(grid, ts, idx, use_clusters=False, n_clusters=None):
     (no-op). PF types update known setpoints only (converters, BESS, H₂).
 
     Unlike :func:`update_grid_data` (loads, renewables, prices including
-    ``h2_price``), this only updates prescribed PF setpoints. Values are in
+    ``h2_price``, and heat-pump ``hp_P_ref`` / ``hp_Q_ref`` / energy bounds),
+    this only updates prescribed PF setpoints. Values are in
     **per-unit** on ``grid.S_base``.
 
     Accepted labels are listed in ``TS_PF_TYPES`` / ``TSType`` (see
     ``constants``). Converter ``P_DC`` / ``P_AC`` / ``Q_AC`` require matching
     DC ``type`` / ``AC_type``; ``storage_Q`` / ``h2_Q`` require AC connection.
+
+    Heat-pump baselines are **not** PF setpoint types: keep them on
+    :func:`update_grid_data`; PF nodal injection uses ``P_ref`` / ``Q_ref``.
 
     Parameters
     ----------
@@ -511,9 +550,14 @@ def _calculate_line_loading_from_model(grid,model,idx):
         keys = sorted(model.PAC_from.keys())
 
         PAC_from = np.array([np.float64(pyo.value(model.PAC_from[k])) for k in keys])
-        QAC_from = np.array([np.float64(pyo.value(model.QAC_from[k])) for k in keys])
         PAC_to = np.array([np.float64(pyo.value(model.PAC_to[k])) for k in keys])
-        QAC_to = np.array([np.float64(pyo.value(model.QAC_to[k])) for k in keys])
+        if hasattr(model, 'QAC_from'):
+            QAC_from = np.array([np.float64(pyo.value(model.QAC_from[k])) for k in keys])
+            QAC_to = np.array([np.float64(pyo.value(model.QAC_to[k])) for k in keys])
+        else:
+            # Linear AC OPF has P-only line flows (no Q).
+            QAC_from = np.zeros_like(PAC_from)
+            QAC_to = np.zeros_like(PAC_to)
 
         S_from   =np.sqrt(PAC_from**2+QAC_from**2)
         S_to     =np.sqrt(PAC_to**2+QAC_to**2)
@@ -1017,6 +1061,72 @@ def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
     grid.Time_series_ran = True
 
 
+def _modify_parameters_l(grid, model, Price_Zones=False, window_block=False):
+    """Update mutable Params on a linear OPF model from current grid TS state."""
+    opf_data = translate_pyf_opf(grid, Price_Zones=Price_Zones)
+    AC_info = opf_data['AC_info']
+    DC_info = opf_data['DC_info']
+    gen_info = opf_data['gen_info']
+    gen_AC_info, gen_DC_info, gen_rs_info = gen_info
+    lf, _, _, _, _ = gen_AC_info
+    P_renSource, _, _ = gen_rs_info
+
+    for idx, val in P_renSource.items():
+        model.P_renSource[idx].set_value(val)
+
+    if grid.ACmode:
+        _, AC_nodes_info, _, _, _, _ = AC_info
+        _, _, _, _, P_know, _, _ = AC_nodes_info
+        for idx, val in P_know.items():
+            model.P_known_AC[idx].set_value(val)
+        for idx, val in lf.items():
+            model.lf[idx].set_value(val)
+        for gen in grid.Generators:
+            if not getattr(gen, 'is_ext_grid', False):
+                continue
+            g = gen.genNumber
+            np_gen_value = pyo.value(model.np_gen[g])
+            pmax_eff = gen.Max_pow_gen * np_gen_value
+            if getattr(gen, 'allow_sell', True):
+                pmin_eff = -(pmax_eff - gen.p_load_eff)
+            else:
+                pmin_eff = 0
+            model.PGi_gen[g].setlb(pmin_eff)
+            model.PGi_gen[g].setub(pmax_eff)
+
+    if grid.DCmode:
+        _, DC_nodes_info, _, _ = DC_info
+        _, _, _, P_known_DC, _ = DC_nodes_info
+        for idx, val in P_known_DC.items():
+            model.P_known_DC[idx].set_value(val)
+        if grid.Generators_DC:
+            lf_DC, _, _, _, _ = gen_DC_info
+            for idx, val in lf_DC.items():
+                model.lf_dc[idx].set_value(val)
+
+    if grid.ESS:
+        for storage in grid.storage_elements:
+            s = storage.storageNumber
+            if not window_block:
+                model.SoC_prev[s].set_value(float(storage.soc_initial))
+            model.soc_ref[s].set_value(float(storage.soc_ref))
+
+    if grid.H2 and not window_block:
+        for el in grid.electrolysers:
+            model.mass_H2_prev[el.electrolyserNumber].set_value(
+                float(el.H2_mass_initial)
+            )
+
+    if grid.HP:
+        for hp in grid.heat_pumps:
+            h = hp.heatPumpNumber
+            if not window_block:
+                model.E_heat_pump_prev[h].set_value(float(hp.E_state))
+            model.hp_p_ref[h].set_value(float(hp.P_ref))
+            model.hp_e_min[h].set_value(float(hp.E_min))
+            model.hp_e_max[h].set_value(float(hp.E_max))
+
+
 def _modify_parameters(grid,model,Price_Zones,window_block=False):
     opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
     AC_info = opf_data['AC_info']
@@ -1098,38 +1208,37 @@ def _modify_parameters(grid,model,Price_Zones,window_block=False):
     if grid.ESS:
         for storage in grid.storage_elements:
             s = storage.storageNumber
-            if storage.connected == AcDcSide.AC:
-                if not window_block:
-                    model.SoC_prev[s].set_value(float(storage.soc_initial))
-                model.soc_ref[s].set_value(float(storage.soc_ref))
-            else:
-                if not window_block:
-                    model.SoC_prev_DC[s].set_value(float(storage.soc_initial))
-                model.soc_ref_DC[s].set_value(float(storage.soc_ref))
+            if not window_block:
+                model.SoC_prev[s].set_value(float(storage.soc_initial))
+            model.soc_ref[s].set_value(float(storage.soc_ref))
 
     if grid.H2 and not window_block:
-        for el in grid.electrolysers:
-            model.mass_H2_prev[el.electrolyserNumber].set_value(
-                float(el.H2_mass_initial)
-            )
+            for el in grid.electrolysers:
+                model.mass_H2_prev[el.electrolyserNumber].set_value(
+                    float(el.H2_mass_initial)
+                )
+
+    if grid.HP:
+        for hp in grid.heat_pumps:
+            h = hp.heatPumpNumber
+            if not window_block:
+                model.E_heat_pump_prev[h].set_value(float(hp.E_state))
+            model.hp_p_ref[h].set_value(float(hp.P_ref))
+            model.hp_q_ref[h].set_value(float(hp.Q_ref))
+            model.hp_e_min[h].set_value(float(hp.E_min))
+            model.hp_e_max[h].set_value(float(hp.E_max))
 
 
 def _carry_storage_h2_state_from_model(grid, model):
-    """Write solved SoC / H₂ mass onto elements and set next-hour initials."""
+    """Write solved SoC / H₂ / HP state onto elements and set next-hour initials."""
     if grid.ESS:
         for storage in grid.storage_elements:
             s = storage.storageNumber
-            if storage.connected == AcDcSide.AC:
-                soc = float(pyo.value(model.SoC[s]))
-                model.SoC_prev[s].set_value(soc)
-                storage.P_charge = float(pyo.value(model.P_storage_charge[s]))
-                storage.P_discharge = float(pyo.value(model.P_storage_discharge[s]))
-                storage.Q = float(pyo.value(model.Q_storage[s]))
-            else:
-                soc = float(pyo.value(model.SoC_DC[s]))
-                model.SoC_prev_DC[s].set_value(soc)
-                storage.P_charge = float(pyo.value(model.P_storage_charge_DC[s]))
-                storage.P_discharge = float(pyo.value(model.P_storage_discharge_DC[s]))
+            soc = float(pyo.value(model.SoC[s]))
+            model.SoC_prev[s].set_value(soc)
+            storage.P_charge = float(pyo.value(model.P_storage_charge[s]))
+            storage.P_discharge = float(pyo.value(model.P_storage_discharge[s]))
+            storage.Q = float(pyo.value(model.Q_storage[s]))
             storage.SoC = soc
             storage.soc_initial = soc
 
@@ -1141,6 +1250,19 @@ def _carry_storage_h2_state_from_model(grid, model):
             el.H2_mass_initial = mass
             model.mass_H2_prev[e].set_value(mass)
             el.P_electrolyser = float(pyo.value(model.P_electrolyser[e]))
+
+    if grid.HP:
+        for hp in grid.heat_pumps:
+            h = hp.heatPumpNumber
+            e_state = float(pyo.value(model.E_heat_pump[h]))
+            p_hp = float(pyo.value(model.P_heat_pump[h]))
+            q_hp = float(pyo.value(model.Q_heat_pump[h]))
+            hp.E_state = e_state
+            hp.P_hp = p_hp
+            hp.Q_hp = q_hp
+            hp.P_shed = hp.P_ref - p_hp
+            hp.Q_shed = hp.Q_ref - q_hp
+            model.E_heat_pump_prev[h].set_value(e_state)
 
 
 def _maybe_empty_h2_after_myopic_step(grid, model, hour_1based):
@@ -1173,6 +1295,20 @@ def _ts_storage_power_row(grid, time_1based):
         row[storage.name] = np.float64(
             (storage.P_discharge - storage.P_charge) * storage.S_base
         )
+    return row
+
+
+def _ts_heat_pump_power_row(grid, time_1based):
+    row = {'time': time_1based}
+    for hp in grid.heat_pumps:
+        row[hp.name] = np.float64(hp.P_hp * hp.S_base)
+    return row
+
+
+def _ts_heat_pump_energy_row(grid, time_1based):
+    row = {'time': time_1based}
+    for hp in grid.heat_pumps:
+        row[hp.name] = np.float64(hp.E_state)
     return row
 
 
@@ -1296,6 +1432,8 @@ def ts_acdc_opf(
     Time_series_res_available = []
     Time_series_storage_soc = []
     Time_series_storage_power = []
+    Time_series_heat_pump_power = []
+    Time_series_heat_pump_energy = []
 
     weights_def = default_obj_weights()
 
@@ -1477,13 +1615,16 @@ def ts_acdc_opf(
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
 
-        if grid.ESS or grid.H2:
+        if grid.ESS or grid.H2 or grid.HP:
             _carry_storage_h2_state_from_model(grid, model)
             if grid.H2:
                 _maybe_empty_h2_after_myopic_step(grid, model, idx + 1)
         if grid.ESS:
             Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
             Time_series_storage_power.append(_ts_storage_power_row(grid, idx + 1))
+        if grid.HP:
+            Time_series_heat_pump_power.append(_ts_heat_pump_power_row(grid, idx + 1))
+            Time_series_heat_pump_energy.append(_ts_heat_pump_energy_row(grid, idx + 1))
 
         t_minus_1_values = _snapshot_initial_values(model)
 
@@ -1510,7 +1651,8 @@ def ts_acdc_opf(
                             Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
                             Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
                             Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
-                            Time_series_storage_soc, Time_series_storage_power)
+                            Time_series_storage_soc, Time_series_storage_power,
+                            Time_series_heat_pump_power, Time_series_heat_pump_energy)
 
     av_t_modelsolve = total_solve_time / count if count else 0.0
     av_t_modelupdate=total_update_time / count if count else 0.0
@@ -1535,6 +1677,305 @@ def ts_acdc_opf(
     return timing_info
 
 
+def ts_acdc_l_opf(
+    grid,
+    start=1,
+    end=None,
+    ObjRule=None,
+    OnlyGen=True,
+    print_step=False,
+    solver='glpk',
+    obj_scaling=1.0,
+    warm_start_mode='roll',
+    export_to_grid=True,
+    build_only=False,
+):
+    """Run sequential linear AC(/DC) OPF over a time-series window.
+
+    Myopic twin of :func:`ts_acdc_opf` using
+    :func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_acdc`.
+    Supports ``Energy_cost`` / ``H2_sale`` only (same as snapshot linear OPF).
+    Carries BESS SoC / H₂ mass / HP energy between hours when ``grid.ESS`` /
+    ``grid.H2`` / ``grid.HP``. Hybrid via ``grid.ACmode`` / ``grid.DCmode``;
+    ``fx_conv`` when converters have ``OPF_fx``. ``SoC_deviation`` is rejected
+    (quadratic). Heat pumps are P-only (``Q_hp`` exported as 0).
+
+    Parameters
+    ----------
+    grid : Grid
+        Network with ``Time_series`` attached.
+    start, end : int, optional
+        Inclusive **1-based** hour indices (same as :func:`ts_acdc_opf`).
+    ObjRule : dict or None, optional
+        Objective weights; linear path accepts ``Energy_cost`` / ``H2_sale``.
+    OnlyGen : bool, optional
+        Passed to :func:`~pyflow_acdc.ACDC_OPF.obj_w_rule`.
+    print_step : bool, optional
+        Print the current hour index while running.
+    solver : str, optional
+        Pyomo LP solver name.
+    obj_scaling : float, optional
+        Divide the objective by this factor.
+    warm_start_mode : {'roll', 'hard'}, optional
+        Variable warm-start policy between hours.
+    export_to_grid : bool, optional
+        Export the last solved model state onto ``grid``.
+    build_only : bool, optional
+        Build / update only (no solve); still writes TS result frames.
+
+    Returns
+    -------
+    dict
+        Timing keys ``Create``, ``Update model Avg``, ``Solve model Avg``,
+        ``Export``.
+    """
+    if not pyomo_imp:
+        raise ImportError("ts_acdc_l_opf requires Pyomo")
+
+    idx = start - 1
+    warm_start_mode = str(warm_start_mode).lower()
+    if warm_start_mode not in ('roll', 'hard'):
+        raise ValueError("warm_start_mode must be either 'roll' or 'hard'")
+    TS_len = len(grid.Time_series[0].data)
+    total_solve_time = 0
+    total_update_time = 0
+    count = 0
+    if end is None:
+        end = TS_len
+    max_time = min(TS_len, end)
+
+    Time_series_line_res = []
+    Time_series_conv_res = []
+    Time_series_grid_loading = []
+    Time_series_Opt_res_P_conv_AC = []
+    Time_series_Opt_res_Q_conv_AC = []
+    Time_series_Opt_res_P_conv_DC = []
+    Time_series_Opt_res_P_Load = []
+    Time_series_Opt_res_P_extGrid = []
+    Time_series_Opt_res_Q_extGrid = []
+    Time_series_Opt_curtailment = []
+    Time_series_price = []
+    Time_series_PZ_cost_kEUR = []
+    Time_series_PZ_load = []
+    Time_series_net_price_zone_power = []
+    Time_series_PN_min = []
+    Time_series_PN_max = []
+    Time_series_a = []
+    Time_series_b = []
+    Time_series_res_available = []
+    Time_series_storage_soc = []
+    Time_series_storage_power = []
+    Time_series_heat_pump_power = []
+    Time_series_heat_pump_energy = []
+
+    analyse_grid(grid)
+    weights_def, price_zones = obj_w_rule(grid, ObjRule, OnlyGen)
+    check_linear_opf_weights(weights_def)
+
+    def _snapshot_initial_values(model_obj):
+        values = {}
+        for var_obj in model_obj.component_objects(pyo.Var, active=True):
+            values[var_obj.name] = {
+                index: var_obj[index].value for index in var_obj}
+        return values
+
+    def _build_ts_l_model():
+        model_obj = pyo.ConcreteModel()
+        model_obj.name = "TS AC/DC linear OPF"
+        opf_create_l_model_acdc(model_obj, grid, TEP=False, window_block=False)
+        obj_rule_local = opf_obj_l(model_obj, grid, weights_def)
+        if obj_scaling != 1.0:
+            obj_rule_local = obj_rule_local / obj_scaling
+        model_obj.obj = pyo.Objective(rule=obj_rule_local, sense=pyo.minimize)
+        model_obj.obj_scaling = obj_scaling
+        if grid.DCmode and any(conv.OPF_fx for conv in grid.Converters_ACDC):
+            fx_conv(model_obj, grid)
+        return model_obj
+
+    t1 = time.perf_counter()
+    model = _build_ts_l_model()
+    t2 = time.perf_counter()
+    t_modelcreate = t2 - t1
+    initial_values = _snapshot_initial_values(model)
+    t_minus_1_values = None
+
+    infeasible = 0
+    inf_list = []
+
+    while idx < max_time:
+        for ts in grid.Time_series:
+            update_grid_data(grid, ts, idx, price_zones)
+        Total_load, min_generation, max_generation = grid_state(grid)
+
+        if Total_load < min_generation or Total_load > max_generation:
+            print(
+                f"Total load {Total_load} is out of bounds "
+                f"{min_generation} and {max_generation}")
+            inf_list.append(idx + 1)
+            idx += 1
+            infeasible += 1
+            continue
+
+        t1 = time.perf_counter()
+        if warm_start_mode == 'hard':
+            reset_to_initialize(model, initial_values)
+        _modify_parameters_l(grid, model, price_zones, window_block=False)
+        t2 = time.perf_counter()
+        t_modelupdate = t2 - t1
+
+        if build_only:
+            t_modelsolve = 0.0
+        else:
+            results, solver_stats = pyomo_model_solve(
+                model, grid, solver, suppress_warnings=True)
+            solution_found = bool(
+                (solver_stats or {}).get('solution_found', False))
+            if (results is None) or (not solution_found):
+                retry_mode = 'roll' if warm_start_mode == 'hard' else 'hard'
+                if print_step:
+                    print(f"{idx+1} Failed with {warm_start_mode}")
+                retry_model = _build_ts_l_model()
+                if retry_mode == 'hard':
+                    reset_to_initialize(retry_model, initial_values)
+                elif t_minus_1_values is not None:
+                    reset_to_initialize(retry_model, t_minus_1_values)
+                _modify_parameters_l(
+                    grid, retry_model, price_zones, window_block=False)
+                retry_results, retry_stats = pyomo_model_solve(
+                    retry_model, grid, solver, suppress_warnings=True)
+                retry_solution_found = bool(
+                    (retry_stats or {}).get('solution_found', False))
+                if retry_results is not None and retry_solution_found:
+                    model = retry_model
+                    results, solver_stats = retry_results, retry_stats
+                    if print_step:
+                        print(
+                            f"{idx+1} Passed with {retry_mode} "
+                            f"returning to {warm_start_mode}")
+                else:
+                    infeasible += 1
+                    inf_list.append(idx + 1)
+                    if print_step:
+                        print(f"{idx+1} Failed with {retry_mode}")
+                    idx += 1
+                    continue
+            t_modelsolve = (solver_stats or {}).get('time')
+            if t_modelsolve is None:
+                t_modelsolve = 0.0
+
+        total_update_time += t_modelupdate
+        total_solve_time += t_modelsolve
+        count += 1
+
+        (
+            opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,
+            opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,
+            opt_res_Loading_conv,
+        ) = opf_step_results_l(model, grid)
+
+        opt_res_curtailment['time'] = idx + 1
+        opt_res_P_conv_AC['time'] = idx + 1
+        opt_res_Q_conv_AC['time'] = idx + 1
+        opt_res_P_conv_DC['time'] = idx + 1
+        opt_P_load['time'] = idx + 1
+        opt_res_P_extGrid['time'] = idx + 1
+        opt_res_Q_extGrid['time'] = idx + 1
+        opt_res_Loading_conv['time'] = idx + 1
+
+        line_data, loadS_AC, loadP_DC = _calculate_line_loading_from_model(
+            grid, model, idx)
+        grid_data_loading = _calculate_grid_loading(
+            grid, loadS_AC, loadP_DC, idx)
+        price_zone_price = _calculate_price_zone_price(grid, idx)
+        net_price_zone_power = _calculate_net_price_zone_power_from_model(
+            grid, model, idx)
+        pz_cost_kEUR = _calculate_pz_social_cost_kEUR_from_model(
+            grid, model, idx)
+        pz_load_mw = _calculate_pz_p_known_mw_from_model(grid, model, idx)
+        pn_min, pn_max, a, b = _calculate_pn_min_max_from_model(
+            grid, model, idx)
+        res_available = _calculate_res_available_from_model(grid, model, idx)
+
+        Time_series_price.append(price_zone_price)
+        Time_series_PZ_cost_kEUR.append(pz_cost_kEUR)
+        Time_series_PZ_load.append(pz_load_mw)
+        Time_series_net_price_zone_power.append(net_price_zone_power)
+        Time_series_PN_min.append(pn_min)
+        Time_series_PN_max.append(pn_max)
+        Time_series_a.append(a)
+        Time_series_b.append(b)
+        Time_series_res_available.append(res_available)
+        Time_series_conv_res.append(opt_res_Loading_conv)
+        Time_series_line_res.append(line_data)
+        Time_series_grid_loading.append(grid_data_loading)
+        Time_series_Opt_res_P_conv_AC.append(opt_res_P_conv_AC)
+        Time_series_Opt_res_Q_conv_AC.append(opt_res_Q_conv_AC)
+        Time_series_Opt_res_P_conv_DC.append(opt_res_P_conv_DC)
+        Time_series_Opt_res_P_Load.append(opt_P_load)
+        Time_series_Opt_res_P_extGrid.append(opt_res_P_extGrid)
+        Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
+        Time_series_Opt_curtailment.append(opt_res_curtailment)
+
+        if grid.ESS or grid.H2 or grid.HP:
+            _carry_storage_h2_state_from_model(grid, model)
+            if grid.H2:
+                _maybe_empty_h2_after_myopic_step(grid, model, idx + 1)
+        if grid.ESS:
+            Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
+            Time_series_storage_power.append(
+                _ts_storage_power_row(grid, idx + 1))
+        if grid.HP:
+            Time_series_heat_pump_power.append(
+                _ts_heat_pump_power_row(grid, idx + 1))
+            Time_series_heat_pump_energy.append(
+                _ts_heat_pump_energy_row(grid, idx + 1))
+
+        t_minus_1_values = _snapshot_initial_values(model)
+        if print_step:
+            print(idx + 1)
+        idx += 1
+
+    if export_to_grid:
+        t1 = time.perf_counter()
+        export_acdc_l_model_to_pyflow_acdc(model, grid)
+        for obj in weights_def:
+            weights_def[obj]['v'] = calculate_objective(grid, obj)
+        t2 = time.perf_counter()
+        t_modelexport = t2 - t1
+    else:
+        t_modelexport = 0.0
+
+    grid.ts_infeasible_indices = sorted(set(inf_list))
+    ts_results = pack_variables(
+        Time_series_conv_res, Time_series_line_res, Time_series_grid_loading,
+        Time_series_Opt_res_P_conv_AC, Time_series_Opt_res_Q_conv_AC,
+        Time_series_Opt_res_P_conv_DC,
+        Time_series_Opt_res_P_extGrid, Time_series_Opt_res_Q_extGrid,
+        Time_series_Opt_curtailment,
+        Time_series_Opt_res_P_Load, Time_series_price,
+        Time_series_PZ_cost_kEUR, Time_series_PZ_load,
+        Time_series_net_price_zone_power,
+        Time_series_PN_min, Time_series_PN_max, Time_series_a, Time_series_b,
+        Time_series_res_available,
+        Time_series_storage_soc, Time_series_storage_power,
+        Time_series_heat_pump_power, Time_series_heat_pump_energy,
+    )
+
+    av_t_modelsolve = total_solve_time / count if count else 0.0
+    av_t_modelupdate = total_update_time / count if count else 0.0
+    _save_TS_to_grid(grid, ts_results, infeasible)
+    grid.OPF_obj = weights_def
+    grid.OPF_run = True
+    grid.Time_series_ran = True
+
+    return {
+        "Create": t_modelcreate,
+        "Update model Avg": av_t_modelupdate,
+        "Solve model Avg": av_t_modelsolve,
+        "Export": t_modelexport,
+    }
+
+
 def _save_TS_to_grid (grid,ts_results,infeasible):
     # Create the DataFrame from the list of rows
     (Time_series_conv_res,Time_series_line_res,Time_series_grid_loading,
@@ -1542,7 +1983,8 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
     Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
     Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
     Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
-    Time_series_storage_soc, Time_series_storage_power)= ts_results
+    Time_series_storage_soc, Time_series_storage_power,
+    Time_series_heat_pump_power, Time_series_heat_pump_energy)= ts_results
 
     grid.time_series_results['converter_p_dc'] = _to_dataframe(Time_series_Opt_res_P_conv_DC)
     grid.time_series_results['converter_q_ac'] = _to_dataframe(Time_series_Opt_res_Q_conv_AC)
@@ -1571,6 +2013,10 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
         grid.time_series_results['storage_soc'] = _to_dataframe(Time_series_storage_soc)
     if Time_series_storage_power:
         grid.time_series_results['storage_power'] = _to_dataframe(Time_series_storage_power)
+    if Time_series_heat_pump_power:
+        grid.time_series_results['heat_pump_p'] = _to_dataframe(Time_series_heat_pump_power)
+    if Time_series_heat_pump_energy:
+        grid.time_series_results['heat_pump_energy_state'] = _to_dataframe(Time_series_heat_pump_energy)
     # Split line time-series into explicit loading and MW-to datasets
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)

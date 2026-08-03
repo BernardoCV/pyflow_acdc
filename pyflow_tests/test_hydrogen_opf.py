@@ -136,8 +136,11 @@ def test_hydrogen_window_reporting():
 
     assert "Hydrogen_window_mass_H2" in res.tables
     assert "Hydrogen_window_P_e" in res.tables
-    assert len(m_df) == 5
+    # mass includes leading initial row at frame start-1; P_e is solve frames only
+    assert len(m_df) == 6
+    assert list(m_df["frame"]) == [-1, 0, 1, 2, 3, 4]
     assert len(pe_df) == 5
+    assert list(pe_df["frame"]) == [0, 1, 2, 3, 4]
 
 
 def test_window_nl_opf_electrolyser_only_requires_time_series():

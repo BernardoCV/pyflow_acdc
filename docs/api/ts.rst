@@ -53,8 +53,8 @@ Grid Data Update Helper
 Optimal Power Flow Time Series
 ------------------------------
 
-Time series
-^^^^^^^^^^^
+Nonlinear (myopic)
+^^^^^^^^^^^^^^^^^^
 .. autofunction:: pyflow_acdc.ts_acdc_opf
 
    Objective rule (``ObjRule``) — see :ref:`Objective Functions <obj_functions>`.
@@ -65,7 +65,7 @@ Time series
    With H₂ (``grid.H2``): inventory carries within ``H2_mass_max``;
    ``empty_tank_cycle`` empties between solves; economics via
    ``ObjRule['H2_sale']``.
-   Element models: :doc:`modelling_storage_hydrogen`.
+   Element models: :doc:`modelling_flexible_assets`.
    Coupled multi-hour inventory / terminal mass:
    :doc:`window` (API) and :doc:`../usage_window_opf` (workflow).
 
@@ -75,6 +75,17 @@ Time series
 .. literalinclude:: ../../pyflow_tests/doc_examples/ts/02_cross_sectional_time_series.py
    :language: python
    :lines: 2-
+
+Linear (myopic)
+^^^^^^^^^^^^^^^
+.. autofunction:: pyflow_acdc.ts_acdc_l_opf
+
+   Myopic twin of :func:`~pyflow_acdc.ts_acdc_opf` using
+   :func:`~pyflow_acdc.optimal_l_pf`'s builder
+   (``opf_create_l_model_acdc``). Supports ``Energy_cost`` / ``H2_sale`` only;
+   ``SoC_deviation`` is rejected. Carries BESS SoC / H₂ mass and
+   ``empty_tank_cycle`` the same way. AC-only and hybrid grids. See
+   :doc:`L_models`.
 
 
 
