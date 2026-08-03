@@ -48,7 +48,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   so OPF cost coeffs can track nodal / price-zone prices.
 - **Dash**: restyled interactive dashboard (``run_dash``, assets, season-compare
   via ``create_season_compare_dash_app``); PEI season-compare doc example and
-  screenshot.
+  screenshot. Family mode adds ``Curtailment`` (``window_opf_results`` /
+  rolling; node/zone/total is MW-weighted
+  ``Σ(curt·available)/Σ(available)`` with ``available=ren/(1−curt)``, so
+  ``curt=0`` still counts; shown as %). Add plot preserves per-panel family /
+  aggregation / elements.
 - **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
   data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
   OPF.

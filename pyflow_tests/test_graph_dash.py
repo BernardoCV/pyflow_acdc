@@ -224,7 +224,32 @@ def test_power_family_overview():
     res = grid.window_opf_results
     families = available_dash_families(grid, res, source="window")
     assert families[0] == "Power"
+    assert "Curtailment" in families
     assert available_family_aggregations(grid, "Power", res) == ["source"]
+
+    df_c, ylabel_c = resolve_family_df(
+        res, grid, "Curtailment", "ren_source", source="window"
+    )
+    assert ylabel_c == "Curtailment %"
+    assert list(df_c["rs1"]) == [0.0, 10.0, 5.0]
+
+    # MW-weighted total: curt=0 still counts via available=ren_power.
+    # rs1: curt=[0, 0.5], ren=[90, 5] → avail=[90, 10]
+    # rs2: curt=[0, 0],   ren=[10, 10] → avail=[10, 10]
+    # frame0: (0*90+0*10)/(90+10)=0; frame1: (0.5*10+0*10)/(10+10)=0.25 → 25%
+    weighted_res = {
+        "curtailment": pd.DataFrame(
+            {"frame": [0, 1], "rs1": [0.0, 0.5], "rs2": [0.0, 0.0]}
+        ),
+        "ren_power": pd.DataFrame(
+            {"frame": [0, 1], "rs1": [90.0, 5.0], "rs2": [10.0, 10.0]}
+        ),
+    }
+    bare = pyf.Grid(S_base=100)
+    df_w, _ = resolve_family_df(
+        weighted_res, bare, "Curtailment", "total", source="window"
+    )
+    assert list(df_w["total"]) == pytest.approx([0.0, 25.0])
 
     df, ylabel = resolve_family_df(res, grid, "Power", "source", source="window")
     assert ylabel == "Power (MW)"
@@ -393,6 +418,8 @@ def test_rolling_window_dash_controls_and_frame_limits():
     grid.rolling_window_info = info
     app = create_rolling_dash_app(grid)
     assert app.layout is not None
+    ids = _layout_ids(app.layout)
+    assert "roll-panel-configs" in ids
 
     with pytest.raises(ValueError, match="rolling"):
         create_rolling_dash_app(pyf.Grid(S_base=100))
@@ -544,7 +571,7 @@ def test_create_dash_app_callbacks_fire():
     assert opened is False
 
     render = _callback_fn(app, _find_callback_key(app, "panel-controls.children", "panel-graphs.children"))
-    ctrls, graphs = render([0, 1], "classic")
+    ctrls, graphs = render([0, 1], {}, "classic")
     assert len(ctrls) == 2
     assert len(graphs) == 2
 
