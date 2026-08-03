@@ -34,8 +34,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``E_heat_pump`` in kWh). Myopic carry in ``ts_acdc_opf``; parent energy chain
   in ``window_nl_opf`` (``window_heat_pump_constraints``). Results
   ``ext_heat_pump`` / ``heat_pump_window``. TS types ``hp_P_ref``, ``hp_Q_ref``,
-  ``hp_E_min``, ``hp_E_max``. Docs ``usage_heat_pump`` / ``api/heat_pump``;
-  plan ``plans/heat_pump_plan.md``; tests ``test_heat_pump_opf.py``.
+  ``hp_E_min``, ``hp_E_max``. Linear twin (P-only): ``optimal_l_pf`` /
+  ``ts_acdc_l_opf`` / ``window_l_opf`` with ``Q_heat_pump`` fixed at 0. Docs
+  ``usage_heat_pump`` / ``api/heat_pump``; plan ``plans/heat_pump_plan.md``;
+  tests ``test_heat_pump_opf.py``.
 - **Coupled window NL OPF** (``window_opf.py``): ``window_nl_opf`` solves a
   multi-hour nonlinear OPF with linked BESS SoC and H₂ inventory across frames;
   ``rolling_window_nl_opf`` chains windows with state carry-over; export helpers

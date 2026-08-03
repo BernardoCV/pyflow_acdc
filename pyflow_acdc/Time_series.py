@@ -1117,6 +1117,15 @@ def _modify_parameters_l(grid, model, Price_Zones=False, window_block=False):
                 float(el.H2_mass_initial)
             )
 
+    if grid.HP:
+        for hp in grid.heat_pumps:
+            h = hp.heatPumpNumber
+            if not window_block:
+                model.E_heat_pump_prev[h].set_value(float(hp.E_state))
+            model.hp_p_ref[h].set_value(float(hp.P_ref))
+            model.hp_e_min[h].set_value(float(hp.E_min))
+            model.hp_e_max[h].set_value(float(hp.E_max))
+
 
 def _modify_parameters(grid,model,Price_Zones,window_block=False):
     opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
@@ -1606,7 +1615,7 @@ def ts_acdc_opf(
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
 
-        if grid.ESS or grid.H2:
+        if grid.ESS or grid.H2 or grid.HP:
             _carry_storage_h2_state_from_model(grid, model)
             if grid.H2:
                 _maybe_empty_h2_after_myopic_step(grid, model, idx + 1)
@@ -1686,9 +1695,10 @@ def ts_acdc_l_opf(
     Myopic twin of :func:`ts_acdc_opf` using
     :func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_acdc`.
     Supports ``Energy_cost`` / ``H2_sale`` only (same as snapshot linear OPF).
-    Carries BESS SoC / H₂ mass between hours when ``grid.ESS`` / ``grid.H2``.
-    Hybrid via ``grid.ACmode`` / ``grid.DCmode``; ``fx_conv`` when converters
-    have ``OPF_fx``. ``SoC_deviation`` is rejected (quadratic).
+    Carries BESS SoC / H₂ mass / HP energy between hours when ``grid.ESS`` /
+    ``grid.H2`` / ``grid.HP``. Hybrid via ``grid.ACmode`` / ``grid.DCmode``;
+    ``fx_conv`` when converters have ``OPF_fx``. ``SoC_deviation`` is rejected
+    (quadratic). Heat pumps are P-only (``Q_hp`` exported as 0).
 
     Parameters
     ----------
@@ -1755,6 +1765,8 @@ def ts_acdc_l_opf(
     Time_series_res_available = []
     Time_series_storage_soc = []
     Time_series_storage_power = []
+    Time_series_heat_pump_power = []
+    Time_series_heat_pump_energy = []
 
     analyse_grid(grid)
     weights_def, price_zones = obj_w_rule(grid, ObjRule, OnlyGen)
@@ -1904,7 +1916,7 @@ def ts_acdc_l_opf(
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
 
-        if grid.ESS or grid.H2:
+        if grid.ESS or grid.H2 or grid.HP:
             _carry_storage_h2_state_from_model(grid, model)
             if grid.H2:
                 _maybe_empty_h2_after_myopic_step(grid, model, idx + 1)
@@ -1912,6 +1924,11 @@ def ts_acdc_l_opf(
             Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
             Time_series_storage_power.append(
                 _ts_storage_power_row(grid, idx + 1))
+        if grid.HP:
+            Time_series_heat_pump_power.append(
+                _ts_heat_pump_power_row(grid, idx + 1))
+            Time_series_heat_pump_energy.append(
+                _ts_heat_pump_energy_row(grid, idx + 1))
 
         t_minus_1_values = _snapshot_initial_values(model)
         if print_step:
@@ -1941,6 +1958,7 @@ def ts_acdc_l_opf(
         Time_series_PN_min, Time_series_PN_max, Time_series_a, Time_series_b,
         Time_series_res_available,
         Time_series_storage_soc, Time_series_storage_power,
+        Time_series_heat_pump_power, Time_series_heat_pump_energy,
     )
 
     av_t_modelsolve = total_solve_time / count if count else 0.0
