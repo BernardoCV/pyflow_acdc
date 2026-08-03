@@ -40,7 +40,13 @@ def _discover_case_files():
         folder = EXAMPLE_GRIDS_DIR / subdir
         if not folder.is_dir():
             continue
-        case_files.extend(sorted(folder.glob("*.py")))
+        case_files.extend(
+            sorted(
+                f
+                for f in folder.glob("*.py")
+                if f.name != "__init__.py" and not f.name.startswith("_")
+            )
+        )
     return case_files
 
 

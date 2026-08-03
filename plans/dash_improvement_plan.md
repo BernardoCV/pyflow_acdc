@@ -55,7 +55,9 @@ All green: `pytest pyflow_tests/test_graph_dash.py` (29 passed).
 
 ## 0. Remaining work
 
-Only **MP family panels** (§1.5) and the **optional** refactors R3/R4 (§4) are left.
+- **§1.5 MP family panels** — only functional gap from the original plan.
+- **§6 Linked x-zoom** — backlog (later); sidebar x-limits already sync all plots.
+- **R3 / R4** — optional cleanups.
 
 ---
 
@@ -212,5 +214,24 @@ duplication **without changing behavior or the public API**. (§1 F1 already del
 
 ## 5. Remaining order
 
-1. **§1.5 MP family panels** — the only functional gap.
-2. **R3 / R4** — optional cleanups, only if desired.
+1. **§1.5 MP family panels** — the only functional gap from the original plan.
+2. **§6 Linked x-zoom** — later / backlog (rolling first if picked up).
+3. **R3 / R4** — optional cleanups, only if desired.
+
+---
+
+## 6. Linked interactive x-zoom (BACKLOG — later)
+
+**Status:** deferred. Sidebar **X-axis limits** (window/season) and rolling **From window /
+Windows visible** already apply the same x-range to every plot. Plotly box-zoom / pan on
+one graph does **not** sync the others today.
+
+**Idea:** listen to `relayoutData` on any panel graph → shared x-range store → push the
+same x-range to all figures (optionally mirror into `x-min`/`x-max` or rolling window
+controls). Handle reset/autoscale, ignore y-only zooms, avoid feedback loops when writing
+ranges back into figures. Rolling needs care (frame index vs commit-window controls).
+
+**Scope when picked up:** start with `create_rolling_dash_app`; then shared
+`_build_family_dash_app` if useful. Estimate: moderate (~half day rolling-only).
+
+**Not blocking** PEI / linear hybrid / curtailment Dash work.

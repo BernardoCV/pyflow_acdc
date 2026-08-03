@@ -1520,7 +1520,8 @@ class Storage:
     ``P_discharge - P_charge`` (discharge counts as generation).
 
     SoC is in **pu** (fraction of ``E_max``). ``E_max`` is physical capacity in MWh.
-    On AC: ``S_max`` and optional ``Q``. On DC: ``P_max`` net active limit.
+    On AC: ``S_max`` (apparent) and ``P_max`` (= ``S_max`` for net-P limits), optional ``Q``.
+    On DC: ``P_max`` net active limit.
     ``soc_ref`` is the soft SoC target for ``ObjRule['SoC_deviation']`` (defaults to
     ``soc_initial``); used by myopic ``ts_acdc_opf``.
     """
@@ -1554,6 +1555,7 @@ class Storage:
                 self.P_discharge *= rate
                 if self.connected == AcDcSide.AC:
                     self.S_max *= rate
+                    self.P_max *= rate
                     self.Q *= rate
                 else:
                     self.P_max *= rate
@@ -1645,6 +1647,7 @@ class Storage:
         if connected == AcDcSide.AC:
             self.Node_AC = node.name
             self.S_max = S_max
+            self.P_max = S_max
             self.Q = 0.0
         else:
             self.Node_DC = node.name

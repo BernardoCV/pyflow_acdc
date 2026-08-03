@@ -12,6 +12,16 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Linear AC(/DC) hybrid OPF stack (LP)**: ``optimal_l_pf``,
+  ``window_l_opf`` / ``rolling_window_l_opf``, and myopic ``ts_acdc_l_opf``
+  mirror the NL operational surface on AC-only and hybrid grids
+  (``ACmode`` / ``DCmode``). Builder ``opf_create_l_model_acdc`` adds
+  linearized DC PF at ``V_ini``, thin converter link
+  ``np·Ps + P_DC + np·(a + b·Ps) = 0``, and ``fx_conv`` PDC/PQ/PV (Q fix
+  skipped when the linear model has no ``Q_conv_s_AC``). BESS remains P-only;
+  ``SoC_deviation`` stays rejected (quadratic). Hybrid ``TEP=True`` still
+  raises. Docs: ``api/L_models``, ``api/ts``, ``usage_window_opf``,
+  ``architecture``; example ``doc_examples/L_models/05_hybrid_linear_opf.py``.
 - **Battery storage (BESS)**: ``Storage`` class, ``add_storage``, and NL OPF
   SoC dynamics / S-circle on AC or DC buses when ``grid.ESS``. Snapshot
   results via ``Results.ext_storage``; docs ``usage_storage`` / ``api/storage``.
@@ -24,8 +34,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``E_heat_pump`` in kWh). Myopic carry in ``ts_acdc_opf``; parent energy chain
   in ``window_nl_opf`` (``window_heat_pump_constraints``). Results
   ``ext_heat_pump`` / ``heat_pump_window``. TS types ``hp_P_ref``, ``hp_Q_ref``,
-  ``hp_E_min``, ``hp_E_max``. Docs ``usage_heat_pump`` / ``api/heat_pump``;
-  plan ``plans/heat_pump_plan.md``; tests ``test_heat_pump_opf.py``.
+  ``hp_E_min``, ``hp_E_max``. Linear twin (P-only): ``optimal_l_pf`` /
+  ``ts_acdc_l_opf`` / ``window_l_opf`` with ``Q_heat_pump`` fixed at 0. Docs
+  ``usage_heat_pump`` / ``api/heat_pump``; plan ``plans/heat_pump_plan.md``;
+  tests ``test_heat_pump_opf.py``.
 - **Coupled window NL OPF** (``window_opf.py``): ``window_nl_opf`` solves a
   multi-hour nonlinear OPF with linked BESS SoC and H₂ inventory across frames;
   ``rolling_window_nl_opf`` chains windows with state carry-over; export helpers
@@ -37,9 +49,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
   ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
   rolling keep hard SoC ini/final and optional ``H2_mass_final``.
-- **Linearised AC OPF** (``optimal_l_pf``): BESS (P-only, no Q / S-circle) and
-  electrolyser inventory / ``H2_sale``; raises if ``grid.DCmode``;
-  ``SoC_deviation`` is rejected (quadratic).
+  Linear twin: ``ts_acdc_l_opf`` (same carry / warm-start; ``Energy_cost`` /
+  ``H2_sale`` only).
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
   ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``, and heat-pump
   ``TSType.HP_P_REF`` / ``HP_Q_REF`` / ``HP_E_MIN`` / ``HP_E_MAX``.
@@ -48,7 +59,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   so OPF cost coeffs can track nodal / price-zone prices.
 - **Dash**: restyled interactive dashboard (``run_dash``, assets, season-compare
   via ``create_season_compare_dash_app``); PEI season-compare doc example and
-  screenshot.
+  screenshot. Family mode adds ``Curtailment`` (``window_opf_results`` /
+  rolling; node/zone/total is MW-weighted
+  ``Σ(curt·ren_available)/Σ(ren_available)`` from exported pre-curtail
+  available MW, so ``curt=0`` and ``curt=1`` both work; shown as %). Add plot
+  preserves per-panel family / aggregation / elements.
+- **Window results**: ``ren_available`` (pre-curtail renewable MW) exported
+  alongside ``ren_power`` / ``curtailment`` for weighted curtailment plots.
 - **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
   data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
   OPF.
@@ -80,6 +97,23 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
+- **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same
+  module; aligns with NL ``opf_create_nl_model_acdc`` naming ahead of hybrid LP).
+- **Linear hybrid OPF (LP)**: ``opf_create_l_model_acdc`` follows
+  ``ACmode`` / ``DCmode``; linearized DC ``V(V−V)G`` / ``PDC_from`` /
+  ``PDC_to`` at ``V_ini``; thin converter loss ``a + b·Ps``; ``fx_conv`` on
+  snapshot / window / TS linear drivers; window and ``ts_acdc_l_opf`` accept
+  hybrid grids. Richer converter LP / S-limit outer approx deferred. Hybrid
+  ``TEP=True`` still raises until TEP hooks are wired.
+- **Rolling foresight**: ``rolling_window_nl_opf`` takes ``future_sight`` in
+  ``[0, 1]`` (default ``0``) instead of ``soc_final_mode='future_sight'``.
+  Steps are ``ceil(future_sight · window_size)`` (clamped to remaining hours);
+  SoC final is enforced at the foresight end; with ``H2_mass_final``, the
+  foresight segment requires ``≥ future_sight · H2_mass_final`` (raw fraction).
+  Docs: ``usage_window_opf`` / ``api/window``.
+- **Pickle load migration**: ``_migrate_legacy_grid_attrs`` backfills node
+  ``_price`` / ``_qf`` / ``_lf`` and gen ``link_cost`` (from legacy ``price`` /
+  ``price_link``) so pre-property wind-farm pickles load cleanly.
 - **Power flow known injections**: ``update_pq_ac`` / ``update_p_dc`` fold BESS
   and H₂ operating fields into the PF known P/Q (same signs as NL OPF). Storage
   contributes ``net_P_pu = P_discharge - P_charge`` (AC also ``Q``); electrolyser

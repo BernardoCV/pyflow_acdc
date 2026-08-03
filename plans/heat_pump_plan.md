@@ -45,6 +45,7 @@ Communities*, CIRED 2026 Brussels Workshop, Paper 1361, 2026.
 | TS types `hp_P_ref` / `hp_Q_ref` / `hp_E_min` / `hp_E_max` | Done |
 | Operation-oriented FEL (`E_flex`, terminal neutrality) | Deferred |
 | Post-solve reserve envelope (`R_up` / `R_down`) | Deferred |
+| Linear OPF (`optimal_l_pf` / `ts_acdc_l_opf` / `window_l_opf`) P-only | Done |
 | DC heat pumps | Out of scope (AC-only) |
 | Inferred thermal / comfort model inside pyflow | Out of scope |
 
@@ -136,6 +137,15 @@ Nodal load hook (`Gen_Pheatpump_constraint`): subtract `P_heat_pump` / `Q_heat_p
 
 - Each hour: update TS (`hp_*`), set `E_heat_pump_prev` from carried `hp.E_state`, solve, export / carry `E_state`.
 
+### Linear OPF (P-only, shipped)
+
+Same P/E formulation as NL on `optimal_l_pf` / `ts_acdc_l_opf` / `window_l_opf`
+(`heat_pump_variables_l` / `heat_pump_constraints_l`). Differences:
+
+- No Q nodal injection; `Q_heat_pump` is a fixed-0 Var (shared window export).
+- Export sets `Q_hp = 0` (shed reporting still uses `Q_ref - Q_hp`).
+- Parent chain reuses `window_heat_pump_constraints`.
+
 ---
 
 ## 5. Results
@@ -143,8 +153,8 @@ Nodal load hook (`Gen_Pheatpump_constraint`): subtract `P_heat_pump` / `Q_heat_p
 | API | When |
 |-----|------|
 | `Results.ext_heat_pump()` | After snapshot OPF — P/Q served, shed, energy state |
-| `Results.heat_pump_window()` | After `window_nl_opf` — P/Q/E trajectories |
-| `grid.time_series_results['heat_pump_p' / 'heat_pump_energy_state']` | After `ts_acdc_opf` |
+| `Results.heat_pump_window()` | After `window_nl_opf` / `window_l_opf` — P/Q/E trajectories |
+| `grid.time_series_results['heat_pump_p' / 'heat_pump_energy_state']` | After `ts_acdc_opf` / `ts_acdc_l_opf` |
 
 ---
 
@@ -161,6 +171,9 @@ Nodal load hook (`Gen_Pheatpump_constraint`): subtract `P_heat_pump` / `Q_heat_p
 | `ACDC_OPF.py` | `heat_pump_info` in OPF translate |
 | `window_opf.py` | `window_heat_pump_constraints`, export frames |
 | `Time_series.py` | HP TS update, myopic `E` carry, TS result keys |
+| `AC_OPF_L_model.py` | `heat_pump_variables_l` / `heat_pump_constraints_l`, P nodal, export |
+| `window_l_opf.py` | HP gate + `window_heat_pump_constraints` |
+| `Time_series.py` | `_modify_parameters_l` HP params; `ts_acdc_l_opf` carry / TS keys |
 | `Results_class.py` | `ext_heat_pump`, `heat_pump_window` |
 | `__init__.py` | export `HeatPump`, `add_heat_pump` |
 | `docs/usage_heat_pump.rst`, `docs/api/heat_pump.rst` | user + API docs |

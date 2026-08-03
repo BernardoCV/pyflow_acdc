@@ -127,3 +127,69 @@ def test_heat_pump_ts_and_window_results_build():
     assert len(p_df) == 4
     assert len(e_df) == 5
     assert hp.name in p_df.columns
+
+
+def test_heat_pump_linear_build_only_p_only():
+    require_pyomo()
+    grid, hp = _grid_with_heat_pump()
+    pyf.analyse_grid(grid)
+
+    model, _, _, _ = pyf.optimal_l_pf(
+        grid,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+
+    h = hp.heatPumpNumber
+    expected_lb = max(
+        hp.P_ref - hp.n_units * hp.P_unit_max,
+        hp.E_state / hp.dt_hours + hp.P_ref - hp.E_max / hp.dt_hours,
+    )
+    expected_ub = min(
+        hp.P_ref,
+        hp.E_state / hp.dt_hours + hp.P_ref - hp.E_min / hp.dt_hours,
+    )
+
+    assert hasattr(model, "P_heat_pump")
+    assert hasattr(model, "E_heat_pump")
+    assert hasattr(model, "Gen_Pheatpump_constraint")
+    assert not hasattr(model, "Gen_Qheatpump_constraint")
+    assert model.Q_heat_pump[h].lb == 0
+    assert model.Q_heat_pump[h].ub == 0
+    assert model.hp_p_ref[h].value == pytest.approx(hp.P_ref)
+    assert not hasattr(model, "hp_q_ref")
+    assert pyo.value(model.heat_pump_p_lower_constraint[h].lower) == pytest.approx(
+        expected_lb
+    )
+    assert pyo.value(model.heat_pump_p_upper_constraint[h].upper) == pytest.approx(
+        expected_ub
+    )
+
+
+def test_heat_pump_linear_ts_and_window_build():
+    require_pyomo()
+    grid, hp = _grid_with_heat_pump()
+    _attach_ts(grid, hp)
+
+    pyf.ts_acdc_l_opf(
+        grid,
+        start=1,
+        end=4,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+    assert "heat_pump_p" in grid.time_series_results
+    assert "heat_pump_energy_state" in grid.time_series_results
+    assert len(grid.time_series_results["heat_pump_p"]) == 4
+
+    pyf.window_l_opf(
+        grid,
+        start=0,
+        end=3,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+    assert "heat_pump_P" in grid.window_opf_results
+    assert "heat_pump_Q" in grid.window_opf_results
+    assert "heat_pump_energy_state" in grid.window_opf_results
+    assert (grid.window_opf_results["heat_pump_Q"][hp.name] == 0).all()
