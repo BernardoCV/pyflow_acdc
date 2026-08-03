@@ -34,7 +34,7 @@ except ImportError:
     ORTOOLS_AVAILABLE = False
 
 from .NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc,TEP_variables
-from .L_models.AC_OPF_L_model import opf_create_l_model_ac,export_acdc_l_model_to_pyflow_acdc
+from .L_models.AC_OPF_L_model import opf_create_l_model_acdc,export_acdc_l_model_to_pyflow_acdc
 from .pyomo_model_solve import pyomo_model_solve, build_only_solver_stats
 from .ACDC_OPF import (
     obj_w_rule,

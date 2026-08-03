@@ -134,6 +134,19 @@ _FAMILY_SPECS = {
         'reduce': 'sum',
         'kind': 'ren',
     },
+    'Curtailment': {
+        'key': 'curtailment',
+        'ylabel': 'Curtailment %',
+        'entity_agg': 'ren_source',
+        'node_agg': 'node',
+        'zone_agg': 'zone',
+        # MW-weighted: Σ(curt·available)/Σ(available), then ×100.
+        # Weights from ren_available (pre-curtail P_ren·np); curt=0 and curt=1 ok.
+        'reduce': 'curt_weighted',
+        'kind': 'ren',
+        'scale': 100.0,
+        'weight_key': 'ren_available',
+    },
     'Generators': {
         'key': 'gen_power',
         'ts_key': 'real_power_opf',
@@ -194,7 +207,8 @@ _FAMILY_SPECS = {
 }
 
 _FAMILY_ORDER = (
-    'Power', 'Ren Sources', 'Generators', 'Prices', 'Storage', 'SoC', 'H2', 'H2 mass',
+    'Power', 'Ren Sources', 'Curtailment', 'Generators', 'Prices',
+    'Storage', 'SoC', 'H2', 'H2 mass',
 )
 
 # Distinct hues for seasons; elements within a season vary lightness on that hue.
@@ -470,6 +484,36 @@ def _register_panel_manager(app):
         return panels
 
 
+def _snapshot_indexed_configs(ids, *value_lists, keys=None):
+    """Map pattern-matching component ids to a config dict keyed by panel index."""
+    keys = keys or ()
+    out = {}
+    for i, id_d in enumerate(ids or []):
+        idx = id_d['index']
+        entry = {}
+        for key, values in zip(keys, value_lists):
+            vals = values or []
+            entry[key] = vals[i] if i < len(vals) else None
+        out[str(idx)] = entry
+    return out
+
+
+def _keep_agg_value(current, aggs):
+    if current in aggs:
+        return current
+    return 'total' if 'total' in aggs else (aggs[0] if aggs else None)
+
+
+def _keep_element_values(current, options_list, aggregation):
+    if aggregation == 'total':
+        return []
+    opts = set(options_list)
+    kept = [e for e in (current or []) if e in opts]
+    if kept:
+        return kept
+    return _default_element_selection(options_list, aggregation)
+
+
 
 def _btn_style(**overrides):
     style = {
@@ -739,7 +783,15 @@ def _family_result_df(results, grid, family, source, s_base=None):
             return None
         return _window_power_overview_df(results, grid)
     if source == 'window':
-        return _frame_column_to_index(results.get(spec['key']))
+        df = _frame_column_to_index(results.get(spec['key']))
+        # curt_weighted keeps fraction [0, 1] until after MW weighting.
+        if (
+            df is not None
+            and spec.get('scale') is not None
+            and spec.get('reduce') != 'curt_weighted'
+        ):
+            df = df * float(spec['scale'])
+        return df
     if source == 'ts':
         ts_key = spec.get('ts_key')
         if ts_key is None:
@@ -803,6 +855,28 @@ def available_dash_families(grid, window_opf_results, source='window', s_base=No
     return out
 
 
+def _reduce_curt_weighted(curt_frac_df, avail_df, names, scale=100.0):
+    """MW-weighted curtailment % using pre-curtail available MW weights."""
+    curt = curt_frac_df[names].astype(float)
+    avail = avail_df[names].astype(float)
+    if (curt < -1e-12).any().any() or (curt > 1.0 + 1e-12).any().any():
+        raise ValueError(
+            f"Curtailment fraction out of [0, 1]; min={float(curt.min().min())}, "
+            f"max={float(curt.max().max())}"
+        )
+    if (avail < -1e-12).any().any():
+        raise ValueError(
+            f"ren_available must be >= 0; min={float(avail.min().min())}"
+        )
+    curtailed_mw = curt * avail
+    den = avail.sum(axis=1)
+    num = curtailed_mw.sum(axis=1)
+    out = pd.Series(0.0, index=curt.index, dtype=float)
+    positive = den > 1e-12
+    out.loc[positive] = (num.loc[positive] / den.loc[positive]) * float(scale)
+    return out
+
+
 def _reduce_group(df, names, reduce, records_by_name):
     sub = df[names]
     if reduce == 'sum':
@@ -821,6 +895,10 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
 
     Returns ``(DataFrame, ylabel)``. Columns are group keys (``total`` for total).
     ``source`` selects window (frame-indexed) vs ts (``time_series_results``) keys.
+
+    Curtailment node/zone/total uses MW-weighted fractions
+    ``Σ(curt·available)/Σ(available)`` with ``available`` from ``ren_available``
+    (pre-curtail), then scales to %. ``curt=0`` and ``curt=1`` both work.
     """
     if family not in _FAMILY_SPECS:
         raise ValueError(f"Unknown family {family!r}")
@@ -835,6 +913,20 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
     if df is None or df.empty:
         return None, spec['ylabel']
 
+    scale = float(spec['scale']) if spec.get('scale') is not None else 1.0
+    curt_weighted = spec.get('reduce') == 'curt_weighted'
+    avail_df = None
+    if curt_weighted:
+        if source != 'window':
+            raise ValueError("Curtailment MW-weighting requires source='window'")
+        weight_key = spec.get('weight_key', 'ren_available')
+        avail_df = _frame_column_to_index(window_opf_results.get(weight_key))
+        if avail_df is None or avail_df.empty:
+            raise ValueError(
+                f"Curtailment weighting requires {weight_key!r} in window results "
+                f"(re-run window/rolling OPF to export it)"
+            )
+
     records = _family_entity_records(grid, family)
     records_by_name = {r['name']: r for r in records}
     present = [r for r in records if r['name'] in df.columns]
@@ -842,8 +934,19 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
     if not present:
         # Fall back to raw columns as entities (no topology grouping).
         if aggregation == spec['entity_agg']:
-            return df.copy(), spec['ylabel']
+            out = df.copy()
+            if curt_weighted:
+                out = out * scale
+            return out, spec['ylabel']
         if aggregation == 'total':
+            if curt_weighted:
+                names = [c for c in df.columns if c in avail_df.columns]
+                if not names:
+                    raise ValueError(
+                        "No overlapping curtailment / ren_available columns for total"
+                    )
+                series = _reduce_curt_weighted(df, avail_df, names, scale=scale)
+                return series.to_frame('total'), spec['ylabel']
             reduce = 'mean' if spec['reduce'] in ('mean', 'price') else 'sum'
             if reduce == 'sum':
                 out = df.sum(axis=1).to_frame('total')
@@ -865,6 +968,21 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
         raise ValueError(
             f"No groups for family={family!r} aggregation={aggregation!r}"
         )
+
+    if curt_weighted:
+        if aggregation == spec['entity_agg']:
+            cols = {gk: df[names[0]] * scale for gk, names in groups.items()}
+        else:
+            cols = {}
+            for gk, names in groups.items():
+                missing = [n for n in names if n not in avail_df.columns]
+                if missing:
+                    raise ValueError(
+                        "ren_available missing columns for curtailment weighting: "
+                        f"{missing}"
+                    )
+                cols[gk] = _reduce_curt_weighted(df, avail_df, names, scale=scale)
+        return pd.DataFrame(cols), spec['ylabel']
 
     cols = {
         gk: _reduce_group(df, names, spec['reduce'], records_by_name)
@@ -1700,7 +1818,13 @@ def _panel_control_card(i, default_choice, dd_options):
     ])
 
 
-def _family_panel_control_card(i, *, compare, default_family, family_options):
+def _family_panel_control_card(
+    i, *, compare, default_family, family_options,
+    aggregation=None, agg_options=None,
+    elements=None, element_options=None,
+    ymin=None, ymax=None,
+    seasons=None, season_options=None,
+):
     """Sidebar card: family + aggregation (+ seasons when compare)."""
     children = [
         html.Div(
@@ -1729,8 +1853,8 @@ def _family_panel_control_card(i, *, compare, default_family, family_options):
         html.Label('Aggregation', style=_label_style(on_dark=True)),
         dcc.Dropdown(
             id={'type': 'plot-agg', 'index': i},
-            options=[],
-            value=None,
+            options=[{'label': a, 'value': a} for a in (agg_options or [])],
+            value=aggregation,
             clearable=False,
             style={'marginBottom': '10px'},
         ),
@@ -1740,8 +1864,8 @@ def _family_panel_control_card(i, *, compare, default_family, family_options):
             html.Label('Seasons', style=_label_style(on_dark=True)),
             dcc.Checklist(
                 id={'type': 'plot-seasons', 'index': i},
-                options=[],
-                value=[],
+                options=[{'label': s, 'value': s} for s in (season_options or [])],
+                value=list(seasons or []),
                 style={'marginBottom': '10px', 'color': _THEME['sidebar_text']},
             ),
         ])
@@ -1749,8 +1873,8 @@ def _family_panel_control_card(i, *, compare, default_family, family_options):
         html.Label('Elements', style=_label_style(on_dark=True)),
         dcc.Checklist(
             id={'type': 'plot-elements', 'index': i},
-            options=[],
-            value=[],
+            options=[{'label': e, 'value': e} for e in (element_options or [])],
+            value=list(elements or []),
             style={'marginBottom': '10px', 'color': _THEME['sidebar_text']},
         ),
         html.Label('Y-axis limits', style=_label_style(on_dark=True)),
@@ -1758,12 +1882,14 @@ def _family_panel_control_card(i, *, compare, default_family, family_options):
             dcc.Input(
                 id={'type': 'plot-ymin', 'index': i},
                 type='number',
+                value=ymin,
                 placeholder='Min',
                 style={'flex': 1, 'padding': '5px'},
             ),
             dcc.Input(
                 id={'type': 'plot-ymax', 'index': i},
                 type='number',
+                value=ymax,
                 placeholder='Max',
                 style={'flex': 1, 'padding': '5px'},
             ),
@@ -1784,9 +1910,11 @@ def _default_element_selection(options, aggregation):
 def _family_auto_ylimits(df, family):
     if df is None or df.empty:
         return 0, 1
-    y_min = int(min(0, df.min().min() - 5))
     if family == 'SoC':
         return 0, 1
+    if family == 'Curtailment':
+        return 0, 100
+    y_min = int(min(0, df.min().min() - 5))
     y_max = int(df.max().max() + 10)
     return y_min, y_max
 
@@ -1916,6 +2044,7 @@ def _build_family_dash_app(
     app.layout = html.Div([
         dcc.Store(id='sidebar-open', data=True),
         dcc.Store(id='plot-panels', data=[0]),
+        dcc.Store(id='plot-panel-configs', data={}),
         html.Div(id='sidebar', style=_sidebar_style(True), children=[
             _sidebar_header(app, title, subtitle=subtitle),
             html.Div(id='global-controls', children=global_children),
@@ -1926,19 +2055,101 @@ def _build_family_dash_app(
     ])
 
     _register_sidebar_toggle(app)
-    _register_panel_manager(app)
 
     classic_dd = [{'label': c, 'value': c} for c in (classic_choices or [])]
+
+    def _default_cfg_for_family(fam, pos=0):
+        if not fam:
+            return {
+                'family': None, 'agg': None, 'elements': [],
+                'ymin': None, 'ymax': None, 'seasons': list(all_seasons),
+            }
+        aggs = available_family_aggregations(grid, fam, sample_results, source=source)
+        agg = 'total' if 'total' in aggs else (aggs[0] if aggs else None)
+        el_opts = family_element_options(
+            grid, sample_results, fam, agg, source=source
+        ) if agg else []
+        el_vals = _default_element_selection(el_opts, agg) if agg else []
+        if compare:
+            df, _ = resolve_season_family_df(
+                grid, fam, agg, seasons=list(all_seasons), elements=el_vals or None
+            )
+        else:
+            df, _ = resolve_family_df(
+                sample_results, grid, fam, agg, source=source
+            ) if agg else (None, None)
+        ymin, ymax = _family_auto_ylimits(df, fam) if df is not None else (None, None)
+        return {
+            'family': fam,
+            'agg': agg,
+            'agg_options': aggs,
+            'elements': el_vals,
+            'element_options': el_opts,
+            'ymin': ymin,
+            'ymax': ymax,
+            'seasons': list(all_seasons),
+        }
+
+    @app.callback(
+        [Output('plot-panels', 'data'),
+         Output('plot-panel-configs', 'data')],
+        [Input('add-plot', 'n_clicks'),
+         Input({'type': 'plot-remove', 'index': ALL}, 'n_clicks')],
+        [State('plot-panels', 'data'),
+         State('plot-panel-configs', 'data'),
+         State({'type': 'plot-family', 'index': ALL}, 'id'),
+         State({'type': 'plot-family', 'index': ALL}, 'value'),
+         State({'type': 'plot-agg', 'index': ALL}, 'value'),
+         State({'type': 'plot-elements', 'index': ALL}, 'value'),
+         State({'type': 'plot-ymin', 'index': ALL}, 'value'),
+         State({'type': 'plot-ymax', 'index': ALL}, 'value'),
+         State({'type': 'plot-seasons', 'index': ALL}, 'value') if compare
+         else State('plot-panels', 'data')],
+        prevent_initial_call=True,
+    )
+    def _manage_panels_with_configs(
+        add_clicks, remove_clicks, panels, configs,
+        fam_ids, fams, aggs, els, ymins, ymaxs, seasons_or_panels,
+    ):
+        panels = list(panels or [0])
+        configs = dict(configs or {})
+        snap_keys = ('family', 'agg', 'elements', 'ymin', 'ymax')
+        snap_vals = [fams, aggs, els, ymins, ymaxs]
+        if compare:
+            snap_keys = snap_keys + ('seasons',)
+            snap_vals = snap_vals + [seasons_or_panels]
+        configs.update(_snapshot_indexed_configs(
+            fam_ids, *snap_vals, keys=snap_keys
+        ))
+        trig = ctx.triggered_id
+        if trig == 'add-plot':
+            next_id = (max(panels) + 1) if panels else 0
+            panels = panels + [next_id]
+            fam = default_family if default_family else (families[0] if families else None)
+            if len(panels) == 2 and len(families) > 1:
+                fam = families[1]
+            configs[str(next_id)] = _default_cfg_for_family(fam)
+            return panels, configs
+        if isinstance(trig, dict) and trig.get('type') == 'plot-remove':
+            rid = trig['index']
+            remaining = [p for p in panels if p != rid]
+            if not remaining:
+                return panels, configs
+            configs.pop(str(rid), None)
+            return remaining, configs
+        return panels, configs
 
     @app.callback(
         [Output('panel-controls', 'children'),
          Output('panel-graphs', 'children')],
         [Input('plot-panels', 'data'),
+         Input('plot-panel-configs', 'data'),
          Input('view-mode', 'data') if not (allow_classic and classic_choices)
          else Input('view-mode', 'value')],
     )
-    def _render_panels(panels, view_mode):
+    def _render_panels(panels, configs, view_mode):
         panels = panels or [0]
+        configs = configs or {}
         mode = view_mode or 'family'
         ctrls, graphs = [], []
         for pos, i in enumerate(panels):
@@ -1946,11 +2157,37 @@ def _build_family_dash_app(
                 dc = classic_choices[min(pos, len(classic_choices) - 1)]
                 ctrls.append(_panel_control_card(i, dc, classic_dd))
             else:
-                fam = default_family if default_family else families[0]
-                if pos == 1 and len(families) > 1:
-                    fam = families[1]
+                cfg = configs.get(str(i))
+                if not cfg or cfg.get('family') not in families:
+                    fam = default_family if default_family else families[0]
+                    if pos == 1 and len(families) > 1 and not cfg:
+                        fam = families[1]
+                    cfg = _default_cfg_for_family(fam, pos)
+                fam = cfg['family']
+                aggs = cfg.get('agg_options') or available_family_aggregations(
+                    grid, fam, sample_results, source=source
+                )
+                agg = _keep_agg_value(cfg.get('agg'), aggs)
+                el_opts = cfg.get('element_options')
+                if el_opts is None and agg:
+                    el_opts = family_element_options(
+                        grid, sample_results, fam, agg, source=source
+                    )
+                el_opts = el_opts or []
+                el_vals = _keep_element_values(cfg.get('elements'), el_opts, agg)
                 ctrls.append(_family_panel_control_card(
-                    i, compare=compare, default_family=fam, family_options=families,
+                    i,
+                    compare=compare,
+                    default_family=fam,
+                    family_options=families,
+                    aggregation=agg,
+                    agg_options=aggs,
+                    elements=el_vals,
+                    element_options=el_opts,
+                    ymin=cfg.get('ymin'),
+                    ymax=cfg.get('ymax'),
+                    seasons=cfg.get('seasons') if compare else None,
+                    season_options=all_seasons if compare else None,
                 ))
             graphs.append(_panel_graph_card(i))
         return ctrls, graphs
@@ -1960,10 +2197,11 @@ def _build_family_dash_app(
         [Output({'type': 'plot-agg', 'index': MATCH}, 'options'),
          Output({'type': 'plot-agg', 'index': MATCH}, 'value')],
         [Input({'type': 'plot-family', 'index': MATCH}, 'value')],
+        [State({'type': 'plot-agg', 'index': MATCH}, 'value')],
     )
-    def _family_aggs(family):
+    def _family_aggs(family, current_agg):
         aggs = available_family_aggregations(grid, family, sample_results, source=source)
-        default = 'total' if 'total' in aggs else (aggs[0] if aggs else None)
+        default = _keep_agg_value(current_agg, aggs)
         return [{'label': a, 'value': a} for a in aggs], default
 
     if compare:
@@ -1976,13 +2214,17 @@ def _build_family_dash_app(
              Output({'type': 'plot-ymax', 'index': MATCH}, 'value')],
             [Input({'type': 'plot-family', 'index': MATCH}, 'value'),
              Input({'type': 'plot-agg', 'index': MATCH}, 'value')],
+            [State({'type': 'plot-seasons', 'index': MATCH}, 'value'),
+             State({'type': 'plot-elements', 'index': MATCH}, 'value'),
+             State({'type': 'plot-ymin', 'index': MATCH}, 'value'),
+             State({'type': 'plot-ymax', 'index': MATCH}, 'value')],
         )
-        def _season_series(family, aggregation):
+        def _season_series(family, aggregation, cur_seasons, cur_els, cur_ymin, cur_ymax):
             season_opts = [{'label': s, 'value': s} for s in all_seasons]
-            season_vals = list(all_seasons)
+            season_vals = list(cur_seasons) if cur_seasons else list(all_seasons)
+            season_vals = [s for s in season_vals if s in all_seasons] or list(all_seasons)
             if not family or not aggregation:
                 return season_opts, season_vals, [], [], 0, 1
-            # Element options from first season's topology/results
             first = all_seasons[0] if all_seasons else None
             el_opts_list = []
             if first is not None and aggregation != 'total':
@@ -1990,11 +2232,17 @@ def _build_family_dash_app(
                     grid, grid.season_window_compare_raw[first], family, aggregation
                 )
             el_opts = [{'label': e, 'value': e} for e in el_opts_list]
-            el_vals = _default_element_selection(el_opts_list, aggregation)
-            df, _ = resolve_season_family_df(
-                grid, family, aggregation, seasons=season_vals, elements=el_vals or None
-            )
-            ymin, ymax = _family_auto_ylimits(df, family)
+            el_vals = _keep_element_values(cur_els, el_opts_list, aggregation)
+            if (
+                cur_ymin is not None and cur_ymax is not None
+                and list(el_vals) == list(cur_els or [])
+            ):
+                ymin, ymax = cur_ymin, cur_ymax
+            else:
+                df, _ = resolve_season_family_df(
+                    grid, family, aggregation, seasons=season_vals, elements=el_vals or None
+                )
+                ymin, ymax = _family_auto_ylimits(df, family)
             return season_opts, season_vals, el_opts, el_vals, ymin, ymax
 
         @app.callback(
@@ -2043,17 +2291,28 @@ def _build_family_dash_app(
              Output({'type': 'plot-ymax', 'index': MATCH}, 'value')],
             [Input({'type': 'plot-family', 'index': MATCH}, 'value'),
              Input({'type': 'plot-agg', 'index': MATCH}, 'value')],
+            [State({'type': 'plot-elements', 'index': MATCH}, 'value'),
+             State({'type': 'plot-ymin', 'index': MATCH}, 'value'),
+             State({'type': 'plot-ymax', 'index': MATCH}, 'value')],
         )
-        def _window_family_series(family, aggregation):
+        def _window_family_series(family, aggregation, cur_els, cur_ymin, cur_ymax):
             if not family or not aggregation:
                 return [], [], 0, 1
             el_opts_list = family_element_options(
                 grid, sample_results, family, aggregation, source=source
             )
             el_opts = [{'label': e, 'value': e} for e in el_opts_list]
-            el_vals = _default_element_selection(el_opts_list, aggregation)
-            df, _ = resolve_family_df(sample_results, grid, family, aggregation, source=source)
-            ymin, ymax = _family_auto_ylimits(df, family)
+            el_vals = _keep_element_values(cur_els, el_opts_list, aggregation)
+            if (
+                cur_ymin is not None and cur_ymax is not None
+                and list(el_vals) == list(cur_els or [])
+            ):
+                ymin, ymax = cur_ymin, cur_ymax
+            else:
+                df, _ = resolve_family_df(
+                    sample_results, grid, family, aggregation, source=source
+                )
+                ymin, ymax = _family_auto_ylimits(df, family)
             return el_opts, el_vals, ymin, ymax
 
         # Classic series callback (only when classic cards exist)
@@ -2302,6 +2561,15 @@ def create_rolling_dash_app(grid):
     app.layout = html.Div([
         dcc.Store(id='sidebar-open', data=True),
         dcc.Store(id='roll-plot-panels', data=[0]),
+        dcc.Store(id='roll-panel-configs', data={
+            '0': {
+                'family': default_family,
+                'agg': agg0,
+                'elements': list(el_vals0),
+                'ymin': ymin0,
+                'ymax': ymax0,
+            },
+        }),
         html.Div(id='sidebar', style=_sidebar_style(True), children=[
             _sidebar_header(app, title, subtitle='Rolling Window OPF'),
             html.Div(id='global-controls', children=[
@@ -2377,35 +2645,91 @@ def create_rolling_dash_app(grid):
     # register sidebar toggle with the same ids used above.
     _register_sidebar_toggle(app)
 
+    def _cfg_for_family(fam):
+        aggs, agg, el_opts, el_vals, ymin, ymax = _rolling_family_defaults(
+            grid, results, fam
+        )
+        return {
+            'family': fam,
+            'agg': agg,
+            'elements': list(el_vals),
+            'ymin': ymin,
+            'ymax': ymax,
+        }
+
     @app.callback(
-        Output('roll-plot-panels', 'data'),
+        [Output('roll-plot-panels', 'data'),
+         Output('roll-panel-configs', 'data')],
         [Input('roll-add-plot', 'n_clicks'),
          Input({'type': 'roll-plot-remove', 'index': ALL}, 'n_clicks')],
-        [State('roll-plot-panels', 'data')],
+        [State('roll-plot-panels', 'data'),
+         State('roll-panel-configs', 'data'),
+         State({'type': 'roll-plot-family', 'index': ALL}, 'id'),
+         State({'type': 'roll-plot-family', 'index': ALL}, 'value'),
+         State({'type': 'roll-plot-agg', 'index': ALL}, 'value'),
+         State({'type': 'roll-plot-elements', 'index': ALL}, 'value'),
+         State({'type': 'roll-plot-ymin', 'index': ALL}, 'value'),
+         State({'type': 'roll-plot-ymax', 'index': ALL}, 'value')],
         prevent_initial_call=True,
     )
-    def _manage_roll_panels(add_clicks, remove_clicks, panels):
+    def _manage_roll_panels(
+        add_clicks, remove_clicks, panels, configs,
+        fam_ids, fams, aggs, els, ymins, ymaxs,
+    ):
         panels = list(panels or [0])
+        configs = dict(configs or {})
+        configs.update(_snapshot_indexed_configs(
+            fam_ids, fams, aggs, els, ymins, ymaxs,
+            keys=('family', 'agg', 'elements', 'ymin', 'ymax'),
+        ))
         trig = ctx.triggered_id
         if trig == 'roll-add-plot':
             next_id = (max(panels) + 1) if panels else 0
-            return panels + [next_id]
+            panels = panels + [next_id]
+            fam = default_family
+            if len(panels) == 2 and len(families) > 1:
+                fam = families[1] if families[1] != fam else fam
+            configs[str(next_id)] = _cfg_for_family(fam)
+            return panels, configs
         if isinstance(trig, dict) and trig.get('type') == 'roll-plot-remove':
             rid = trig['index']
             remaining = [p for p in panels if p != rid]
-            return remaining if remaining else panels
-        return panels
+            if not remaining:
+                return panels, configs
+            configs.pop(str(rid), None)
+            return remaining, configs
+        return panels, configs
 
-    def _build_panels(panels):
+    def _build_panels(panels, configs):
         panels = panels or [0]
+        configs = configs or {}
         ctrls, graphs = [], []
         for pos, i in enumerate(panels):
-            fam = default_family
-            if pos == 1 and len(families) > 1:
-                fam = families[1] if families[1] != fam else fam
-            aggs, agg, el_opts, el_vals, ymin, ymax = _rolling_family_defaults(
-                grid, results, fam
-            )
+            cfg = configs.get(str(i))
+            if not cfg or cfg.get('family') not in families:
+                fam = default_family
+                if pos == 1 and len(families) > 1:
+                    fam = families[1] if families[1] != fam else fam
+                aggs, agg, el_opts, el_vals, ymin, ymax = _rolling_family_defaults(
+                    grid, results, fam
+                )
+            else:
+                fam = cfg['family']
+                aggs = available_family_aggregations(
+                    grid, fam, results, source='window'
+                )
+                agg = _keep_agg_value(cfg.get('agg'), aggs)
+                el_opts = family_element_options(
+                    grid, results, fam, agg, source='window'
+                )
+                el_vals = _keep_element_values(cfg.get('elements'), el_opts, agg)
+                ymin = cfg.get('ymin')
+                ymax = cfg.get('ymax')
+                if ymin is None or ymax is None:
+                    df, _ = resolve_family_df(
+                        results, grid, fam, agg, source='window'
+                    )
+                    ymin, ymax = _family_auto_ylimits(df, fam)
             ctrls.append(_rolling_panel_card(
                 i, families=families, family=fam, aggs=aggs, agg=agg,
                 el_opts=el_opts, el_vals=el_vals, ymin=ymin, ymax=ymax,
@@ -2422,24 +2746,28 @@ def create_rolling_dash_app(grid):
     @app.callback(
         [Output('roll-panel-controls', 'children'),
          Output('roll-panel-graphs', 'children')],
-        [Input('roll-plot-panels', 'data')],
+        [Input('roll-plot-panels', 'data'),
+         Input('roll-panel-configs', 'data')],
     )
-    def _render_roll_panels(panels):
-        return _build_panels(panels)
+    def _render_roll_panels(panels, configs):
+        return _build_panels(panels, configs)
 
     @app.callback(
         [Output({'type': 'roll-plot-agg', 'index': MATCH}, 'options'),
          Output({'type': 'roll-plot-agg', 'index': MATCH}, 'value')],
         [Input({'type': 'roll-plot-family', 'index': MATCH}, 'value')],
+        [State({'type': 'roll-plot-agg', 'index': MATCH}, 'value')],
     )
-    def _roll_family_aggs(family):
+    def _roll_family_aggs(family, current_agg):
         if not family:
             raise ValueError('roll-plot-family is required')
         aggs = available_family_aggregations(grid, family, results, source='window')
         if not aggs:
             raise ValueError(f'No aggregations for family {family!r}')
-        default = 'total' if 'total' in aggs else aggs[0]
-        return [{'label': a, 'value': a} for a in aggs], default
+        return (
+            [{'label': a, 'value': a} for a in aggs],
+            _keep_agg_value(current_agg, aggs),
+        )
 
     @app.callback(
         [Output({'type': 'roll-plot-elements', 'index': MATCH}, 'options'),
@@ -2448,8 +2776,11 @@ def create_rolling_dash_app(grid):
          Output({'type': 'roll-plot-ymax', 'index': MATCH}, 'value')],
         [Input({'type': 'roll-plot-family', 'index': MATCH}, 'value'),
          Input({'type': 'roll-plot-agg', 'index': MATCH}, 'value')],
+        [State({'type': 'roll-plot-elements', 'index': MATCH}, 'value'),
+         State({'type': 'roll-plot-ymin', 'index': MATCH}, 'value'),
+         State({'type': 'roll-plot-ymax', 'index': MATCH}, 'value')],
     )
-    def _roll_family_series(family, aggregation):
+    def _roll_family_series(family, aggregation, cur_els, cur_ymin, cur_ymax):
         if not family or not aggregation:
             raise ValueError(
                 f'family and aggregation required; got {family!r}/{aggregation!r}'
@@ -2458,9 +2789,17 @@ def create_rolling_dash_app(grid):
             grid, results, family, aggregation, source='window'
         )
         el_opts = [{'label': e, 'value': e} for e in el_opts_list]
-        el_vals = _default_element_selection(el_opts_list, aggregation)
-        df, _ = resolve_family_df(results, grid, family, aggregation, source='window')
-        ymin, ymax = _family_auto_ylimits(df, family)
+        el_vals = _keep_element_values(cur_els, el_opts_list, aggregation)
+        if (
+            cur_ymin is not None and cur_ymax is not None
+            and list(el_vals) == list(cur_els or [])
+        ):
+            ymin, ymax = cur_ymin, cur_ymax
+        else:
+            df, _ = resolve_family_df(
+                results, grid, family, aggregation, source='window'
+            )
+            ymin, ymax = _family_auto_ylimits(df, family)
         return el_opts, el_vals, ymin, ymax
 
     @app.callback(

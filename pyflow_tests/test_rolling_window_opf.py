@@ -92,20 +92,55 @@ def test_rolling_window_nl_opf_future_sight_build_only():
         start=1,
         end=10,
         window_size=4,
-        soc_final_mode="future_sight",
+        future_sight=1.0,
         ObjRule={"Energy_cost": 1},
         build_only=True,
     )
-    assert stats[0]["future_sight"] is True
+    assert stats[0]["future_sight"] == 1.0
+    assert stats[0]["foresight_steps"] == 4
     assert stats[0]["solve"] == (0, 7)  # commit 0–3 + next 4–7
     assert stats[0]["commit"] == (0, 3)
     assert stats[0]["h2_final_frames"] == [3, 7]
-    assert stats[0]["h2_final_scale"] is None
-    assert stats[-1]["future_sight"] is False
+    assert stats[0]["h2_final_scale"] == {3: 1.0, 7: 1.0}
+    assert stats[-1]["future_sight"] == 0.0
+    assert stats[-1]["foresight_steps"] == 0
     assert stats[-1]["force_soc"] is True
     assert stats[-1]["solve"] == (8, 9)
     assert stats[-1]["h2_final_frames"] is None
     assert stats[-1]["h2_final_scale"] is None
+
+
+def test_rolling_window_nl_opf_future_sight_half_build_only():
+    grid = _grid_rolling(10)
+    _, _, _, stats = pyf.rolling_window_nl_opf(
+        grid,
+        start=1,
+        end=10,
+        window_size=4,
+        future_sight=0.5,
+        ObjRule={"Energy_cost": 1},
+        build_only=True,
+    )
+    # ceil(0.5 * 4) = 2 foresight steps
+    assert stats[0]["future_sight"] == 0.5
+    assert stats[0]["foresight_steps"] == 2
+    assert stats[0]["solve"] == (0, 5)  # commit 0–3 + foresight 4–5
+    assert stats[0]["h2_final_frames"] == [3, 5]
+    assert stats[0]["h2_final_scale"] == {3: 1.0, 5: 0.5}
+    assert stats[0]["force_soc"] is True
+
+
+def test_rolling_rejects_old_future_sight_mode():
+    grid = _grid_rolling(6)
+    with pytest.raises(ValueError, match="soc_final_mode"):
+        pyf.rolling_window_nl_opf(
+            grid,
+            start=1,
+            end=6,
+            window_size=3,
+            soc_final_mode="future_sight",
+            build_only=True,
+        )
 
 
 def test_rolling_requires_soc_final():

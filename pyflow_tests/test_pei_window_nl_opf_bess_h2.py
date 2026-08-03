@@ -110,9 +110,9 @@ def test_pei_window_nl_opf_bess_h2_builds():
     assert len(model.frames) == n_hours
 
     block0 = model.frame_model[0]
-    assert hasattr(block0, "storage_AC")
+    assert hasattr(block0, "storage")
     assert hasattr(block0, "electrolyser")
-    assert len(block0.storage_AC) == 1
+    assert len(block0.storage) == 1
     assert len(block0.electrolyser) == 1
 
 

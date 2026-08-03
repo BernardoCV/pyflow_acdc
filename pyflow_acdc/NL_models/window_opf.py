@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Coupled window NL OPF with BESS and electrolyser (frame blocks + parent links)."""
 
+import math
 import time
 from datetime import datetime, timezone
 
@@ -40,16 +41,11 @@ def _sum_frame_objectives(model, frames):
     return total
 
 
-def _soc_delta_expr(st, block, s, ac=True):
-    scale = st.dt_hours * st.S_base / st.E_max
-    if ac:
-        return scale * (
-            st.eta_charge * block.P_storage_charge[s]
-            - block.P_storage_discharge[s] / st.eta_discharge
-        )
+def _soc_delta_expr(eta_charge, eta_discharge, E_max, dt_hours, S_base, block, s):
+    scale = dt_hours[s] * S_base[s] / E_max[s]
     return scale * (
-        st.eta_charge * block.P_storage_charge_DC[s]
-        - block.P_storage_discharge_DC[s] / st.eta_discharge
+        eta_charge[s] * block.P_storage_charge[s]
+        - block.P_storage_discharge[s] / eta_discharge[s]
     )
 
 
@@ -60,81 +56,52 @@ def window_soc_constraints(model, grid, storage_info, frames, *, enforce_final=T
     ``set_value`` without rebuilding constraints.
     """
     ordered = list(frames)
-    _, _, storage_ac_by_number, storage_dc_by_number = storage_info
+    _lim, storage_soc, storage_phys, lista_storage = storage_info
+    soc_min_st, soc_max_st, soc_initial, _soc_ref, soc_final = storage_soc
+    eta_charge, eta_discharge, E_max_st, dt_hours_st, S_base_st, _conn = storage_phys
+    if not lista_storage:
+        raise ValueError("storage_info is empty but grid.ESS is True")
 
-    ac_ids = list(storage_ac_by_number)
-    dc_ids = list(storage_dc_by_number)
-    if ac_ids:
-        model.soc_initial_AC = pyo.Param(
-            ac_ids,
-            mutable=True,
-            initialize={s: float(storage_ac_by_number[s].soc_initial) for s in ac_ids},
-        )
-        model.soc_final_AC = pyo.Param(
-            ac_ids,
-            mutable=True,
-            initialize={
-                s: (
-                    float(storage_ac_by_number[s].soc_final)
-                    if storage_ac_by_number[s].soc_final is not None
-                    else float(storage_ac_by_number[s].soc_initial)
-                )
-                for s in ac_ids
-            },
-        )
-    if dc_ids:
-        model.soc_initial_DC = pyo.Param(
-            dc_ids,
-            mutable=True,
-            initialize={s: float(storage_dc_by_number[s].soc_initial) for s in dc_ids},
-        )
-        model.soc_final_DC = pyo.Param(
-            dc_ids,
-            mutable=True,
-            initialize={
-                s: (
-                    float(storage_dc_by_number[s].soc_final)
-                    if storage_dc_by_number[s].soc_final is not None
-                    else float(storage_dc_by_number[s].soc_initial)
-                )
-                for s in dc_ids
-            },
-        )
+    model.soc_initial = pyo.Param(
+        lista_storage,
+        mutable=True,
+        initialize={s: float(soc_initial[s]) for s in lista_storage},
+    )
+    model.soc_final = pyo.Param(
+        lista_storage,
+        mutable=True,
+        initialize={
+            s: (
+                float(soc_final[s])
+                if soc_final[s] is not None
+                else float(soc_initial[s])
+            )
+            for s in lista_storage
+        },
+    )
 
     model.window_soc_constraint = pyo.ConstraintList()
 
     for i, t in enumerate(ordered):
         block = model.frame_model[t]
-        for s, st in storage_ac_by_number.items():
-            delta = _soc_delta_expr(st, block, s, ac=True)
+        for s in lista_storage:
+            delta = _soc_delta_expr(
+                eta_charge, eta_discharge, E_max_st, dt_hours_st, S_base_st,
+                block, s)
             if i == 0:
                 model.window_soc_constraint.add(
-                    block.SoC[s] == model.soc_initial_AC[s] + delta)
+                    block.SoC[s] == model.soc_initial[s] + delta)
             else:
                 t_prev = ordered[i - 1]
                 model.window_soc_constraint.add(
                     block.SoC[s] == model.frame_model[t_prev].SoC[s] + delta)
 
-        for s, st in storage_dc_by_number.items():
-            delta = _soc_delta_expr(st, block, s, ac=False)
-            if i == 0:
-                model.window_soc_constraint.add(
-                    block.SoC_DC[s] == model.soc_initial_DC[s] + delta)
-            else:
-                t_prev = ordered[i - 1]
-                model.window_soc_constraint.add(
-                    block.SoC_DC[s] == model.frame_model[t_prev].SoC_DC[s] + delta)
-
     if enforce_final and ordered:
         t_last = ordered[-1]
-        for s, st in storage_ac_by_number.items():
-            if st.soc_final is not None:
+        for s in lista_storage:
+            if soc_final[s] is not None:
                 model.window_soc_constraint.add(
-                    model.frame_model[t_last].SoC[s] == model.soc_final_AC[s])
-        for s, st in storage_dc_by_number.items():
-            if st.soc_final is not None:
-                model.window_soc_constraint.add(
-                    model.frame_model[t_last].SoC_DC[s] == model.soc_final_DC[s])
+                    model.frame_model[t_last].SoC[s] == model.soc_final[s])
 
 
 def window_h2_constraints(
@@ -154,27 +121,35 @@ def window_h2_constraints(
 
     * One terminal frame (default / single pin): ``mass_H2[t] == scale ·
       H2_mass_final`` (optional ``final_scale``).
-    * Several pins (future sight passes end of *x* and end of *x+1*): each
-      segment must produce ``>= H2_mass_final`` (incremental). Tank ub stays
-      ``H2_mass_max`` through the first pin, then ``n_pins · H2_mass_max``.
+    * Several pins (future sight: end of commit and end of foresight): each
+      segment must produce ``>= scale · H2_mass_final`` (incremental; default
+      scale ``1``). Tank ub stays ``scale₀ · H2_mass_max`` through the first
+      pin, then ``(Σ scales) · H2_mass_max``.
     """
     ordered = list(frames)
-    el_ids = [el.electrolyserNumber for el in grid.electrolysers]
-    el_by_number = {el.electrolyserNumber: el for el in grid.electrolysers}
+    hydrogen_lim, hydrogen_state, hydrogen_phys, lista_electrolyser = hydrogen_info
+    _Pmin, _Pmax, _Qmin, _Qmax, H2_mass_max = hydrogen_lim
+    H2_mass_initial, H2_mass_final = hydrogen_state
+    b_h, c_h, S_base_el, dt_hours_el, _connected = hydrogen_phys
+    if not lista_electrolyser:
+        raise ValueError("hydrogen_info is empty but grid.H2 is True")
+    el_ids = lista_electrolyser
+    el_name = {el.electrolyserNumber: el.name for el in grid.electrolysers}
 
     model.h2_mass_initial = pyo.Param(
         el_ids,
         mutable=True,
-        initialize={e: float(el_by_number[e].H2_mass_initial) for e in el_ids},
+        initialize={e: float(H2_mass_initial[e]) for e in el_ids},
     )
 
     model.window_h2_constraint = pyo.ConstraintList()
 
     for i, t in enumerate(ordered):
         block = model.frame_model[t]
-        for e, el in el_by_number.items():
+        for e in el_ids:
             h_prod = (
-                el.b_h * block.P_electrolyser[e] * el.S_base * el.dt_hours + el.c_h)
+                b_h[e] * block.P_electrolyser[e] * S_base_el[e] * dt_hours_el[e]
+                + c_h[e])
             if i == 0:
                 model.window_h2_constraint.add(
                     block.mass_H2[e] == model.h2_mass_initial[e] + h_prod)
@@ -200,13 +175,6 @@ def window_h2_constraints(
                     f"{ordered[0]}…{ordered[-1]}"
                 )
 
-    incremental = len(term_frames) > 1
-    if incremental and final_scale is not None:
-        raise ValueError(
-            "final_scale is not used when multiple H₂ final frames are set "
-            "(incremental / future-sight pins)"
-        )
-
     if final_scale is not None:
         for t in term_frames:
             if t not in final_scale:
@@ -214,38 +182,46 @@ def window_h2_constraints(
                     f"final_scale missing frame={t}; have {sorted(final_scale)}"
                 )
 
-    els_with_final = [
-        (e, el) for e, el in el_by_number.items() if el.H2_mass_final is not None
+    pin_scales = [
+        1.0 if final_scale is None else float(final_scale[t_term])
+        for t_term in term_frames
     ]
+    for scale in pin_scales:
+        if scale < 0:
+            raise ValueError(f"H₂ final_scale values must be >= 0, got {scale}")
+
+    els_with_final = [e for e in el_ids if H2_mass_final[e] is not None]
     if not els_with_final:
         return
 
-    for e, el in els_with_final:
-        if el.H2_mass_final > el.H2_mass_max:
+    for e in els_with_final:
+        if H2_mass_final[e] > H2_mass_max[e]:
             raise ValueError(
-                f"H2_mass_final={el.H2_mass_final} exceeds "
-                f"H2_mass_max={el.H2_mass_max} on {el.name!r}"
+                f"H2_mass_final={H2_mass_final[e]} exceeds "
+                f"H2_mass_max={H2_mass_max[e]} on {el_name[e]!r}"
             )
 
+    incremental = len(term_frames) > 1
     if incremental:
-        n_pins = len(term_frames)
         first_pin = term_frames[0]
+        first_scale = pin_scales[0]
+        total_scale = sum(pin_scales)
         for t in ordered:
-            ub_scale = 1.0 if t <= first_pin else float(n_pins)
-            for e, el in els_with_final:
-                model.frame_model[t].mass_H2[e].setub(ub_scale * el.H2_mass_max)
+            ub_scale = first_scale if t <= first_pin else total_scale
+            for e in els_with_final:
+                model.frame_model[t].mass_H2[e].setub(ub_scale * H2_mass_max[e])
 
-        pin_index = [(t_term, e) for t_term in term_frames for e, _ in els_with_final]
+        pin_index = [(t_term, e) for t_term in term_frames for e in els_with_final]
         pin_init = {
-            (t_term, e): float(el.H2_mass_final)
-            for t_term in term_frames
-            for e, el in els_with_final
+            (t_term, e): float(H2_mass_final[e]) * pin_scales[i]
+            for i, t_term in enumerate(term_frames)
+            for e in els_with_final
         }
         model.h2_mass_final_target = pyo.Param(
             pin_index, mutable=True, initialize=pin_init
         )
         for i, t_term in enumerate(term_frames):
-            for e, el in els_with_final:
+            for e in els_with_final:
                 mass_end = model.frame_model[t_term].mass_H2[e]
                 if i == 0:
                     mass_start = model.h2_mass_initial[e]
@@ -260,15 +236,14 @@ def window_h2_constraints(
     # Single pin: mass[t] == scale * H2_mass_final
     pin_index = []
     pin_init = {}
-    for t_term in term_frames:
-        scale = 1.0 if final_scale is None else float(final_scale[t_term])
-        for e, el in els_with_final:
-            target = scale * el.H2_mass_final
-            if target > el.H2_mass_max:
+    for t_term, scale in zip(term_frames, pin_scales):
+        for e in els_with_final:
+            target = scale * H2_mass_final[e]
+            if target > H2_mass_max[e]:
                 raise ValueError(
                     f"H₂ final target {target} kg (scale={scale} × "
-                    f"H2_mass_final={el.H2_mass_final}) exceeds "
-                    f"H2_mass_max={el.H2_mass_max} on {el.name!r}"
+                    f"H2_mass_final={H2_mass_final[e]}) exceeds "
+                    f"H2_mass_max={H2_mass_max[e]} on {el_name[e]!r}"
                 )
             pin_index.append((t_term, e))
             pin_init[(t_term, e)] = float(target)
@@ -371,14 +346,10 @@ def _update_window_frame_params(model, grid, frames, ts_base, price_zones):
 
 def _set_window_state_params(model, grid):
     """Push current SoC / H₂ initials into mutable window Params."""
-    if hasattr(model, 'soc_initial_AC') or hasattr(model, 'soc_initial_DC'):
+    if grid.ESS:
         for st in grid.storage_elements:
-            s = st.storageNumber
-            if st.connected == AcDcSide.AC and hasattr(model, 'soc_initial_AC'):
-                model.soc_initial_AC[s].set_value(float(st.soc_initial))
-            elif st.connected != AcDcSide.AC and hasattr(model, 'soc_initial_DC'):
-                model.soc_initial_DC[s].set_value(float(st.soc_initial))
-    if hasattr(model, 'h2_mass_initial'):
+            model.soc_initial[st.storageNumber].set_value(float(st.soc_initial))
+    if grid.H2:
         for el in grid.electrolysers:
             model.h2_mass_initial[el.electrolyserNumber].set_value(
                 float(el.H2_mass_initial)
@@ -423,15 +394,14 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
         for storage in grid.storage_elements:
             name = storage.name
             s = storage.storageNumber
+            row_soc[name] = np.float64(pyo.value(block.SoC[s]))
+            pc = np.float64(pyo.value(block.P_storage_charge[s])) * grid.S_base
+            pd_ = np.float64(pyo.value(block.P_storage_discharge[s])) * grid.S_base
             if storage.connected == AcDcSide.AC:
-                row_soc[name] = np.float64(pyo.value(block.SoC[s]))
-                pc = np.float64(pyo.value(block.P_storage_charge[s])) * grid.S_base
-                pd_ = np.float64(pyo.value(block.P_storage_discharge[s])) * grid.S_base
-                row_q[name] = np.float64(pyo.value(block.Q_storage[s])) * grid.S_base
+                row_q[name] = (
+                    np.float64(pyo.value(block.Q_storage[s])) * grid.S_base
+                )
             else:
-                row_soc[name] = np.float64(pyo.value(block.SoC_DC[s]))
-                pc = np.float64(pyo.value(block.P_storage_charge_DC[s])) * grid.S_base
-                pd_ = np.float64(pyo.value(block.P_storage_discharge_DC[s])) * grid.S_base
                 row_q[name] = np.nan
             row_pc[name] = pc
             row_pd[name] = pd_
@@ -550,20 +520,28 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
         nodes_ac = {n.name: n for n in grid.nodes_AC}
         nodes_dc = {n.name: n for n in grid.nodes_DC}
         rows_rp = []
+        rows_ravail = []
         rows_rprice = []
+        rows_curt = []
         for t in ordered:
             block = model.frame_model[t]
             abs_t = _abs_frame(t)
             row_rp = {'frame': abs_t}
+            row_ravail = {'frame': abs_t}
             row_rprice = {'frame': abs_t}
+            row_c = {'frame': abs_t}
             for rs in grid.RenSources:
                 r = rs.rsNumber
-                p = (
-                    np.float64(pyo.value(block.P_renSource[r]))
-                    * np.float64(pyo.value(block.gamma[r]))
-                    * np.float64(pyo.value(block.np_rsgen[r]))
-                )
-                row_rp[rs.name] = p * grid.S_base
+                p_ren = np.float64(pyo.value(block.P_renSource[r]))
+                gamma = np.float64(pyo.value(block.gamma[r]))
+                np_rs = np.float64(pyo.value(block.np_rsgen[r]))
+                available_pu = p_ren * np_rs
+                row_ravail[rs.name] = available_pu * grid.S_base
+                row_rp[rs.name] = available_pu * gamma * grid.S_base
+                if np_rs <= 0:
+                    row_c[rs.name] = 0.0
+                else:
+                    row_c[rs.name] = 1.0 - gamma
                 if rs.connected in (AcDcSide.AC, 'AC'):
                     node = nodes_ac.get(rs.Node)
                     if node is not None and hasattr(block, 'price'):
@@ -581,22 +559,12 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
                     else:
                         row_rprice[rs.name] = np.nan
             rows_rp.append(row_rp)
+            rows_ravail.append(row_ravail)
             rows_rprice.append(row_rprice)
-        results['ren_power'] = pd.DataFrame(rows_rp)
-        results['ren_price'] = pd.DataFrame(rows_rprice)
-
-        rows_curt = []
-        for t in ordered:
-            block = model.frame_model[t]
-            row_c = {'frame': _abs_frame(t)}
-            for rs in grid.RenSources:
-                r = rs.rsNumber
-                np_rs = np.float64(pyo.value(block.np_rsgen[r]))
-                if np_rs <= 0:
-                    row_c[rs.name] = 0.0
-                else:
-                    row_c[rs.name] = 1.0 - np.float64(pyo.value(block.gamma[r]))
             rows_curt.append(row_c)
+        results['ren_power'] = pd.DataFrame(rows_rp)
+        results['ren_available'] = pd.DataFrame(rows_ravail)
+        results['ren_price'] = pd.DataFrame(rows_rprice)
         results['curtailment'] = pd.DataFrame(rows_curt)
 
     if ordered and (grid.ACmode or grid.DCmode):
@@ -626,6 +594,8 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
         and grid.DCmode
         and grid.Converters_ACDC
     ):
+        # NL has Q_conv_s_AC / P_conv_c_AC / P_conv_loss; linear has P-only Ps.
+        linear_conv = not hasattr(model.frame_model[ordered[0]], 'Q_conv_s_AC')
         rows_conv = []
         for t in ordered:
             block = model.frame_model[t]
@@ -634,31 +604,46 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
                 k: np.float64(pyo.value(v))
                 for k, v in block.P_conv_s_AC.items()
             }
-            q_s = {
-                k: np.float64(pyo.value(v))
-                for k, v in block.Q_conv_s_AC.items()
-            }
-            p_c = {
-                k: np.float64(pyo.value(v))
-                for k, v in block.P_conv_c_AC.items()
-            }
-            p_loss = {
-                k: np.float64(pyo.value(v))
-                for k, v in block.P_conv_loss.items()
-            }
-            for conv in grid.Converters_ACDC:
-                n = conv.ConvNumber
-                p_ac = p_s[n] * conv.np_conv
-                q_ac = q_s[n] * conv.np_conv
-                p_dc = -(p_c[n] + p_loss[n]) * conv.np_conv
-                if conv.np_conv == 0:
-                    row_conv[conv.name] = 0.0
-                else:
-                    s_ac = np.sqrt(p_ac**2 + q_ac**2)
-                    row_conv[conv.name] = (
-                        max(s_ac, abs(p_dc)) * grid.S_base
-                        / (conv.MVA_max * conv.np_conv)
-                    )
+            if linear_conv:
+                for conv in grid.Converters_ACDC:
+                    n = conv.ConvNumber
+                    ps = p_s[n]
+                    loss_pu = float(conv.a_conv) + float(conv.b_conv) * ps
+                    p_ac = ps * conv.np_conv
+                    p_dc = -(p_ac + loss_pu * conv.np_conv)
+                    if conv.np_conv == 0:
+                        row_conv[conv.name] = 0.0
+                    else:
+                        row_conv[conv.name] = (
+                            max(abs(p_ac), abs(p_dc)) * grid.S_base
+                            / (conv.MVA_max * conv.np_conv)
+                        )
+            else:
+                q_s = {
+                    k: np.float64(pyo.value(v))
+                    for k, v in block.Q_conv_s_AC.items()
+                }
+                p_c = {
+                    k: np.float64(pyo.value(v))
+                    for k, v in block.P_conv_c_AC.items()
+                }
+                p_loss = {
+                    k: np.float64(pyo.value(v))
+                    for k, v in block.P_conv_loss.items()
+                }
+                for conv in grid.Converters_ACDC:
+                    n = conv.ConvNumber
+                    p_ac = p_s[n] * conv.np_conv
+                    q_ac = q_s[n] * conv.np_conv
+                    p_dc = -(p_c[n] + p_loss[n]) * conv.np_conv
+                    if conv.np_conv == 0:
+                        row_conv[conv.name] = 0.0
+                    else:
+                        s_ac = np.sqrt(p_ac**2 + q_ac**2)
+                        row_conv[conv.name] = (
+                            max(s_ac, abs(p_dc)) * grid.S_base
+                            / (conv.MVA_max * conv.np_conv)
+                        )
             rows_conv.append(row_conv)
         results['converter_loading'] = pd.DataFrame(rows_conv)
 
@@ -1002,6 +987,7 @@ def rolling_window_nl_opf(
     window_size=24,
     soc_final_mode='every_m',
     soc_final_every_m=1,
+    future_sight=0.0,
     ObjRule=None,
     PV_set=False,
     OnlyGen=True,
@@ -1024,7 +1010,7 @@ def rolling_window_nl_opf(
     Equal-length windows reuse one Pyomo model (local frames ``0…n-1``): TS and
     SoC/H₂ state ``Param``s are updated each roll (constraints stay put).
     ``warm_start_mode`` matches :func:`~pyflow_acdc.ts_acdc_opf` (``roll`` /
-    ``hard``). Short last windows and future-sight ``2X`` solves use separate
+    ``hard``). Short last windows and foresight solves use separate
     cached models.
 
     Each window starts from the previous terminal SoC. H₂ tank empties are
@@ -1040,24 +1026,26 @@ def rolling_window_nl_opf(
     Whether the goal is a mass target or sale-only does not change the empty
     policy above.
 
-    Terminal SoC is controlled by rolling via ``enforce_soc_final`` on each
-    :func:`window_nl_opf` call (terminals always sit on that solve's last frame):
+    Terminal SoC / foresight:
 
-    * ``soc_final_mode='every_m'`` — windows ``1…m-1`` run with
+    * ``future_sight`` in ``(0, 1]`` — extend the solve by
+      ``ceil(future_sight · window_size)`` frames into the next commit
+      (clamped to remaining hours). Enforce ``soc_final`` on that foresight
+      end; keep only the commit. With a mass target, commit must produce
+      ``>= H2_mass_final`` and the foresight segment ``>= future_sight ·
+      H2_mass_final`` (raw fraction). Last window has no foresight and still
+      enforces ``soc_final``.
+    * ``future_sight == 0`` — no foresight. Terminal SoC follows
+      ``soc_final_mode='every_m'``: windows ``1…m-1`` run with
       ``enforce_soc_final=False``; window ``m`` (and ``2m``, …) and the last
       window use ``True``.
-    * ``soc_final_mode='future_sight'`` — optimise *x*+*x+1* as one
-      ``window_nl_opf``, enforce SoC on that solve's last frame (end of *x+1*),
-      keep only *x*. The last window has no foresight and enforces ``soc_final``.
 
     H₂ mass target (``H2_mass_final``) and H₂ sale (``ObjRule['H2_sale']`` with
-    ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target,
-    each commit window regenerates ``H2_mass_final`` from the carried (or
-    emptied) tank. Under future sight the continuous *x*+*x+1* solve requires
-    **at least** ``H2_mass_final`` production in *x* and again in *x+1*
-    (incremental, not a cumulative ``2 · H2_mass_final`` absolute pin). Tank
-    capacity stays ``H2_mass_max`` through end of *x*, then
-    ``2 · H2_mass_max`` for the foresight half so both segments can fit.
+    ``h2_price`` / ``TSType.H2_PRICE``) are independent. With a mass target and
+    no foresight, each commit regenerates ``H2_mass_final`` from the carried
+    (or emptied) tank. Under foresight, tank ub stays ``H2_mass_max`` through
+    end of the commit, then ``(1 + future_sight) · H2_mass_max`` for the
+    foresight segment.
 
     Parameters
     ----------
@@ -1065,10 +1053,13 @@ def rolling_window_nl_opf(
         1-based inclusive hours (same as ``ts_acdc_opf``).
     window_size : int, optional
         Commit frames per window (except possibly the last).
-    soc_final_mode : {'every_m', 'future_sight'}, optional
-        Terminal-SoC policy.
+    soc_final_mode : {'every_m'}, optional
+        Terminal-SoC policy when ``future_sight == 0``.
     soc_final_every_m : int, optional
         Used when ``soc_final_mode='every_m'`` (must be >= 1).
+    future_sight : float, optional
+        Foresight fraction in ``[0, 1]`` (default ``0`` = off). Steps are
+        ``ceil(future_sight * window_size)``.
     print_step : bool, optional
         If True, print ``Rolling window k/n (frames …)`` before each window.
     warm_start_mode : {'roll', 'hard'}, optional
@@ -1088,12 +1079,15 @@ def rolling_window_nl_opf(
         ``wall_end``. Each ``window_stats[i]['timing']`` has the same per-window
         breakdown plus wall timestamps.
     """
-    if soc_final_mode not in ('every_m', 'future_sight'):
+    if soc_final_mode not in ('every_m',):
         raise ValueError(
-            f"soc_final_mode must be 'every_m' or 'future_sight', got {soc_final_mode!r}"
+            f"soc_final_mode must be 'every_m', got {soc_final_mode!r}"
         )
     if soc_final_every_m < 1:
         raise ValueError(f"soc_final_every_m must be >= 1, got {soc_final_every_m}")
+    future_sight = float(future_sight)
+    if not (0.0 <= future_sight <= 1.0):
+        raise ValueError(f"future_sight must be in [0, 1], got {future_sight}")
     warm_start_mode = str(warm_start_mode).lower()
     if warm_start_mode not in ('roll', 'hard'):
         raise ValueError("warm_start_mode must be either 'roll' or 'hard'")
@@ -1147,23 +1141,28 @@ def rolling_window_nl_opf(
         t_win0 = time.perf_counter()
         wall_start = datetime.now(timezone.utc).isoformat()
         is_last = k == n_win - 1
-        use_foresight = (
-            soc_final_mode == 'future_sight' and not is_last
-        )
+        available = idx1 - c_end
+        foresight_steps = 0
+        if future_sight > 0.0 and not is_last and available > 0:
+            foresight_steps = min(
+                math.ceil(future_sight * window_size),
+                available,
+            )
+        use_foresight = foresight_steps > 0
         if use_foresight:
-            _, next_end = commits[k + 1]
-            solve_start, solve_end = c_start, next_end
+            foresight_end = c_end + foresight_steps
+            solve_start, solve_end = c_start, foresight_end
             force_soc = True
             if enforce_h2_mass:
-                # Two pins → incremental ≥ H2_mass_final per half (see window_h2).
-                h2_frames = [c_end, next_end]
+                h2_frames = [c_end, foresight_end]
+                h2_scale = {c_end: 1.0, foresight_end: future_sight}
             else:
                 h2_frames = None
-            h2_scale = None
+                h2_scale = None
         else:
             solve_start, solve_end = c_start, c_end
-            if soc_final_mode == 'future_sight':
-                force_soc = True  # last window
+            if future_sight > 0.0:
+                force_soc = True  # last window (or no remaining foresight hours)
             else:
                 force_soc = ((k + 1) % soc_final_every_m == 0) or is_last
             h2_frames = None  # last frame of this solve
@@ -1174,7 +1173,10 @@ def rolling_window_nl_opf(
                 f"(frames {c_start}–{c_end})"
             )
             if use_foresight:
-                step_msg += f" + future-sight ({c_end + 1}–{next_end})"
+                step_msg += (
+                    f" + future-sight {future_sight:g} "
+                    f"({c_end + 1}–{foresight_end}, {foresight_steps} steps)"
+                )
             print(step_msg)
         t_prepare = time.perf_counter() - t_win0
 
@@ -1266,7 +1268,8 @@ def rolling_window_nl_opf(
             'commit': (c_start, c_end),
             'solve': (solve_start, solve_end),
             'force_soc': force_soc,
-            'future_sight': use_foresight,
+            'future_sight': future_sight if use_foresight else 0.0,
+            'foresight_steps': foresight_steps,
             'h2_final_frames': h2_frames,
             'h2_final_scale': h2_scale,
             'warm_start_mode': warm_start_mode,
@@ -1296,6 +1299,7 @@ def rolling_window_nl_opf(
         'commits': list(commits),
         'start_frame': idx0,
         'end_frame': idx1,
+        'future_sight': future_sight,
     }
     timing_acc['windows'] = n_win
     timing_acc['frames'] = idx1 - idx0 + 1

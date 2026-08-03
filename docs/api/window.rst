@@ -30,4 +30,14 @@ Rolling window
    Inclusive **1-based** ``start`` / ``end`` (same convention as
    :func:`~pyflow_acdc.ts_acdc_opf`). Chains :func:`~pyflow_acdc.window_nl_opf`
    with SoC carry-over; H₂ tank empties follow ``empty_tank_cycle`` between
-   commits.
+   commits. Optional ``future_sight`` in ``[0, 1]`` extends each commit solve
+   by ``ceil(future_sight · window_size)`` foresight frames (SoC final at the
+   foresight end; proportional H₂ mass on the foresight segment). See
+   :doc:`../usage_window_opf`.
+
+Linear AC(/DC) window
+---------------------
+
+Linear counterparts (:func:`~pyflow_acdc.window_l_opf`,
+:func:`~pyflow_acdc.rolling_window_l_opf`) live under :doc:`L_models`
+(AC-only and hybrid LP; BESS P-only).
