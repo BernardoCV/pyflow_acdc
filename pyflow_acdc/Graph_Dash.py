@@ -1910,9 +1910,11 @@ def _default_element_selection(options, aggregation):
 def _family_auto_ylimits(df, family):
     if df is None or df.empty:
         return 0, 1
-    y_min = int(min(0, df.min().min() - 5))
     if family == 'SoC':
         return 0, 1
+    if family == 'Curtailment':
+        return 0, 100
+    y_min = int(min(0, df.min().min() - 5))
     y_max = int(df.max().max() + 10)
     return y_min, y_max
 
