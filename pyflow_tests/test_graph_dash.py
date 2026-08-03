@@ -233,23 +233,26 @@ def test_power_family_overview():
     assert ylabel_c == "Curtailment %"
     assert list(df_c["rs1"]) == [0.0, 10.0, 5.0]
 
-    # MW-weighted total: curt=0 still counts via available=ren_power.
-    # rs1: curt=[0, 0.5], ren=[90, 5] → avail=[90, 10]
-    # rs2: curt=[0, 0],   ren=[10, 10] → avail=[10, 10]
-    # frame0: (0*90+0*10)/(90+10)=0; frame1: (0.5*10+0*10)/(10+10)=0.25 → 25%
+    # MW-weighted total uses ren_available (pre-curtail).
+    # rs1: curt=[0, 0.5, 1.0], avail=[90, 10, 40]
+    # rs2: curt=[0, 0, 0],     avail=[10, 10, 10]
+    # f0: 0%; f1: (5+0)/20=25%; f2: (40+0)/50=80%
     weighted_res = {
         "curtailment": pd.DataFrame(
-            {"frame": [0, 1], "rs1": [0.0, 0.5], "rs2": [0.0, 0.0]}
+            {"frame": [0, 1, 2], "rs1": [0.0, 0.5, 1.0], "rs2": [0.0, 0.0, 0.0]}
+        ),
+        "ren_available": pd.DataFrame(
+            {"frame": [0, 1, 2], "rs1": [90.0, 10.0, 40.0], "rs2": [10.0, 10.0, 10.0]}
         ),
         "ren_power": pd.DataFrame(
-            {"frame": [0, 1], "rs1": [90.0, 5.0], "rs2": [10.0, 10.0]}
+            {"frame": [0, 1, 2], "rs1": [90.0, 5.0, 0.0], "rs2": [10.0, 10.0, 10.0]}
         ),
     }
     bare = pyf.Grid(S_base=100)
     df_w, _ = resolve_family_df(
         weighted_res, bare, "Curtailment", "total", source="window"
     )
-    assert list(df_w["total"]) == pytest.approx([0.0, 25.0])
+    assert list(df_w["total"]) == pytest.approx([0.0, 25.0, 80.0])
 
     df, ylabel = resolve_family_df(res, grid, "Power", "source", source="window")
     assert ylabel == "Power (MW)"
@@ -351,6 +354,9 @@ def _grid_with_window_results():
         ),
         "ren_power": pd.DataFrame(
             {"frame": [0, 1, 2], "rs1": [5.0, 8.0, 6.0]}
+        ),
+        "ren_available": pd.DataFrame(
+            {"frame": [0, 1, 2], "rs1": [5.0, 8.0 / 0.9, 6.0 / 0.95]}
         ),
         "ren_price": pd.DataFrame(
             {"frame": [0, 1, 2], "rs1": [0.0, 0.0, 0.0]}

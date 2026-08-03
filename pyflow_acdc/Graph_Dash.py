@@ -140,12 +140,12 @@ _FAMILY_SPECS = {
         'entity_agg': 'ren_source',
         'node_agg': 'node',
         'zone_agg': 'zone',
-        # MW-weighted: Σ(curt·available)/Σ(available), then ×100 for display.
-        # available = ren_power/(1−curt); curt=0 → available=ren_power (included).
+        # MW-weighted: Σ(curt·available)/Σ(available), then ×100.
+        # Weights from ren_available (pre-curtail P_ren·np); curt=0 and curt=1 ok.
         'reduce': 'curt_weighted',
         'kind': 'ren',
         'scale': 100.0,
-        'weight_key': 'ren_power',
+        'weight_key': 'ren_available',
     },
     'Generators': {
         'key': 'gen_power',
@@ -855,47 +855,19 @@ def available_dash_families(grid, window_opf_results, source='window', s_base=No
     return out
 
 
-def _curtailment_available_mw(curt_frac, ren_mw):
-    """Recover available MW from delivered ren and curtailment fraction.
-
-    ``available = ren_power / (1 − curt)``. When ``curt == 0``, this is
-    ``ren_power`` so zero-curtailment sources still enter the MW weights.
-    Fully curtailed rows (``curt >= 1``) cannot recover available from
-    ``ren_power`` alone (delivered is 0).
-    """
-    curt = curt_frac.astype(float)
-    ren = ren_mw.astype(float).reindex(curt.index)
-    if ren.isna().any():
-        missing = list(ren.index[ren.isna()])
+def _reduce_curt_weighted(curt_frac_df, avail_df, names, scale=100.0):
+    """MW-weighted curtailment % using pre-curtail available MW weights."""
+    curt = curt_frac_df[names].astype(float)
+    avail = avail_df[names].astype(float)
+    if (curt < -1e-12).any().any() or (curt > 1.0 + 1e-12).any().any():
         raise ValueError(
-            "ren_power missing columns needed to weight curtailment: "
-            f"{missing}"
+            f"Curtailment fraction out of [0, 1]; min={float(curt.min().min())}, "
+            f"max={float(curt.max().max())}"
         )
-    full = curt >= (1.0 - 1e-12)
-    if full.any():
-        bad = list(curt.index[full])
+    if (avail < -1e-12).any().any():
         raise ValueError(
-            "Cannot recover available MW for 100% curtailment from ren_power "
-            f"alone (need positive available); columns={bad}"
+            f"ren_available must be >= 0; min={float(avail.min().min())}"
         )
-    if (curt < -1e-12).any() or (curt > 1.0 + 1e-12).any():
-        raise ValueError(
-            f"Curtailment fraction out of [0, 1]; min={float(curt.min())}, "
-            f"max={float(curt.max())}"
-        )
-    # curt=0 → divide by 1 → available=ren (included in Σ weights).
-    return ren / (1.0 - curt)
-
-
-def _reduce_curt_weighted(curt_frac_df, ren_df, names, scale=100.0):
-    """MW-weighted curtailment % for one group of ren-source columns."""
-    curt = curt_frac_df[names]
-    ren = ren_df[names]
-    avail_cols = {
-        name: _curtailment_available_mw(curt[name], ren[name])
-        for name in names
-    }
-    avail = pd.DataFrame(avail_cols)
     curtailed_mw = curt * avail
     den = avail.sum(axis=1)
     num = curtailed_mw.sum(axis=1)
@@ -925,8 +897,8 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
     ``source`` selects window (frame-indexed) vs ts (``time_series_results``) keys.
 
     Curtailment node/zone/total uses MW-weighted fractions
-    ``Σ(curt·available)/Σ(available)`` with ``available = ren_power/(1−curt)``
-    (``curt=0`` still counts via ``available=ren_power``), then scales to %.
+    ``Σ(curt·available)/Σ(available)`` with ``available`` from ``ren_available``
+    (pre-curtail), then scales to %. ``curt=0`` and ``curt=1`` both work.
     """
     if family not in _FAMILY_SPECS:
         raise ValueError(f"Unknown family {family!r}")
@@ -943,15 +915,16 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
 
     scale = float(spec['scale']) if spec.get('scale') is not None else 1.0
     curt_weighted = spec.get('reduce') == 'curt_weighted'
-    ren_df = None
+    avail_df = None
     if curt_weighted:
         if source != 'window':
             raise ValueError("Curtailment MW-weighting requires source='window'")
-        weight_key = spec.get('weight_key', 'ren_power')
-        ren_df = _frame_column_to_index(window_opf_results.get(weight_key))
-        if ren_df is None or ren_df.empty:
+        weight_key = spec.get('weight_key', 'ren_available')
+        avail_df = _frame_column_to_index(window_opf_results.get(weight_key))
+        if avail_df is None or avail_df.empty:
             raise ValueError(
-                f"Curtailment weighting requires {weight_key!r} in window results"
+                f"Curtailment weighting requires {weight_key!r} in window results "
+                f"(re-run window/rolling OPF to export it)"
             )
 
     records = _family_entity_records(grid, family)
@@ -967,12 +940,12 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
             return out, spec['ylabel']
         if aggregation == 'total':
             if curt_weighted:
-                names = [c for c in df.columns if c in ren_df.columns]
+                names = [c for c in df.columns if c in avail_df.columns]
                 if not names:
                     raise ValueError(
-                        "No overlapping curtailment / ren_power columns for total"
+                        "No overlapping curtailment / ren_available columns for total"
                     )
-                series = _reduce_curt_weighted(df, ren_df, names, scale=scale)
+                series = _reduce_curt_weighted(df, avail_df, names, scale=scale)
                 return series.to_frame('total'), spec['ylabel']
             reduce = 'mean' if spec['reduce'] in ('mean', 'price') else 'sum'
             if reduce == 'sum':
@@ -1002,13 +975,13 @@ def resolve_family_df(window_opf_results, grid, family, aggregation, source='win
         else:
             cols = {}
             for gk, names in groups.items():
-                missing = [n for n in names if n not in ren_df.columns]
+                missing = [n for n in names if n not in avail_df.columns]
                 if missing:
                     raise ValueError(
-                        "ren_power missing columns for curtailment weighting: "
+                        "ren_available missing columns for curtailment weighting: "
                         f"{missing}"
                     )
-                cols[gk] = _reduce_curt_weighted(df, ren_df, names, scale=scale)
+                cols[gk] = _reduce_curt_weighted(df, avail_df, names, scale=scale)
         return pd.DataFrame(cols), spec['ylabel']
 
     cols = {

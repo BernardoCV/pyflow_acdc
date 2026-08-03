@@ -50,9 +50,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   via ``create_season_compare_dash_app``); PEI season-compare doc example and
   screenshot. Family mode adds ``Curtailment`` (``window_opf_results`` /
   rolling; node/zone/total is MW-weighted
-  ``Σ(curt·available)/Σ(available)`` with ``available=ren/(1−curt)``, so
-  ``curt=0`` still counts; shown as %). Add plot preserves per-panel family /
-  aggregation / elements.
+  ``Σ(curt·ren_available)/Σ(ren_available)`` from exported pre-curtail
+  available MW, so ``curt=0`` and ``curt=1`` both work; shown as %). Add plot
+  preserves per-panel family / aggregation / elements.
+- **Window results**: ``ren_available`` (pre-curtail renewable MW) exported
+  alongside ``ren_power`` / ``curtailment`` for weighted curtailment plots.
 - **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
   data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
   OPF.

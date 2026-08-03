@@ -460,20 +460,28 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
         nodes_ac = {n.name: n for n in grid.nodes_AC}
         nodes_dc = {n.name: n for n in grid.nodes_DC}
         rows_rp = []
+        rows_ravail = []
         rows_rprice = []
+        rows_curt = []
         for t in ordered:
             block = model.frame_model[t]
             abs_t = _abs_frame(t)
             row_rp = {'frame': abs_t}
+            row_ravail = {'frame': abs_t}
             row_rprice = {'frame': abs_t}
+            row_c = {'frame': abs_t}
             for rs in grid.RenSources:
                 r = rs.rsNumber
-                p = (
-                    np.float64(pyo.value(block.P_renSource[r]))
-                    * np.float64(pyo.value(block.gamma[r]))
-                    * np.float64(pyo.value(block.np_rsgen[r]))
-                )
-                row_rp[rs.name] = p * grid.S_base
+                p_ren = np.float64(pyo.value(block.P_renSource[r]))
+                gamma = np.float64(pyo.value(block.gamma[r]))
+                np_rs = np.float64(pyo.value(block.np_rsgen[r]))
+                available_pu = p_ren * np_rs
+                row_ravail[rs.name] = available_pu * grid.S_base
+                row_rp[rs.name] = available_pu * gamma * grid.S_base
+                if np_rs <= 0:
+                    row_c[rs.name] = 0.0
+                else:
+                    row_c[rs.name] = 1.0 - gamma
                 if rs.connected in (AcDcSide.AC, 'AC'):
                     node = nodes_ac.get(rs.Node)
                     if node is not None and hasattr(block, 'price'):
@@ -491,22 +499,12 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
                     else:
                         row_rprice[rs.name] = np.nan
             rows_rp.append(row_rp)
+            rows_ravail.append(row_ravail)
             rows_rprice.append(row_rprice)
-        results['ren_power'] = pd.DataFrame(rows_rp)
-        results['ren_price'] = pd.DataFrame(rows_rprice)
-
-        rows_curt = []
-        for t in ordered:
-            block = model.frame_model[t]
-            row_c = {'frame': _abs_frame(t)}
-            for rs in grid.RenSources:
-                r = rs.rsNumber
-                np_rs = np.float64(pyo.value(block.np_rsgen[r]))
-                if np_rs <= 0:
-                    row_c[rs.name] = 0.0
-                else:
-                    row_c[rs.name] = 1.0 - np.float64(pyo.value(block.gamma[r]))
             rows_curt.append(row_c)
+        results['ren_power'] = pd.DataFrame(rows_rp)
+        results['ren_available'] = pd.DataFrame(rows_ravail)
+        results['ren_price'] = pd.DataFrame(rows_rprice)
         results['curtailment'] = pd.DataFrame(rows_curt)
 
     if ordered and (grid.ACmode or grid.DCmode):
