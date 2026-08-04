@@ -65,16 +65,14 @@ def test_storage_nl_model_builds():
         build_only=True,
     )
 
-    assert hasattr(model, "storage_AC")
-    assert hasattr(model, "storage_DC")
+    assert hasattr(model, "storage")
     assert hasattr(model, "P_storage_charge")
-    assert hasattr(model, "P_storage_charge_DC")
+    assert hasattr(model, "Q_storage")
     assert hasattr(model, "S_storage_AC_limit_constraint")
     assert hasattr(model, "P_storage_DC_net_upper_constraint")
     assert hasattr(model, "Gen_Pstorage_constraint")
     assert hasattr(model, "Gen_Pstorage_DC_constraint")
-    assert len(model.storage_AC) == 1
-    assert len(model.storage_DC) == 1
+    assert len(model.storage) == 2
 
 
 def test_ext_storage_reporting():
@@ -185,8 +183,12 @@ def test_storage_soc_ref_param_and_soc_deviation_obj():
         build_only=True,
     )
     assert hasattr(model, "soc_ref")
-    assert hasattr(model, "soc_ref_DC")
-    ac_id = next(iter(model.storage_AC))
+    assert not hasattr(model, "soc_ref_DC")
+    ac_id = next(
+        s.storageNumber
+        for s in grid.storage_elements
+        if s.connected.value == "AC"
+    )
     assert model.soc_ref[ac_id].value == pytest.approx(0.5)
     from pyflow_acdc.constants import default_obj_weights
     assert ObjComponent.SOC_DEVIATION in default_obj_weights()

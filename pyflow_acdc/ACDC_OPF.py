@@ -11,7 +11,7 @@ import pyomo.environ as pyo
 import warnings
 
 from .NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
-from .L_models.AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
+from .L_models.AC_OPF_L_model import opf_create_l_model_acdc, export_acdc_l_model_to_pyflow_acdc
 from .grid_analysis import analyse_grid
 from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights, AcDcSide
 from .pyomo_model_solve import (
@@ -28,9 +28,12 @@ __all__ = [
     'pyomo_model_solve',
     'opf_update_param',
     'opf_obj',
+    'opf_obj_l',
+    'check_linear_opf_weights',
     'opf_line_res',
     'opf_price_price_zone',
     'opf_step_results',
+    'opf_step_results_l',
     'fx_conv',
     'export_solver_progress_to_excel',
     'reset_to_initialize',
@@ -73,16 +76,16 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0,build_only=False):
-    """Build and solve the linearised AC OPF for ``grid``.
+    """Build and solve the linearised AC(/DC) OPF for ``grid``.
 
-    Constructs the linearised AC Pyomo model, minimises the weighted objective,
+    Constructs the linearised Pyomo model (AC Bθ; when ``grid.DCmode``, also
+    linearized DC PF and thin LP converters), minimises the weighted objective,
     solves it, and exports the solution back onto ``grid``. Supported objective
     components are generator ``Energy_cost`` and (when electrolysers exist)
     ``H2_sale``. ``SoC_deviation`` is quadratic and raises if weighted.
     Other non-zero weights trigger a warning.
 
-    Raises if ``grid.DCmode`` (AC networks only for now). When ``grid.ESS`` /
-    ``grid.H2``, BESS (P-only) and electrolysers are included.
+    When ``grid.ESS`` / ``grid.H2``, BESS (P-only) and electrolysers are included.
 
     Parameters
     ----------
@@ -122,20 +125,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
 
-    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
-        raise ValueError(
-            "SoC_deviation is quadratic and is not supported in linear OPF")
-
-    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
-    other_weights_nonzero = [
-        key for key, value in weights_def.items()
-        if key not in supported_l and value['w'] != 0
-    ]
-    if other_weights_nonzero:
-        warnings.warn(
-            "Linear OPF only supports Energy_cost and H2_sale; "
-            f"ignoring non-zero weights for {other_weights_nonzero}"
-        )
+    check_linear_opf_weights(weights_def)
 
     model = pyo.ConcreteModel()
     model.name="""AC 'DC linear' OPF"""
@@ -143,7 +133,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     t1 = time.perf_counter()
 
-    opf_create_l_model_ac(model,grid)
+    opf_create_l_model_acdc(model,grid)
 
     t2 = time.perf_counter()
     t_modelcreate = t2-t1
@@ -163,6 +153,9 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     """
     """
+    if grid.DCmode and any(conv.OPF_fx for conv in grid.Converters_ACDC):
+        fx_conv(model, grid)
+
     t3 = time.perf_counter()
     if build_only:
         model_res, solver_stats = build_only_solver_stats(solver, model)
@@ -301,24 +294,29 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
 
 def fx_conv(model,grid):
     def fx_PDC(model,conv):
-        if grid.Converters_ACDC[conv].OPF_fx==True and grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PDC:
-            return model.P_conv_DC[conv.Node_DC.nodeNumber]==grid.Converters_ACDC[conv].P_DC
-        else:
-            return pyo.Constraint.Skip
-    def fx_PAC(model,conv):
-        if grid.Converters_ACDC[conv].OPF_fx==True and (grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PQ or grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PV):
-            return model.P_conv_s_AC[conv]==grid.Converters_ACDC[conv].P_AC
-        else:
-            return pyo.Constraint.Skip
-    def fx_QAC(model,conv):
-        if grid.Converters_ACDC[conv].OPF_fx==True and grid.Converters_ACDC[conv].OPF_fx_type==ConverterOpfFxType.PQ:
-            return model.Q_conv_s_AC[conv]==grid.Converters_ACDC[conv].Q_AC
-        else:
-            return pyo.Constraint.Skip
+        element = grid.Converters_ACDC[conv]
+        if element.OPF_fx and element.OPF_fx_type == ConverterOpfFxType.PDC:
+            return model.P_conv_DC[element.Node_DC.nodeNumber] == element.P_DC
+        return pyo.Constraint.Skip
 
-    model.Conv_fx_pdc=pyo.Constraint(model.conv,rule=fx_PDC)
-    model.Conv_fx_pac=pyo.Constraint(model.conv,rule=fx_PAC)
-    model.Conv_fx_qac =pyo.Constraint(model.conv,rule=fx_QAC)
+    def fx_PAC(model,conv):
+        element = grid.Converters_ACDC[conv]
+        if element.OPF_fx and element.OPF_fx_type in (
+                ConverterOpfFxType.PQ, ConverterOpfFxType.PV):
+            return model.P_conv_s_AC[conv] == element.P_AC
+        return pyo.Constraint.Skip
+
+    def fx_QAC(model,conv):
+        element = grid.Converters_ACDC[conv]
+        if not hasattr(model, 'Q_conv_s_AC'):
+            return pyo.Constraint.Skip
+        if element.OPF_fx and element.OPF_fx_type == ConverterOpfFxType.PQ:
+            return model.Q_conv_s_AC[conv] == element.Q_AC
+        return pyo.Constraint.Skip
+
+    model.Conv_fx_pdc = pyo.Constraint(model.conv, rule=fx_PDC)
+    model.Conv_fx_pac = pyo.Constraint(model.conv, rule=fx_PAC)
+    model.Conv_fx_qac = pyo.Constraint(model.conv, rule=fx_QAC)
 
 
 
@@ -341,13 +339,24 @@ def opf_obj_l(model,grid,ObjRule):
     total = 0
 
     if ObjRule[ObjComponent.ENERGY_COST]['w'] != 0:
-        total += sum(
-            (
-                model.PGi_gen[gen.genNumber] * grid.S_base * model.lf[gen.genNumber]
-                + model.np_gen[gen.genNumber] * gen.fc
+        if grid.ACmode:
+            total += sum(
+                (
+                    model.PGi_gen[gen.genNumber] * grid.S_base * model.lf[gen.genNumber]
+                    + model.np_gen[gen.genNumber] * gen.fc
+                )
+                for gen in grid.Generators
             )
-            for gen in grid.Generators
-        )
+        if grid.DCmode and grid.Generators_DC:
+            total += sum(
+                (
+                    model.PGi_gen_DC[gen.genNumber_DC]
+                    * grid.S_base
+                    * model.lf_dc[gen.genNumber_DC]
+                    + model.np_gen_DC[gen.genNumber_DC] * gen.fc
+                )
+                for gen in grid.Generators_DC
+            )
 
     if ObjRule[ObjComponent.H2_SALE]['w'] != 0:
         if not grid.H2:
@@ -364,6 +373,29 @@ def opf_obj_l(model,grid,ObjRule):
         )
 
     return total
+
+
+def check_linear_opf_weights(weights_def):
+    """Validate ObjRule weights for linear OPF / linear window drivers.
+
+    Raises if ``SoC_deviation`` is weighted (quadratic). Warns on other
+    non-zero weights outside ``Energy_cost`` / ``H2_sale`` (they are ignored
+    by :func:`opf_obj_l`).
+    """
+    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
+        raise ValueError(
+            "SoC_deviation is quadratic and is not supported in linear OPF"
+        )
+    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
+    other_weights_nonzero = [
+        key for key, value in weights_def.items()
+        if key not in supported_l and value['w'] != 0
+    ]
+    if other_weights_nonzero:
+        warnings.warn(
+            "Linear OPF only supports Energy_cost and H2_sale; "
+            f"ignoring non-zero weights for {other_weights_nonzero}"
+        )
 
 
 def opf_obj_l_array_losses(model, grid, ObjRule):
@@ -549,10 +581,7 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
         total = 0
         for st in grid.storage_elements:
             s = st.storageNumber
-            if st.connected == AcDcSide.AC:
-                total += (model.SoC[s] - model.soc_ref[s]) ** 2
-            else:
-                total += (model.SoC_DC[s] - model.soc_ref_DC[s]) ** 2
+            total += (model.SoC[s] - model.soc_ref[s]) ** 2
         return total
 
     s=1
@@ -656,20 +685,64 @@ def translate_pyf_opf(grid,Price_Zones=False):
     gen_DC_info = pack_variables(lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC)
     gen_info = pack_variables(gen_AC_info,gen_DC_info,gen_rs_info)
 
-    lista_storage_ac = [
-        s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.AC]
-    lista_storage_dc = [
-        s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.DC]
-    storage_ac_by_number = {
-        s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.AC}
-    storage_dc_by_number = {
-        s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.DC}
-    storage_info = pack_variables(
-        lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number)
+    nn_st = 0
+    P_charge_max, P_discharge_max, P_max_st, S_max_st = {}, {}, {}, {}
+    soc_min_st, soc_max_st, soc_initial, soc_ref, soc_final = {}, {}, {}, {}, {}
+    eta_charge, eta_discharge, E_max_st, dt_hours_st, S_base_st = {}, {}, {}, {}, {}
+    connected_st = {}
+    for s in grid.storage_elements:
+        nn_st += 1
+        n = s.storageNumber
+        P_charge_max[n] = s.P_charge_max
+        P_discharge_max[n] = s.P_discharge_max
+        P_max_st[n] = s.P_max
+        S_max_st[n] = s.S_max if s.connected == AcDcSide.AC else 0.0
+        soc_min_st[n] = s.soc_min
+        soc_max_st[n] = s.soc_max
+        soc_initial[n] = s.soc_initial
+        soc_ref[n] = s.soc_ref
+        soc_final[n] = s.soc_final
+        eta_charge[n] = s.eta_charge
+        eta_discharge[n] = s.eta_discharge
+        E_max_st[n] = s.E_max
+        dt_hours_st[n] = s.dt_hours
+        S_base_st[n] = s.S_base
+        connected_st[n] = s.connected
+    lista_storage = list(range(0, nn_st))
+    storage_lim = pack_variables(P_charge_max, P_discharge_max, P_max_st, S_max_st)
+    storage_soc = pack_variables(
+        soc_min_st, soc_max_st, soc_initial, soc_ref, soc_final)
+    storage_phys = pack_variables(
+        eta_charge, eta_discharge, E_max_st, dt_hours_st, S_base_st, connected_st)
+    storage_info = pack_variables(storage_lim, storage_soc, storage_phys, lista_storage)
 
-    lista_electrolyser = [e.electrolyserNumber for e in grid.electrolysers]
-    electrolyser_by_number = {e.electrolyserNumber: e for e in grid.electrolysers}
-    hydrogen_info = pack_variables(lista_electrolyser, electrolyser_by_number)
+    nn_el = 0
+    P_min_el, P_max_el, Q_min_el, Q_max_el, H2_mass_max = {}, {}, {}, {}, {}
+    H2_mass_initial, H2_mass_final = {}, {}
+    b_h, c_h, S_base_el, dt_hours_el, connected_el = {}, {}, {}, {}, {}
+    for el in grid.electrolysers:
+        nn_el += 1
+        e = el.electrolyserNumber
+        P_min_el[e] = el.P_min
+        P_max_el[e] = el.P_max
+        Q_min_el[e] = el.Q_min if el.connected == AcDcSide.AC else 0.0
+        Q_max_el[e] = el.Q_max if el.connected == AcDcSide.AC else 0.0
+        H2_mass_max[e] = el.H2_mass_max
+        H2_mass_initial[e] = el.H2_mass_initial
+        H2_mass_final[e] = el.H2_mass_final
+        b_h[e] = el.b_h
+        c_h[e] = el.c_h
+        S_base_el[e] = el.S_base
+        dt_hours_el[e] = el.dt_hours
+        connected_el[e] = el.connected
+    lista_electrolyser = list(range(0, nn_el))
+    hydrogen_lim = pack_variables(
+        P_min_el, P_max_el, Q_min_el, Q_max_el, H2_mass_max)
+    hydrogen_state = pack_variables(H2_mass_initial, H2_mass_final)
+    hydrogen_phys = pack_variables(
+        b_h, c_h, S_base_el, dt_hours_el, connected_el)
+    hydrogen_info = pack_variables(
+        hydrogen_lim, hydrogen_state, hydrogen_phys, lista_electrolyser)
 
     "Price zone info"
 
@@ -1024,6 +1097,78 @@ def opf_step_results(model,grid):
                 opt_res_Loading_conv)
 
 
+def opf_step_results_l(model, grid):
+    """TS step reporting for linear OPF (P-only; converter Q = 0)."""
+    opt_res_P_conv_DC = {}
+    opt_res_P_conv_AC = {}
+    opt_res_Q_conv_AC = {}
+    opt_res_Loading_conv = {}
+    opt_P_load = {}
+    opt_res_P_extGrid = {}
+    opt_res_Q_extGrid = {}
+    opt_res_curtailment = {}
+
+    if grid.ACmode and grid.DCmode:
+        P_conv_s_AC_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_conv_s_AC.items()}
+
+        def process_converter(conv):
+            nconv = conv.ConvNumber
+            name = conv.name
+            Ps = P_conv_s_AC_values[nconv]
+            loss_pu = float(conv.a_conv) + float(conv.b_conv) * Ps
+            pac = Ps * conv.np_conv
+            pdc = -(pac + loss_pu * conv.np_conv)
+            opt_res_P_conv_AC[name] = pac
+            opt_res_Q_conv_AC[name] = 0.0
+            opt_res_P_conv_DC[name] = pdc
+            if conv.np_conv == 0:
+                opt_res_Loading_conv[name] = 0
+            else:
+                opt_res_Loading_conv[name] = (
+                    max(abs(pac), abs(pdc)) * grid.S_base
+                    / (conv.MVA_max * conv.np_conv)
+                )
+
+        with ThreadPoolExecutor() as executor:
+            executor.map(process_converter, grid.Converters_ACDC)
+
+    if grid.ACmode:
+        Pload_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_known_AC.items()}
+        PGen_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.PGi_gen.items()}
+        for node in grid.nodes_AC:
+            opt_P_load[node.name] = -Pload_values[node.nodeNumber]
+        for gen in grid.Generators:
+            opt_res_P_extGrid[gen.name] = PGen_values[gen.genNumber]
+            opt_res_Q_extGrid[gen.name] = 0.0
+
+    if grid.DCmode and grid.Generators_DC:
+        PGen_DC_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.PGi_gen_DC.items()}
+        for gen in grid.Generators_DC:
+            opt_res_P_extGrid[gen.name] = PGen_DC_values[gen.genNumber_DC]
+            opt_res_Q_extGrid[gen.name] = 0.0
+
+    gamma_values = {k: np.float64(pyo.value(v)) for k, v in model.gamma.items()}
+    Pren_values = {
+        k: np.float64(pyo.value(v)) for k, v in model.P_renSource.items()}
+    for rs in grid.RenSources:
+        name = rs.name
+        gamma = gamma_values[rs.rsNumber]
+        opt_res_curtailment[name] = (
+            1 - gamma if rs.np_rsgen > 0 else 0)
+        rs_multiplicity = np.float64(pyo.value(model.np_rsgen[rs.rsNumber]))
+        opt_res_P_extGrid[f'RenSource_{name}'] = (
+            Pren_values[rs.rsNumber] * gamma * rs_multiplicity)
+        opt_res_Q_extGrid[f'RenSource_{name}'] = 0.0
+
+    return (
+        opt_res_P_conv_DC, opt_res_P_conv_AC, opt_res_Q_conv_AC, opt_P_load,
+        opt_res_P_extGrid, opt_res_Q_extGrid, opt_res_curtailment,
+        opt_res_Loading_conv,
+    )
 
 
 def calculate_objective(grid,obj,OnlyGen=True):

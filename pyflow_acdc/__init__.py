@@ -152,7 +152,7 @@ try:
     __all__.extend([
         'optimal_pf', 'optimal_l_pf', 'pyomo_model_solve', 'opf_obj', 'opf_line_res',
         'opf_price_price_zone', 'translate_pyf_opf',
-        'ts_acdc_opf', 'results_ts_opf',
+        'ts_acdc_opf', 'ts_acdc_l_opf', 'results_ts_opf',
     ])
     try:
         from .NL_models.window_opf import (
@@ -161,6 +161,11 @@ try:
         __all__.extend([
             'window_nl_opf', 'rolling_window_nl_opf', 'results_window_opf',
         ])
+    except ImportError:
+        pass
+    try:
+        from .L_models.window_l_opf import window_l_opf, rolling_window_l_opf
+        __all__.extend(['window_l_opf', 'rolling_window_l_opf'])
     except ImportError:
         pass
     HAS_OPF = True

@@ -31,7 +31,7 @@ Paper energy-balance form (SoE :math:`e_t`, charging / discharging
         e_{t} &= e_{t-1} + \eta_c P_{t}^{c} - \frac{1}{\eta_d} P_{t}^{d}
             & \qquad \forall t \in \mathcal{T} \\
         e_{t}^{\mathrm{ini}} &= E_{0}, \quad
-        e_{t}^{\mathrm{fin}} &= E_{f} \\
+        e_{t}^{\mathrm{fin}} = E_{f} & \\
         e^{\min} &\leq e_{t} \leq e^{\max}
             & \qquad \forall t \in \mathcal{T} \\
         0 &\leq P_{t}^{c} \leq P^{c,\max},\quad
@@ -112,7 +112,7 @@ temperature, degradation). pyflow-acdc uses the **linear** production model of
         h_{t} &= b_{h}\, P_{t}^{e} + c_{h}
             & \qquad \forall t \in \mathcal{T} \\
         M_{t_{i}} &= M^{\mathrm{ini}},\quad
-        M_{t_{f}} &= M^{\mathrm{fin}} \\
+        M_{t_{f}} = M^{\mathrm{fin}} & \\
         0 &\leq M_{t} \leq \overline{M}
             & \qquad \forall t \in \mathcal{T}
     \end{align}
