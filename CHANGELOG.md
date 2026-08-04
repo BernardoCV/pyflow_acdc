@@ -190,7 +190,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `Moray_East` wind-farm data; removed the obsolete `generate_grids.py`.
 - **Tests**: fast fake-solve harness (`_quick_fake_solve.py`,
   `test_OPF_quick_runner.py`) and plotting tests (`test_plot.py`).
-- `CONTRIBUTING.md`, `CHANGELOG.md`, and `docs/architecture.md`.
+- `CONTRIBUTING.md`, `CHANGELOG.md`, and `ARCHITECTURE.md` (docs include via
+  `docs/architecture.md`).
 - Centralised string-as-enum constants in `pyflow_acdc/constants.py`:
   `ObjComponent`, `CssMode`, `MIPBackend`, `PricingStrategy`, `TSType`
   (plus the `TS_RENEWABLE_TYPES` group), and a `default_obj_weights()` factory.
