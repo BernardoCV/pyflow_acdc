@@ -13,7 +13,10 @@ DC node
 
    DC node equivalent circuit
 
-The AC node is modeled using voltage :math:`U_d` where [1]_:
+The DC node is modeled using voltage :math:`U_d` where [1]_:
+
+Non-linear model
+~~~~~~~~~~~~~~~~
 
 .. math::
     :label: eq:PdciSUM
@@ -34,6 +37,25 @@ The AC node is modeled using voltage :math:`U_d` where [1]_:
 * :math:`P_{rg}` is the active power injection of renewable generation in pu
 * :math:`P_{cn}` is the active power injection of converter in pu
 * :math:`P_l` is the active power demand in pu
+
+Linear model
+~~~~~~~~~~~~
+
+In the linear OPF stack (:doc:`L_models`), the DC nodal balance is linearized
+around a voltage reference :math:`U_{d}^{\mathrm{ref}}`:
+
+.. math::
+    :label: eq:PdciSUM_L
+
+    \begin{align}
+        P_{net}^{dc} &= P_{flow}^{dc} \\
+        P_{net}^{dc} &= P_{cn_d} + \sum \gamma_{rg_d}P_{rg_d} - P_{l_d} \\
+        P_{flow}^{dc} &= \sum_{\substack{f \in \mathcal{N}_{dc} \\ f \neq d}}
+          p_{e}\, U_{d}^{\mathrm{ref}}\,(U_{d}-U_{f})\,\frac{1}{R_{df}}
+          \qquad \forall d \in \mathcal{N}_{dc} \\
+        U_{\min} &\leq U_{d} \leq U_{\max}
+          \qquad \forall d \in \mathcal{N}_{dc}
+    \end{align}
 
 Class Reference: :class:`pyflow_acdc.Classes.Node_DC`
 
@@ -68,6 +90,9 @@ DC line
         2, &\text{for symmetrical monopolar or bipolar} \\
     \end{cases}
 
+Non-linear model
+~~~~~~~~~~~~~~~~
+
 .. math::
     :label: eq:PfromDC
 
@@ -75,6 +100,24 @@ DC line
         P_{from,d}=&U_d(U_d-U_f) p_{e} \left(\frac{1}{R_{df}} \right) \\
         P_{to,f}=&U_f(U_f-U_d)p_{e} \left(\frac{1}{R_{df}} \right) \\
         -P_{e, rating} \leq& P_{to/from} \leq P_{e,rating} \qquad \forall e \in \mathcal{B}_{dc}
+    \end{align}
+
+Linear model
+~~~~~~~~~~~~
+
+In the linear OPF stack, DC branch flows use the same polarity factor with a
+fixed voltage reference:
+
+.. math::
+    :label: eq:PfromDC_L
+
+    \begin{align}
+        P_{from,d} &=
+          (U_{d}-U_{f})\, p_{e}\, U_{d}^{\mathrm{ref}}\, \frac{1}{R_{df}} \\
+        P_{to,f} &=
+          (U_{f}-U_{d})\, p_{e}\, U_{f}^{\mathrm{ref}}\, \frac{1}{R_{df}} \\
+        -P_{e, rating} &\leq P_{to/from} \leq P_{e,rating}
+          \qquad \forall e \in \mathcal{B}_{dc}
     \end{align}
 
 Class Reference: :class:`pyflow_acdc.Classes.Line_DC`
