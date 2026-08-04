@@ -100,6 +100,13 @@ __all__ = [
     'change_line_AC_to_reconducting',
     'change_line_AC_to_tap_transformer',
 
+    # Expandable / reconductoring setup (used by cases; not OPF-gated)
+    'expand_elements_from_pd',
+    'repurpose_element_from_pd',
+    'expand_element',
+    'update_attributes',
+    'base_cost_calculation',
+
     # Zone Assignments
     'assign_RenToZone',
     'assign_nodeToPrice_Zone',
@@ -473,6 +480,324 @@ def change_line_AC_to_reconducting(grid, line_name, r_new,x_new,g_new,b_new,MVA_
     if l is None:
         raise ValueError(f"Line '{line_name}' not found in grid.lines_AC")
     return rec_line
+
+
+def expand_elements_from_pd(grid, exp_elements):
+    """
+    This function iterates over exp_elements and applies expand_element
+    with the corresponding columns (N_i, life_time, and base_cost) if available.
+
+    Parameters:
+    exp_elements: DataFrame containing element data.
+    grid: The grid object to be passed to expand_element.
+    """
+
+    # Normalize CSV headers to lowercase so lookups are case-insensitive.
+    exp_elements = exp_elements.rename(columns=lambda c: str(c).strip().lower())
+
+    # Helper function to get the column value if it exists
+    def get_column_value(row, col_name, default_value=None):
+        if col_name not in row.index:
+            return default_value
+        value = row[col_name]
+        return default_value if pd.isna(value) else value
+
+    def parse_optional_bool(value):
+        if value is None:
+            return None
+        if isinstance(value, (bool, np.bool_)):
+            return bool(value)
+        if isinstance(value, (int, float)):
+            return bool(value)
+        text = str(value).strip().lower()
+        if text in {'1', 'true', 't', 'yes', 'y'}:
+            return True
+        if text in {'0', 'false', 'f', 'no', 'n'}:
+            return False
+        return None
+
+    # Build an index/set on grid and validate all requested names first.
+    element_index = _rebuild_expand_element_index(grid)
+    requested_names = exp_elements.iloc[:, 0].tolist()
+    missing = [name for name in requested_names if name not in element_index]
+    if missing:
+        raise ValueError(f"Expandable element name(s) not found: {sorted(set(missing))}")
+
+    for _, row in exp_elements.iterrows():
+        name = row.iloc[0]
+        planned_installation = get_column_value(row, 'planned_installation')
+        if planned_installation is None:
+            planned_installation = get_column_value(row, 'planned_install')
+
+        expand_element(
+            grid,
+            name,
+            get_column_value(row, 'n_b'),
+            get_column_value(row, 'n_i'),
+            get_column_value(row, 'n_max'),
+            get_column_value(row, 'life_time'),
+            get_column_value(row, 'base_cost'),
+            get_column_value(row, 'per_unit_cost'),
+            get_column_value(row, 'exp'),
+            update_grid=False,
+            n_inv_max=get_column_value(row, 'n_inv_max'),
+            planned_installation=planned_installation,
+            allow_planned_decrease=parse_optional_bool(get_column_value(row, 'allow_planned_decrease')),
+        )
+    grid.update_graph_ac()
+    grid.create_Ybus_AC()
+
+
+def _rebuild_expand_element_index(grid):
+    """
+    Build and store a unique expandable-element name index on grid.
+
+    Index keys are element names. Values are (group, object), where group is one of:
+    line_ac, line_dc, conv_acdc, gen_ac, ren_source.
+    """
+    groups = [
+        ("line_ac", grid.lines_AC),
+        ("line_dc", grid.lines_DC),
+        ("conv_acdc", grid.Converters_ACDC),
+        ("gen_ac", grid.Generators),
+        ("ren_source", grid.RenSources),
+    ]
+
+    name_index = {}
+    duplicates = {}
+    for group, elements in groups:
+        for element in elements:
+            element_name = getattr(element, "name", None)
+            if element_name is None:
+                continue
+            if element_name in name_index:
+                duplicates.setdefault(element_name, [name_index[element_name][0]])
+                duplicates[element_name].append(group)
+            else:
+                name_index[element_name] = (group, element)
+
+    if duplicates:
+        duplicated = ", ".join(sorted(duplicates.keys()))
+        raise ValueError(f"Duplicate expandable element names found in grid: {duplicated}")
+
+    # Keep both a dict and a set on grid for fast checks.
+    grid._expand_element_index = name_index
+    grid._expand_element_name_set = set(name_index.keys())
+    return name_index
+
+
+def repurpose_element_from_pd(grid, rec_elements):
+    # Normalize CSV headers to lowercase so lookups are case-insensitive.
+    rec_elements = rec_elements.rename(columns=lambda c: str(c).strip().lower())
+
+    def get_column_value(row, col_name, default_value=None):
+        return row[col_name] if col_name in row.index else default_value
+
+    # Apply the expand_element function for each element in exp_elements
+    rec_elements.iloc[:, 0].apply(lambda name: change_line_AC_to_reconducting(
+        grid,
+        name,
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'r_new', default_value=0.001),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'x_new', default_value=0.001),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'g_new', default_value=0),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'b_new', default_value=0),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'mva_rating_new', default_value=MAX_RATING_PLACEHOLDER),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'life_time', default_value=1),
+        get_column_value(rec_elements.loc[rec_elements[rec_elements.iloc[:, 0] == name].index[0], :], 'base_cost', default_value=0),
+        False
+
+    ))
+    grid.update_graph_ac()
+    grid.create_Ybus_AC()
+
+
+def update_attributes(
+    element,
+    n_b,
+    n_i,
+    n_max,
+    life_time,
+    base_cost,
+    per_unit_cost,
+    exp,
+    n_inv_max=None,
+    planned_installation=None,
+    allow_planned_decrease=None,
+):
+   """Updates the attributes of the given element if not None."""
+   def _sync_inv0(key, value):
+       """
+       Keep MP 'investment_decisions' period-0 aligned with object attributes.
+       Only sync if the element already supports the key.
+       """
+       if not hasattr(element, 'investment_decisions'):
+           return
+       inv = element.investment_decisions
+       if key not in inv:
+           return
+       if inv[key] is None:
+           inv[key] = [value]
+           return
+       # Accept scalars or sequences; always ensure we can set index 0.
+       try:
+           series = list(inv[key])
+       except TypeError:
+           series = [inv[key]]
+       if len(series) == 0:
+           series = [value]
+       else:
+           series[0] = value
+       inv[key] = series
+
+   if n_b is not None:
+       if n_i is None:
+           n_i = n_b
+       if hasattr(element, 'np_line'):
+           element.np_line_b = n_b
+           element.np_line = n_b
+       if hasattr(element, 'np_conv'):
+           element.np_conv_b = n_b
+           element.np_conv = n_b
+       if hasattr(element, 'np_gen'):
+           element.np_gen_b = n_b
+           element.np_gen = n_b
+       if hasattr(element, 'np_rsgen'):
+           element.np_rsgen_b = n_b
+           element.np_rsgen = n_b
+
+   def _apply_max_rule(max_attr, current_attr):
+       if not hasattr(element, max_attr):
+           return
+       current_val = getattr(element, current_attr, None)
+       candidate_from_nmax = n_max
+       candidate_from_ninv = (current_val + n_inv_max) if (n_inv_max is not None and current_val is not None) else None
+
+       # Prefer the explicit total expansion cap (`n_max`) when provided.
+       # `n_inv_max` is treated as an additional investment-related parameter,
+       # not as a hard cap on the overall feasible maximum.
+       if candidate_from_nmax is not None:
+           setattr(element, max_attr, candidate_from_nmax)
+       elif candidate_from_ninv is not None:
+           setattr(element, max_attr, candidate_from_ninv)
+
+   _apply_max_rule('np_line_max', 'np_line')
+   _apply_max_rule('np_conv_max', 'np_conv')
+   _apply_max_rule('np_gen_max', 'np_gen')
+   _apply_max_rule('np_rsgen_max', 'np_rsgen')
+
+   if planned_installation is not None:
+       element.planned_installation = planned_installation
+       _sync_inv0('planned_installation', planned_installation)
+   if allow_planned_decrease is not None:
+       element.allow_planned_decrease = allow_planned_decrease
+
+   # MP max_inv is driven by n_inv_max (when provided), not by static np_*_max.
+   if n_inv_max is not None:
+       _sync_inv0('max_inv', n_inv_max)
+
+   # Sync period-0 np_dynamic to the current stock (when supported).
+   if hasattr(element, 'np_line'):
+       _sync_inv0('np_dynamic', element.np_line)
+   elif hasattr(element, 'np_conv'):
+       _sync_inv0('np_dynamic', element.np_conv)
+   elif hasattr(element, 'np_gen'):
+       _sync_inv0('np_dynamic', element.np_gen)
+   elif hasattr(element, 'np_rsgen'):
+       _sync_inv0('np_dynamic', element.np_rsgen)
+
+   if life_time is not None:
+       element.life_time = life_time
+
+   if per_unit_cost is not None:
+       if hasattr(element, 'cost_perMWkm'):
+           element.cost_perMWkm = per_unit_cost
+       if hasattr(element, 'cost_perMVAkm'):
+           element.cost_perMVAkm = per_unit_cost
+       if hasattr(element, 'cost_perMVA'):
+           element.cost_perMVA = per_unit_cost
+   if base_cost is not None:
+       element.base_cost = base_cost
+   else:
+       base_cost_calculation(element)
+   if exp is not None:
+       element.exp = exp
+
+
+def expand_element(
+    grid,
+    name,
+    n_b=None,
+    n_i=None,
+    n_max=None,
+    life_time=None,
+    base_cost=None,
+    per_unit_cost=None,
+    exp=None,
+    update_grid=True,
+    n_inv_max=None,
+    planned_installation=None,
+    allow_planned_decrease=None,
+    **legacy_kwargs,
+):
+    # Backward compatibility: accept legacy uppercase kwargs.
+    if n_b is None and 'N_b' in legacy_kwargs:
+        n_b = legacy_kwargs.pop('N_b')
+    if n_i is None and 'N_i' in legacy_kwargs:
+        n_i = legacy_kwargs.pop('N_i')
+    if n_max is None and 'N_max' in legacy_kwargs:
+        n_max = legacy_kwargs.pop('N_max')
+    if legacy_kwargs:
+        unexpected = ", ".join(sorted(legacy_kwargs.keys()))
+        raise TypeError(f"Unexpected keyword arguments: {unexpected}")
+
+    # Rebuild each call so line-type reassignments remain consistent.
+    element_index = _rebuild_expand_element_index(grid)
+    element_data = element_index.get(name)
+    if element_data is None:
+        raise ValueError(f"Expandable element '{name}' not found in grid")
+
+    group, element = element_data
+    if group == "line_ac":
+        element = change_line_AC_to_expandable(grid, name, update_grid)
+        element.np_line_opf = True
+    elif group == "line_dc":
+        element.np_line_opf = True
+    elif group == "conv_acdc":
+        element.np_conv_opf = True
+    elif group == "gen_ac":
+        element.np_gen_opf = True
+    elif group == "ren_source":
+        element.np_rsgen_opf = True
+    else:
+        raise ValueError(f"Unsupported expandable element group '{group}' for '{name}'")
+
+    update_attributes(
+        element, n_b, n_i, n_max, life_time, base_cost, per_unit_cost, exp,
+        n_inv_max=n_inv_max, planned_installation=planned_installation,
+        allow_planned_decrease=allow_planned_decrease
+    )
+
+
+def base_cost_calculation(element):
+    if isinstance(element, Exp_Line_AC):
+        element.base_cost = element.cost_perMVAkm * element.Length_km * element.MW_rating
+
+    if isinstance(element, Line_DC):
+        element.base_cost = element.cost_perMWkm * element.Length_km * element.MW_rating
+
+    if isinstance(element, AC_DC_converter):
+        element.base_cost = element.cost_perMVA * element.MVA_max
+
+    if isinstance(element, Gen_AC):
+        if element.Max_S is not None:
+            element.base_cost = element.cost_perMVA * element.Max_S
+        elif element.Max_pow_gen != 0:
+            element.base_cost = element.cost_perMVA * element.Max_pow_gen
+        else:
+            element.base_cost = element.cost_perMVA * element.Max_pow_genR
+    if isinstance(element, Ren_Source):
+        element.base_cost = element.cost_perMVA * element.Max_S
+
 
 def change_line_AC_to_tap_transformer(grid, line_name):
     """Convert an AC line into a tap-changing transformer branch.
@@ -1017,7 +1342,6 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
         fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
         Ren_zone = Gen_data.at[index, 'Ren_zone'] if 'Ren_zone' in Gen_data.columns else None
-        price_link = False
 
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
         np_value = Gen_data.at[index, 'np'] if 'np' in Gen_data.columns else 1
@@ -1032,7 +1356,7 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
                 MVArmax = 9999
             if MVArmin is None:
                 MVArmin = -9999
-            add_gen(grid, node_name,var_name, price_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
+            add_gen(grid, node_name,var_name,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
 
 def _look_up_node(grid, node, ac_or_dc="AC"):
 
@@ -1141,12 +1465,10 @@ def _look_up_ren_source_zone(grid, zone):
     return found
 
 
-def _resolve_link_cost(link_cost=None, price_link=None):
-    """Resolve gen cost-link mode; ``price_link=True`` is legacy for ``linear``."""
+def _resolve_link_cost(link_cost=None):
+    """Resolve gen cost-link mode (default ``LinkCost.NONE``)."""
     if link_cost is not None:
         return link_cost if isinstance(link_cost, LinkCost) else LinkCost(link_cost)
-    if price_link:
-        return LinkCost.LINEAR
     return LinkCost.NONE
 
 
@@ -1160,7 +1482,7 @@ def _sync_gen_cost_from_node(gen):
         gen.lf = node.lf
 
 
-def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
+def add_gen(grid, node,gen_name=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append an AC generator to ``grid.Generators``.
 
     Parameters
@@ -1175,8 +1497,6 @@ def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_R
         How OPF costs track the bus (default ``'none'``). ``quadratic``:
         ``qf``/``lf`` from ``node.qf``/``node.lf``; ``linear``: ``lf`` from
         ``node.price``.
-    price_link : bool, optional
-        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         Linear, quadratic, and fixed OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1240,13 +1560,13 @@ def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_R
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    gen.link_cost = _resolve_link_cost(link_cost)
     _sync_gen_cost_from_node(gen)
     grid.Generators.append(gen)
 
     return gen
 
-def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
+def add_gen_DC(grid, node,gen_name=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append a DC generator to ``grid.Generators_DC``.
 
     Parameters
@@ -1259,8 +1579,6 @@ def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MA
         Generator name.
     link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
         See :func:`add_gen`.
-    price_link : bool, optional
-        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1304,14 +1622,14 @@ def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MA
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    gen.link_cost = _resolve_link_cost(link_cost)
     _sync_gen_cost_from_node(gen)
     grid.Generators_DC.append(gen)
 
     return gen
 
 
-def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0, link_cost=None):
+def add_extgrid(grid, node, gen_name=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0, link_cost=None):
     """Add an external-grid equivalent generator at an AC bus.
 
     Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
@@ -1325,8 +1643,6 @@ def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_R
         Connection bus.
     gen_name : str, optional
         Generator name; defaults to ``'extgrid_<node>'``.
-    price_link : bool, optional
-        Deprecated: ``True`` means ``link_cost='linear'``.
     link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
         See :func:`add_gen`.
     lf, qf : float, optional
@@ -1370,7 +1686,7 @@ def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_R
     node.PGi = 0
     node.QGi = 0
     node.recalc_extgrid_load()
-    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    gen.link_cost = _resolve_link_cost(link_cost)
     _sync_gen_cost_from_node(gen)
     if gen.link_cost != LinkCost.NONE:
         # Keep aggregated price-zone load consistent after extgrid load is introduced.

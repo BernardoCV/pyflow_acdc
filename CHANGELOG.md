@@ -7,11 +7,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.5**.
+> packaged version is **0.6.8**.
 
 ## [Unreleased]
 
-## [0.6.5]
+## [0.6.8]
 
 Controllable heat pumps (NL + linear P-only twin).
 
@@ -32,6 +32,34 @@ Controllable heat pumps (NL + linear P-only twin).
   ``_modify_parameters_l`` and myopic carry include heat-pump ``E_heat_pump_prev``
   / refs when ``grid.HP``; ``window_block=True`` skips rewriting
   ``E_heat_pump_prev`` (parent window owns the energy chain).
+
+## [0.6.7]
+
+### Fixed
+- **Wheel packaging**: ship ``pyflow_acdc.NL_models`` and ``pyflow_acdc.L_models``
+  subpackages (setuptools ``packages.find``). ``0.6.6`` omitted them, so OPF /
+  TEP / STEP imports failed with ``No module named 'pyflow_acdc.NL_models'``.
+- **CI package check**: install the built wheel with pyomo and assert NL/L
+  subpackages plus TEP/STEP public attributes are importable (top-level
+  ``import pyflow_acdc`` alone no longer counts as success).
+
+## [0.6.6]
+
+### Fixed
+- **Expandable setup always available**: moved ``expand_elements_from_pd``,
+  ``expand_element``, ``repurpose_element_from_pd``, ``update_attributes``, and
+  ``base_cost_calculation`` from OPF-gated ``ACDC_Static_TEP`` into
+  ``grid_modifications``, so example cases that mark elements expandable no
+  longer fail with ``AttributeError`` when the soft-fail OPF import path does
+  not attach TEP symbols.
+
+## [0.6.5]
+
+### Added
+- **Sequential STEP** ``build_only``: skips the period-1 solve, extracts init
+  values as usual, then stops before building later periods.
+- **North Sea example data**: ``clusters_kmeans_medoids_k24.json`` for 2023+2024
+  MS TEP (alongside existing k4).
 
 ## [0.6.4]
 
@@ -77,6 +105,9 @@ and related packaging / docs / tooling.
 
 ### Removed
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
+- **``price_link``**: removed from ``Gen_AC`` / ``Gen_DC`` and ``add_gen`` /
+  ``add_gen_DC`` / ``add_extgrid``. Use ``link_cost='linear'`` instead. Legacy
+  pickles are still migrated by ``_migrate_legacy_gen_link_cost``.
 
 ### Changed
 - **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same

@@ -137,21 +137,9 @@ is documented in :doc:`L_models`.
 Element Expansion Helpers
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: pyflow_acdc.expand_elements_from_pd
-
-   Applies expansion definitions from a pandas table.
-
-.. autofunction:: pyflow_acdc.repurpose_element_from_pd
-
-   Applies reconductoring/repurposing definitions from a pandas table.
-
-.. autofunction:: pyflow_acdc.update_attributes
-
-   Updates expansion-related attributes of a TEP-enabled element.
-
-.. autofunction:: pyflow_acdc.expand_element
-
-   Enables or updates one element for TEP investment modeling.
+Expandable setup (``expand_elements_from_pd``, ``expand_element``,
+``repurpose_element_from_pd``, …) is documented under :doc:`grid_mod`
+(grid modifications; no Pyomo required).
 
 
 .. _TEP_obj_functions:

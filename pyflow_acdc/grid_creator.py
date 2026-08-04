@@ -1448,14 +1448,12 @@ def create_grid_from_mat(matfile):
                 lf = Gen_data_cost.at[index, 'c(n-2)']
                 cf = Gen_data_cost.at[index, 'c0']
 
-            price_link = False
-
             if Gen_data.at[index, 'status'] == 0:
                 np_gen = 0
             else:
                 np_gen = 1
 
-            gen = add_gen(G, node_name,var_name, price_link,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA)
+            gen = add_gen(G, node_name,var_name,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA)
             gen.np_gen = np_gen
 
     return [G, res]
@@ -1838,7 +1836,7 @@ def create_sub_grid(grid,Area=None, Area_name = None,polygon_coords=None):
                     Max_pow_genR= line.MVA_rating/grid.S_base
                     gen = Gen_AC(line.name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,S_rated=Max_pow_gen/grid.S_base)
 
-                    gen.price_link=True
+                    gen.link_cost = LinkCost.LINEAR
                     gen.lf= node.price
                     gen.qf = getattr(node, 'qf', 0)
 

@@ -78,6 +78,13 @@ __all__ = [
     'change_line_AC_to_expandable',
     'change_line_AC_to_tap_transformer',
 
+    # Expandable / reconductoring setup (always available; not OPF-gated)
+    'expand_elements_from_pd',
+    'repurpose_element_from_pd',
+    'expand_element',
+    'update_attributes',
+    'base_cost_calculation',
+
     # Zone Assignments
     'assign_RenToZone',
     'assign_nodeToPrice_Zone',
@@ -177,8 +184,7 @@ try:
         from .NL_models.ACDC_Static_TEP import *
         __all__.extend([
             'transmission_expansion',
-            'multi_scenario_TEP', 'expand_elements_from_pd',
-            'repurpose_element_from_pd', 'update_attributes', 'expand_element',
+            'multi_scenario_TEP',
             'export_TEP_multiScenario_results_to_excel',
             'alpha_pareto', 'rate_sensitivity', 'kappa_sensitivity',
             'comprehensive_sensitivity_analysis'

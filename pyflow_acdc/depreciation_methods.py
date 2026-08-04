@@ -179,13 +179,18 @@ try:
 except ImportError:
     pass
 
+# --- Expandable setup (always available; not OPF-gated) -------------------
+try:
+    from .grid_modifications import expand_element
+    _register(expand_element, 'Expand_element')
+except ImportError:
+    pass
+
 # --- Static TEP (requires pyomo) ------------------------------------------
 try:
     from .NL_models.ACDC_Static_TEP import (
-        expand_element,
         export_TEP_multiScenario_results_to_excel,
     )
-    _register(expand_element, 'Expand_element')
     _register(export_TEP_multiScenario_results_to_excel, 'export_TEP_TS_results_to_excel')
 except ImportError:
     pass
