@@ -7,27 +7,39 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.3**.
+> packaged version is **0.7.0**.
 
 ## [Unreleased]
 
+## [0.7.0]
+
+Optional desktop GUI shell (PySide6).
+
 ### Added
-- **Linear AC(/DC) hybrid OPF stack (LP)**: ``optimal_l_pf``,
-  ``window_l_opf`` / ``rolling_window_l_opf``, and myopic ``ts_acdc_l_opf``
-  mirror the NL operational surface on AC-only and hybrid grids
-  (``ACmode`` / ``DCmode``). Builder ``opf_create_l_model_acdc`` adds
-  linearized DC PF at ``V_ini``, thin converter link
-  ``np·Ps + P_DC + np·(a + b·Ps) = 0``, and ``fx_conv`` PDC/PQ/PV (Q fix
-  skipped when the linear model has no ``Q_conv_s_AC``). BESS remains P-only;
-  ``SoC_deviation`` stays rejected (quadratic). Hybrid ``TEP=True`` still
-  raises. Docs: ``api/L_models``, ``api/ts``, ``usage_window_opf``,
-  ``architecture``; example ``doc_examples/L_models/05_hybrid_linear_opf.py``.
-- **Battery storage (BESS)**: ``Storage`` class, ``add_storage``, and NL OPF
-  SoC dynamics / S-circle on AC or DC buses when ``grid.ESS``. Snapshot
-  results via ``Results.ext_storage``; docs ``usage_storage`` / ``api/storage``.
-- **Green hydrogen**: ``Electrolyser`` class, ``add_electrolyser``, and NL OPF
-  inventory when ``grid.H2``. Snapshot results via ``Results.ext_electrolyser``;
-  docs ``usage_hydrogen`` / ``api/hydrogen``.
+- **Desktop GUI** (optional ``[GUI]`` extra: ``PySide6``, ``kaleido``): package
+  ``pyflow_acdc.gui`` — thin shell over existing ``add_*`` / solvers /
+  ``Results`` / plots. Console entry ``pyflow-acdc-gui``. Phase 0 bones
+  (tabs / widgets / workers). Plan ``plans/gui_plan.md``. Does not replace
+  Dash; core install stays Qt-free (``HAS_GUI`` / ImportError guard).
+
+## [0.6.6]
+
+CVXPY sparse SOCP scaffolding (convex AC/DC stack).
+
+### Added
+- **SOCP / MI-SOCP stack (CVXPY)**: optional ``[SOCP]`` extra (``cvxpy``).
+  Builders in ``convex_model/`` (``build_socp_data``, ``socp_model``);
+  runners in ``ACDC_convex`` (``socp_optimise``, ``soc_window_optimisation``,
+  ``translate_pyf_socp``). ``T``-indexed variables for future window /
+  inventory coupling. BESS / H₂ / CCP constraints deferred. Plan
+  ``plans/convex_acdc_socp_plan.md``; architecture documents the stack next to
+  NL / L OPF.
+
+## [0.6.5]
+
+Controllable heat pumps (NL + linear P-only twin).
+
+### Added
 - **Controllable heat pumps**: ``HeatPump`` class, ``add_heat_pump``, and NL OPF
   when ``grid.HP`` (AC-only planning-oriented flexible load: baseline
   ``P_ref``/``Q_ref``, served ``P_heat_pump``/``Q_heat_pump``, cumulative
@@ -36,8 +48,98 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``ext_heat_pump`` / ``heat_pump_window``. TS types ``hp_P_ref``, ``hp_Q_ref``,
   ``hp_E_min``, ``hp_E_max``. Linear twin (P-only): ``optimal_l_pf`` /
   ``ts_acdc_l_opf`` / ``window_l_opf`` with ``Q_heat_pump`` fixed at 0. Docs
-  ``usage_heat_pump`` / ``api/heat_pump``; plan ``plans/heat_pump_plan.md``;
-  tests ``test_heat_pump_opf.py``.
+  ``usage_heat_pump`` / ``api/heat_pump`` / ``api/modelling_flexible_assets``;
+  plan ``plans/heat_pump_plan.md``; tests ``test_heat_pump_opf.py``.
+
+### Changed
+- **Window / TS parameter updates**: ``_modify_parameters`` /
+  ``_modify_parameters_l`` and myopic carry include heat-pump ``E_heat_pump_prev``
+  / refs when ``grid.HP``; ``window_block=True`` skips rewriting
+  ``E_heat_pump_prev`` (parent window owns the energy chain).
+
+## [0.6.4]
+
+Linear twin of the 0.6.3 BESS / H₂ operational surface, plus hybrid AC/DC LP
+and related packaging / docs / tooling.
+
+### Added
+- **Linear AC(/DC) hybrid OPF stack (LP)**: ``optimal_l_pf``,
+  ``window_l_opf`` / ``rolling_window_l_opf``, and myopic ``ts_acdc_l_opf``
+  mirror the NL operational surface on AC-only and hybrid grids
+  (``ACmode`` / ``DCmode``). Builder ``opf_create_l_model_acdc`` adds
+  linearized DC PF at ``V_ini``, thin converter link
+  ``np·Ps + P_DC + np·(a + b·Ps) = 0``, and ``fx_conv`` PDC/PQ/PV (Q fix
+  skipped when the linear model has no ``Q_conv_s_AC``). BESS is P-only
+  (``Q_storage`` fixed at 0); electrolyser is P + mass inventory.
+  ``SoC_deviation`` stays rejected (quadratic). Hybrid ``TEP=True`` still
+  raises. Docs: ``api/L_models``, ``api/ts``, ``usage_window_opf``,
+  ``architecture``; example ``doc_examples/L_models/05_hybrid_linear_opf.py``.
+- **Dash**: restyled interactive dashboard (``run_dash``, assets, season-compare
+  via ``create_season_compare_dash_app``); PEI season-compare doc example and
+  screenshot. Family mode adds ``Curtailment`` (``window_opf_results`` /
+  rolling; node/zone/total is MW-weighted
+  ``Σ(curt·ren_available)/Σ(ren_available)`` from exported pre-curtail
+  available MW, so ``curt=0`` and ``curt=1`` both work; shown as %). Add plot
+  preserves per-panel family / aggregation / elements.
+- **Window results**: ``ren_available`` (pre-curtail renewable MW) exported
+  alongside ``ren_power`` / ``curtailment`` for weighted curtailment plots.
+- **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
+  ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets). Coverage
+  reports and the README badge are maintained on Codecov.
+- **`pyomo_model_solve.py`**: extracted generic Pyomo solve layer from
+  `ACDC_OPF.py` (`pyomo_model_solve`, log parsers, feasibility checks,
+  `reset_to_initialize`, `export_solver_progress_to_excel`). `ACDC_OPF` re-exports
+  for backward compatibility.
+- **Tests**: `test_solver_utils.py` (mocked Pyomo/OR-Tools solver probes),
+  `test_opf_result_helpers.py` (OPF result helpers after Ipopt solve),
+  `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`),
+  `test_graph_dash.py` (synthetic TS + Dash callback unit tests).
+- **`ipopt_available` / `require_ipopt`** helpers in `pyflow_tests/_test_solver_deps.py`.
+- **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /
+  ``linear``) and ``link_cost`` on ``add_gen`` / ``add_gen_DC`` / ``add_extgrid``
+  so OPF cost coeffs can track nodal / price-zone prices.
+
+### Removed
+- **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
+
+### Changed
+- **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same
+  module; aligns with NL ``opf_create_nl_model_acdc`` naming).
+- **Linear hybrid OPF (LP)**: ``opf_create_l_model_acdc`` follows
+  ``ACmode`` / ``DCmode``; linearized DC ``V(V−V)G`` / ``PDC_from`` /
+  ``PDC_to`` at ``V_ini``; thin converter loss ``a + b·Ps``; ``fx_conv`` on
+  snapshot / window / TS linear drivers; window and ``ts_acdc_l_opf`` accept
+  hybrid grids. Richer converter LP / S-limit outer approx deferred. Hybrid
+  ``TEP=True`` still raises until TEP hooks are wired.
+- **Pickle load migration**: ``_migrate_legacy_grid_attrs`` backfills node
+  ``_price`` / ``_qf`` / ``_lf`` and gen ``link_cost`` (from legacy ``price`` /
+  ``price_link``) so pre-property wind-farm pickles load cleanly.
+- **Power flow API**: ``power_flow`` / ``ac_power_flow`` / ``dc_power_flow``
+  return ``(elapsed, tol, tol_history)``; sequential tracker adds per-outer
+  Newton histories (``ac_pf_iter_tolerances`` / ``dc_pf_iter_tolerances``).
+- **Price-zone ↔ node linking** and generator cost sync improved in
+  ``grid_modifications`` / ``Classes``.
+- **`dill`** is a required base dependency; removed optional-import fallbacks in
+  `grid_creator` / `Export_files` and `require_dill` test skips.
+- **`Market_Coeff`**: module and public-function docstrings; expanded
+  `docs/api/market_coef.rst` (EPEX CSV schema, workflow, ENTSO-E layout).
+  `clean_entsoe_data` now returns the output Excel path.
+- Docs and user-facing strings: **pyflow-acdc** / **pyflow_acdc** naming
+  (replacing mixed ``PyFlow-ACDC`` / ``PyFlow ACDC`` variants).
+- Citation / docs: README and ``docs/citing.rst`` aligned; root
+  ``ARCHITECTURE.md`` included from ``docs/architecture.md``.
+
+## [0.6.3]
+
+BESS and green-hydrogen integration in the **nonlinear** OPF / window / TS stack.
+
+### Added
+- **Battery storage (BESS)**: ``Storage`` class, ``add_storage``, and NL OPF
+  SoC dynamics / S-circle on AC or DC buses when ``grid.ESS``. Snapshot
+  results via ``Results.ext_storage``; docs ``usage_storage`` / ``api/storage``.
+- **Green hydrogen**: ``Electrolyser`` class, ``add_electrolyser``, and NL OPF
+  inventory when ``grid.H2``. Snapshot results via ``Results.ext_electrolyser``;
+  docs ``usage_hydrogen`` / ``api/hydrogen``.
 - **Coupled window NL OPF** (``window_opf.py``): ``window_nl_opf`` solves a
   multi-hour nonlinear OPF with linked BESS SoC and H₂ inventory across frames;
   ``rolling_window_nl_opf`` chains windows with state carry-over; export helpers
@@ -49,23 +151,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``empty_tank_cycle`` empties (``None`` = never; ``N`` = every ``N`` hours);
   ``ObjRule['H2_sale']`` / ``TSType.H2_PRICE`` for sale economics. Window /
   rolling keep hard SoC ini/final and optional ``H2_mass_final``.
-  Linear twin: ``ts_acdc_l_opf`` (same carry / warm-start; ``Energy_cost`` /
-  ``H2_sale`` only).
 - **Objective / TS constants**: ``ObjComponent.H2_SALE``,
-  ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``, and heat-pump
-  ``TSType.HP_P_REF`` / ``HP_Q_REF`` / ``HP_E_MIN`` / ``HP_E_MAX``.
-- **Generator cost linking**: ``LinkCost`` (``none`` / ``quadratic`` /
-  ``linear``) and ``link_cost`` on ``add_gen`` / ``add_gen_DC`` / ``add_extgrid``
-  so OPF cost coeffs can track nodal / price-zone prices.
-- **Dash**: restyled interactive dashboard (``run_dash``, assets, season-compare
-  via ``create_season_compare_dash_app``); PEI season-compare doc example and
-  screenshot. Family mode adds ``Curtailment`` (``window_opf_results`` /
-  rolling; node/zone/total is MW-weighted
-  ``Σ(curt·ren_available)/Σ(ren_available)`` from exported pre-curtail
-  available MW, so ``curt=0`` and ``curt=1`` both work; shown as %). Add plot
-  preserves per-panel family / aggregation / elements.
-- **Window results**: ``ren_available`` (pre-curtail renewable MW) exported
-  alongside ``ren_power`` / ``curtailment`` for weighted curtailment plots.
+  ``ObjComponent.SOC_DEVIATION``, ``TSType.H2_PRICE``.
 - **PEI example**: ``PEI_grid`` flags ``storage`` / ``hydrogen`` / seasonal
   data; ``examples/PEI_BESS``; tests for storage, hydrogen, window, and rolling
   OPF.
@@ -80,61 +167,22 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   dispatch ``TS_PF_TYPES`` → ``update_grid_for_pf``, else → ``update_grid_data``.
   Droop/P converters without a ``conv_P_DC`` series restore ``P_DC`` from
   ``Pconv_save`` in ``ts_acdc_pf``.
-- **CI**: Codecov upload on push/PR to ``main`` (``coverage`` job in
-  ``pr-tests.yml``; set ``CODECOV_TOKEN`` in repository secrets). Coverage
-  reports and the README badge are maintained on Codecov.
-- **`pyomo_model_solve.py`**: extracted generic Pyomo solve layer from
-  `ACDC_OPF.py` (`pyomo_model_solve`, log parsers, feasibility checks,
-  `reset_to_initialize`, `export_solver_progress_to_excel`). `ACDC_OPF` re-exports
-  for backward compatibility.
-- **Tests**: `test_solver_utils.py` (mocked Pyomo/OR-Tools solver probes),
-  `test_opf_result_helpers.py` (OPF result helpers after Ipopt solve),
-  `test_market_coeff.py`, clustering doc examples (`test_docs_clustering`),
-  `test_graph_dash.py` (synthetic TS + Dash callback unit tests).
-- **`ipopt_available` / `require_ipopt`** helpers in `pyflow_tests/_test_solver_deps.py`.
-
-### Removed
-- **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
 
 ### Changed
-- **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same
-  module; aligns with NL ``opf_create_nl_model_acdc`` naming ahead of hybrid LP).
-- **Linear hybrid OPF (LP)**: ``opf_create_l_model_acdc`` follows
-  ``ACmode`` / ``DCmode``; linearized DC ``V(V−V)G`` / ``PDC_from`` /
-  ``PDC_to`` at ``V_ini``; thin converter loss ``a + b·Ps``; ``fx_conv`` on
-  snapshot / window / TS linear drivers; window and ``ts_acdc_l_opf`` accept
-  hybrid grids. Richer converter LP / S-limit outer approx deferred. Hybrid
-  ``TEP=True`` still raises until TEP hooks are wired.
 - **Rolling foresight**: ``rolling_window_nl_opf`` takes ``future_sight`` in
   ``[0, 1]`` (default ``0``) instead of ``soc_final_mode='future_sight'``.
   Steps are ``ceil(future_sight · window_size)`` (clamped to remaining hours);
   SoC final is enforced at the foresight end; with ``H2_mass_final``, the
   foresight segment requires ``≥ future_sight · H2_mass_final`` (raw fraction).
   Docs: ``usage_window_opf`` / ``api/window``.
-- **Pickle load migration**: ``_migrate_legacy_grid_attrs`` backfills node
-  ``_price`` / ``_qf`` / ``_lf`` and gen ``link_cost`` (from legacy ``price`` /
-  ``price_link``) so pre-property wind-farm pickles load cleanly.
 - **Power flow known injections**: ``update_pq_ac`` / ``update_p_dc`` fold BESS
   and H₂ operating fields into the PF known P/Q (same signs as NL OPF). Storage
   contributes ``net_P_pu = P_discharge - P_charge`` (AC also ``Q``); electrolyser
   ``P_electrolyser`` is a known load (AC also ``Q_electrolyser`` as injection).
   Defaults remain zero until set / after OPF export.
 - **Window OPF parameter updates**: ``_modify_parameters(..., window_block=True)``
-  skips rewriting ``SoC_prev`` / ``mass_H2_prev`` / ``E_heat_pump_prev`` so
-  frame-to-frame inventory links are not overwritten by
-  ``soc_initial`` / ``H2_mass_initial`` / ``E_state``.
-- **Power flow API**: ``power_flow`` / ``ac_power_flow`` / ``dc_power_flow``
-  return ``(elapsed, tol, tol_history)``; sequential tracker adds per-outer
-  Newton histories (``ac_pf_iter_tolerances`` / ``dc_pf_iter_tolerances``).
-- **Price-zone ↔ node linking** and generator cost sync improved in
-  ``grid_modifications`` / ``Classes``.
-- **`dill`** is a required base dependency; removed optional-import fallbacks in
-  `grid_creator` / `Export_files` and `require_dill` test skips.
-- **`Market_Coeff`**: module and public-function docstrings; expanded
-  `docs/api/market_coef.rst` (EPEX CSV schema, workflow, ENTSO-E layout).
-  `clean_entsoe_data` now returns the output Excel path.
-- Docs and user-facing strings: **pyflow-acdc** / **pyflow_acdc** naming
-  (replacing mixed ``PyFlow-ACDC`` / ``PyFlow ACDC`` variants).
+  skips rewriting ``SoC_prev`` / ``mass_H2_prev`` so frame-to-frame inventory
+  links are not overwritten by ``soc_initial`` / ``H2_mass_initial``.
 
 ## [0.6.2] - 2026-07-29
 
@@ -202,7 +250,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   `Moray_East` wind-farm data; removed the obsolete `generate_grids.py`.
 - **Tests**: fast fake-solve harness (`_quick_fake_solve.py`,
   `test_OPF_quick_runner.py`) and plotting tests (`test_plot.py`).
-- `CONTRIBUTING.md`, `CHANGELOG.md`, and `docs/architecture.md`.
+- `CONTRIBUTING.md`, `CHANGELOG.md`, and `ARCHITECTURE.md` (docs include via
+  `docs/architecture.md`).
 - Centralised string-as-enum constants in `pyflow_acdc/constants.py`:
   `ObjComponent`, `CssMode`, `MIPBackend`, `PricingStrategy`, `TSType`
   (plus the `TS_RENEWABLE_TYPES` group), and a `default_obj_weights()` factory.

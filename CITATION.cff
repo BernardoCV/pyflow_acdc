@@ -26,6 +26,8 @@ references:
     title: An optimal power flow tool for AC/DC systems, applied to the analysis of the North Sea Grid for offshore wind integration
     journal: IEEE Transactions on Power Systems
     year: 2025
+    volume: 40
+    issue: 5
     doi: 10.1109/TPWRS.2025.3533889
-    start: 1
-    end: 14
+    start: 4278
+    end: 4291

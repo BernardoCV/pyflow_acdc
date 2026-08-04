@@ -455,7 +455,7 @@ pyflow_acdc/gui/
 | Results | [`pyflow_acdc/Results_class.py`](../pyflow_acdc/Results_class.py) |
 | Dash plan | [`plans/dash_improvement_plan.md`](dash_improvement_plan.md) |
 | CSV usage | [`docs/usage.rst`](../docs/usage.rst) |
-| Architecture | [`docs/architecture.md`](../docs/architecture.md) |
+| Architecture | [`ARCHITECTURE.md`](../ARCHITECTURE.md) |
 | PySide6 | https://doc.qt.io/qtforpython/ |
 
 ---
