@@ -124,7 +124,8 @@ class Results:
             self.slack_ac(print_table=print_table)
 
         self.power_loss(print_table=print_table)
-        if self.Grid.OPF_run :
+        opt_run = self.Grid.OPF_run or self.Grid.socp_run
+        if opt_run:
             if self.Grid.Generators != [] or self.Grid.Generators_DC != []:
                 self.ext_gen(print_table=print_table)
             if self.Grid.RenSources:
@@ -142,7 +143,11 @@ class Results:
                     self.hydrogen_window(print_table=print_table)
                 if self.Grid.heat_pumps:
                     self.heat_pump_window(print_table=print_table)
-            if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
+            if (
+                self.Grid.OPF_run
+                and not self.Grid.TEP_run
+                and not self.Grid.MP_TEP_run
+            ):
                 self.obj_res(print_table=print_table)
             if self.Grid.Price_Zones != []:
                 self.price_zone(print_table=print_table)

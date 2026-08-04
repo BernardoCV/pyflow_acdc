@@ -486,6 +486,7 @@ def socp_optimise(
         ``(problem, variables, timing_info, solver_stats)``.
     """
     analyse_grid(grid)
+    grid.reset_run_flags()
 
     t0 = time.perf_counter()
 
@@ -572,6 +573,7 @@ def soc_window_optimisation(
     the full TS horizon is used.
     """
     analyse_grid(grid)
+    grid.reset_run_flags()
 
     t0 = time.perf_counter()
     socp_data = translate_pyf_socp(

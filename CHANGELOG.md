@@ -16,16 +16,21 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 CVXPY sparse SOCP scaffolding (convex AC/DC stack).
 
 ### Added
-- **SOCP / MI-SOCP stack (CVXPY)**: optional ``[SOCP]`` extra (``cvxpy``).
-  Builders in ``convex_model/`` (``build_socp_data``, ``socp_model``);
-  runners in ``ACDC_convex`` (``socp_optimise``, ``soc_window_optimisation``,
-  ``translate_pyf_socp``). ``T``-indexed variables for window / inventory
-  coupling. Plan ``plans/convex_acdc_socp_plan.md``; architecture documents
-  the stack next to NL / L OPF. CCP and MI exclusivity still deferred.
+- **SOCP / MI-SOCP stack (CVXPY)**: optional ``[SOCP]`` extra (``cvxpy`` +
+  ``clarabel``). Builders in ``convex_model/`` (``build_socp_data``,
+  ``socp_model``); runners in ``ACDC_convex`` (``socp_optimise``,
+  ``soc_window_optimisation``, ``translate_pyf_socp``). ``T``-indexed
+  variables for window / inventory coupling. Plan
+  ``plans/convex_acdc_socp_plan.md``; architecture documents the stack next
+  to NL / L OPF. CCP and MI exclusivity still deferred.
 - **SOCP BESS + H₂ (G6 / linear)**: continuous ``P_charge``/``P_discharge``
   (no exclusivity binaries), AC S-circle / DC ``|P_net|``, SoC chain across
   ``T``; electrolyser P (+ AC Q) and linear mass balance. Wired into AC/DC
   nodal injection, ``H2_sale`` / ``SoC_deviation`` objectives, and export.
+- **SOCP docs / Results / CI**: usage + API pages; NL/L/SOCP modelling
+  sections; ``grid.socp_run`` reporting in ``Results.all``; smoke tests in
+  ``test_socp.py``; open-source Clarabel in ``[SOCP]`` / ``All`` so CI does
+  not need MOSEK.
 
 ### Changed
 - **SOCP converter loss (L13)**: Paper affine form via DCP epigraph

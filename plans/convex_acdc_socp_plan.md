@@ -9,13 +9,13 @@ Mario Useche-Arteaga et al. (SEGAN 2026 energy-hub paper).
 Publication-grounded; remaining open items are in §7–§8. Owner decisions already locked
 are in **§0.0** (L1–L28) and progress is in **§0.4** (do not re-litigate without an explicit change).
 
-**Status:** Phase **0–3 scaffolding largely landed** in tree (2026-07-29). Deterministic
-**sparse** SOCP builder + runners exist; **no end-to-end solve validation yet**. BESS / H₂ /
-CCP remain deferred (L18), but **`T`-indexed CVXPY variables are kept** so interperiod
-coupling can be added later without reformulating the model layout.
+**Status:** Phase **0–4** and **7** largely complete (2026-08-04). Deterministic
+sparse SOCP builder + runners solve; BESS G6 + linear H₂ scaffolded; usage/API/
+modelling docs and smoke tests landed. **Phase 8** (heat pumps, Q-18 = **A** NL Q
+twin) is next. CCP and MI-BESS exclusivity remain deferred (L18).
 
-**Handoff note (2026-07-29):** work paused to switch tasks. Resume from **§0.4 Implementation
-log** + locked decisions **L21–L28**. Do not re-litigate L1–L28 without an explicit change.
+**Handoff note (2026-08-04):** Resume from **Phase 8** (§5.7) with Q-18 locked to
+**A**. Do not re-litigate L1–L28 or Q-18 without an explicit change.
 
 **Primary reference**
 
@@ -84,7 +84,7 @@ Mario reference (workspace): `mario_implementation/scop/ACDC_PE_Simplified_Effic
 | Objective | Paper: maximize **export revenue** (Eq. 1 / 37). pyflow v1 default: NLP-style **`Energy_cost`** (L27); priced export via `Ext_Gen` / L16 |
 | Network | AC collection + HVDC + converters + export links |
 | Assets (paper) | Wind, BESS (MI), H₂, CCP |
-| Assets (pyflow v1) | Gens as vars (L24), wind/`gamma` (L12/L25), converters, AC/DC + limits, **BESS G6 + linear H₂** (L18); MI exclusivity deferred. **Heat pumps not in SOCP yet** (NL/L have them; see §5.7). |
+| Assets (pyflow v1) | Gens as vars (L24), wind/`gamma` (L12/L25), converters, AC/DC + limits, **BESS G6 + linear H₂** (L18); MI exclusivity deferred. **Heat pumps = Phase 8**, Q-18 locked **A** (NL Q twin; §5.7). |
 | Convex core | **Sparse SOCP** only (L19) |
 | Uncertainty | CCP later; not required for first deterministic build |
 | Time | Multi-period when TS present |
@@ -99,7 +99,7 @@ SOCP lifting: `h_k = |v_k|²`, sparse complex `w_km` (Mario), rotated SOC inequa
 | Sparse edge-set formulation (Paper A §3) | BESS sizing; TEP investment |
 | **AC + DC thermal limits** (Eqs. 40–43; L15) | ADN EMP / Paper B |
 | Converter AC↔DC coupling + loss (L8/L13) + rating | `CONVEX_Ybus` converter AC nodes (option A — later) |
-| `ObjComponent` objective (L27); `gamma` (L12); `T`-indexed vars (L21); BESS G6 + H₂ linear | **MI exclusivity / CCP / heat pumps** (add later; §5.7) |
+| `ObjComponent` objective (L27); `gamma` (L12); `T`-indexed vars (L21); BESS G6 + H₂ linear | **MI exclusivity / CCP** (later); heat pumps via Phase 8 (Q-18 = A) |
 | `socp_optimise` + `soc_window_optimisation` (L22) | Dense SOCP (L19); Pyomo port; case-specific API design |
 | Optional NLP benchmark later | Modifying `window_opf.py` / NLP builders |
 
@@ -574,15 +574,15 @@ window energy chain). Full physics / API lock lives in
 [`heat_pump_plan.md`](heat_pump_plan.md). This section is the **SOCP adoption
 plan** only — do not invent HP rules beyond that document.
 
-**Status today:** `convex_model` / `ACDC_convex` have **no** `HP` hooks. Phase
-**8** below.
+**Status today:** `convex_model` / `ACDC_convex` have **no** `HP` hooks yet. Phase
+**8** below. **Q-18 locked: option A (NL Q twin).**
 
 #### Why add them to SOCP
 
 - Same operational grids that already run BESS/H₂ + HP under NL/L should be able
   to use `socp_optimise` / `soc_window_optimisation` without dropping HP.
-- HP constraints are **linear** in `P`/`E` (and linear in `Q` in NL) → fit a
-  convex model once the network SOCP is validated (after Phase 4).
+- HP constraints are **linear** in `P`/`E`/`Q` (NL) → fit a convex model once
+  the network SOCP is validated (after Phase 4).
 
 #### Formulation to port (from shipped NL / L — no new physics)
 
@@ -591,14 +591,14 @@ Decision vars per HP `h`, time `t` (same indexing as BESS/H₂, L21):
 | Var | Meaning | Units |
 |-----|---------|-------|
 | `P_heat_pump[h,t]` | Served active demand | pu |
-| `Q_heat_pump[h,t]` | Served reactive (NL) or fixed 0 (L) | pu |
+| `Q_heat_pump[h,t]` | Served reactive (**A** = NL bounds) | pu |
 | `E_heat_pump[h,t]` | Cumulative energy state | kWh |
 
 Bounds / links (every `t`; refs/bounds may come from TS):
 
 ```text
 P_ref - n_units * P_unit_max  <=  P_hp  <=  P_ref
-Q_ref                          <=  Q_hp  <=  0          # NL only; L: Q_hp = 0
+Q_ref                          <=  Q_hp  <=  0          # Q-18 A (NL twin)
 E_min                          <=  E_hp  <=  E_max
 
 E_hp[t] = E_prev + P_hp[t] * S_base * dt_hours
@@ -613,15 +613,12 @@ P_hp[t] <= E_prev/dt + P_ref - E_min/dt
 
 **AC-only:** DC heat pumps remain out of scope (`heat_pump_plan.md`).
 
-#### Owner choice before coding (ask once)
+#### Owner choice — locked
 
-| Option | Behaviour | Prefer when |
-|--------|-----------|-------------|
-| **A — NL twin** | Keep `Q_heat_pump` bounds as in NL | Full SOCP reactive fidelity |
-| **B — L twin** | `Q_heat_pump = 0`; P/E only | Match linear OPF; smaller model |
-
-Default recommendation if unset: **A** (SOCP already has Q elsewhere). Do **not**
-mix A/B without an explicit lock.
+| Option | Behaviour | Status |
+|--------|-----------|--------|
+| **A — NL twin** | Keep `Q_heat_pump` bounds as in NL | **Locked Q-18** |
+| **B — L twin** | `Q_heat_pump = 0`; P/E only | Rejected for SOCP v1 |
 
 #### Implementation checklist (Phase 8)
 
@@ -629,7 +626,7 @@ mix A/B without an explicit lock.
    (`P_ref`, `Q_ref`, `n_units`, `P_unit_max`, `E_*`, `dt_hours`, `S_base`, node).
 2. **`heat_pump_variables` / `heat_pump_constraints`:** vars + bounds + `E` chain
    over `T` (same pattern as storage/H₂ continuous blocks).
-3. **`_ac_node_injection`:** −`P` (−`Q` if option A) when `grid.HP`.
+3. **`_ac_node_injection`:** −`P` and −`Q` (Q-18 **A**) when `grid.HP`.
 4. **`translate_pyf_socp`:** optional `hp_P_ref` / `hp_Q_ref` / `hp_E_min` /
    `hp_E_max` profiles from `grid.Time_series` (same keys as NL); fail-hard on
    unknown `element_name`.
@@ -649,25 +646,25 @@ comfort model; DC HP; new objective keys unless added package-wide first.
 
 #### Exit criterion
 
-`socp_optimise` / `soc_window_optimisation` accept `grid.HP` with the locked A or B
-surface; energy chain over `T` matches the NL/L equations above; no Paper A
-dependency.
+`socp_optimise` / `soc_window_optimisation` accept `grid.HP` with the locked
+**A** (NL Q twin) surface; energy chain over `T` matches the NL equations above;
+no Paper A dependency.
 
 ---
 
 ## 6. Phased roadmap
 
-| Phase | Goal | Status (2026-07-29) | Exit criterion |
+| Phase | Goal | Status (2026-08-04) | Exit criterion |
 |-------|------|---------------------|----------------|
 | **0** | `[SOCP]` extra; skeleton `convex_model` / `ACDC_convex` | **Done** | Import-guarded; L1–L28 reflected |
-| **1** | Sparse SOC + AC balance + **AC thermals** + gens | **Scaffolded** (unvalidated) | Feasible / builds / solves small AC |
-| **2** | DC + converters (L8/L13/L14) + DC thermals + `T` | **Scaffolded** (unvalidated) | AC/DC hub builds case-agnostically |
-| **3** | `translate_pyf_socp` + ObjComponent + runners (L22–L27) | **Scaffolded** (unvalidated) | Single + window paths call same model |
-| **4** | Smoke solve + scaling / solver defaults | **Done** — MOSEK-first default documented; `case39_acdc` single-period solve, short window smoke, PEI short-window build, and optional NLP compare covered | Completes within owner budget |
+| **1** | Sparse SOC + AC balance + **AC thermals** + gens | **Done** (smoke via Phase 4) | Feasible / builds / solves small AC |
+| **2** | DC + converters (L8/L13/L14) + DC thermals + `T` | **Done** (smoke via Phase 4) | AC/DC hub builds case-agnostically |
+| **3** | `translate_pyf_socp` + ObjComponent + runners (L22–L27) | **Done** (smoke via Phase 4) | Single + window paths call same model |
+| **4** | Smoke solve + scaling / solver defaults | **Done** — MOSEK-first default; `case39_acdc` solve / window / PEI build / optional NLP compare | Completes within owner budget |
 | **5** | CCP (optional later) | Deferred | Wind / price modes |
-| **6** | BESS G6 + H₂ linear (MI exclusivity still deferred) | **Scaffolded** (unvalidated) | Coupled assets continuous |
-| **7** | Docs, `Results`, CI | Deferred | `[SOCP]` documented; smoke tests |
-| **8** | Heat pumps in SOCP (§5.7; lock A vs B first) | **Planned** (not started) | `grid.HP` parity with chosen NL or L surface |
+| **6** | BESS G6 + H₂ linear (MI exclusivity still deferred) | **Done** for continuous G6/H₂ (smoke); MI exclusivity deferred | Coupled assets continuous |
+| **7** | Docs, `Results`, CI | **Done** — usage/API/modelling pages; `socp_run` in Results; open-source Clarabel in `[SOCP]`; `test_socp.py` | `[SOCP]` documented; smoke tests |
+| **8** | Heat pumps in SOCP (§5.7; **Q-18 = A**) | **Ready** (not started) | `grid.HP` parity with NL Q twin |
 
 Prefer Mario’s script (L7) for SOC / balance / converter patterns; **add AC limits from the paper** (L15) even though his script lacks them.
 
@@ -677,7 +674,9 @@ Prefer Mario’s script (L7) for SOC / balance / converter patterns; **add AC li
 2. ~~Smoke: `socp_optimise` solve on small Grid.~~ Done — `case39_acdc` + CLARABEL `optimal` after L13 `a+b·t` / `|Re(Ss)|` fix.
 3. ~~Compare objective / voltages vs NLP on a known case (optional).~~ Done — `case39_acdc` voltage smoke vs IPOPT in tests.
 4. ~~Solver defaults / `[SOCP]` extra docs (Q-10); optional BESS/H₂ + window smoke.~~ Done — MOSEK-first docs + SOCP usage/API pages + smoke tests.
-5. Later: CCP; MI-BESS exclusivity; Phase 8 heat pumps (lock Q-18 first).
+5. ~~Phase 7 docs / Results / CI.~~ Done.
+6. ~~Q-18.~~ Locked **A** (NL Q twin).
+7. **Next:** Phase 8 heat pumps (§5.7 checklist). Later: CCP; MI-BESS exclusivity.
 
 ---
 
@@ -701,7 +700,7 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 | Q-ID | Question | Status |
 |------|----------|--------|
 | Q-10 | Solvers inside `[SOCP]` (MOSEK vs docs-only)? | **Resolved** — default preference `MOSEK → CLARABEL → SCS`; docs explain fallback |
-| Q-11 | CI without commercial license? | **Open** |
+| Q-11 | CI without commercial license? | **Resolved** — `[SOCP]` includes open-source Clarabel; tests skip if no conic solver; MOSEK never required |
 | Q-12 | MIP gap (BESS) | **N/A until L18 lifted** |
 | Q-13 | CVXPY solve path (not Pyomo) | **Locked L3** |
 
@@ -713,7 +712,7 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 | Q-15 | BESS MI exclusivity? | **Deferred L18** |
 | Q-16 | H₂ daily quota? | **Deferred** |
 | Q-17 | CCP quantiles? | **Deferred** |
-| Q-18 | SOCP heat pumps: NL Q twin (**A**) vs L P-only (**B**)? | **Open** — lock before Phase 8 (§5.7) |
+| Q-18 | SOCP heat pumps: NL Q twin (**A**) vs L P-only (**B**)? | **Locked A** — NL Q twin (§5.7 / Phase 8) |
 | Q-19 | Paper parity tolerances | **Open** / deferred with L2 |
 
 ### 7.4 Data and reference
@@ -730,11 +729,11 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 |------|----------|--------|
 | Q-2 | Complement NLP (not replace)? | **Open** (default: complement) |
 | Q-25 | Sign-off on port | Mario / CITCEA |
-| Q-26 | `Results` section name | **Open** |
+| Q-26 | `Results` section name | **Resolved** — reuse existing Results tables when `grid.socp_run`; full `T` arrays on `grid.socp_results` |
 
 ### 7.6 Minimum to start Phase 0 / 1
 
-**Scaffold done under L1–L28.** Next gate: Phase 4 smoke solve (cvxpy + solver).
+**Phases 0–4 and 7 done.** Next gate: **Phase 8** heat pumps (Q-18 = A).
 
 **Still useful:** exact Paper A AC thermal expressions (40–43) mapped to pyflow rating fields (U-A8); `wpp_forecast` for smoke runs.
 
@@ -817,13 +816,13 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 | **`pyflow_acdc/convex_model/convex_model.py`** | **Landed** — `build_socp_data`, `socp_model`, subsystem vars/constraints |
 | **`pyflow_acdc/ACDC_convex.py`** | **Landed** — `translate_pyf_socp`, `socp_optimise`, `soc_window_optimisation`, objective, export |
 | `__init__.py` | **Landed** — guarded export of both runners + translate |
-| `pyproject.toml` | **Landed** — `SOCP = ["cvxpy"]`; folded into `All` |
-| `Classes.py` | Optional: CCP / run flags only as needed |
+| `pyproject.toml` | **Landed** — `SOCP = ["cvxpy", "clarabel"]`; folded into `All` |
+| `Classes.py` | **Landed** — `socp_run` cleared in `reset_run_flags` |
 | `constants.py` | Optional: SOCP / CCP mode enums |
-| `solver_utils.py` | Optional: CVXPY / conic capability probe |
-| `Results_class.py` | Optional: `socp` report methods (`grid.socp_results` stub exists) |
-| `docs/usage_socp.rst`, `docs/citing.rst` | User guide + citation |
-| `pyflow_tests/...` | **Next** — generic smoke / build_only tests |
+| `solver_utils.py` | **Landed** — `resolve_socp_solver` / `cvxpy_available` |
+| `Results_class.py` | **Landed** — `socp_run` gates same flex/gen sections as `OPF_run`; `T` arrays on `grid.socp_results` |
+| `docs/usage_socp.rst`, `docs/api/socp.rst`, modelling pages | **Done** — public SOCP usage + API + NL/L/SOCP formulations |
+| `pyflow_tests/test_socp.py` | **Done** — build / solve / window / PEI / optional NLP compare |
 
 **Do not modify (v1)**
 

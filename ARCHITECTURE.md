@@ -88,7 +88,8 @@ Lower layers never import from higher layers. `constants` is a leaf module
   stack (optional `[SOCP]` extra): `build_socp_data` / `socp_model` builders;
   runners `socp_optimise`, `soc_window_optimisation`, `translate_pyf_socp`.
   Distinct from Pyomo NL/L OPF. BESS (G6 continuous) + linear H₂ included;
-  MI exclusivity and CCP deferred (see `plans/convex_acdc_socp_plan.md`).
+  heat pumps planned as NL Q twin (Phase 8 / Q-18 A); MI exclusivity and CCP
+  deferred (see `plans/convex_acdc_socp_plan.md`).
 
 ## Planning and sizing
 

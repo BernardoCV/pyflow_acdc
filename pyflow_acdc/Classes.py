@@ -303,6 +303,7 @@ class Grid:
         self.Seq_MS_STEP_run = False
         self.window_opf_run = False
         self.rolling_window_opf_run = False
+        self.socp_run = False
 
     @property
     def nodes_AC(self):
