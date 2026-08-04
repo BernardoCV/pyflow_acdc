@@ -11,11 +11,13 @@ cd pyflow_acdc
 pip install -e .
 ```
 
-Requires **Python 3.10+**. Install the optional extras you need (see the
+Requires **Python 3.10+**. Package version is set in `pyproject.toml`
+(this branch is **0.6.6**). Install the optional extras you need (see the
 README for the full list), e.g.:
 
 ```bash
 pip install -e ".[OPF]"            # pyomo for optimal power flow
+pip install -e ".[SOCP]"           # cvxpy for sparse SOCP
 pip install -e ".[LINEAR_ARRAY]"  # ortools + highspy for array MIP/CSS
 pip install -e ".[tests]"          # pytest + pytest-cov
 pip install -e ".[All]"        # everything except gurobipy (needs a license)
@@ -93,7 +95,7 @@ pytest pyflow_tests/ --cov=pyflow_acdc --cov-report=term-missing
   `sphinx.ext.napoleon`): one-line purpose, then `Parameters` / `Returns` /
   `Raises` / side-effects as relevant.
 
-See `docs/architecture.md` for module responsibilities and the dependency
+See `ARCHITECTURE.md` for module responsibilities and the dependency
 layering.
 
 ## Documentation
