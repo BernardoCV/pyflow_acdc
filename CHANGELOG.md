@@ -7,9 +7,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.4**.
+> packaged version is **0.6.5**.
 
 ## [Unreleased]
+
+## [0.6.5]
+
+### Added
+- **Sequential STEP** ``build_only``: skips the period-1 solve, extracts init
+  values as usual, then stops before building later periods.
+- **North Sea example data**: ``clusters_kmeans_medoids_k24.json`` for 2023+2024
+  MS TEP (alongside existing k4).
 
 ## [0.6.4]
 
