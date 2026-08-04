@@ -55,6 +55,9 @@ and related packaging / docs / tooling on this branch.
 
 ### Removed
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
+- **``price_link``**: removed from ``Gen_AC`` / ``Gen_DC`` and ``add_gen`` /
+  ``add_gen_DC`` / ``add_extgrid``. Use ``link_cost='linear'`` instead. Legacy
+  pickles are still migrated by ``_migrate_legacy_gen_link_cost``.
 
 ### Changed
 - **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same

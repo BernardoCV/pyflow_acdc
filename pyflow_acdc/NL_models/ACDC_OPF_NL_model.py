@@ -1996,13 +1996,13 @@ def price_zone_variables(model,grid,Price_Zone_info,AC_info,DC_info,gen_info):
 
     def lf_bounds(model, g):
         gen = grid.Generators[g]
-        if gen.price_link:
+        if gen.link_cost == LinkCost.LINEAR:
             return (None,None)
         else:
             return (lf[g],lf[g])
     def lf_bounds_DC(model, g):
         gen = grid.Generators_DC[g]
-        if gen.price_link:
+        if gen.link_cost == LinkCost.LINEAR:
             return (None,None)
         else:
             return (lf_DC[g],lf_DC[g])

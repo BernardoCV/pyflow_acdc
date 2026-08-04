@@ -284,16 +284,16 @@ def case39_acdc(TEP=False,exp='All',N_b_ac=1,N_b_dc=0,N_i=1,N_max=3,Increase=1,k
 
     
     # Add Generators
-    pyf.add_gen(grid, '30', '1', price_link=False, lf=0.3, qf=0.01, MWmax=1040.0, MWmin=0.0, MVArmax=400.0, MVArmin=140.0, PsetMW=250.0, QsetMVA=161.762)
-    pyf.add_gen(grid, '31', '2', price_link=False, lf=0.3, qf=0.01, MWmax=646.0, MWmin=0.0, MVArmax=300.0, MVArmin=-100.0, PsetMW=677.871, QsetMVA=221.574)
-    pyf.add_gen(grid, '32', '3', price_link=False, lf=0.3, qf=0.01, MWmax=725.0, MWmin=0.0, MVArmax=300.0, MVArmin=150.0, PsetMW=650.0, QsetMVA=206.96500000000003)
-    pyf.add_gen(grid, '33', '4', price_link=False, lf=0.3, qf=0.01, MWmax=652.0, MWmin=0.0, MVArmax=250.0, MVArmin=0.0, PsetMW=632.0, QsetMVA=108.29300000000002)
-    pyf.add_gen(grid, '34', '5', price_link=False, lf=0.3, qf=0.01, MWmax=508.0, MWmin=0.0, MVArmax=167.0, MVArmin=0.0, PsetMW=508.0, QsetMVA=166.688)
-    pyf.add_gen(grid, '35', '6', price_link=False, lf=0.3, qf=0.01, MWmax=687.0, MWmin=0.0, MVArmax=300.0, MVArmin=-100.0, PsetMW=650.0, QsetMVA=210.661)
-    pyf.add_gen(grid, '36', '7', price_link=False, lf=0.3, qf=0.01, MWmax=580.0, MWmin=0.0, MVArmax=240.0, MVArmin=0.0, PsetMW=560.0, QsetMVA=100.16500000000002)
-    pyf.add_gen(grid, '37', '8', price_link=False, lf=0.3, qf=0.01, MWmax=564.0, MWmin=0.0, MVArmax=250.0, MVArmin=0.0, PsetMW=540.0, QsetMVA=-1.36945)
-    pyf.add_gen(grid, '38', '9', price_link=False, lf=0.3, qf=0.01, MWmax=865.0, MWmin=0.0, MVArmax=300.0, MVArmin=-150.0, PsetMW=830.0000000000001, QsetMVA=21.7327)
-    pyf.add_gen(grid, '39', '10', price_link=False, lf=0.3, qf=0.01, MWmax=1100.0, MWmin=0.0, MVArmax=300.0, MVArmin=-100.0, PsetMW=1000.0, QsetMVA=78.4674)
+    pyf.add_gen(grid, '30', '1', lf=0.3, qf=0.01, MWmax=1040.0, MWmin=0.0, MVArmax=400.0, MVArmin=140.0, PsetMW=250.0, QsetMVA=161.762)
+    pyf.add_gen(grid, '31', '2', lf=0.3, qf=0.01, MWmax=646.0, MWmin=0.0, MVArmax=300.0, MVArmin=-100.0, PsetMW=677.871, QsetMVA=221.574)
+    pyf.add_gen(grid, '32', '3', lf=0.3, qf=0.01, MWmax=725.0, MWmin=0.0, MVArmax=300.0, MVArmin=150.0, PsetMW=650.0, QsetMVA=206.96500000000003)
+    pyf.add_gen(grid, '33', '4', lf=0.3, qf=0.01, MWmax=652.0, MWmin=0.0, MVArmax=250.0, MVArmin=0.0, PsetMW=632.0, QsetMVA=108.29300000000002)
+    pyf.add_gen(grid, '34', '5', lf=0.3, qf=0.01, MWmax=508.0, MWmin=0.0, MVArmax=167.0, MVArmin=0.0, PsetMW=508.0, QsetMVA=166.688)
+    pyf.add_gen(grid, '35', '6', lf=0.3, qf=0.01, MWmax=687.0, MWmin=0.0, MVArmax=300.0, MVArmin=-100.0, PsetMW=650.0, QsetMVA=210.661)
+    pyf.add_gen(grid, '36', '7', lf=0.3, qf=0.01, MWmax=580.0, MWmin=0.0, MVArmax=240.0, MVArmin=0.0, PsetMW=560.0, QsetMVA=100.16500000000002)
+    pyf.add_gen(grid, '37', '8', lf=0.3, qf=0.01, MWmax=564.0, MWmin=0.0, MVArmax=250.0, MVArmin=0.0, PsetMW=540.0, QsetMVA=-1.36945)
+    pyf.add_gen(grid, '38', '9', lf=0.3, qf=0.01, MWmax=865.0, MWmin=0.0, MVArmax=300.0, MVArmin=-150.0, PsetMW=830.0000000000001, QsetMVA=21.7327)
+    pyf.add_gen(grid, '39', '10', lf=0.3, qf=0.01, MWmax=1100.0, MWmin=0.0, MVArmax=300.0, MVArmin=-100.0, PsetMW=1000.0, QsetMVA=78.4674)
     
     
     if TEP==True:

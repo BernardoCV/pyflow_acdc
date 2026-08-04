@@ -9,23 +9,29 @@ Renewable Source
    :alt: Renewable source model
    :align: center
 
-   Renewable source model   
+   Renewable source model
+
+Non-linear model
+~~~~~~~~~~~~~~~~
 
 For all renewable sources:
 
 .. math::
     :label: eq:Rgen
 
-    0 \leq \gamma_{rg} \leq 1 \qquad \forall rg \in \mathcal{RG}
+    \gamma_{rg}^{\min} \leq \gamma_{rg} \leq 1
+      \qquad \forall rg \in \mathcal{RG}
 
-For renewables sources connected to AC nodes:
+For renewable sources connected to AC nodes:
 
 .. math::
     :label: eq:Rgen_AC
 
-    \begin{align}        
-        Q_{rg}^{min} \leq Q_{rg} \leq Q_{rg}^{max} & \qquad \forall rg \in \mathcal{RG}_{ac} \\
-        (\gamma_{rg} P_{rg})^2 + Q_{rg}^2 \leq S_{rg,rating}^{2^{max}} & \qquad \forall g \in \mathcal{RG}_{ac}
+    \begin{align}
+        Q_{rg}^{\min} \leq Q_{rg} \leq Q_{rg}^{\max}
+          & \qquad \forall rg \in \mathcal{RG}_{ac} \\
+        (\gamma_{rg} P_{rg})^2 + Q_{rg}^2 \leq S_{rg,\mathrm{rating}}^{2}
+          & \qquad \forall rg \in \mathcal{RG}_{ac}
     \end{align}
 
 .. themed-figure:: ren_source_limits
@@ -35,7 +41,19 @@ For renewables sources connected to AC nodes:
 
    Renewable source limits
 
-Class Reference: :class:`pyflow_acdc.Classes.RenSource`
+Linear model
+~~~~~~~~~~~~
+
+In the linear OPF stack (:doc:`L_models`), only the curtailment factor is
+optimised. Reactive power and the apparent-power circle are omitted:
+
+.. math::
+    :label: eq:Rgen_L
+
+    \gamma_{rg}^{\min} \leq \gamma_{rg} \leq 1
+      \qquad \forall rg \in \mathcal{RG}
+
+Class Reference: :class:`pyflow_acdc.Classes.Ren_Source`
 
 .. autoclass:: pyflow_acdc.Ren_Source
    :no-members:
@@ -81,13 +99,19 @@ Generator
 
    Generator model
 
+Non-linear model
+~~~~~~~~~~~~~~~~
+
 .. math::
     :label: eq:gen
 
-    \begin{align}        
-        P_{g}^{min} \leq P_{g} \leq P_{g}^{max} & \qquad \forall g \in \mathcal{G}_{ac}   \\
-        Q_{g}^{min}  \leq Q_{g} \leq Q_{g}^{max}   & \qquad \forall g \in \mathcal{G}_{ac}  \\
-        P_{g}^2+Q_{g}^2 \leq   S_{g,rating}^{2} & \qquad \forall g \in \mathcal{G}_{ac}  
+    \begin{align}
+        P_{g}^{\min} \leq P_{g} \leq P_{g}^{\max}
+          & \qquad \forall g \in \mathcal{G}_{ac} \\
+        Q_{g}^{\min} \leq Q_{g} \leq Q_{g}^{\max}
+          & \qquad \forall g \in \mathcal{G}_{ac} \\
+        P_{g}^{2} + Q_{g}^{2} \leq S_{g,\mathrm{rating}}^{2}
+          & \qquad \forall g \in \mathcal{G}_{ac}
     \end{align}
 
 .. themed-figure:: gen_limits
@@ -96,6 +120,18 @@ Generator
    :align: center
 
    Generator limits
+
+Linear model
+~~~~~~~~~~~~
+
+In the linear OPF stack (:doc:`L_models`), only active-power bounds are
+enforced. Reactive power and the apparent-power circle are omitted:
+
+.. math::
+    :label: eq:gen_L
+
+    P_{g}^{\min} \leq P_{g} \leq P_{g}^{\max}
+      \qquad \forall g \in \mathcal{G}_{ac}
 
 Class Reference: :class:`pyflow_acdc.Classes.Gen_AC`
 

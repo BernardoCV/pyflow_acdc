@@ -1016,7 +1016,6 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
         fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
         Ren_zone = Gen_data.at[index, 'Ren_zone'] if 'Ren_zone' in Gen_data.columns else None
-        price_link = False
 
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
         np_value = Gen_data.at[index, 'np'] if 'np' in Gen_data.columns else 1
@@ -1031,7 +1030,7 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
                 MVArmax = 9999
             if MVArmin is None:
                 MVArmin = -9999
-            add_gen(grid, node_name,var_name, price_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
+            add_gen(grid, node_name,var_name,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
 
 def _look_up_node(grid, node, ac_or_dc="AC"):
 
@@ -1140,12 +1139,10 @@ def _look_up_ren_source_zone(grid, zone):
     return found
 
 
-def _resolve_link_cost(link_cost=None, price_link=None):
-    """Resolve gen cost-link mode; ``price_link=True`` is legacy for ``linear``."""
+def _resolve_link_cost(link_cost=None):
+    """Resolve gen cost-link mode (default ``LinkCost.NONE``)."""
     if link_cost is not None:
         return link_cost if isinstance(link_cost, LinkCost) else LinkCost(link_cost)
-    if price_link:
-        return LinkCost.LINEAR
     return LinkCost.NONE
 
 
@@ -1159,7 +1156,7 @@ def _sync_gen_cost_from_node(gen):
         gen.lf = node.lf
 
 
-def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
+def add_gen(grid, node,gen_name=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append an AC generator to ``grid.Generators``.
 
     Parameters
@@ -1174,8 +1171,6 @@ def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_R
         How OPF costs track the bus (default ``'none'``). ``quadratic``:
         ``qf``/``lf`` from ``node.qf``/``node.lf``; ``linear``: ``lf`` from
         ``node.price``.
-    price_link : bool, optional
-        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         Linear, quadratic, and fixed OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1239,13 +1234,13 @@ def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_R
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    gen.link_cost = _resolve_link_cost(link_cost)
     _sync_gen_cost_from_node(gen)
     grid.Generators.append(gen)
 
     return gen
 
-def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
+def add_gen_DC(grid, node,gen_name=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append a DC generator to ``grid.Generators_DC``.
 
     Parameters
@@ -1258,8 +1253,6 @@ def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MA
         Generator name.
     link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
         See :func:`add_gen`.
-    price_link : bool, optional
-        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1303,14 +1296,14 @@ def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MA
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    gen.link_cost = _resolve_link_cost(link_cost)
     _sync_gen_cost_from_node(gen)
     grid.Generators_DC.append(gen)
 
     return gen
 
 
-def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0, link_cost=None):
+def add_extgrid(grid, node, gen_name=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0, link_cost=None):
     """Add an external-grid equivalent generator at an AC bus.
 
     Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
@@ -1324,8 +1317,6 @@ def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_R
         Connection bus.
     gen_name : str, optional
         Generator name; defaults to ``'extgrid_<node>'``.
-    price_link : bool, optional
-        Deprecated: ``True`` means ``link_cost='linear'``.
     link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
         See :func:`add_gen`.
     lf, qf : float, optional
@@ -1369,7 +1360,7 @@ def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_R
     node.PGi = 0
     node.QGi = 0
     node.recalc_extgrid_load()
-    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    gen.link_cost = _resolve_link_cost(link_cost)
     _sync_gen_cost_from_node(gen)
     if gen.link_cost != LinkCost.NONE:
         # Keep aggregated price-zone load consistent after extgrid load is introduced.
