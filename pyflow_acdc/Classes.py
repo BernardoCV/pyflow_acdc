@@ -803,7 +803,7 @@ class Grid:
                                 +node.QGi_electrolyser
                                -node.QLi
                                -node.QLi_heat_pump
-                               +node.Q_s_fx for node in self.nodes_AC])      
+                               +node.Q_s_fx for node in self.nodes_AC])
         self.Ps_AC = np.vstack([node.P_s for node in self.nodes_AC])
         self.Qs_AC = np.vstack([node.Q_s for node in self.nodes_AC])
 
