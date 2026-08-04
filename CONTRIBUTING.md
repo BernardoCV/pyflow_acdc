@@ -12,7 +12,7 @@ pip install -e .
 ```
 
 Requires **Python 3.10+**. Package version is set in `pyproject.toml`
-(this branch is **0.6.6**). Install the optional extras you need (see the
+(this branch is **0.6.7**). Install the optional extras you need (see the
 README for the full list), e.g.:
 
 ```bash

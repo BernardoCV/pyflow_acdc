@@ -29,8 +29,42 @@ jobs:
       - name: Check package metadata
         run: python -m twine check dist/*
 
-      - name: Install built wheel
-        run: python -m pip install --force-reinstall dist/*.whl
+      - name: Install built wheel with OPF extra dep
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          python -m pip install pyomo
+
+      - name: Assert subpackages are in the wheel
+        run: |
+          python - <<'PY'
+          import importlib.util
+          for name in (
+              "pyflow_acdc.NL_models",
+              "pyflow_acdc.L_models",
+          ):
+              if importlib.util.find_spec(name) is None:
+                  raise SystemExit(f"missing packaged subpackage: {name}")
+              print(f"ok {name}")
+          PY
 
       - name: Import smoke test
-        run: python -c "import pyflow_acdc; print('import ok')"
+        run: |
+          python - <<'PY'
+          import pyflow_acdc as pyf
+          from pyflow_acdc.NL_models.ACDC_Static_TEP import transmission_expansion
+          from pyflow_acdc.NL_models.ACDC_MultiPeriod_TEP import multi_period_transmission_expansion
+          from pyflow_acdc.NL_models.ACDC_sequential_STEP import sequential_STEP
+          from pyflow_acdc.L_models.ACDC_L_TEP import linear_multi_period_transmission_expansion
+
+          for attr in (
+              "expand_elements_from_pd",
+              "transmission_expansion",
+              "multi_period_transmission_expansion",
+              "sequential_STEP",
+              "linear_multi_period_transmission_expansion",
+          ):
+              if not hasattr(pyf, attr):
+                  raise SystemExit(f"pyflow_acdc missing attribute after install: {attr}")
+
+          print("import ok")
+          PY

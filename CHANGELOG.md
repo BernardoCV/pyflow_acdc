@@ -7,9 +7,19 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.6**.
+> packaged version is **0.6.7**.
 
 ## [Unreleased]
+
+## [0.6.7]
+
+### Fixed
+- **Wheel packaging**: ship ``pyflow_acdc.NL_models`` and ``pyflow_acdc.L_models``
+  subpackages (setuptools ``packages.find``). ``0.6.6`` omitted them, so OPF /
+  TEP / STEP imports failed with ``No module named 'pyflow_acdc.NL_models'``.
+- **CI package check**: install the built wheel with pyomo and assert NL/L
+  subpackages plus TEP/STEP public attributes are importable (top-level
+  ``import pyflow_acdc`` alone no longer counts as success).
 
 ## [0.6.6]
 
