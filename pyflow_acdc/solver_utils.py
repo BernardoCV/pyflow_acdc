@@ -1,4 +1,4 @@
-"""Probe installed Pyomo solvers and OR-Tools backends in the current environment."""
+"""Probe installed Pyomo solvers, CVXPY solvers, and OR-Tools backends."""
 
 import logging
 
@@ -27,6 +27,12 @@ DEFAULT_ORTOOLS_BACKENDS = [
     "CPLEX",
     "XPRESS",
     "GLPK",
+]
+
+DEFAULT_SOCP_SOLVERS = [
+    "MOSEK",
+    "CLARABEL",
+    "SCS",
 ]
 
 
@@ -121,6 +127,29 @@ def resolve_pyomo_linear_solver(candidates=None):
         candidates = PYOMO_LINEAR_SOLVERS
     for name in candidates:
         if is_pyomo_solver_available(name):
+            return name
+    return None
+
+
+def cvxpy_available():
+    """Return ``True`` when CVXPY can be imported."""
+    try:
+        __import__("cvxpy")
+    except Exception:
+        return False
+    return True
+
+
+def resolve_socp_solver(candidates=None):
+    """First available CVXPY conic solver from ``candidates``."""
+    if not cvxpy_available():
+        return None
+    import cvxpy as cp
+
+    candidate_names = candidates if candidates is not None else DEFAULT_SOCP_SOLVERS
+    installed = set(cp.installed_solvers())
+    for name in candidate_names:
+        if name in installed:
             return name
     return None
 

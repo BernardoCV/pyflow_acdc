@@ -9,6 +9,8 @@ Structure mirrors ACDC_OPF_NL_model.py:
   build_socp_data        – extract topology/data from Grid → SimpleNamespace
   socp_model             – top-level orchestrator on prepared SOCP data
     generator_variables  – PGi_gen, QGi_gen
+    storage_variables    – P_charge/P_discharge, Q, SoC (G6, no binaries)
+    hydrogen_variables   – P_electrolyser, Q, mass_H2 (linear)
     ac_variables         – h_AC, w_AC
     ac_constraints       – voltage bounds, SOC lifts, nodal balance, thermals
     dc_variables         – h_DC, w_DC, P_DC
@@ -20,7 +22,7 @@ Design rules (locked):
   L3  – CVXPY only (no Pyomo)
   L8  – Converter AC-side RL branches ignored in Ybus
   L11 – Balance uses conj(S) == flow_k
-  L13 – Converter loss: Ploss = a + c * |Ss|^2
+  L13 – Converter loss: Ploss = a + b * t, t >= |Re(Ss)| (paper affine; DCP)
   L14 – DC polarity: pol = cn_pol
   L15 – AC and DC thermal limits are mandatory
   L19 – Sparse edge sets only; no dense mode
@@ -29,6 +31,8 @@ Design rules (locked):
 
 import numpy as np
 from types import SimpleNamespace
+
+from ..constants import AcDcSide
 
 try:
     import cvxpy as cp
@@ -43,6 +47,10 @@ __all__ = [
     "socp_model",
     "generator_variables",
     "generator_constraints",
+    "storage_variables",
+    "storage_constraints",
+    "hydrogen_variables",
+    "hydrogen_constraints",
     "ac_variables",
     "ac_constraints",
     "dc_variables",
@@ -90,7 +98,7 @@ def build_socp_data(grid):
                 if str(n.type).lower() in ('slack', 'nodetype.slack')]
 
     ac_line_limits = {}
-    for line in grid.Lines_AC:
+    for line in grid.lines_AC:
         k = line.fromNode.nodeNumber
         m = line.toNode.nodeNumber
         rating_pu = line.MVA_rating / Sbase if line.MVA_rating and line.MVA_rating > 0 else None
@@ -118,7 +126,7 @@ def build_socp_data(grid):
                 if str(n.type).lower() in ('slack', 'nodetype.slack')]
 
     dc_line_limits = {}
-    for line in grid.Lines_DC:
+    for line in grid.lines_DC:
         k = line.fromNode.nodeNumber
         m = line.toNode.nodeNumber
         rating_pu = line.MW_rating / Sbase if line.MW_rating and line.MW_rating > 0 else None
@@ -137,7 +145,7 @@ def build_socp_data(grid):
             'nDC':  conv.Node_DC.nodeNumber,
             'pol':  abs(conv.cn_pol) if hasattr(conv, 'cn_pol') else 1,
             'a':    conv.a_conv,
-            'c':    conv.c_rect,
+            'b':    conv.b_conv,
             'Smax': conv.MVA_max * np_c / Sbase,
         })
 
@@ -188,6 +196,78 @@ def build_socp_data(grid):
             0.0,
         )  # Q=0 (L12)
 
+    # --------------------------------------------------------------- storage
+    # G6: separate continuous charge/discharge; no exclusivity binaries.
+    storage_data = []
+    storage_by_ac_node = {}
+    storage_by_dc_node = {}
+    for s in grid.storage_elements:
+        node_num = s._node.nodeNumber
+        entry = {
+            'idx': s.storageNumber,
+            'node': node_num,
+            'connected': s.connected,
+            'P_charge_max': s.P_charge_max,
+            'P_discharge_max': s.P_discharge_max,
+            'P_max': s.P_max,
+            'S_max': s.S_max if s.connected == AcDcSide.AC else 0.0,
+            'eta_charge': s.eta_charge,
+            'eta_discharge': s.eta_discharge,
+            'E_max': s.E_max,
+            'dt_hours': s.dt_hours,
+            'S_base': s.S_base,
+            'soc_min': s.soc_min,
+            'soc_max': s.soc_max,
+            'soc_initial': s.soc_initial,
+            'soc_final': s.soc_final,
+            'soc_ref': s.soc_ref,
+        }
+        storage_data.append(entry)
+        if s.connected == AcDcSide.AC:
+            storage_by_ac_node.setdefault(node_num, []).append(len(storage_data) - 1)
+        else:
+            storage_by_dc_node.setdefault(node_num, []).append(len(storage_data) - 1)
+
+    # ------------------------------------------------------------- electrolyser
+    h2_data = []
+    h2_by_ac_node = {}
+    h2_by_dc_node = {}
+    for el in grid.electrolysers:
+        node_num = el._node.nodeNumber
+        entry = {
+            'idx': el.electrolyserNumber,
+            'node': node_num,
+            'connected': el.connected,
+            'P_min': el.P_min,
+            'P_max': el.P_max,
+            'Q_min': el.Q_min if el.connected == AcDcSide.AC else 0.0,
+            'Q_max': el.Q_max if el.connected == AcDcSide.AC else 0.0,
+            'H2_mass_max': el.H2_mass_max,
+            'H2_mass_initial': el.H2_mass_initial,
+            'H2_mass_final': el.H2_mass_final,
+            'b_h': el.b_h,
+            'c_h': el.c_h,
+            'S_base': el.S_base,
+            'dt_hours': el.dt_hours,
+            'h2_price': float(el.h2_price),
+        }
+        h2_data.append(entry)
+        if el.connected == AcDcSide.AC:
+            h2_by_ac_node.setdefault(node_num, []).append(len(h2_data) - 1)
+        else:
+            h2_by_dc_node.setdefault(node_num, []).append(len(h2_data) - 1)
+
+    # DC node polarity from converters (L14); conflict → hard error
+    dc_pol = {}
+    for cd in conv_data:
+        k = cd['nDC']
+        if k in dc_pol and dc_pol[k] != cd['pol']:
+            raise ValueError(
+                f"Conflicting converter polarity at DC node {k}: "
+                f"{dc_pol[k]} vs {cd['pol']}"
+            )
+        dc_pol[k] = cd['pol']
+
     return SimpleNamespace(
         N_AC=N_AC, Ybus_AC=Ybus_AC, E_AC=E_AC,
         V_min_AC=V_min_AC, V_max_AC=V_max_AC, ac_slack=ac_slack,
@@ -195,8 +275,14 @@ def build_socp_data(grid):
         N_DC=N_DC, Ybus_DC=Ybus_DC, E_DC=E_DC,
         V_min_DC=V_min_DC, V_max_DC=V_max_DC, dc_slack=dc_slack,
         dc_line_limits=dc_line_limits,
-        conv_data=conv_data, conv_ac_nodes=conv_ac_nodes,
+        conv_data=conv_data, conv_ac_nodes=conv_ac_nodes, dc_pol=dc_pol,
         gen_data_AC=gen_data_AC, ren_nodes_AC=ren_nodes_AC,
+        storage_data=storage_data,
+        storage_by_ac_node=storage_by_ac_node,
+        storage_by_dc_node=storage_by_dc_node,
+        h2_data=h2_data,
+        h2_by_ac_node=h2_by_ac_node,
+        h2_by_dc_node=h2_by_dc_node,
         Sbase=Sbase,
     )
 
@@ -245,6 +331,136 @@ def generator_constraints(d, gen_vars):
 
 
 # ---------------------------------------------------------------------------
+# Storage variables / constraints (G6 — no exclusivity binaries)
+# ---------------------------------------------------------------------------
+
+def storage_variables(d, T):
+    """Declare BESS charge/discharge, Q (AC), and SoC over ``T``."""
+    n_st = len(d.storage_data)
+    if n_st == 0:
+        raise ValueError("storage_variables called with empty storage_data")
+
+    P_charge = cp.Variable((n_st, T), nonneg=True, name="P_storage_charge")
+    P_discharge = cp.Variable((n_st, T), nonneg=True, name="P_storage_discharge")
+    Q_storage = cp.Variable((n_st, T), name="Q_storage")
+    SoC = cp.Variable((n_st, T), name="SoC")
+
+    return SimpleNamespace(
+        P_charge=P_charge,
+        P_discharge=P_discharge,
+        Q_storage=Q_storage,
+        SoC=SoC,
+    )
+
+
+def storage_constraints(d, st_vars):
+    """SoC chain, power limits, and AC S-circle / DC |P_net| (G6)."""
+    constrs = []
+    T = d.T
+    Pc = st_vars.P_charge
+    Pd = st_vars.P_discharge
+    Qs = st_vars.Q_storage
+    SoC = st_vars.SoC
+
+    for si, sd in enumerate(d.storage_data):
+        constrs += [
+            Pc[si, :] <= sd['P_charge_max'],
+            Pd[si, :] <= sd['P_discharge_max'],
+            SoC[si, :] >= sd['soc_min'],
+            SoC[si, :] <= sd['soc_max'],
+        ]
+        if sd['connected'] == AcDcSide.DC:
+            constrs += [Qs[si, :] == 0]
+        else:
+            constrs += [
+                Qs[si, :] >= -sd['S_max'],
+                Qs[si, :] <= sd['S_max'],
+            ]
+
+        scale = sd['dt_hours'] * sd['S_base'] / sd['E_max']
+        for t in range(T):
+            soc_prev = sd['soc_initial'] if t == 0 else SoC[si, t - 1]
+            constrs += [
+                SoC[si, t] == soc_prev + scale * (
+                    sd['eta_charge'] * Pc[si, t]
+                    - Pd[si, t] / sd['eta_discharge']
+                )
+            ]
+            p_net = Pd[si, t] - Pc[si, t]
+            if sd['connected'] == AcDcSide.AC:
+                constrs += [
+                    cp.norm(cp.vstack([p_net, Qs[si, t]])) <= sd['S_max']
+                ]
+            else:
+                constrs += [
+                    p_net <= sd['P_max'],
+                    -p_net <= sd['P_max'],
+                ]
+
+        if sd['soc_final'] is not None:
+            constrs += [SoC[si, T - 1] == sd['soc_final']]
+
+    return constrs
+
+
+# ---------------------------------------------------------------------------
+# Hydrogen variables / constraints (linear, paper Eqs. 13–16)
+# ---------------------------------------------------------------------------
+
+def hydrogen_variables(d, T):
+    """Declare electrolyser P, optional AC Q, and H₂ mass inventory."""
+    n_el = len(d.h2_data)
+    if n_el == 0:
+        raise ValueError("hydrogen_variables called with empty h2_data")
+
+    P_electrolyser = cp.Variable((n_el, T), name="P_electrolyser")
+    Q_electrolyser = cp.Variable((n_el, T), name="Q_electrolyser")
+    mass_H2 = cp.Variable((n_el, T), nonneg=True, name="mass_H2")
+
+    return SimpleNamespace(
+        P_electrolyser=P_electrolyser,
+        Q_electrolyser=Q_electrolyser,
+        mass_H2=mass_H2,
+    )
+
+
+def hydrogen_constraints(d, h2_vars):
+    """Electrolyser bounds and H₂ mass balance chain."""
+    constrs = []
+    T = d.T
+    Pel = h2_vars.P_electrolyser
+    Qel = h2_vars.Q_electrolyser
+    mass = h2_vars.mass_H2
+
+    for ei, ed in enumerate(d.h2_data):
+        constrs += [
+            Pel[ei, :] >= ed['P_min'],
+            Pel[ei, :] <= ed['P_max'],
+            mass[ei, :] <= ed['H2_mass_max'],
+        ]
+        if ed['connected'] == AcDcSide.DC:
+            constrs += [Qel[ei, :] == 0]
+        else:
+            constrs += [
+                Qel[ei, :] >= ed['Q_min'],
+                Qel[ei, :] <= ed['Q_max'],
+            ]
+
+        for t in range(T):
+            mass_prev = ed['H2_mass_initial'] if t == 0 else mass[ei, t - 1]
+            h_prod = (
+                ed['b_h'] * Pel[ei, t] * ed['S_base'] * ed['dt_hours']
+                + ed['c_h']
+            )
+            constrs += [mass[ei, t] == mass_prev + h_prod]
+
+        if ed['H2_mass_final'] is not None:
+            constrs += [mass[ei, T - 1] == ed['H2_mass_final']]
+
+    return constrs
+
+
+# ---------------------------------------------------------------------------
 # AC variables
 # ---------------------------------------------------------------------------
 
@@ -268,7 +484,7 @@ def ac_variables(d, T):
 # AC constraints
 # ---------------------------------------------------------------------------
 
-def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars):
+def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars=None, h2_vars=None):
     """Build AC constraints: voltage bounds, SOC lifts, nodal balance, thermals.
 
     Parameters
@@ -281,6 +497,10 @@ def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars):
         Output of :func:`ac_variables`.
     conv_vars : SimpleNamespace or None
         Output of :func:`converter_variables`, or ``None`` if no converters.
+    st_vars : SimpleNamespace or None
+        Output of :func:`storage_variables`, or ``None`` if no BESS.
+    h2_vars : SimpleNamespace or None
+        Output of :func:`hydrogen_variables`, or ``None`` if no H₂.
     Returns
     -------
     list
@@ -325,7 +545,7 @@ def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars):
                 w_km_t = w_AC[(k, m)][t] if (k, m) in w_AC else cp.conj(w_AC[(m, k)][t])
                 flow_k = flow_k + d.Ybus_AC[k, m] * w_km_t
 
-            S_k = _ac_node_injection(k, t, d, gen_vars, Ss)
+            S_k = _ac_node_injection(k, t, d, gen_vars, Ss, st_vars, h2_vars)
             constrs += [flow_k == 0] if S_k is None else [cp.conj(S_k) == flow_k]
 
         # thermal limits (L15)
@@ -365,8 +585,11 @@ def dc_variables(d, T):
 # DC constraints
 # ---------------------------------------------------------------------------
 
-def dc_constraints(d, dc_vars):
+def dc_constraints(d, dc_vars, st_vars=None, h2_vars=None):
     """Build DC constraints: voltage bounds, SOC lifts, nodal balance, thermals.
+
+    Converter DC nodes use ``pol * flow == P_DC + flex`` (L14). Nodes with
+    BESS/H₂ but no converter use ``flow == flex`` (``pol = 1``).
 
     Returns
     -------
@@ -379,6 +602,10 @@ def dc_constraints(d, dc_vars):
     T = d.T
 
     constrs = []
+
+    dc_balance_nodes = set(d.dc_pol.keys())
+    dc_balance_nodes |= set(d.storage_by_dc_node.keys())
+    dc_balance_nodes |= set(d.h2_by_dc_node.keys())
 
     for t in range(T):
         # voltage magnitude bounds
@@ -402,16 +629,19 @@ def dc_constraints(d, dc_vars):
                 )
             ]
 
-        # nodal balance: P_DC[k] = pol * flow_k (L14)
-        for cd in d.conv_data:
-            k = cd['nDC']
+        # nodal balance (converter + optional BESS/H₂ flex)
+        for k in dc_balance_nodes:
             flow_k = d.Ybus_DC[k, k] * h_DC[k, t]
             for m in range(d.N_DC):
                 if m == k or abs(d.Ybus_DC[k, m]) < 1e-12:
                     continue
                 w_km_t = w_DC[(k, m)][t] if (k, m) in w_DC else w_DC[(m, k)][t]
                 flow_k = flow_k + d.Ybus_DC[k, m] * w_km_t
-            constrs += [P_DC[k, t] == cd['pol'] * flow_k]
+            flex = _dc_flex_injection(k, t, d, st_vars, h2_vars)
+            if k in d.dc_pol:
+                constrs += [d.dc_pol[k] * flow_k == P_DC[k, t] + flex]
+            else:
+                constrs += [flow_k == flex]
 
         # thermal limits (L15)
         for (k, m), rating_pu in d.dc_line_limits.items():
@@ -436,12 +666,14 @@ def converter_variables(d, T):
     SimpleNamespace
         ``Ss``    – AC-side apparent power (n_conv × T) complex
         ``Ploss`` – converter losses       (n_conv × T) real
+        ``t_abs`` – epigraph of ``|Re(Ss)|`` for affine loss (n_conv × T)
     """
     n_conv = len(d.conv_data)
     Ss    = cp.Variable((n_conv, T), complex=True, name="Ss")
     Ploss = cp.Variable((n_conv, T), name="Ploss")
+    t_abs = cp.Variable((n_conv, T), nonneg=True, name="t_abs_Pconv")
 
-    return SimpleNamespace(Ss=Ss, Ploss=Ploss)
+    return SimpleNamespace(Ss=Ss, Ploss=Ploss, t_abs=t_abs)
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +683,9 @@ def converter_variables(d, T):
 def converter_constraints(d, conv_vars, dc_vars):
     """Build converter constraints: power balance, loss model, rating.
 
+    Loss model (Paper A Eqs. 10–12, DCP form):
+    ``t >= |Re(Ss)|``, ``Ploss == a + b * t`` with ``a_conv`` / ``b_conv``.
+
     Returns
     -------
     list
@@ -458,6 +693,7 @@ def converter_constraints(d, conv_vars, dc_vars):
     """
     Ss    = conv_vars.Ss
     Ploss = conv_vars.Ploss
+    t_abs = conv_vars.t_abs
     P_DC  = dc_vars.P_DC
     T = d.T
 
@@ -465,13 +701,13 @@ def converter_constraints(d, conv_vars, dc_vars):
 
     for t in range(T):
         for ci, cd in enumerate(d.conv_data):
-            # power balance: Re(Ss) + P_DC + Ploss = 0 (L13)
+            # power balance: Re(Ss) + P_DC + Ploss = 0
             constrs += [cp.real(Ss[ci, t]) + P_DC[cd['nDC'], t] + Ploss[ci, t] == 0]
 
-            # loss model: Ploss = a + c * |Ss|²  (h_AC = 1 pu denominator, v1; L13)
+            # affine loss via |Re(Ss)| epigraph (L13 / paper b, not c_rect)
             constrs += [
-                Ploss[ci, t] == cd['a'] + cd['c'] * (
-                    cp.real(Ss[ci, t]) ** 2 + cp.imag(Ss[ci, t]) ** 2)
+                t_abs[ci, t] >= cp.abs(cp.real(Ss[ci, t])),
+                Ploss[ci, t] == cd['a'] + cd['b'] * t_abs[ci, t],
             ]
 
             # apparent power rating
@@ -509,12 +745,23 @@ def socp_model(grid, d):
     ac_vars   = ac_variables(d, T)
     dc_vars   = dc_variables(d, T)   if grid.DCmode             else None
     conv_vars = converter_variables(d, T) if grid.ACmode and grid.DCmode and d.conv_data else None
+    st_vars   = storage_variables(d, T) if grid.ESS and d.storage_data else None
+    h2_vars   = hydrogen_variables(d, T) if grid.H2 and d.h2_data else None
+
+    if grid.ESS and not d.storage_data:
+        raise ValueError("grid.ESS is True but storage_data is empty")
+    if grid.H2 and not d.h2_data:
+        raise ValueError("grid.H2 is True but h2_data is empty")
 
     # -- constraints ---------------------------------------------------------
     constrs  = generator_constraints(d, gen_vars) if gen_vars is not None else []
-    constrs += ac_constraints(d, grid, ac_vars, gen_vars, conv_vars)
+    if st_vars is not None:
+        constrs += storage_constraints(d, st_vars)
+    if h2_vars is not None:
+        constrs += hydrogen_constraints(d, h2_vars)
+    constrs += ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars, h2_vars)
     if grid.DCmode:
-        constrs += dc_constraints(d, dc_vars)
+        constrs += dc_constraints(d, dc_vars, st_vars, h2_vars)
     if grid.ACmode and grid.DCmode and d.conv_data:
         constrs += converter_constraints(d, conv_vars, dc_vars)
 
@@ -523,34 +770,51 @@ def socp_model(grid, d):
         ac=ac_vars,
         dc=dc_vars,
         conv=conv_vars,
+        storage=st_vars,
+        hydrogen=h2_vars,
     )
 
     return constrs, variables
 
 
 # ---------------------------------------------------------------------------
-# Internal helper
+# Internal helpers
 # ---------------------------------------------------------------------------
 
-def _ac_node_injection(k, t, d, gen_vars, Ss):
+def _ac_node_injection(k, t, d, gen_vars, Ss, st_vars=None, h2_vars=None):
     """Return the net complex injection at AC node *k*, time *t*.
 
     Returns ``None`` for zero-injection nodes.
     """
     parts = []
 
-    for gi, gd in enumerate(d.gen_data_AC):
-        if gd['node'] == k:
-            parts.append(gen_vars.PGi_gen[gi, t] + 1j * gen_vars.QGi_gen[gi, t])
+    if gen_vars is not None:
+        for gi, gd in enumerate(d.gen_data_AC):
+            if gd['node'] == k:
+                parts.append(gen_vars.PGi_gen[gi, t] + 1j * gen_vars.QGi_gen[gi, t])
 
     if k in d.ren_nodes_AC:
         p_t = float(d.P_ren[k][t]) if k in d.P_ren else d.ren_nodes_AC[k][0]
         parts.append(p_t + 1j * d.ren_nodes_AC[k][1])
 
-    if k in d.conv_ac_nodes:
+    if Ss is not None and k in d.conv_ac_nodes:
         for ci, cd in enumerate(d.conv_data):
             if cd['nAC'] == k:
                 parts.append(Ss[ci, t])
+
+    if st_vars is not None and k in d.storage_by_ac_node:
+        for si in d.storage_by_ac_node[k]:
+            parts.append(
+                (st_vars.P_discharge[si, t] - st_vars.P_charge[si, t])
+                + 1j * st_vars.Q_storage[si, t]
+            )
+
+    if h2_vars is not None and k in d.h2_by_ac_node:
+        for ei in d.h2_by_ac_node[k]:
+            # P is a load; Q is reactive injection (NL sign convention)
+            parts.append(
+                -h2_vars.P_electrolyser[ei, t] + 1j * h2_vars.Q_electrolyser[ei, t]
+            )
 
     if not parts:
         return None
@@ -559,3 +823,17 @@ def _ac_node_injection(k, t, d, gen_vars, Ss):
     for p in parts[1:]:
         result = result + p
     return result
+
+
+def _dc_flex_injection(k, t, d, st_vars, h2_vars):
+    """Net DC flexible injection at node *k*: +BESS net − electrolyser load."""
+    flex = 0
+    if st_vars is not None and k in d.storage_by_dc_node:
+        for si in d.storage_by_dc_node[k]:
+            flex = flex + (
+                st_vars.P_discharge[si, t] - st_vars.P_charge[si, t]
+            )
+    if h2_vars is not None and k in d.h2_by_dc_node:
+        for ei in d.h2_by_dc_node[k]:
+            flex = flex - h2_vars.P_electrolyser[ei, t]
+    return flex

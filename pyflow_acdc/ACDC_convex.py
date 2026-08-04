@@ -19,8 +19,14 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from .constants import ObjComponent, TSType, TS_RENEWABLE_TYPES, default_obj_weights
+from .constants import (
+    ObjComponent,
+    TSType,
+    TS_RENEWABLE_TYPES,
+    default_obj_weights,
+)
 from .grid_analysis import analyse_grid
+from .solver_utils import resolve_socp_solver
 
 try:
     import cvxpy as cp
@@ -79,7 +85,7 @@ def translate_pyf_socp(grid, gamma=1.0, frame_ids=None, P_ext_bounds=None):
     -------
     SimpleNamespace
         Static SOCP data plus ``T``, ``frame_ids``, ``P_ren``, ``prices``,
-        and ``P_ext_bounds``.
+        ``h2_prices``, and ``P_ext_bounds``.
     """
     socp_data = build_socp_data(grid)
 
@@ -166,12 +172,40 @@ def translate_pyf_socp(grid, gamma=1.0, frame_ids=None, P_ext_bounds=None):
         if node is not None:
             prices_out[node.nodeNumber] = profile.copy()
 
+    # ---- H₂ sale prices: electrolyser index → array(T) --------------------
+    el_by_name = {el.name: el for el in grid.electrolysers}
+    h2_prices = {
+        ei: np.full(T, float(ed['h2_price']), dtype=float)
+        for ei, ed in enumerate(socp_data.h2_data)
+    }
+    for ts in series:
+        typ = _ts_type(ts)
+        if typ != TSType.H2_PRICE:
+            continue
+        data = np.asarray(ts.data, dtype=float)
+        profile = np.array([data[abs_t] for abs_t in frame_ids], dtype=float)
+        el = el_by_name.get(ts.element_name)
+        if el is None:
+            raise ValueError(
+                f"H2_PRICE time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
+            )
+        for ei, ed in enumerate(socp_data.h2_data):
+            if ed['idx'] == el.electrolyserNumber:
+                h2_prices[ei] = profile.copy()
+                break
+        else:
+            raise ValueError(
+                f"Electrolyser {el.name!r} not found in h2_data"
+            )
+
     return SimpleNamespace(
         **vars(socp_data),
         T=T,
         frame_ids=frame_ids,
         P_ren=P_ren_out,
         prices=prices_out,
+        h2_prices=h2_prices,
         P_ext_bounds=P_ext_bounds or {},
     )
 
@@ -223,6 +257,8 @@ def _build_objective(variables, d, grid, weights_def=None):
     - ``AC_losses``         : AC branch active losses
     - ``DC_losses``         : DC branch active losses
     - ``Converter_Losses``  : converter losses
+    - ``H2_sale``           : −price · Δm (maximise H₂ revenue)
+    - ``SoC_deviation``     : quadratic SoC tracking vs ``soc_ref``
 
     Any active unsupported component raises ``NotImplementedError``.
     """
@@ -233,6 +269,8 @@ def _build_objective(variables, d, grid, weights_def=None):
     gen = variables.gen
     dc = variables.dc
     conv = variables.conv
+    st = variables.storage
+    h2 = variables.hydrogen
     terms = []
     np_den_eps = 1e-3
 
@@ -268,6 +306,23 @@ def _build_objective(variables, d, grid, weights_def=None):
             if conv is None:
                 continue
             terms.append(weight * cp.sum(conv.Ploss) * grid.LCoE * d.Sbase)
+        elif component == ObjComponent.H2_SALE.value:
+            if h2 is None:
+                raise ValueError("H2_sale weight > 0 requires grid.H2 / electrolysers")
+            for ei, ed in enumerate(d.h2_data):
+                for t in range(d.T):
+                    h_prod = (
+                        ed['b_h'] * h2.P_electrolyser[ei, t] * ed['S_base'] * ed['dt_hours']
+                        + ed['c_h']
+                    )
+                    price_t = float(d.h2_prices[ei][t])
+                    terms.append(weight * (-price_t * h_prod))
+        elif component == ObjComponent.SOC_DEVIATION.value:
+            if st is None:
+                raise ValueError("SoC_deviation weight > 0 requires grid.ESS / storage")
+            for si, sd in enumerate(d.storage_data):
+                for t in range(d.T):
+                    terms.append(weight * (st.SoC[si, t] - sd['soc_ref']) ** 2)
         else:
             raise NotImplementedError(
                 f"SOCP objective component '{component}' is not implemented."
@@ -297,6 +352,8 @@ def _export_to_grid(grid, variables, socp_data):
     gen  = variables.gen
     dc   = variables.dc
     conv = variables.conv
+    st   = variables.storage
+    h2   = variables.hydrogen
 
     # Voltage magnitudes → AC nodes
     if ac.h_AC.value is not None:
@@ -325,6 +382,35 @@ def _export_to_grid(grid, variables, socp_data):
             if dc is not None and dc.P_DC.value is not None:
                 c_obj.P_DC = float(dc.P_DC.value[cd['nDC'], 0])
 
+    # BESS results (last time step for SoC / operating point for t=0 attrs)
+    if st is not None and st.P_charge.value is not None:
+        t_last = socp_data.T - 1
+        for si, sd in enumerate(socp_data.storage_data):
+            s_obj = grid.storage_elements[si]
+            if s_obj.storageNumber != sd['idx']:
+                raise ValueError(
+                    f"storage_data index mismatch: expected storageNumber "
+                    f"{sd['idx']}, got {s_obj.storageNumber}"
+                )
+            s_obj.P_charge = float(st.P_charge.value[si, 0])
+            s_obj.P_discharge = float(st.P_discharge.value[si, 0])
+            s_obj.Q = float(st.Q_storage.value[si, 0])
+            s_obj.SoC = float(st.SoC.value[si, t_last])
+
+    # H₂ results
+    if h2 is not None and h2.P_electrolyser.value is not None:
+        t_last = socp_data.T - 1
+        for ei, ed in enumerate(socp_data.h2_data):
+            el = grid.electrolysers[ei]
+            if el.electrolyserNumber != ed['idx']:
+                raise ValueError(
+                    f"h2_data index mismatch: expected electrolyserNumber "
+                    f"{ed['idx']}, got {el.electrolyserNumber}"
+                )
+            el.P_electrolyser = float(h2.P_electrolyser.value[ei, 0])
+            el.Q_electrolyser = float(h2.Q_electrolyser.value[ei, 0])
+            el.mass_H2 = float(h2.mass_H2.value[ei, t_last])
+
     # Store full time-series for post-processing
     grid.socp_results = SimpleNamespace(
         h_AC  = ac.h_AC.value,
@@ -335,6 +421,13 @@ def _export_to_grid(grid, variables, socp_data):
         P_DC  = dc.P_DC.value  if dc   is not None else None,
         Ss    = conv.Ss.value  if conv is not None else None,
         Ploss = conv.Ploss.value if conv is not None else None,
+        P_storage_charge = st.P_charge.value if st is not None else None,
+        P_storage_discharge = st.P_discharge.value if st is not None else None,
+        Q_storage = st.Q_storage.value if st is not None else None,
+        SoC = st.SoC.value if st is not None else None,
+        P_electrolyser = h2.P_electrolyser.value if h2 is not None else None,
+        Q_electrolyser = h2.Q_electrolyser.value if h2 is not None else None,
+        mass_H2 = h2.mass_H2.value if h2 is not None else None,
         T     = socp_data.T,
         frame_ids = socp_data.frame_ids,
     )
@@ -377,7 +470,8 @@ def socp_optimise(
         ``{'Energy_cost': {'w': 1}}``.
     solver : str or None
         CVXPY solver name, e.g. ``'MOSEK'``, ``'GUROBI'``, ``'CLARABEL'``.
-        If ``None``, CVXPY picks automatically.
+        If ``None``, prefers ``'MOSEK'`` when installed, then ``'CLARABEL'``,
+        then ``'SCS'``; otherwise CVXPY picks automatically.
     solver_opts : dict or None
         Keyword options forwarded to ``problem.solve()``.
     build_only : bool
@@ -429,8 +523,9 @@ def socp_optimise(
         return problem, variables, timing_info, solver_stats
 
     solve_kwargs = {'verbose': verbose}
-    if solver is not None:
-        solve_kwargs['solver'] = solver
+    chosen_solver = solver if solver is not None else resolve_socp_solver()
+    if chosen_solver is not None:
+        solve_kwargs['solver'] = chosen_solver
     if solver_opts:
         solve_kwargs.update(solver_opts)
 
@@ -441,6 +536,7 @@ def socp_optimise(
     solver_stats['status'] = problem.status
     solver_stats['value']  = problem.value
     solver_stats['time']   = t4 - t3
+    solver_stats['solver'] = chosen_solver
 
     if problem.status not in ('optimal', 'optimal_inaccurate'):
         warnings.warn(
@@ -509,8 +605,9 @@ def soc_window_optimisation(
         return problem, variables, timing_info, solver_stats
 
     solve_kwargs = {'verbose': verbose}
-    if solver is not None:
-        solve_kwargs['solver'] = solver
+    chosen_solver = solver if solver is not None else resolve_socp_solver()
+    if chosen_solver is not None:
+        solve_kwargs['solver'] = chosen_solver
     if solver_opts:
         solve_kwargs.update(solver_opts)
 
@@ -521,6 +618,7 @@ def soc_window_optimisation(
     solver_stats['status'] = problem.status
     solver_stats['value'] = problem.value
     solver_stats['time'] = t4 - t3
+    solver_stats['solver'] = chosen_solver
 
     if problem.status not in ('optimal', 'optimal_inaccurate'):
         warnings.warn(

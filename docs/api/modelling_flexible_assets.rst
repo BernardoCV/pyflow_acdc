@@ -78,6 +78,53 @@ with bounds ``soc_min`` / ``soc_max``, optional window terminal ``soc_final``,
 and AC S-circle / DC net-:math:`P` limits. **Sign convention:** net active
 power injected into the bus is ``P_discharge - P_charge``.
 
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same SoC update is used, with a net active-power
+limit and no reactive storage power:
+
+.. math::
+    :label: eq:bess_l
+
+    \begin{align}
+        \mathrm{SoC}_{t}
+        &=
+        \mathrm{SoC}_{t-1}
+        +
+        \frac{\Delta t\, S_{\mathrm{base}}}{E_{\max}}
+        \Bigl(
+            \eta_c P_{t}^{c} - \frac{P_{t}^{d}}{\eta_d}
+        \Bigr) \\
+        |P_{t}^{d}-P_{t}^{c}| &\leq P^{\max}
+    \end{align}
+
+SOCP model
+^^^^^^^^^^
+
+In the sparse SOCP stack the same SoC update is used. On AC buses the rating is
+an apparent-power limit; on DC buses it is a net active-power limit:
+
+.. math::
+    :label: eq:bess_socp
+
+    \begin{align}
+        \mathrm{SoC}_{t}
+        &=
+        \mathrm{SoC}_{t-1}
+        +
+        \frac{\Delta t\, S_{\mathrm{base}}}{E_{\max}}
+        \Bigl(
+            \eta_c P_{t}^{c} - \frac{P_{t}^{d}}{\eta_d}
+        \Bigr) \\
+        \bigl\|(P_{t}^{d}-P_{t}^{c})+j\,q_{t}^{b}\bigr\|
+        &\leq s_{b}^{\max}
+          \qquad \text{(AC)} \\
+        |P_{t}^{d}-P_{t}^{c}|
+        &\leq P^{\max}
+          \qquad \text{(DC)}
+    \end{align}
+
 * :attr:`~pyflow_acdc.Node_AC.connected_storage` /
   :attr:`~pyflow_acdc.Node_DC.connected_storage` /
   :attr:`~pyflow_acdc.Grid.storage_elements`
@@ -141,6 +188,26 @@ resets between solves (not a Pyomo constraint) — see :doc:`../usage_window_opf
 and :func:`~pyflow_acdc.ts_acdc_opf`. Optional ``H2_mass_final`` is enforced in
 coupled window / rolling OPF when set. Economics use ``h2_price`` with
 ``ObjRule['H2_sale']``.
+
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same inventory update is used with electrolyser
+active power only:
+
+.. math::
+    :label: eq:h2_l
+
+    h = b_{h}\, P_{e}\, S_{\mathrm{base}}\, \Delta t + c_{h},
+    \qquad
+    M_{t} = M_{t-1} + h
+
+SOCP model
+^^^^^^^^^^
+
+In the sparse SOCP stack the same inventory update is used. On AC buses,
+optional reactive compensation is available through ``Q_min_MVAR`` /
+``Q_max_MVAR``; on DC buses reactive power is zero.
 
 * :attr:`~pyflow_acdc.Node_AC.connected_electrolyser` /
   :attr:`~pyflow_acdc.Node_DC.connected_electrolyser` /
@@ -240,6 +307,28 @@ frames (:func:`~pyflow_acdc.NL_models.window_opf.window_heat_pump_constraints`).
 ``hp_E_min``, ``hp_E_max``). In AC power flow,
 :meth:`~pyflow_acdc.Grid.update_pq_ac` treats ``P_ref`` / ``Q_ref`` as known
 nodal loads (same sign convention as NL OPF).
+
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same active-power and energy-state model is used,
+with reactive heat-pump power fixed at zero:
+
+.. math::
+    :label: eq:hp_l
+
+    \begin{align}
+        P_{\mathrm{ref}} - n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
+        &\leq
+        P_{\mathrm{hp}}
+        \leq
+        P_{\mathrm{ref}} \\
+        E_{t}
+        &=
+        E_{t-1}
+        +
+        P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t
+    \end{align}
 
 * :attr:`~pyflow_acdc.Node_AC.connected_heat_pumps` /
   :attr:`~pyflow_acdc.Grid.heat_pumps`
