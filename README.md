@@ -4,7 +4,6 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/pyflow-acdc)](https://pypi.org/project/pyflow-acdc/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyflow-acdc)](https://pypi.org/project/pyflow-acdc/)
-[![Downloads](https://img.shields.io/pepy/dt/pyflow-acdc)](https://pepy.tech/projects/pyflow-acdc)
 [![License](https://img.shields.io/github/license/CITCEA-UPC/pyflow_acdc)](https://github.com/CITCEA-UPC/pyflow_acdc/blob/main/LICENSE)
 [![PR tests](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/CITCEA-UPC/pyflow_acdc/actions/workflows/pr-tests.yml)
 [![codecov](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc/graph/badge.svg)](https://codecov.io/gh/CITCEA-UPC/pyflow_acdc)
