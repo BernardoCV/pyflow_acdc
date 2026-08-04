@@ -275,6 +275,28 @@ frames (:func:`~pyflow_acdc.NL_models.window_opf.window_heat_pump_constraints`).
 :meth:`~pyflow_acdc.Grid.update_pq_ac` treats ``P_ref`` / ``Q_ref`` as known
 nodal loads (same sign convention as NL OPF).
 
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same active-power and energy-state model is used,
+with reactive heat-pump power fixed at zero:
+
+.. math::
+    :label: eq:hp_l
+
+    \begin{align}
+        P_{\mathrm{ref}} - n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
+        &\leq
+        P_{\mathrm{hp}}
+        \leq
+        P_{\mathrm{ref}} \\
+        E_{t}
+        &=
+        E_{t-1}
+        +
+        P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t
+    \end{align}
+
 * :attr:`~pyflow_acdc.Node_AC.connected_heat_pumps` /
   :attr:`~pyflow_acdc.Grid.heat_pumps`
 * ``analyse_grid`` sets ``grid.HP`` when heat pumps are present
