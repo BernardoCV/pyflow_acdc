@@ -121,8 +121,6 @@ In the sparse SOCP stack (:doc:`socp`), converters use AC-side apparent power
           \qquad \forall cn \in \mathcal{C}n
     \end{align}
 
-
-
 Class Reference: :class:`pyflow_acdc.Classes.AC_DC_converter`
 
 .. autoclass:: pyflow_acdc.AC_DC_converter

@@ -6,10 +6,9 @@ modules. [1]_ They trade full AC (and nonlinear DC/converter) accuracy for
 speed and LP/MILP-solvability, making them suitable for fast studies, large
 sweeps, and the Pyomo backend of :func:`~pyflow_acdc.wind_farm_CSS`.
 
-**Not SOCP.** This stack is an **LP** linearization of the existing NL OPF
-(Bθ AC; fixed-``V_ini`` DC; thin converter ``a + b·Ps``). Second-order cone /
-CCP formulations are out of scope (see the convex SOCP plan if present). Prefer
-:func:`~pyflow_acdc.optimal_pf` / :doc:`window` when you need full NL physics.
+Component formulations (Non-linear vs Linear) are documented on the system
+modelling pages: :doc:`modelling_ac`, :doc:`modelling_dc`,
+:doc:`modelling_acdc_converter`, and :doc:`modelling_flexible_assets`.
 
 Model construction lives in ``pyflow_acdc.L_models.AC_OPF_L_model``; operational
 drivers are :func:`~pyflow_acdc.optimal_l_pf`,
@@ -28,7 +27,8 @@ Sets up and solves the linearised OPF: it creates the
 :ref:`linear model <L_model_creation>`, minimises the weighted objective, solves
 with a Pyomo LP solver, and exports the solution back to the ``grid``. Supported
 objective terms are generator ``Energy_cost`` and optional ``H2_sale``.
-When ``grid.ESS`` / ``grid.H2``, BESS (P-only) and electrolysers are included.
+When ``grid.ESS`` / ``grid.H2`` / ``grid.HP``, BESS (P-only), electrolysers,
+and heat pumps (P-only) are included.
 Hybrid grids use ``grid.ACmode`` / ``grid.DCmode``: AC Bθ plus linearized DC
 flows and thin converters; ``fx_conv`` PDC/PQ/PV apply (Q fix skipped — no
 ``Q_conv_s_AC``). ``SoC_deviation`` is not supported (quadratic).
@@ -51,9 +51,10 @@ flows and thin converters; ``fx_conv`` PDC/PQ/PV apply (Q fix skipped — no
 Linear coupled window
 ---------------------
 
-Multi-hour linear OPF with linked BESS SoC and H₂ inventory (same indexing as
-the nonlinear window). Lives in ``pyflow_acdc.L_models.window_l_opf``.
-Accepts AC-only and hybrid grids; BESS remains P-only. See also
+Multi-hour linear OPF with linked BESS SoC, H₂ inventory, and heat-pump energy
+state (same indexing as the nonlinear window). Lives in
+``pyflow_acdc.L_models.window_l_opf``.
+Accepts AC-only and hybrid grids; BESS and heat pumps remain P-only. See also
 :doc:`../usage_window_opf`.
 
 .. autofunction:: pyflow_acdc.window_l_opf
@@ -124,18 +125,20 @@ The linear model includes variables for (gated by ``grid.ACmode`` /
   ``P_conv_s_AC`` / DC converter injections
 - Optional BESS charge / discharge / SoC (when ``grid.ESS``; P-only, no Q)
 - Optional electrolyser power / H₂ mass (when ``grid.H2``; no Q)
+- Optional heat-pump served power / energy state (when ``grid.HP``; P-only, no Q)
 
 **Constraints**
 
 The model enforces constraints for:
 
-- AC nodal active power balance (linearized), including storage injection and
-  electrolyser load when present
+- AC nodal active power balance (linearized), including storage injection,
+  electrolyser load, and heat-pump load when present
 - When ``DCmode``: linearized DC nodal balance and ``PDC_from`` / ``PDC_to``;
   converter ``np·Ps + P_DC + np·(a + b·Ps) = 0``
 - Generator / renewable aggregation at nodes
 - Optional storage SoC balance and ``|P_net| ≤ P_max``
 - Optional electrolyser mass balance
+- Optional heat-pump energy-state balance and instantaneous P bounds
 - AC branch linearized power flow equations
 - Thermal limits (including linear big-M formulations for REC/CT states)
 - Slack angle constraints

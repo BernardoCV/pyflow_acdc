@@ -13,7 +13,10 @@ DC node
 
    DC node equivalent circuit
 
-The AC node is modeled using voltage :math:`U_d` where [1]_:
+The DC node is modeled using voltage :math:`U_d` where [1]_:
+
+Non-linear model
+~~~~~~~~~~~~~~~~
 
 Non-linear model
 ~~~~~~~~~~~~~~~~
