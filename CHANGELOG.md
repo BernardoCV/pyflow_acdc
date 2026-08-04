@@ -7,9 +7,16 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.7**.
+> packaged version is **0.6.8**.
 
 ## [Unreleased]
+
+## [0.6.8]
+
+### Fixed
+- **Sequential STEP results export**: removed redundant ``run_results["_meta"]``
+  (abort status stays on ``grid.Seq_*_aborted`` / ``abort_reason``), so
+  ``pyomo_model_results_sequential`` no longer hits mixed str/int key sorting.
 
 ## [0.6.7]
 

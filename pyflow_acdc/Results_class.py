@@ -3404,7 +3404,7 @@ class Results:
         Parameters
         ----------
         run_results : dict
-            Output dictionary from sequential_STEP keyed by run index.
+            Output dictionary from sequential_STEP keyed by integer run index.
         print_table : bool
             Whether to print the combined table.
 
