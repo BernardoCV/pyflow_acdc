@@ -121,6 +121,45 @@ def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):
     assert "no feasible solution" in run_results["_meta"]["abort_reason"]
 
 
+def test_case24_sequential_step_build_only():
+    """build_only: build period 1, extract init values, do not build period 2+."""
+    require_pyomo()
+
+    grid, _, mod = _case24_mp_grid_with_csvs()
+    inv_csv = mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv")
+    mix_csv = mod._resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
+
+    run_results = pyf.sequential_STEP(
+        grid=grid,
+        inv_data=inv_csv,
+        mix_data=mix_csv,
+        n_years=mod.DEFAULT_N_YEARS,
+        Hy=8760,
+        discount_rate=0.02,
+        ObjRule=mod.DEFAULT_OBJ_RULE,
+        solver=tep_solver(),
+        tee=False,
+        obj_scaling=1e9,
+        save_svgs=False,
+        export_steps=False,
+        build_only=True,
+    )
+
+    assert run_results["_meta"]["aborted"] is False
+    assert 0 in run_results
+    assert 1 not in run_results
+
+    stats = run_results[0]["solver_stats"]
+    assert stats["termination_condition"] == "build_only"
+    assert stats["solution_found"] is False
+    assert run_results[0]["timing_info"]["solve"] == 0.0
+    assert run_results[0]["model"] is not None
+
+    assert grid.Seq_STEP_run is True
+    assert grid.Seq_STEP_obj_res is not None
+    assert len(grid.Seq_STEP_obj_res) == 1
+
+
 def run_test():
     exit_code = pytest.main([__file__, "-q"])
     if exit_code == 0:

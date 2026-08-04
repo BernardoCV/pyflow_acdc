@@ -346,9 +346,13 @@ def _run_sequential_core(
                 )
             _round_dynamic_np_to_nearest_integer(grid)
             has_feasible_solution = bool(solver_stats and solver_stats.get("solution_found", False))
-            if not has_feasible_solution:
+            termination = (
+                solver_stats.get("termination_condition", "unknown") if solver_stats else "unknown"
+            )
+            is_build_only = str(termination).lower() == "build_only"
+            # Same as static/MP TEP: build_only skips solve but still extracts init values.
+            if not has_feasible_solution and not is_build_only:
                 aborted = True
-                termination = solver_stats.get("termination_condition", "unknown") if solver_stats else "unknown"
                 abort_reason = f"run {k + 1} has no feasible solution (termination={termination})"
                 if tee:
                     print(f"{step_name} aborted at run {k + 1}: no solution found (termination={termination})")
@@ -426,6 +430,15 @@ def _run_sequential_core(
 
             if export_dir is not None:
                 export_results_to_csv(run_results, export_dir, file_name=export_csv_name)
+
+            # Sequential build_only: one period is enough (later periods need a real solve).
+            if is_build_only:
+                if tee:
+                    print(
+                        f"{step_name} build_only: finished run {k + 1} "
+                        f"(solve skipped, init values extracted); not building further periods."
+                    )
+                break
     finally:
         _restore_absolute_np_caps(element_meta, absolute_np_max_by_name)
 
@@ -528,6 +541,7 @@ def sequential_STEP(
     save_svgs=False,
     export_steps=False,
     nlp_warmstart=False,
+    build_only=False,
 ):
     """
     Sequentially solve static transmission expansion one investment period at a time.
@@ -553,6 +567,7 @@ def sequential_STEP(
             solver_options=solver_options,
             obj_scaling=obj_scaling,
             nlp_warmstart=nlp_warmstart,
+            build_only=build_only,
         )
         return model, model_res, timing_info, solver_stats, {}
 
