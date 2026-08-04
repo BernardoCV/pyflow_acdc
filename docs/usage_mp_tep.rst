@@ -27,6 +27,7 @@ Grid creation for multi-period TEP includes topology, generators, renewables,
 - :func:`~pyflow_acdc.add_RenSource` (with ``base_cost``)
 - expandable table (line rows, then one row per generator and renewable) →
   :func:`~pyflow_acdc.expand_elements_from_pd`
+  (API: :doc:`api/grid_mod`)
 
 For the bundled example:
 
