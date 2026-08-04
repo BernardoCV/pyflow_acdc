@@ -134,24 +134,24 @@ def NS_MTDC_2025(
         price_zone = AC_node_data.at[index, 'Market']
         pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone, 'AC')
 
-    pyf.add_extgrid(grid, 'BE4', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE4'])
-    pyf.add_extgrid(grid, 'BE7', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE7'])
-    pyf.add_extgrid(grid, 'DE1', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE1'])
-    pyf.add_extgrid(grid, 'DE3', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE3'])
-    pyf.add_extgrid(grid, 'DE4', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE4'])
-    pyf.add_extgrid(grid, 'DE6', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE6'])
-    pyf.add_extgrid(grid, 'DK4', MVAmax=1744, price_zone_link=True, MVArmax=1744 / 3, MVArmin=-1744 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK4'])
-    pyf.add_extgrid(grid, 'DK7', MVAmax=2330, price_zone_link=True, MVArmax=2330 / 3, MVArmin=-2330 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK7'])
-    pyf.add_extgrid(grid, 'GB1', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB1'])
-    pyf.add_extgrid(grid, 'GB5', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB5'])
-    pyf.add_extgrid(grid, 'GB21', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB21'])
-    pyf.add_extgrid(grid, 'GB23', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB23'])
-    pyf.add_extgrid(grid, 'GB25', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB25'])
-    pyf.add_extgrid(grid, 'NL6', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL6'])
-    pyf.add_extgrid(grid, 'NL10', MVAmax=4670, price_zone_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL10'])
-    pyf.add_extgrid(grid, 'NO8', MVAmax=2173, price_zone_link=True, MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO8'])
-    pyf.add_extgrid(grid, 'NO9', MVAmax=2173, price_zone_link=True, MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO9'])
-    pyf.add_gen(grid, 'GB20', MWmax=545, MWmin=490.5, price_zone_link=True)
+    pyf.add_extgrid(grid, 'BE4', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE4'])
+    pyf.add_extgrid(grid, 'BE7', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE7'])
+    pyf.add_extgrid(grid, 'DE1', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE1'])
+    pyf.add_extgrid(grid, 'DE3', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE3'])
+    pyf.add_extgrid(grid, 'DE4', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE4'])
+    pyf.add_extgrid(grid, 'DE6', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE6'])
+    pyf.add_extgrid(grid, 'DK4', MVAmax=1744, price_link=True, MVArmax=1744 / 3, MVArmin=-1744 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK4'])
+    pyf.add_extgrid(grid, 'DK7', MVAmax=2330, price_link=True, MVArmax=2330 / 3, MVArmin=-2330 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK7'])
+    pyf.add_extgrid(grid, 'GB1', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB1'])
+    pyf.add_extgrid(grid, 'GB5', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB5'])
+    pyf.add_extgrid(grid, 'GB21', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB21'])
+    pyf.add_extgrid(grid, 'GB23', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB23'])
+    pyf.add_extgrid(grid, 'GB25', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB25'])
+    pyf.add_extgrid(grid, 'NL6', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL6'])
+    pyf.add_extgrid(grid, 'NL10', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL10'])
+    pyf.add_extgrid(grid, 'NO8', MVAmax=2173, price_link=True, MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO8'])
+    pyf.add_extgrid(grid, 'NO9', MVAmax=2173, price_link=True, MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO9'])
+    pyf.add_gen(grid, 'GB20', MWmax=545, MWmin=490.5, price_link=True)
 
     for z in ['BE', 'DE', 'DK', 'NL', 'NO', 'GB']:
         pyf.add_RenSource_zone(grid, z)
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     
     grid, _res = NS_MTDC_2025(tee=True)
     from importlib import import_module
-    mp_module = import_module("pyflow_acdc.ACDC_MultiPeriod_TEP")
+    mp_module = import_module("pyflow_acdc.NL_models.ACDC_MultiPeriod_TEP")
     # Keep all investment-decision vectors aligned across keys (Load/curvature/import_expand/etc).
     n_inv_periods = mp_module._fill_investment_decisions(grid)
 

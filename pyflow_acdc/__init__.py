@@ -38,10 +38,16 @@ __all__ = [
     'add_line_DC',
     'add_ACDC_converter',
     'add_DCDC_converter',
+    'Gen_AC',
+    'Gen_DC',
+    'Storage',
+    'Electrolyser',
     'add_gen',
     'add_gen_DC',
     'add_extgrid',
     'add_RenSource',
+    'add_storage',
+    'add_electrolyser',
     'add_generators',
 
     # Add Zones
@@ -105,7 +111,6 @@ __all__ = [
     'time_series_statistics',
     'update_grid_data',
     'update_grid_for_pf',
-    'known_converter_pf_setpoints',
 
     # Export
     'save_grid_to_file',
@@ -147,13 +152,22 @@ try:
     __all__.extend([
         'optimal_pf', 'optimal_l_pf', 'pyomo_model_solve', 'opf_obj', 'opf_line_res',
         'opf_price_price_zone', 'translate_pyf_opf',
-        'ts_acdc_opf', 'results_ts_opf'
+        'ts_acdc_opf', 'results_ts_opf',
     ])
+    try:
+        from .NL_models.window_opf import (
+            window_nl_opf, rolling_window_nl_opf, results_window_opf,
+        )
+        __all__.extend([
+            'window_nl_opf', 'rolling_window_nl_opf', 'results_window_opf',
+        ])
+    except ImportError:
+        pass
     HAS_OPF = True
 
     # ACDC_Static_TEP also requires OPF/pyomo
     try:
-        from .ACDC_Static_TEP import *
+        from .NL_models.ACDC_Static_TEP import *
         __all__.extend([
             'transmission_expansion',
             'multi_scenario_TEP', 'expand_elements_from_pd',
@@ -163,7 +177,7 @@ try:
             'comprehensive_sensitivity_analysis'
         ])
         try:
-            from .ACDC_sequential_STEP import *
+            from .NL_models.ACDC_sequential_STEP import *
             __all__.extend(['sequential_STEP', 'sequential_MS_STEP'])
         except ImportError:
             pass
@@ -181,7 +195,7 @@ except ImportError:
     HAS_OPF = False
 
 try:
-    from .ACDC_MultiPeriod_TEP import *
+    from .NL_models.ACDC_MultiPeriod_TEP import *
     __all__.extend([
         'multi_period_transmission_expansion',
         'multi_period_MS_TEP',
@@ -194,7 +208,7 @@ except ImportError:
     pass
 
 try:
-    from .ACDC_L_TEP import *
+    from .L_models.ACDC_L_TEP import *
     __all__.extend([
         'linear_transmission_expansion',
         'linear_multi_period_transmission_expansion',
@@ -214,17 +228,33 @@ try:
     __all__.extend([
         'run_dash',
         'run_ts_dash',
+        'run_window_dash',
+        'run_rolling_dash',
+        'run_season_compare_dash',
         'run_mp_ts_dash',
         'create_mp_ts_dash',
+        'create_dash_app',
+        'create_window_dash_app',
+        'create_rolling_dash_app',
+        'create_season_compare_dash_app',
+        'build_season_window_compare',
+        'attach_season_window_compare',
+        'resolve_family_df',
+        'resolve_season_family_df',
+        'available_dash_families',
+        'available_family_aggregations',
         'plot_TS_res_from_ts',
         'plot_TS_res_dash',
+        'plot_window_res_dash',
+        'plot_window_family_dash',
+        'plot_season_family_dash',
     ])
     HAS_DASH = True
 except ImportError:
     HAS_DASH = False
 
 try:
-    from .AC_L_CSS_ortools import *
+    from .L_models.AC_L_CSS_ortools import *
     __all__.extend(['optimal_l_css_ortools'])
     HAS_AC_L_CSS_ORTOOLS = True
 except ImportError:
@@ -285,7 +315,7 @@ for folder in _case_folders:
         continue
 
     for case_file in sorted(folder.glob("*.py")):
-        if case_file.name == "__init__.py":
+        if case_file.name == "__init__.py" or case_file.name.startswith("_"):
             continue
 
         rel_module = case_file.relative_to(_cases_root).with_suffix("")

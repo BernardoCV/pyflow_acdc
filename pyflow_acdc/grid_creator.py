@@ -18,11 +18,14 @@ from .Results_class import Results
 from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC, Gen_DC,
     Grid, Line_AC, Line_DC, Node_AC, Node_DC, Price_Zone, Ren_Source,
-    Ren_source_zone, Size_selection, TF_Line_AC, TimeSeries,
+    Ren_source_zone, Size_selection, Storage, Electrolyser, TF_Line_AC, TimeSeries,
 )
 from .grid_analysis import cable_parameters, converter_parameters
 from .grid_modifications import add_gen
-from .constants import SQRT_3, MAX_RATING_PLACEHOLDER, DEFAULT_V_MIN_DC, DEFAULT_V_MAX_DC, DataInput
+from .constants import (
+    SQRT_3, MAX_RATING_PLACEHOLDER, DEFAULT_V_MIN_DC, DEFAULT_V_MAX_DC, DataInput,
+    LinkCost,
+)
 
 import pickle
 import gzip
@@ -71,6 +74,8 @@ def initialize_pyflowacdc():
     Gen_AC.reset_class()
     Gen_DC.reset_class()
     Ren_Source.reset_class()
+    Storage.reset_class()
+    Electrolyser.reset_class()
 
 
 def create_grid_from_data(S_base, AC_node_data=None, AC_line_data=None, DC_node_data=None, DC_line_data=None, Converter_data=None, data_in=DataInput.REAL):
@@ -1443,14 +1448,14 @@ def create_grid_from_mat(matfile):
                 lf = Gen_data_cost.at[index, 'c(n-2)']
                 cf = Gen_data_cost.at[index, 'c0']
 
-            price_zone_link = False
+            price_link = False
 
             if Gen_data.at[index, 'status'] == 0:
                 np_gen = 0
             else:
                 np_gen = 1
 
-            gen = add_gen(G, node_name,var_name, price_zone_link,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA)
+            gen = add_gen(G, node_name,var_name, price_link,lf,qf,cf,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA)
             gen.np_gen = np_gen
 
     return [G, res]
@@ -1508,10 +1513,47 @@ def _migrate_legacy_converter_impedance(conv):
             setattr(conv, new, getattr(conv, old))
 
 
+def _migrate_legacy_node_price_attrs(node):
+    """Backfill ``_price``/``_qf``/``_lf`` after pre-property pickles."""
+    d = node.__dict__
+    for public, private, default in (
+        ('price', '_price', 0.0),
+        ('qf', '_qf', 0.0),
+        ('lf', '_lf', 0.0),
+    ):
+        legacy = d.pop(public, None)
+        if private not in d:
+            d[private] = default if legacy is None else legacy
+
+
+def _migrate_legacy_gen_link_cost(gen):
+    """Map pre-``link_cost`` pickles (``price_link`` bool) onto ``LinkCost``."""
+    d = gen.__dict__
+    if 'link_cost' in d:
+        d.pop('price_link', None)
+        return
+    legacy_pl = d.pop('price_link', False)
+    gen.link_cost = LinkCost.LINEAR if legacy_pl else LinkCost.NONE
+
+
 def _migrate_legacy_grid_attrs(grid):
     """Apply pickle attribute renames once after deserialization."""
     if not hasattr(grid, 'S_base_ref'):
         grid.S_base_ref = grid.S_base
+    if not hasattr(grid, 'storage_elements'):
+        grid.storage_elements = []
+    if not hasattr(grid, 'electrolysers'):
+        grid.electrolysers = []
+    if not hasattr(grid, 'ts_timestamps'):
+        grid.ts_timestamps = None
+    for node in grid.nodes_AC + grid.nodes_DC:
+        if not hasattr(node, 'connected_storage'):
+            node.connected_storage = []
+        if not hasattr(node, 'connected_electrolyser'):
+            node.connected_electrolyser = []
+        _migrate_legacy_node_price_attrs(node)
+    for gen in grid.Generators + grid.Generators_DC:
+        _migrate_legacy_gen_link_cost(gen)
     for line in (
         grid.lines_AC + grid.lines_AC_exp + grid.lines_AC_rec
         + grid.lines_AC_tf + grid.lines_AC_ct + grid.lines_DC
@@ -1792,8 +1834,9 @@ def create_sub_grid(grid,Area=None, Area_name = None,polygon_coords=None):
                     Max_pow_genR= line.MVA_rating/grid.S_base
                     gen = Gen_AC(line.name, node,Max_pow_gen,Min_pow_gen,Max_pow_genR,Min_pow_genR,S_rated=Max_pow_gen/grid.S_base)
 
-                    gen.price_zone_link=True
+                    gen.price_link=True
                     gen.lf= node.price
+                    gen.qf = getattr(node, 'qf', 0)
 
                     node.PLi_base += line.MVA_rating/grid.S_base
                     node.update_PLi()

@@ -162,6 +162,7 @@ DOCS_CASES = [
     "test_docs_tep_pymoo.py",
     "test_docs_wf_array.py",
     "test_docs_dash.py",
+    "test_docs_window_opf.py",
     "test_docs_L_models.py",
 ]
 

@@ -21,7 +21,7 @@ from .Classes import (
     AC_DC_converter, Cable_options, DCDC_converter, Exp_Line_AC, Gen_AC,
     Gen_DC, Line_AC, Line_DC, MTDCPrice_Zone, Node_AC, Node_DC,
     OffshorePrice_Zone, Price_Zone, Ren_Source, Ren_source_zone,
-    rec_Line_AC, Size_selection, TF_Line_AC, TimeSeries,
+    rec_Line_AC, Size_selection, Storage, Electrolyser, TF_Line_AC, TimeSeries,
 )
 from .constants import (
     SQRT_3,
@@ -29,15 +29,19 @@ from .constants import (
     DEFAULT_V_MIN_DC,
     DEFAULT_V_MAX_DC,
     NodeType,
+    ConverterDCType,
     DEFAULT_GEN_TYPE,
     CableType,
     DataInput,
     Polarity,
     AcDcSide,
     PricingStrategy,
+    LinkCost,
     TSType,
     TS_RENEWABLE_TYPES,
     TS_CONV_PF_TYPES,
+    TS_STORAGE_PF_TYPES,
+    TS_H2_PF_TYPES,
 )
 from .grid_analysis import (
     pol2cart,
@@ -68,6 +72,8 @@ __all__ = [
     'add_gen_DC',
     'add_extgrid',
     'add_RenSource',
+    'add_storage',
+    'add_electrolyser',
     'add_generators',
     'add_cable_option',
     'add_line_sizing',
@@ -119,7 +125,7 @@ __all__ = [
 
 "Add main components"
 
-def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1,Gs= 0,Bs=0,x_coord=None,y_coord=None,geometry=None):
+def add_AC_node(grid, kV_base, node_type=NodeType.PQ, Voltage_0=1.01, theta_0=0.01, Power_Gained=0, Reactive_Gained=0, Power_load=0, Reactive_load=0, name=None, Umin=0.9, Umax=1.1, Gs=0, Bs=0, x_coord=None, y_coord=None, geometry=None):
     """Append an AC bus to ``grid.nodes_AC``.
 
     Parameters
@@ -128,8 +134,8 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
         Grid to modify (mutated in place).
     kV_base : float
         Base voltage in kV.
-    node_type : str, optional
-        ``'PQ'``, ``'PV'``, or ``'Slack'``.
+    node_type : str or NodeType, optional
+        :attr:`~pyflow_acdc.constants.NodeType.PQ`, ``PV``, or ``SLACK``.
     Voltage_0 : float, optional
         Initial voltage magnitude in p.u.
     theta_0 : float, optional
@@ -156,7 +162,7 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
 
     Examples
     --------
-    >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1', node_type='PQ')
+    >>> node = pyf.add_AC_node(grid, kV_base=400, name='bus1')
     """
     node = Node_AC( node_type, Voltage_0, theta_0,kV_base, Power_Gained, Reactive_Gained, Power_load, Reactive_load, name, Umin, Umax,Gs,Bs,x_coord,y_coord, S_base=grid.S_base)
     if geometry is not None:
@@ -170,7 +176,7 @@ def add_AC_node(grid, kV_base,node_type='PQ',Voltage_0=1.01, theta_0=0.01, Power
 
     return node
 
-def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None,Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC,x_coord=None,y_coord=None,geometry=None):
+def add_DC_node(grid, kV_base, node_type=ConverterDCType.P, Voltage_0=1.01, Power_Gained=0, Power_load=0, name=None, Umin=DEFAULT_V_MIN_DC, Umax=DEFAULT_V_MAX_DC, x_coord=None, y_coord=None, geometry=None):
     """Append a DC bus to ``grid.nodes_DC``.
 
     Parameters
@@ -179,8 +185,9 @@ def add_DC_node(grid,kV_base,node_type='P', Voltage_0=1.01, Power_Gained=0, Powe
         Grid to modify.
     kV_base : float
         Base voltage in kV.
-    node_type : str, optional
-        ``'P'``, ``'Slack'``, or ``'Droop'``.
+    node_type : str or ConverterDCType, optional
+        :attr:`~pyflow_acdc.constants.ConverterDCType.P`, ``PAC``, ``SLACK``,
+        or ``DROOP``.
     Voltage_0 : float, optional
         Initial voltage in p.u.
     Power_Gained, Power_load : float, optional
@@ -1009,7 +1016,7 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
         fc = Gen_data.at[index, 'Fixed cost'] if 'Fixed cost' in Gen_data.columns else 0
         geo  = Gen_data.at[index, 'geometry'] if 'geometry' in Gen_data.columns else None
         Ren_zone = Gen_data.at[index, 'Ren_zone'] if 'Ren_zone' in Gen_data.columns else None
-        price_zone_link = False
+        price_link = False
 
         fuel_type = Gen_data.at[index, 'Fueltype']    if 'Fueltype' in Gen_data.columns else 'Other'
         np_value = Gen_data.at[index, 'np'] if 'np' in Gen_data.columns else 1
@@ -1024,7 +1031,7 @@ def add_generators(grid,Gen_csv,curtailment_allowed=1):
                 MVArmax = 9999
             if MVArmin is None:
                 MVArmin = -9999
-            add_gen(grid, node_name,var_name, price_zone_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
+            add_gen(grid, node_name,var_name, price_link,lf,qf,fc,MWmax,MWmin,MVArmin,MVArmax,PsetMW,QsetMVA,fuel_type=fuel_type,geometry=geo,np_gen=np_value)
 
 def _look_up_node(grid, node, ac_or_dc="AC"):
 
@@ -1104,7 +1111,55 @@ def _look_up_converter(grid, conv):
         raise ValueError(f"Converter {conv_name} not found.")
     return conv_obj
 
-def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+
+def _look_up_ren_source(grid, ren_source):
+    sources = getattr(grid, "RenSources", [])
+    if not isinstance(ren_source, str):
+        if ren_source in sources:
+            return ren_source
+        raise ValueError(f"Ren_Source {ren_source} not found in grid")
+
+    name = ren_source
+    found = next((rs for rs in sources if rs.name == name), None)
+    if found is None:
+        raise ValueError(f"Ren_Source {name} not found.")
+    return found
+
+
+def _look_up_ren_source_zone(grid, zone):
+    zones = getattr(grid, "RenSource_zones", [])
+    if not isinstance(zone, str):
+        if zone in zones:
+            return zone
+        raise ValueError(f"Ren_source_zone {zone} not found in grid")
+
+    name = zone
+    found = next((z for z in zones if z.name == name), None)
+    if found is None:
+        raise ValueError(f"Ren_source_zone {name} not found.")
+    return found
+
+
+def _resolve_link_cost(link_cost=None, price_link=None):
+    """Resolve gen cost-link mode; ``price_link=True`` is legacy for ``linear``."""
+    if link_cost is not None:
+        return link_cost if isinstance(link_cost, LinkCost) else LinkCost(link_cost)
+    if price_link:
+        return LinkCost.LINEAR
+    return LinkCost.NONE
+
+
+def _sync_gen_cost_from_node(gen):
+    """Apply ``gen.link_cost`` from the host bus (call after setting ``link_cost``)."""
+    node = gen._node
+    if gen.link_cost == LinkCost.LINEAR:
+        gen.lf = node.price
+    elif gen.link_cost == LinkCost.QUADRATIC:
+        gen.qf = node.qf
+        gen.lf = node.lf
+
+
+def add_gen(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,MVArmin=None,MVArmax=None,PsetMW=0,QsetMVA=0,Smax=None,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append an AC generator to ``grid.Generators``.
 
     Parameters
@@ -1115,8 +1170,12 @@ def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax
         Connection bus (name or object).
     gen_name : str, optional
         Generator name; defaults to ``'gen_<node>'``.
-    price_zone_link : bool, optional
-        If True, use node price zone marginal cost (``lf=node.price``).
+    link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
+        How OPF costs track the bus (default ``'none'``). ``quadratic``:
+        ``qf``/``lf`` from ``node.qf``/``node.lf``; ``linear``: ``lf`` from
+        ``node.price``.
+    price_link : bool, optional
+        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         Linear, quadratic, and fixed OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1180,17 +1239,13 @@ def add_gen(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.price_zone_link=price_zone_link
-
-    if price_zone_link:
-
-        gen.qf= 0
-        gen.lf= node.price
+    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    _sync_gen_cost_from_node(gen)
     grid.Generators.append(gen)
 
     return gen
 
-def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1):
+def add_gen_DC(grid, node,gen_name=None, price_link=None,lf=0,qf=0,fc=0,MWmax=MAX_RATING_PLACEHOLDER,MWmin=0,PsetMW=0,fuel_type=DEFAULT_GEN_TYPE,geometry= None,installation_cost:float=0,np_gen:int=1, link_cost=None):
     """Append a DC generator to ``grid.Generators_DC``.
 
     Parameters
@@ -1201,8 +1256,10 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
         Connection bus.
     gen_name : str, optional
         Generator name.
-    price_zone_link : bool, optional
-        Link marginal cost to node price zone.
+    link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
+        See :func:`add_gen`.
+    price_link : bool, optional
+        Deprecated: ``True`` means ``link_cost='linear'``.
     lf, qf, fc : float, optional
         OPF cost coefficients.
     MWmax, MWmin : float, optional
@@ -1246,18 +1303,14 @@ def add_gen_DC(grid, node,gen_name=None, price_zone_link=False,lf=0,qf=0,fc=0,MW
         if isinstance(geometry, str):
             geometry = loads(geometry)
         gen.geometry= geometry
-    gen.price_zone_link=price_zone_link
-
-    if price_zone_link:
-
-        gen.qf= 0
-        gen.lf= node.price
+    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    _sync_gen_cost_from_node(gen)
     grid.Generators_DC.append(gen)
 
     return gen
 
 
-def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0):
+def add_extgrid(grid, node, gen_name=None,price_link=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDER,MWmax=None,MWmin=None,MVArmin=None,MVArmax=None,Allow_sell=True,P_load_MW=0, link_cost=None):
     """Add an external-grid equivalent generator at an AC bus.
 
     Sets ``is_ext_grid=True``. If no slack bus exists, the connected node becomes
@@ -1271,8 +1324,10 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
         Connection bus.
     gen_name : str, optional
         Generator name; defaults to ``'extgrid_<node>'``.
-    price_zone_link : bool, optional
-        Link marginal cost to price zone.
+    price_link : bool, optional
+        Deprecated: ``True`` means ``link_cost='linear'``.
+    link_cost : {'none', 'quadratic', 'linear'} or LinkCost, optional
+        See :func:`add_gen`.
     lf, qf : float, optional
         OPF cost coefficients.
     MVAmax : float, optional
@@ -1314,18 +1369,15 @@ def add_extgrid(grid, node, gen_name=None,price_zone_link=False,lf=0,qf=0,MVAmax
     node.PGi = 0
     node.QGi = 0
     node.recalc_extgrid_load()
-    if price_zone_link:
+    gen.link_cost = _resolve_link_cost(link_cost, price_link)
+    _sync_gen_cost_from_node(gen)
+    if gen.link_cost != LinkCost.NONE:
         # Keep aggregated price-zone load consistent after extgrid load is introduced.
         pz_name = getattr(node, "PZ", None)
         if pz_name:
             pz = _look_up_price_zone(grid, pz_name)
             if hasattr(pz, "recalc_PLi_base_and_total"):
                 pz.recalc_PLi_base_and_total()
-
-    gen.price_zone_link=price_zone_link
-    if price_zone_link:
-        gen.qf= 0
-        gen.lf= node.price
 
     # Iterate over all AC nodes to see if any is already 'Slack'
     has_slack = any(n.type == NodeType.SLACK for n in grid.nodes_AC)
@@ -1478,6 +1530,221 @@ def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=N
 
     return rensource
 
+
+def add_storage(
+    grid,
+    node,
+    *,
+    E_max_MWh,
+    P_charge_MW,
+    P_discharge_MW,
+    eta_charge,
+    eta_discharge,
+    storage_name=None,
+    S_max_MVA=None,
+    soc_min=0.0,
+    soc_max=1.0,
+    soc_initial=0.5,
+    soc_final=None,
+    soc_ref=None,
+    dt_hours=1.0,
+    geometry=None,
+):
+    """Append a BESS element to ``grid.storage_elements``.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid to modify.
+    node : Node_AC, Node_DC, or str
+        Connection bus.
+    E_max_MWh : float
+        Energy capacity in MWh.
+    P_charge_MW : float
+        Maximum charging power in MW.
+    P_discharge_MW : float
+        Maximum discharging power in MW.
+    eta_charge : float
+        Charging efficiency in (0, 1].
+    eta_discharge : float
+        Discharging efficiency in (0, 1].
+    storage_name : str, optional
+        Element name; defaults to ``'storage_<node>'``.
+    S_max_MVA : float, optional
+        AC: apparent-power rating in MVA (default ``max(P_charge_MW, P_discharge_MW)``).
+        DC: max active-power rating in MW (same default).
+    soc_min, soc_max : float, optional
+        SoC bounds in pu.
+    soc_initial : float, optional
+        Initial SoC in pu.
+    soc_final : float or None, optional
+        Terminal SoC in pu for horizon OPF.
+    soc_ref : float or None, optional
+        Soft SoC reference in pu for ``ObjRule['SoC_deviation']`` (myopic TS).
+        Defaults to ``soc_initial``.
+    dt_hours : float, optional
+        Timestep duration in hours.
+    geometry : shapely.Geometry or str, optional
+        Plot geometry.
+
+    Returns
+    -------
+    Storage
+        Created storage element.
+
+    Examples
+    --------
+    >>> storage = pyf.add_storage(
+    ...     grid, 'PE_Island', E_max_MWh=100, P_charge_MW=33, P_discharge_MW=33,
+    ...     eta_charge=0.85, eta_discharge=0.9, soc_initial=0.5, soc_final=0.5)
+    """
+    node = _look_up_node(grid, node, ac_or_dc="any")
+
+    if storage_name is None:
+        storage_name = f"storage_{node.name}"
+
+    p_max_mw = max(P_charge_MW, P_discharge_MW)
+    if S_max_MVA is None:
+        S_max_MVA = p_max_mw
+
+    s_base = grid.S_base
+    p_charge_pu = P_charge_MW / s_base
+    p_discharge_pu = P_discharge_MW / s_base
+
+    if node in grid.nodes_AC:
+        storage = Storage(
+            storage_name,
+            node,
+            AcDcSide.AC,
+            E_max=E_max_MWh,
+            P_charge_max=p_charge_pu,
+            P_discharge_max=p_discharge_pu,
+            S_max=S_max_MVA / s_base,
+            eta_charge=eta_charge,
+            eta_discharge=eta_discharge,
+            soc_min=soc_min,
+            soc_max=soc_max,
+            soc_initial=soc_initial,
+            soc_final=soc_final,
+            soc_ref=soc_ref,
+            S_base=s_base,
+            dt_hours=dt_hours,
+        )
+    elif node in grid.nodes_DC:
+        storage = Storage(
+            storage_name,
+            node,
+            AcDcSide.DC,
+            E_max=E_max_MWh,
+            P_charge_max=p_charge_pu,
+            P_discharge_max=p_discharge_pu,
+            P_max=S_max_MVA / s_base,
+            eta_charge=eta_charge,
+            eta_discharge=eta_discharge,
+            soc_min=soc_min,
+            soc_max=soc_max,
+            soc_initial=soc_initial,
+            soc_final=soc_final,
+            soc_ref=soc_ref,
+            S_base=s_base,
+            dt_hours=dt_hours,
+        )
+    else:
+        raise ValueError(f"Node {node.name!r} is not in AC or DC nodes")
+
+    if geometry is not None:
+        if isinstance(geometry, str):
+            geometry = loads(geometry)
+        storage.geometry = geometry
+
+    grid.storage_elements.append(storage)
+    return storage
+
+
+def add_electrolyser(
+    grid,
+    node,
+    *,
+    P_max_MW,
+    P_min_MW,
+    b_h,
+    c_h,
+    H2_mass_max_kg,
+    electrolyser_name=None,
+    H2_mass_initial_kg=0.0,
+    H2_mass_final_kg=None,
+    h2_price=0.0,
+    Q_min_MVAR=0.0,
+    Q_max_MVAR=0.0,
+    dt_hours=1.0,
+    empty_tank_cycle=None,
+    geometry=None,
+):
+    """Append an electrolyser to ``grid.electrolysers``.
+
+    AC nodes: active load plus optional reactive compensation (``Q_min_MVAR`` /
+    ``Q_max_MVAR``). DC nodes: active load only.
+
+    ``h2_price`` (EUR/kg, default 0) is used when ``ObjRule={'H2_sale': 1}``;
+    optional ``TSType.H2_PRICE`` series overrides it per frame.
+
+    ``empty_tank_cycle`` (``None`` or int ``>= 1``) sets out-of-opt tank empties:
+    myopic never empties when ``None``, else every ``N`` hours; rolling empties
+    every window when ``None``, else at commit boundaries at/past each ``k·N``.
+    """
+    node = _look_up_node(grid, node, ac_or_dc="any")
+
+    if electrolyser_name is None:
+        electrolyser_name = f"electrolyser_{node.name}"
+
+    s_base = grid.S_base
+
+    if node in grid.nodes_AC:
+        electrolyser = Electrolyser(
+            electrolyser_name,
+            node,
+            AcDcSide.AC,
+            P_max=P_max_MW / s_base,
+            P_min=P_min_MW / s_base,
+            b_h=b_h,
+            c_h=c_h,
+            H2_mass_max=H2_mass_max_kg,
+            H2_mass_initial=H2_mass_initial_kg,
+            H2_mass_final=H2_mass_final_kg,
+            h2_price=h2_price,
+            Q_min=Q_min_MVAR / s_base,
+            Q_max=Q_max_MVAR / s_base,
+            S_base=s_base,
+            dt_hours=dt_hours,
+            empty_tank_cycle=empty_tank_cycle,
+        )
+    else:
+        electrolyser = Electrolyser(
+            electrolyser_name,
+            node,
+            AcDcSide.DC,
+            P_max=P_max_MW / s_base,
+            P_min=P_min_MW / s_base,
+            b_h=b_h,
+            c_h=c_h,
+            H2_mass_max=H2_mass_max_kg,
+            H2_mass_initial=H2_mass_initial_kg,
+            H2_mass_final=H2_mass_final_kg,
+            h2_price=h2_price,
+            S_base=s_base,
+            dt_hours=dt_hours,
+            empty_tank_cycle=empty_tank_cycle,
+        )
+
+    if geometry is not None:
+        if isinstance(geometry, str):
+            geometry = loads(geometry)
+        electrolyser.geometry = geometry
+
+    grid.electrolysers.append(electrolyser)
+    return electrolyser
+
+
 "Time series data "
 
 
@@ -1540,6 +1807,12 @@ def time_series_dict(grid, ts):
                 rs.TS_dict['PRGi_available'] = ts.TS_num
                 break  # Stop after assigning to the correct node
 
+    elif typ == TSType.H2_PRICE:
+        for el in grid.electrolysers:
+            if ts.element_name == el.name:
+                el.TS_dict['h2_price'] = ts.TS_num
+                break
+
     elif typ in TS_CONV_PF_TYPES:
         matched = False
         for conv in grid.Converters_ACDC:
@@ -1553,6 +1826,34 @@ def time_series_dict(grid, ts):
             raise ValueError(
                 f"{typ} time series element_name={ts.element_name!r} "
                 f"does not match any ACDC converter"
+            )
+
+    elif typ in TS_STORAGE_PF_TYPES:
+        matched = False
+        for storage in grid.storage_elements:
+            if ts.element_name == storage.name:
+                if not hasattr(storage, 'TS_dict') or storage.TS_dict is None:
+                    storage.TS_dict = {}
+                storage.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any storage element"
+            )
+
+    elif typ in TS_H2_PF_TYPES:
+        matched = False
+        for el in grid.electrolysers:
+            if ts.element_name == el.name:
+                el.TS_dict[typ] = ts.TS_num
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
             )
 
 def add_inv_series(grid,inv_data,associated=None,inv_type=None,name=None):
@@ -2052,6 +2353,13 @@ def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None
       :class:`~pyflow_acdc.Classes.Node_AC`, :class:`~pyflow_acdc.Classes.Node_DC`
       (updates ``PLi_factor``)
     - ``'price'`` — energy price on price zones or nodes
+    - ``'h2_price'`` — H₂ sale price on :class:`~pyflow_acdc.Classes.Electrolyser`
+      (normal OPF TS, not a PF setpoint)
+    - ``'storage_P'``, ``'storage_Q'`` — BESS PF setpoints (pu; ``storage_Q``
+      AC only) via :func:`~pyflow_acdc.update_grid_for_pf`
+    - ``'h2_P'``, ``'h2_Q'`` — electrolyser PF setpoints (pu; ``h2_Q`` AC only)
+    - ``'conv_P_DC'``, ``'conv_P_AC'``, ``'conv_Q_AC'`` — ACDC converter PF
+      setpoints (pu)
     - ``'WPP'``, ``'OWPP'``, ``'SF'``, ``'REN'``, ``'Solar'`` — renewable
       availability on :class:`~pyflow_acdc.Classes.Ren_source_zone` or
       :class:`~pyflow_acdc.Classes.Ren_Source`` (``PRGi_available``)
@@ -2118,17 +2426,26 @@ def add_TimeSeries(grid, Time_Series_data,associated=None,TS_type=None,name=None
     s = 1
 
 
-def assign_RenToZone(grid,ren_source_name,new_zone_name):
-    """Move a renewable source into ``new_zone_name``.
+def assign_RenToZone(grid, ren_source, zone, link_availability=True):
+    """Assign a renewable source to a ren-source zone (membership and optional link).
+
+    Membership always places the source in ``zone.RenSources`` and sets
+    ``Ren_source_zone`` for aggregation (e.g. total gen per zone). When
+    ``link_availability`` is True (default), ``PGRi_linked`` is set so zone
+    ``PRGi_available`` time series / parameter updates propagate to the source
+    (same idea as ``link_load`` on :func:`assign_nodeToPrice_Zone`).
 
     Parameters
     ----------
     grid : Grid
         Grid containing the source and zones.
-    ren_source_name : str
-        :class:`~pyflow_acdc.Classes.Ren_Source` name.
-    new_zone_name : str
-        Target :class:`~pyflow_acdc.Classes.Ren_source_zone` name.
+    ren_source : Ren_Source or str
+        Renewable source object or name.
+    zone : Ren_source_zone or str
+        Target zone object or name.
+    link_availability : bool, optional
+        If True, link source availability to the zone parameter
+        (``PGRi_linked=True``). If False, keep membership only.
 
     Returns
     -------
@@ -2142,53 +2459,27 @@ def assign_RenToZone(grid,ren_source_name,new_zone_name):
     Examples
     --------
     >>> pyf.assign_RenToZone(grid, 'wind1', 'WindZone1')
-    >>> pyf.assign_RenToZone(grid, 'wind2', 'WindZone1')
-
-    Or assign via :func:`add_RenSource` using ``zone='WindZone1'``.
+    >>> pyf.assign_RenToZone(grid, rs_obj, zone_obj, link_availability=False)
     """
-    new_zone = None
-    old_zone = None
-    ren_source_to_reassign = None
+    new_zone = _look_up_ren_source_zone(grid, zone)
+    ren_source_to_reassign = _look_up_ren_source(grid, ren_source)
 
-    for RenZone in grid.RenSource_zones:
-        if RenZone.name == new_zone_name:
-            new_zone = RenZone
-            break
-    if new_zone is None:
-        raise ValueError(f"Zone {new_zone_name} not found.")
-
-    # Remove node from its old price_zone
-    for RenZone in grid.RenSource_zones:
-        for ren_source in RenZone.RenSources:
-            if ren_source.name == ren_source_name:
-                old_zone = RenZone
-                ren_source_to_reassign = ren_source
-                break
-        if old_zone:
+    for ren_zone in grid.RenSource_zones:
+        if ren_source_to_reassign in ren_zone.RenSources:
+            ren_zone.RenSources = [
+                rs for rs in ren_zone.RenSources if rs is not ren_source_to_reassign
+            ]
             break
 
-    if old_zone is not None:
-        RenZone.ren_source = [ren_source for ren_source in old_zone.RenSources
-                               if ren_source.name != ren_source_name]
-
-    # If the node was not found in any Renewable zone, check grid.nodes_AC
-    if ren_source_to_reassign is None:
-        for ren_source in grid.RenSources:
-            if ren_source.name == ren_source_name:
-                ren_source_to_reassign = ren_source
-                break
-
-    if ren_source_to_reassign is None:
-        raise ValueError(f"Renewable source {ren_source_name} not found.")
-    ren_source_to_reassign.PGRi_linked = True
+    ren_source_to_reassign.PGRi_linked = bool(link_availability)
     ren_source_to_reassign.Ren_source_zone = new_zone.name
-    # Add node to the new price_zone
     if ren_source_to_reassign not in new_zone.RenSources:
         new_zone.RenSources.append(ren_source_to_reassign)
 
+
 "Assigning components to zones"
 
-def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_load=True):
+def assign_nodeToPrice_Zone(grid, node, price_zone, ACDC='AC', link_load=True):
     """Assign a bus to a price zone (removes it from the previous zone).
 
     Parameters
@@ -2197,8 +2488,8 @@ def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_loa
         Grid to modify.
     node : Node_AC, Node_DC, or str
         Bus to assign.
-    new_price_zone_name : str
-        Target :class:`~pyflow_acdc.Classes.Price_Zone` name.
+    price_zone : Price_Zone or str
+        Target :class:`~pyflow_acdc.Classes.Price_Zone` object or name.
     ACDC : str, optional
         ``'AC'``, ``'DC'``, or ``'any'`` for name lookup side.
     link_load : bool, optional
@@ -2208,21 +2499,27 @@ def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_loa
     -------
     None
 
+    Raises
+    ------
+    ValueError
+        If the node or price zone is not found.
+
     Examples
     --------
     >>> pyf.assign_nodeToPrice_Zone(grid, 'bus1', 'Zone1', ACDC='AC')
+    >>> pyf.assign_nodeToPrice_Zone(grid, bus_obj, zone_obj, ACDC='AC')
     """
     acdc_norm = ACDC if ACDC in ('AC', 'DC') else 'any'
     nodes_attr = 'nodes_DC' if acdc_norm == 'DC' else 'nodes_AC'
     node = _look_up_node(grid, node, ac_or_dc=acdc_norm)
-    new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+    new_price_zone = _look_up_price_zone(grid, price_zone)
 
     # Remove node from its old price_zone
     old_price_zone = None
-    for price_zone in grid.Price_Zones:
-        nodes = getattr(price_zone, nodes_attr)
+    for pz in grid.Price_Zones:
+        nodes = getattr(pz, nodes_attr)
         if node in nodes:
-            old_price_zone = price_zone
+            old_price_zone = pz
             break
     if old_price_zone is not None:
         old_nodes = getattr(old_price_zone, nodes_attr)
@@ -2235,12 +2532,15 @@ def assign_nodeToPrice_Zone(grid, node, new_price_zone_name, ACDC='AC', link_loa
     if node not in new_price_zone_nodes:
         new_price_zone_nodes.append(node)
         node.PZ = new_price_zone.name
-        node.price = new_price_zone.price
         node.PLi_linked = link_load
+        # PZ → node only; gens follow via node setters + gen.link_cost.
+        node.price = new_price_zone.price
+        node.qf = new_price_zone.a
+        node.lf = new_price_zone.b
         if hasattr(new_price_zone, "recalc_PLi_base_and_total"):
             new_price_zone.recalc_PLi_base_and_total()
 
-def assign_ConvToPrice_Zone(grid, conv, new_price_zone_name):
+def assign_ConvToPrice_Zone(grid, conv, price_zone):
     """Assign an AC/DC converter to a price zone.
 
     Parameters
@@ -2249,20 +2549,20 @@ def assign_ConvToPrice_Zone(grid, conv, new_price_zone_name):
         Grid to modify.
     conv : AC_DC_converter or str
         Converter object or name.
-    new_price_zone_name : str
-        Target price zone name.
+    price_zone : Price_Zone or str
+        Target price zone object or name.
 
     Returns
     -------
     None
     """
-    new_price_zone = _look_up_price_zone(grid, new_price_zone_name)
+    new_price_zone = _look_up_price_zone(grid, price_zone)
     conv_obj = _look_up_converter(grid, conv)
 
     # Remove converter from its old price_zone, if any
-    for price_zone in grid.Price_Zones:
-        if conv_obj in price_zone.ConvACDC:
-            price_zone.ConvACDC = [c for c in price_zone.ConvACDC if c is not conv_obj]
+    for pz in grid.Price_Zones:
+        if conv_obj in pz.ConvACDC:
+            pz.ConvACDC = [c for c in pz.ConvACDC if c is not conv_obj]
             break
 
     # Add converter to the new price_zone

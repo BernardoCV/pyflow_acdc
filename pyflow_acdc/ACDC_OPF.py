@@ -10,10 +10,10 @@ import numpy as np
 import pyomo.environ as pyo
 import warnings
 
-from .ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
-from .AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
+from .NL_models.ACDC_OPF_NL_model import opf_create_nl_model_acdc, export_acdc_nl_model_to_pyflow_acdc
+from .L_models.AC_OPF_L_model import opf_create_l_model_ac, export_acdc_l_model_to_pyflow_acdc
 from .grid_analysis import analyse_grid
-from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights
+from .constants import NodeType, ConverterDCType, ConverterOpfFxType, ObjComponent, default_obj_weights, AcDcSide
 from .pyomo_model_solve import (
     build_only_solver_stats,
     export_solver_progress_to_excel,
@@ -73,12 +73,16 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0,build_only=False):
-    """Build and solve the linear (DC-style) OPF for ``grid``.
+    """Build and solve the linearised AC OPF for ``grid``.
 
-    Constructs the linear Pyomo model, minimises the weighted objective, solves
-    it, and exports the solution back onto ``grid``. The linear model only
-    accounts for AC-generator energy cost; non-zero weights on other objective
-    components trigger a warning.
+    Constructs the linearised AC Pyomo model, minimises the weighted objective,
+    solves it, and exports the solution back onto ``grid``. Supported objective
+    components are generator ``Energy_cost`` and (when electrolysers exist)
+    ``H2_sale``. ``SoC_deviation`` is quadratic and raises if weighted.
+    Other non-zero weights trigger a warning.
+
+    Raises if ``grid.DCmode`` (AC networks only for now). When ``grid.ESS`` /
+    ``grid.H2``, BESS (P-only) and electrolysers are included.
 
     Parameters
     ----------
@@ -118,12 +122,20 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
 
     weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
 
-    # Check if any other weight is non-zero while Energy_cost is zero
-    if weights_def[ObjComponent.ENERGY_COST]['w'] == 0:
-        other_weights_nonzero = [key for key, value in weights_def.items()
-                               if key != ObjComponent.ENERGY_COST and value['w'] != 0]
-        if other_weights_nonzero:
-            warnings.warn("Linear OPF can only consider energy cost by AC Generator power")
+    if weights_def[ObjComponent.SOC_DEVIATION]['w'] != 0:
+        raise ValueError(
+            "SoC_deviation is quadratic and is not supported in linear OPF")
+
+    supported_l = {ObjComponent.ENERGY_COST, ObjComponent.H2_SALE}
+    other_weights_nonzero = [
+        key for key, value in weights_def.items()
+        if key not in supported_l and value['w'] != 0
+    ]
+    if other_weights_nonzero:
+        warnings.warn(
+            "Linear OPF only supports Energy_cost and H2_sale; "
+            f"ignoring non-zero weights for {other_weights_nonzero}"
+        )
 
     model = pyo.ConcreteModel()
     model.name="""AC 'DC linear' OPF"""
@@ -325,12 +337,33 @@ def opf_update_param(model,grid):
     return model
 
 def opf_obj_l(model,grid,ObjRule):
+    """Linear OPF objective: Energy_cost and optional H2_sale."""
+    total = 0
 
-    if ObjRule[ObjComponent.ENERGY_COST]['w']==0:
-        return 0
-    AC= sum((model.PGi_gen[gen.genNumber]*grid.S_base*model.lf[gen.genNumber]+model.np_gen[gen.genNumber]*gen.fc) for gen in grid.Generators)
+    if ObjRule[ObjComponent.ENERGY_COST]['w'] != 0:
+        total += sum(
+            (
+                model.PGi_gen[gen.genNumber] * grid.S_base * model.lf[gen.genNumber]
+                + model.np_gen[gen.genNumber] * gen.fc
+            )
+            for gen in grid.Generators
+        )
 
-    return AC
+    if ObjRule[ObjComponent.H2_SALE]['w'] != 0:
+        if not grid.H2:
+            raise ValueError(
+                "H2_sale weight > 0 requires grid.H2 / electrolysers in linear OPF")
+        # Minimise -price·Δm  ≡  maximise H₂ sale revenue (EUR for Δm in kg).
+        total += sum(
+            -float(el.h2_price) * (
+                el.b_h * model.P_electrolyser[el.electrolyserNumber]
+                * el.S_base * el.dt_hours
+                + el.c_h
+            )
+            for el in grid.electrolysers
+        )
+
+    return total
 
 
 def opf_obj_l_array_losses(model, grid, ObjRule):
@@ -355,7 +388,7 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
     Parameters
     ----------
     model : pyomo.ConcreteModel
-        OPF model returned by :func:`~pyflow_acdc.ACDC_OPF_NL_model.opf_create_nl_model_acdc`.
+        OPF model returned by :func:`~pyflow_acdc.NL_models.ACDC_OPF_NL_model.opf_create_nl_model_acdc`.
     grid : Grid
         Network being optimised.
     weights_def : dict
@@ -492,6 +525,36 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
         if weights_def[ObjComponent.GEN_SET_DEV]['w']==0:
             return 0
         return sum((model.PGi_gen[gen.genNumber]-gen.Pset*gen.np_gen)**2 for gen in grid.Generators)
+
+    def formula_H2_sale():
+        if weights_def[ObjComponent.H2_SALE]['w'] == 0:
+            return 0
+        if not grid.H2:
+            raise ValueError("H2_sale weight > 0 requires grid.H2 / electrolysers")
+        # Minimise -price·Δm  ≡  maximise H₂ sale revenue (EUR for Δm in kg).
+        # h2_price defaults to 0 → term is zero until set or driven by H2_PRICE TS.
+        return sum(
+            -float(el.h2_price) * (
+                el.b_h * model.P_electrolyser[el.electrolyserNumber] * el.S_base * el.dt_hours
+                + el.c_h
+            )
+            for el in grid.electrolysers
+        )
+
+    def formula_SoC_deviation():
+        if weights_def[ObjComponent.SOC_DEVIATION]['w'] == 0:
+            return 0
+        if not grid.ESS:
+            raise ValueError("SoC_deviation weight > 0 requires grid.ESS / storage")
+        total = 0
+        for st in grid.storage_elements:
+            s = st.storageNumber
+            if st.connected == AcDcSide.AC:
+                total += (model.SoC[s] - model.soc_ref[s]) ** 2
+            else:
+                total += (model.SoC_DC[s] - model.soc_ref_DC[s]) ** 2
+        return total
+
     s=1
     for key, entry in weights_def.items():
         if key == ObjComponent.EXT_GEN:
@@ -516,7 +579,10 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
             entry['f']  =formula_Offshoreprofit()
         elif key == ObjComponent.GEN_SET_DEV:
             entry['f']  =formula_Gen_set_dev()
-
+        elif key == ObjComponent.H2_SALE:
+            entry['f'] = formula_H2_sale()
+        elif key == ObjComponent.SOC_DEVIATION:
+            entry['f'] = formula_SoC_deviation()
     s=1
     total_weight = sum(entry['w'] for entry in weights_def.values())
     if total_weight== 0:
@@ -589,6 +655,21 @@ def translate_pyf_opf(grid,Price_Zones=False):
     gen_AC_info = pack_variables(lf,qf,fc,np_gen,lista_gen)
     gen_DC_info = pack_variables(lf_DC,qf_DC,fc_DC,np_gen_DC,lista_gen_DC)
     gen_info = pack_variables(gen_AC_info,gen_DC_info,gen_rs_info)
+
+    lista_storage_ac = [
+        s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.AC]
+    lista_storage_dc = [
+        s.storageNumber for s in grid.storage_elements if s.connected == AcDcSide.DC]
+    storage_ac_by_number = {
+        s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.AC}
+    storage_dc_by_number = {
+        s.storageNumber: s for s in grid.storage_elements if s.connected == AcDcSide.DC}
+    storage_info = pack_variables(
+        lista_storage_ac, lista_storage_dc, storage_ac_by_number, storage_dc_by_number)
+
+    lista_electrolyser = [e.electrolyserNumber for e in grid.electrolysers]
+    electrolyser_by_number = {e.electrolyserNumber: e for e in grid.electrolysers}
+    hydrogen_info = pack_variables(lista_electrolyser, electrolyser_by_number)
 
     "Price zone info"
 
@@ -758,7 +839,9 @@ def translate_pyf_opf(grid,Price_Zones=False):
         'DC_info': DC_info,
         'Conv_info': Conv_info,
         'Price_Zone_info': Price_Zone_info,
-        'gen_info': gen_info
+        'gen_info': gen_info,
+        'storage_info': storage_info,
+        'hydrogen_info': hydrogen_info,
     }
 
 
@@ -1008,6 +1091,20 @@ def calculate_objective(grid,obj,OnlyGen=True):
 
     if obj==ObjComponent.GEN_SET_DEV:
         return sum((gen.PGen-gen.Pset*gen.np_gen)**2 for gen in grid.Generators)
+
+    if obj == ObjComponent.H2_SALE:
+        if not grid.H2:
+            return 0
+        total = 0.0
+        for el in grid.electrolysers:
+            h_prod = el.b_h * el.P_electrolyser * el.S_base * el.dt_hours + el.c_h
+            total += -float(el.h2_price) * h_prod
+        return total
+
+    if obj == ObjComponent.SOC_DEVIATION:
+        if not grid.ESS:
+            return 0
+        return sum((st.SoC - st.soc_ref) ** 2 for st in grid.storage_elements)
 
     return 0
 

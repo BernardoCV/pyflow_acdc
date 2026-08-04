@@ -26,6 +26,10 @@ from .constants import (
     TSType,
     TS_RENEWABLE_TYPES,
     TS_CONV_PF_TYPES,
+    TS_STORAGE_PF_TYPES,
+    TS_H2_PF_TYPES,
+    TS_PF_TYPES,
+    AcDcSide,
 )
 
 
@@ -36,12 +40,11 @@ __all__ = ['time_series_pf',
            'ts_dc_pf',
            'time_series_statistics',
            'update_grid_data',
-           'update_grid_for_pf',
-           'known_converter_pf_setpoints']
+           'update_grid_for_pf']
 
 try:
     import pyomo.environ as pyo
-    from .ACDC_OPF_NL_model import (
+    from .NL_models.ACDC_OPF_NL_model import (
         opf_create_nl_model_acdc,
         export_acdc_nl_model_to_pyflow_acdc)
 
@@ -185,12 +188,12 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
     and TEP scenario-frame updates. Call directly when building custom
     time-step loops.
 
-    Converter / future BESS PF setpoint series (``conv_P_DC``, etc.) are not
-    handled here — use :func:`update_grid_for_pf` after any Droop/P ``P_DC``
-    reset so prescribed setpoints win.
+    Converter / BESS / H₂ PF setpoint series (``conv_P_DC``, ``storage_P``,
+    ``h2_P``, etc.) are not handled here — use :func:`update_grid_for_pf`
+    after any Droop/P ``P_DC`` reset so prescribed setpoints win.
     """
     typ = ts.type
-    if typ in TS_CONV_PF_TYPES:
+    if typ in TS_PF_TYPES:
         return
 
     if use_clusters:
@@ -223,6 +226,14 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
                 price_zone.PGL_min_base = ts_data[idx]
             elif typ == TSType.PGL_MAX:
                 price_zone.PGL_max = ts_data[idx]
+    elif typ in (TSType.A_CG, TSType.B_CG):
+        # Cost-curve coeffs update zones (→ nodes → linked gens) without PZ-cost mode.
+        price_zone = grid.Price_Zones_dict.get(ts.element_name, None)
+        if price_zone:
+            if typ == TSType.A_CG:
+                price_zone.a_base = ts_data[idx]
+            else:
+                price_zone.b = ts_data[idx]
 
     if typ == TSType.PRICE:
         # Directly access price zone and nodes using dictionaries
@@ -262,55 +273,39 @@ def update_grid_data(grid, ts, idx, price_zone_restrictions=False, use_clusters=
         if rs:
             rs.PRGi_available = ts_data[idx]
 
-
-def known_converter_pf_setpoints(conv):
-    """Return the PF setpoints that are known for an ACDC converter's control modes.
-
-    Parameters
-    ----------
-    conv : AC_DC_converter
-        Converter whose ``type`` (DC) and ``AC_type`` define the known variables.
-
-    Returns
-    -------
-    frozenset of str
-        Subset of ``{'P_DC', 'P_AC', 'Q_AC'}``:
-
-        - ``P_DC`` when DC type is ``P`` or ``Droop`` (droop power reference)
-        - ``P_AC`` when DC type is ``PAC``
-        - ``Q_AC`` when AC type is ``PQ``
-
-        DC ``Slack`` does not expose a known ``P_DC``; AC ``PV`` / ``Slack`` do
-        not expose a known ``Q_AC``.
-    """
-    known = set()
-    if conv.type in (ConverterDCType.P, ConverterDCType.DROOP):
-        known.add('P_DC')
-    elif conv.type == ConverterDCType.PAC:
-        known.add('P_AC')
-    if conv.AC_type == NodeType.PQ:
-        known.add('Q_AC')
-    return frozenset(known)
+    elif typ == TSType.H2_PRICE:
+        if not hasattr(grid, 'electrolysers_dict'):
+            grid.electrolysers_dict = {el.name: el for el in grid.electrolysers}
+        el = grid.electrolysers_dict.get(ts.element_name, None)
+        if el is None:
+            raise ValueError(
+                f"H2_PRICE time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
+            )
+        el.h2_price = ts_data[idx]
 
 
 def update_grid_for_pf(grid, ts, idx, use_clusters=False, n_clusters=None):
     """Apply one PF-setpoint time-series sample when ``ts`` is a PF setpoint type.
 
     Always safe to call for every attached series: non-PF types are ignored
-    (no-op). Converter PF types update known setpoints only; future BESS / H₂
-    PF setpoint types can be added here the same way.
+    (no-op). PF types update known setpoints only (converters, BESS, H₂).
 
-    Unlike :func:`update_grid_data` (loads, renewables, prices), this only
-    updates prescribed PF setpoints. Converter values are in **per-unit** on
-    ``grid.S_base``, matching ``conv.P_DC`` / ``P_AC`` / ``Q_AC``.
+    Unlike :func:`update_grid_data` (loads, renewables, prices including
+    ``h2_price``), this only updates prescribed PF setpoints. Values are in
+    **per-unit** on ``grid.S_base``.
+
+    Accepted labels are listed in ``TS_PF_TYPES`` / ``TSType`` (see
+    ``constants``). Converter ``P_DC`` / ``P_AC`` / ``Q_AC`` require matching
+    DC ``type`` / ``AC_type``; ``storage_Q`` / ``h2_Q`` require AC connection.
 
     Parameters
     ----------
     grid : Grid
         Grid to update in place.
     ts : TimeSeries
-        Any series; only PF setpoint types (currently ``conv_P_DC``,
-        ``conv_P_AC``, ``conv_Q_AC``) cause updates.
+        Any series; only PF setpoint types (``conv_*``, ``storage_*``,
+        ``h2_P`` / ``h2_Q``) cause updates.
     idx : int
         Index into ``ts.data`` (or clustered data).
     use_clusters : bool, optional
@@ -321,58 +316,101 @@ def update_grid_for_pf(grid, ts, idx, use_clusters=False, n_clusters=None):
     Raises
     ------
     ValueError
-        If ``ts`` is a converter PF setpoint type but the converter name is
-        unknown, or that setpoint is not known for the converter's
-        ``AC_type`` / DC ``type`` (see :func:`known_converter_pf_setpoints`).
+        If ``ts`` is a PF setpoint type but the element name is unknown, or
+        that setpoint is not valid for the element's control / connection side.
     """
     typ = ts.type
-    if typ not in TS_CONV_PF_TYPES:
+    if typ not in TS_PF_TYPES:
         return
 
     if use_clusters:
         ts_data = ts.data_clustered[n_clusters]
     else:
         ts_data = ts.data
-
-    if not hasattr(grid, 'Converters_ACDC_dict'):
-        grid.Converters_ACDC_dict = {c.name: c for c in grid.Converters_ACDC}
-
-    conv = grid.Converters_ACDC_dict.get(ts.element_name, None)
-    if conv is None:
-        raise ValueError(
-            f"{typ} time series element_name={ts.element_name!r} "
-            f"does not match any ACDC converter"
-        )
-
-    known = known_converter_pf_setpoints(conv)
     value = float(ts_data[idx])
 
-    if typ == TSType.CONV_P_DC:
-        if 'P_DC' not in known:
+    if typ in TS_CONV_PF_TYPES:
+        if not hasattr(grid, 'Converters_ACDC_dict'):
+            grid.Converters_ACDC_dict = {c.name: c for c in grid.Converters_ACDC}
+
+        conv = grid.Converters_ACDC_dict.get(ts.element_name, None)
+        if conv is None:
             raise ValueError(
-                f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
-                f"{conv.AC_type!r}) does not have known PF setpoint P_DC; "
-                f"known={sorted(known)}"
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any ACDC converter"
             )
-        conv.P_DC = value
-        conv.Node_DC.Pconv = value
-    elif typ == TSType.CONV_P_AC:
-        if 'P_AC' not in known:
+
+        if typ == TSType.CONV_P_DC:
+            if conv.type not in (ConverterDCType.P, ConverterDCType.DROOP):
+                raise ValueError(
+                    f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
+                    f"{conv.AC_type!r}) does not have known PF setpoint P_DC"
+                )
+            conv.P_DC = value
+            conv.Node_DC.Pconv = value
+        elif typ == TSType.CONV_P_AC:
+            if conv.type != ConverterDCType.PAC:
+                raise ValueError(
+                    f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
+                    f"{conv.AC_type!r}) does not have known PF setpoint P_AC"
+                )
+            conv.P_AC = value
+            conv.Node_AC.P_s = value
+        elif typ == TSType.CONV_Q_AC:
+            if conv.AC_type != NodeType.PQ:
+                raise ValueError(
+                    f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
+                    f"{conv.AC_type!r}) does not have known PF setpoint Q_AC"
+                )
+            conv.Q_AC = value
+        return
+
+    if typ in TS_STORAGE_PF_TYPES:
+        if not hasattr(grid, 'storage_elements_dict'):
+            grid.storage_elements_dict = {
+                s.name: s for s in grid.storage_elements
+            }
+        storage = grid.storage_elements_dict.get(ts.element_name, None)
+        if storage is None:
             raise ValueError(
-                f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
-                f"{conv.AC_type!r}) does not have known PF setpoint P_AC; "
-                f"known={sorted(known)}"
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any storage element"
             )
-        conv.P_AC = value
-        conv.Node_AC.P_s = value
-    elif typ == TSType.CONV_Q_AC:
-        if 'Q_AC' not in known:
+        if typ == TSType.STORAGE_P:
+            if value >= 0.0:
+                storage.P_discharge = value
+                storage.P_charge = 0.0
+            else:
+                storage.P_charge = -value
+                storage.P_discharge = 0.0
+        elif typ == TSType.STORAGE_Q:
+            if storage.connected != AcDcSide.AC:
+                raise ValueError(
+                    f"Storage {storage.name!r} (connected={storage.connected!r}) "
+                    f"does not have known PF setpoint Q"
+                )
+            storage.Q = value
+        return
+
+    if typ in TS_H2_PF_TYPES:
+        if not hasattr(grid, 'electrolysers_dict'):
+            grid.electrolysers_dict = {el.name: el for el in grid.electrolysers}
+        el = grid.electrolysers_dict.get(ts.element_name, None)
+        if el is None:
             raise ValueError(
-                f"Converter {conv.name!r} (DC type={conv.type!r}, AC type="
-                f"{conv.AC_type!r}) does not have known PF setpoint Q_AC; "
-                f"known={sorted(known)}"
+                f"{typ} time series element_name={ts.element_name!r} "
+                f"does not match any electrolyser"
             )
-        conv.Q_AC = value
+        if typ == TSType.H2_P:
+            el.P_electrolyser = value
+        elif typ == TSType.H2_Q:
+            if el.connected != AcDcSide.AC:
+                raise ValueError(
+                    f"Electrolyser {el.name!r} (connected={el.connected!r}) "
+                    f"does not have known PF setpoint Q"
+                )
+            el.Q_electrolyser = value
+        return
 
 
 def _converter_names_with_pf_ts(grid, ts_type):
@@ -745,7 +783,7 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
             _apply_droop_p_dc_baseline(grid)
 
         for ts in grid.Time_series:
-            if ts.type in TS_CONV_PF_TYPES:
+            if ts.type in TS_PF_TYPES:
                 update_grid_for_pf(grid, ts, idx)
             else:
                 update_grid_data(grid, ts, idx)
@@ -753,9 +791,9 @@ def ts_acdc_pf(grid, start=1, end=None,print_step=False,tol_lim=DEFAULT_TOLERANC
         if grid.ACmode and grid.DCmode:
             acdc_sequential(grid,QLimit=False)
         elif grid.ACmode:
-            t,tol=ac_power_flow(grid,tol_lim, maxIter)
+            t,tol,_hist=ac_power_flow(grid,tol_lim, maxIter)
         elif grid.DCmode:
-            t,tol=dc_power_flow(grid,tol_lim, maxIter)
+            t,tol,_hist=dc_power_flow(grid,tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
             # Submit the functions to the executor
@@ -859,7 +897,10 @@ def ts_ac_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
 
     while idx < max_time:
         for ts in grid.Time_series:
-            update_grid_data(grid, ts, idx)
+            if ts.type in TS_PF_TYPES:
+                update_grid_for_pf(grid, ts, idx)
+            else:
+                update_grid_data(grid, ts, idx)
         ac_power_flow(grid, tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
@@ -939,7 +980,10 @@ def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
 
     while idx < max_time:
         for ts in grid.Time_series:
-            update_grid_data(grid, ts, idx)
+            if ts.type in TS_PF_TYPES:
+                update_grid_for_pf(grid, ts, idx)
+            else:
+                update_grid_data(grid, ts, idx)
         dc_power_flow(grid, tol_lim, maxIter)
 
         with ThreadPoolExecutor() as executor:
@@ -973,7 +1017,7 @@ def ts_dc_pf(grid, start=1, end=None, print_step=False, tol_lim=DEFAULT_TOLERANC
     grid.Time_series_ran = True
 
 
-def _modify_parameters(grid,model,Price_Zones):
+def _modify_parameters(grid,model,Price_Zones,window_block=False):
     opf_data = translate_pyf_opf(grid,Price_Zones=Price_Zones)
     AC_info = opf_data['AC_info']
     DC_info = opf_data['DC_info']
@@ -1050,6 +1094,86 @@ def _modify_parameters(grid,model,Price_Zones):
             model.P_known_DC[idx].set_value(val)
     for idx, val in P_renSource.items():
         model.P_renSource[idx].set_value(val)
+
+    if grid.ESS:
+        for storage in grid.storage_elements:
+            s = storage.storageNumber
+            if storage.connected == AcDcSide.AC:
+                if not window_block:
+                    model.SoC_prev[s].set_value(float(storage.soc_initial))
+                model.soc_ref[s].set_value(float(storage.soc_ref))
+            else:
+                if not window_block:
+                    model.SoC_prev_DC[s].set_value(float(storage.soc_initial))
+                model.soc_ref_DC[s].set_value(float(storage.soc_ref))
+
+    if grid.H2 and not window_block:
+        for el in grid.electrolysers:
+            model.mass_H2_prev[el.electrolyserNumber].set_value(
+                float(el.H2_mass_initial)
+            )
+
+
+def _carry_storage_h2_state_from_model(grid, model):
+    """Write solved SoC / H₂ mass onto elements and set next-hour initials."""
+    if grid.ESS:
+        for storage in grid.storage_elements:
+            s = storage.storageNumber
+            if storage.connected == AcDcSide.AC:
+                soc = float(pyo.value(model.SoC[s]))
+                model.SoC_prev[s].set_value(soc)
+                storage.P_charge = float(pyo.value(model.P_storage_charge[s]))
+                storage.P_discharge = float(pyo.value(model.P_storage_discharge[s]))
+                storage.Q = float(pyo.value(model.Q_storage[s]))
+            else:
+                soc = float(pyo.value(model.SoC_DC[s]))
+                model.SoC_prev_DC[s].set_value(soc)
+                storage.P_charge = float(pyo.value(model.P_storage_charge_DC[s]))
+                storage.P_discharge = float(pyo.value(model.P_storage_discharge_DC[s]))
+            storage.SoC = soc
+            storage.soc_initial = soc
+
+    if grid.H2:
+        for el in grid.electrolysers:
+            e = el.electrolyserNumber
+            mass = float(pyo.value(model.mass_H2[e]))
+            el.mass_H2 = mass
+            el.H2_mass_initial = mass
+            model.mass_H2_prev[e].set_value(mass)
+            el.P_electrolyser = float(pyo.value(model.P_electrolyser[e]))
+
+
+def _maybe_empty_h2_after_myopic_step(grid, model, hour_1based):
+    """Out-of-opt tank empty after a myopic hour (``empty_tank_cycle``).
+
+    ``None`` → never empty. Positive ``N`` → empty when ``hour_1based % N == 0``.
+    Caller must only invoke when ``grid.H2`` is true.
+    """
+    for el in grid.electrolysers:
+        n = el.empty_tank_cycle
+        if n is None:
+            continue
+        if hour_1based % n != 0:
+            continue
+        el.empty_tank()
+        model.mass_H2_prev[el.electrolyserNumber].set_value(0.0)
+
+
+def _ts_storage_soc_row(grid, time_1based):
+    row = {'time': time_1based}
+    for storage in grid.storage_elements:
+        row[storage.name] = np.float64(storage.SoC)
+    return row
+
+
+def _ts_storage_power_row(grid, time_1based):
+    """Net injection MW (discharge − charge) per storage element."""
+    row = {'time': time_1based}
+    for storage in grid.storage_elements:
+        row[storage.name] = np.float64(
+            (storage.P_discharge - storage.P_charge) * storage.S_base
+        )
+    return row
 
 
 def ts_acdc_opf(
@@ -1133,6 +1257,8 @@ def ts_acdc_opf(
         - ``res_available``: available renewable energy
         - ``ac_loading``, ``dc_loading``: line loading percentages
         - ``ac_MW_to``, ``dc_MW_to``: line active power flows
+        - ``storage_soc``: BESS SoC [pu] per element (when ``grid.ESS``)
+        - ``storage_power``: BESS net injection [MW] per element (when ``grid.ESS``)
     """
     idx = start-1
     warm_start_mode = str(warm_start_mode).lower()
@@ -1168,6 +1294,8 @@ def ts_acdc_opf(
     Time_series_a = []
     Time_series_b = []
     Time_series_res_available = []
+    Time_series_storage_soc = []
+    Time_series_storage_power = []
 
     weights_def = default_obj_weights()
 
@@ -1348,6 +1476,15 @@ def ts_acdc_opf(
         Time_series_Opt_res_P_extGrid.append(opt_res_P_extGrid)
         Time_series_Opt_res_Q_extGrid.append(opt_res_Q_extGrid)
         Time_series_Opt_curtailment.append(opt_res_curtailment)
+
+        if grid.ESS or grid.H2:
+            _carry_storage_h2_state_from_model(grid, model)
+            if grid.H2:
+                _maybe_empty_h2_after_myopic_step(grid, model, idx + 1)
+        if grid.ESS:
+            Time_series_storage_soc.append(_ts_storage_soc_row(grid, idx + 1))
+            Time_series_storage_power.append(_ts_storage_power_row(grid, idx + 1))
+
         t_minus_1_values = _snapshot_initial_values(model)
 
         if print_step:
@@ -1372,7 +1509,8 @@ def ts_acdc_opf(
                             Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
                             Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
                             Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
-                            Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available)
+                            Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
+                            Time_series_storage_soc, Time_series_storage_power)
 
     av_t_modelsolve = total_solve_time / count if count else 0.0
     av_t_modelupdate=total_update_time / count if count else 0.0
@@ -1403,7 +1541,8 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
     Time_series_Opt_res_P_conv_AC,Time_series_Opt_res_Q_conv_AC,Time_series_Opt_res_P_conv_DC,
     Time_series_Opt_res_P_extGrid,Time_series_Opt_res_Q_extGrid,Time_series_Opt_curtailment,
     Time_series_Opt_res_P_Load,Time_series_price,Time_series_PZ_cost_kEUR,Time_series_PZ_load,Time_series_net_price_zone_power,
-    Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available)= ts_results
+    Time_series_PN_min,Time_series_PN_max,Time_series_a,Time_series_b,Time_series_res_available,
+    Time_series_storage_soc, Time_series_storage_power)= ts_results
 
     grid.time_series_results['converter_p_dc'] = _to_dataframe(Time_series_Opt_res_P_conv_DC)
     grid.time_series_results['converter_q_ac'] = _to_dataframe(Time_series_Opt_res_Q_conv_AC)
@@ -1428,6 +1567,10 @@ def _save_TS_to_grid (grid,ts_results,infeasible):
     grid.time_series_results['a'] = _to_dataframe(Time_series_a)
     grid.time_series_results['b'] = _to_dataframe(Time_series_b)
     grid.time_series_results['res_available'] = _to_dataframe(Time_series_res_available)
+    if Time_series_storage_soc:
+        grid.time_series_results['storage_soc'] = _to_dataframe(Time_series_storage_soc)
+    if Time_series_storage_power:
+        grid.time_series_results['storage_power'] = _to_dataframe(Time_series_storage_power)
     # Split line time-series into explicit loading and MW-to datasets
     ac_loading = line_data_df.filter(like='AC_Load_', axis=1)
     dc_loading = line_data_df.filter(like='DC_Load_', axis=1)

@@ -4,7 +4,7 @@ Optimal Power Flow Module
 This module provides functions for AC/DC hybrid optimal power flow analysis [1]_.
 
 functions are found in ``pyflow_acdc.ACDC_OPF``, ``pyflow_acdc.pyomo_model_solve``,
-and ``pyflow_acdc.ACDC_OPF_NL_model``
+and ``pyflow_acdc.NL_models.ACDC_OPF_NL_model``
 
 AC/DC Hybrid Optimal Power Flow
 -------------------------------
@@ -18,16 +18,13 @@ For step-by-step examples (grid setup, generators, and calling ``optimal_pf``), 
 
 .. autofunction:: pyflow_acdc.optimal_pf
 
-For the linear (DC-style) OPF (:func:`~pyflow_acdc.optimal_l_pf`), see
-:doc:`L_models`.
-
 .. _model_creation:
 
 Creating the OPF model
 ^^^^^^^^^^^^^^^^^^^^^^
 
 
-.. autofunction:: pyflow_acdc.ACDC_OPF_NL_model.opf_create_nl_model_acdc
+.. autofunction:: pyflow_acdc.NL_models.ACDC_OPF_NL_model.opf_create_nl_model_acdc
 
 **Variables**
 
@@ -53,6 +50,8 @@ The model enforces constraints for:
 - Voltage and angle limits
 - :ref:`Converter operation limits <ACDC_converter_modelling>`
 - :ref:`Price zone balancing <Price_zone_modelling>`
+- :ref:`BESS SoC and power limits <Storage_modelling>` (when ``grid.ESS``)
+- :ref:`Electrolyser power and H₂ inventory <Electrolyser_modelling>` (when ``grid.H2``)
 
 For more details on the constraints, please refer to the :ref:`System Modelling <modelling>` page.
 
@@ -137,6 +136,12 @@ The user can define the objective by setting the weight of each sub objective. T
     * - ``Gen_set_dev``
       - Generator setpoint deviation
       - :math:`\sum_{g \in G}  \left(P_g -P_{g,set}\right)^2`
+    * - ``SoC_deviation``
+      - Soft BESS SoC reference toward ``soc_ref`` (defaults to ``soc_initial``). Useful in myopic :func:`~pyflow_acdc.ts_acdc_opf` so storage is not emptied under pure ``Energy_cost``. Requires ``grid.ESS``. Quadratic — not supported in linear OPF. See :ref:`Storage_modelling`.
+      - :math:`\sum_{s} \bigl(\mathrm{SoC}_{s} - soc_{ref,s}\bigr)^{2}`
+    * - ``H2_sale``
+      - Hydrogen sale revenue (minimise negative revenue ≡ maximise sales). Uses each electrolyser ``h2_price`` (EUR/kg; static or ``H2_PRICE`` series). Requires ``grid.H2``. Supported in NL and linear OPF. See :ref:`Electrolyser_modelling`.
+      - :math:`-\sum_{e} price_{H2,e}\,\bigl(b_{h,e}\, P_{e}\, S_{\mathrm{base}}\,\Delta t + c_{h,e}\bigr)`
 
 .. _model_solving:
 

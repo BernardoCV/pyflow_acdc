@@ -2,11 +2,81 @@
 
 import pyflow_acdc as pyf
 import pandas as pd
+from shapely.geometry import Point, LineString
+
+from pyflow_acdc.constants import ConverterDCType, NodeType, Polarity
+from pyflow_acdc.example_grids.PF import _pei_bess_data as pei_data
 
 
-def PEI_grid():    
-    
+def PEI_grid(
+    include_countries: list[str] = None,
+    *,
+    storage: bool = False,
+    hydrogen: bool = False,
+    data: str | None = None,
+    seasons=None,
+    attach_wind: bool = True,
+    attach_export_prices: bool = True,
+    ts_start=None,
+    ts_end=None,
+):
+    """Princess Elisabeth Island case.
+
+    Parameters
+    ----------
+    include_countries : list of str, optional
+        ``GB`` (Nautilus) and/or ``DK`` (Triton). Default empty (Belgium only).
+    storage : bool, optional
+        Add Table-1 BESS on ``PE_Island``.
+    hydrogen : bool, optional
+        Add hub electrolyser (``H2_MASS_MAX_KG`` / ``H2_MASS_FINAL_KG``).
+    data : {None, 'season_comparison', 'full'}, optional
+        Attach wind + export ``b_CG`` time series from seasonal folders or
+        ``Full_data`` (sets ``grid.ts_timestamps`` for ``full``).
+    seasons : str or sequence of str, optional
+        Seasonal windows when ``data='season_comparison'`` (default Autumn).
+    attach_wind, attach_export_prices : bool, optional
+        When ``data`` is set, toggle which series to attach (default both).
+    ts_start, ts_end : optional
+        UTC bounds ``[ts_start, ts_end)`` when ``data='full'``.
+    """
+    "Inlcude country can be either GB for nautilus link and/or DK for triton Link"
+    if include_countries is None:
+        include_countries = []
+    if data is not None and data not in pei_data.PEI_DATA_MODES:
+        raise ValueError(
+            f"data must be None or one of {pei_data.PEI_DATA_MODES}, got {data!r}"
+        )
+    # Converter parameters (OPF_ACDC_Energy_Islands.py, pu on grid S_base)
+    _CONV_T_R = 0.0015
+    _CONV_T_X = 0.1121
+    _CONV_PR_R = 1.0e-4
+    _CONV_PR_X = 0.1643
+    _CONV_FILTER_B = 0.0887
+    _CONV_LOSS_A = 1.103
+    _CONV_LOSS_B = 0.887
+    _CONV_LOSS_C_RECT = 2.885
+    _CONV_LOSS_C_INV = 4.371
+    _CONV_POL = 2
+    _CONV_UC_MIN = 0.85
+    _CONV_UC_MAX = 1.2
+    _CONV_KWARGS = dict(
+        Transformer_resistance=_CONV_T_R,
+        Transformer_reactance=_CONV_T_X,
+        Phase_Reactor_R=_CONV_PR_R,
+        Phase_Reactor_X=_CONV_PR_X,
+        Filter=_CONV_FILTER_B,
+        lossa=_CONV_LOSS_A,
+        lossb=_CONV_LOSS_B,
+        losscrect=_CONV_LOSS_C_RECT,
+        losscinv=_CONV_LOSS_C_INV,
+        polarity=_CONV_POL,
+        Ucmin=_CONV_UC_MIN,
+        Ucmax=_CONV_UC_MAX,
+    )
+
     S_base=100
+    DC_BIPOLAR_A_RATING = 3810 #A
     
     # DataFrame Code:
     nodes_AC_data = [
@@ -355,13 +425,13 @@ def PEI_grid():
     nodes_DC = pd.DataFrame(nodes_DC_data)
 
     lines_DC_data = [
-        {'fromNode': 'PEI_DC', 'toNode': 'ON_DC', 'r': 0.001, 'MW_rating': 1400, 'kV_base': 525, 'Length_km': 1, 'Mono_Bi_polar': 'm', 'Line_id': '0', 'geometry': 'LINESTRING (2.502952 51.528717, 2.572517 51.496147, 2.709503 51.421573, 2.706757 51.233698, 2.771301 51.126938)'}
+        {'Line_id': '0', 'fromNode': 'PEI_DC', 'toNode': 'ON_DC', 'R_Ohm_km': 0.0095, 'A_rating': DC_BIPOLAR_A_RATING, 'kV_base': 525, 'Length_km': 45, 'Mono_Bi_polar': 'b', 'geometry': 'LINESTRING (2.502952 51.528717, 2.572517 51.496147, 2.709503 51.421573, 2.706757 51.233698, 2.771301 51.126938)'}
     ]
     lines_DC = pd.DataFrame(lines_DC_data)
 
     Converters_ACDC_data = [
-        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': 'PE_Island', 'DC_node': 'PEI_DC', 'P_AC': -15.23256842600699, 'Q_AC': -30.50016621804582, 'P_DC': 14.0, 'T_r': 0.0, 'T_x': 0.0, 'PR_r': 0.0, 'PR_x': 0.0, 'Filter_b': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '0', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.500677 51.528584, 2.502952 51.528717)'},
-        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': 'BE_ON', 'DC_node': 'ON_DC', 'P_AC': 12.834001291959405, 'Q_AC': 21.10058400394354, 'P_DC': -13.812961565331412, 'T_r': 0.0, 'T_x': 0.0, 'PR_r': 0.0, 'PR_x': 0.0, 'Filter_b': 0.0, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 10000.0, 'Nconverter': 1, 'pol': 2, 'Conv_id': '1', 'lossa': 1.103, 'lossb': 0.887, 'losscrect': 2.885, 'losscinv': 4.371, 'Ucmin': 0.85, 'Ucmax': 1.2, 'geometry': 'LINESTRING (2.770443 51.125775, 2.771301 51.126938)'}
+        {'AC_type': 'PV', 'DC_type': 'P', 'AC_node': 'PE_Island', 'DC_node': 'PEI_DC', 'P_AC': -15.23256842600699, 'Q_AC': -30.50016621804582, 'P_DC': 14.0, 'T_r': _CONV_T_R, 'T_x': _CONV_T_X, 'PR_r': _CONV_PR_R, 'PR_x': _CONV_PR_X, 'Filter_b': _CONV_FILTER_B, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 1000.0, 'Nconverter': 1, 'pol': _CONV_POL, 'Conv_id': '0', 'lossa': _CONV_LOSS_A, 'lossb': _CONV_LOSS_B, 'losscrect': _CONV_LOSS_C_RECT, 'losscinv': _CONV_LOSS_C_INV, 'Ucmin': _CONV_UC_MIN, 'Ucmax': _CONV_UC_MAX, 'geometry': 'LINESTRING (2.500677 51.528584, 2.502952 51.528717)'},
+        {'AC_type': 'PV', 'DC_type': 'Slack', 'AC_node': 'BE_ON', 'DC_node': 'ON_DC', 'P_AC': 12.834001291959405, 'Q_AC': 21.10058400394354, 'P_DC': -13.812961565331412, 'T_r': _CONV_T_R, 'T_x': _CONV_T_X, 'PR_r': _CONV_PR_R, 'PR_x': _CONV_PR_X, 'Filter_b': _CONV_FILTER_B, 'Droop': 0, 'AC_kV_base': 220, 'MVA_rating': 1000.0, 'Nconverter': 1, 'pol': _CONV_POL, 'Conv_id': '1', 'lossa': _CONV_LOSS_A, 'lossb': _CONV_LOSS_B, 'losscrect': _CONV_LOSS_C_RECT, 'losscinv': _CONV_LOSS_C_INV, 'Ucmin': _CONV_UC_MIN, 'Ucmax': _CONV_UC_MAX, 'geometry': 'LINESTRING (2.770443 51.125775, 2.771301 51.126938)'}
     ]
     Converters_ACDC = pd.DataFrame(Converters_ACDC_data)
 
@@ -389,171 +459,292 @@ def PEI_grid():
     
     
     # Add Renewable Source Zones
-
+    PE_I_zone = pyf.add_RenSource_zone(grid,'PE_I')
+    PE_II_zone =pyf.add_RenSource_zone(grid,'PE_II')
+    PE_III_zone =pyf.add_RenSource_zone(grid,'PE_III')
     
     # Add Renewable Sources
-    pyf.add_RenSource(grid, 'PE_I_T1', 22.0, ren_source_name='PE_I_T1', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T2', 22.0, ren_source_name='PE_I_T2', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T3', 22.0, ren_source_name='PE_I_T3', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T4', 22.0, ren_source_name='PE_I_T4', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T5', 22.0, ren_source_name='PE_I_T5', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T6', 22.0, ren_source_name='PE_I_T6', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T7', 22.0, ren_source_name='PE_I_T7', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T8', 22.0, ren_source_name='PE_I_T8', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T9', 22.0, ren_source_name='PE_I_T9', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T10', 22.0, ren_source_name='PE_I_T10', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T11', 22.0, ren_source_name='PE_I_T11', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T12', 22.0, ren_source_name='PE_I_T12', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T13', 22.0, ren_source_name='PE_I_T13', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T14', 22.0, ren_source_name='PE_I_T14', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T15', 22.0, ren_source_name='PE_I_T15', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T16', 22.0, ren_source_name='PE_I_T16', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T17', 22.0, ren_source_name='PE_I_T17', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T18', 22.0, ren_source_name='PE_I_T18', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T19', 22.0, ren_source_name='PE_I_T19', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T20', 22.0, ren_source_name='PE_I_T20', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T21', 22.0, ren_source_name='PE_I_T21', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T22', 22.0, ren_source_name='PE_I_T22', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T23', 22.0, ren_source_name='PE_I_T23', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T24', 22.0, ren_source_name='PE_I_T24', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T25', 22.0, ren_source_name='PE_I_T25', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T26', 22.0, ren_source_name='PE_I_T26', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T27', 22.0, ren_source_name='PE_I_T27', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T28', 22.0, ren_source_name='PE_I_T28', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T29', 22.0, ren_source_name='PE_I_T29', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T30', 22.0, ren_source_name='PE_I_T30', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T31', 22.0, ren_source_name='PE_I_T31', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_I_T32', 22.0, ren_source_name='PE_I_T32', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T1', 22.0, ren_source_name='PE_II_T1', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T2', 22.0, ren_source_name='PE_II_T2', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T3', 22.0, ren_source_name='PE_II_T3', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T4', 22.0, ren_source_name='PE_II_T4', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T5', 22.0, ren_source_name='PE_II_T5', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T6', 22.0, ren_source_name='PE_II_T6', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T7', 22.0, ren_source_name='PE_II_T7', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T8', 22.0, ren_source_name='PE_II_T8', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T9', 22.0, ren_source_name='PE_II_T9', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T10', 22.0, ren_source_name='PE_II_T10', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T11', 22.0, ren_source_name='PE_II_T11', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T12', 22.0, ren_source_name='PE_II_T12', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T13', 22.0, ren_source_name='PE_II_T13', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T14', 22.0, ren_source_name='PE_II_T14', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T15', 22.0, ren_source_name='PE_II_T15', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T16', 22.0, ren_source_name='PE_II_T16', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T17', 22.0, ren_source_name='PE_II_T17', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T18', 22.0, ren_source_name='PE_II_T18', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T19', 22.0, ren_source_name='PE_II_T19', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T20', 22.0, ren_source_name='PE_II_T20', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T21', 22.0, ren_source_name='PE_II_T21', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T22', 22.0, ren_source_name='PE_II_T22', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T23', 22.0, ren_source_name='PE_II_T23', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T24', 22.0, ren_source_name='PE_II_T24', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T25', 22.0, ren_source_name='PE_II_T25', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T26', 22.0, ren_source_name='PE_II_T26', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T27', 22.0, ren_source_name='PE_II_T27', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T28', 22.0, ren_source_name='PE_II_T28', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T29', 22.0, ren_source_name='PE_II_T29', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T30', 22.0, ren_source_name='PE_II_T30', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T31', 22.0, ren_source_name='PE_II_T31', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T32', 22.0, ren_source_name='PE_II_T32', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T33', 22.0, ren_source_name='PE_II_T33', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T34', 22.0, ren_source_name='PE_II_T34', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T35', 22.0, ren_source_name='PE_II_T35', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T36', 22.0, ren_source_name='PE_II_T36', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T37', 22.0, ren_source_name='PE_II_T37', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T38', 22.0, ren_source_name='PE_II_T38', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T39', 22.0, ren_source_name='PE_II_T39', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T40', 22.0, ren_source_name='PE_II_T40', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T41', 22.0, ren_source_name='PE_II_T41', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T42', 22.0, ren_source_name='PE_II_T42', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T43', 22.0, ren_source_name='PE_II_T43', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T44', 22.0, ren_source_name='PE_II_T44', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T45', 22.0, ren_source_name='PE_II_T45', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T46', 22.0, ren_source_name='PE_II_T46', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T47', 22.0, ren_source_name='PE_II_T47', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T48', 22.0, ren_source_name='PE_II_T48', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T49', 22.0, ren_source_name='PE_II_T49', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T50', 22.0, ren_source_name='PE_II_T50', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T51', 22.0, ren_source_name='PE_II_T51', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T52', 22.0, ren_source_name='PE_II_T52', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T53', 22.0, ren_source_name='PE_II_T53', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T54', 22.0, ren_source_name='PE_II_T54', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T55', 22.0, ren_source_name='PE_II_T55', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T56', 22.0, ren_source_name='PE_II_T56', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T57', 22.0, ren_source_name='PE_II_T57', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T58', 22.0, ren_source_name='PE_II_T58', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T59', 22.0, ren_source_name='PE_II_T59', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T60', 22.0, ren_source_name='PE_II_T60', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T61', 22.0, ren_source_name='PE_II_T61', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T62', 22.0, ren_source_name='PE_II_T62', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T63', 22.0, ren_source_name='PE_II_T63', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_II_T64', 22.0, ren_source_name='PE_II_T64', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T1', 22.0, ren_source_name='PE_III_T1', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T2', 22.0, ren_source_name='PE_III_T2', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T3', 22.0, ren_source_name='PE_III_T3', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T4', 22.0, ren_source_name='PE_III_T4', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T5', 22.0, ren_source_name='PE_III_T5', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T6', 22.0, ren_source_name='PE_III_T6', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T7', 22.0, ren_source_name='PE_III_T7', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T8', 22.0, ren_source_name='PE_III_T8', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T9', 22.0, ren_source_name='PE_III_T9', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T10', 22.0, ren_source_name='PE_III_T10', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T11', 22.0, ren_source_name='PE_III_T11', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T12', 22.0, ren_source_name='PE_III_T12', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T13', 22.0, ren_source_name='PE_III_T13', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T14', 22.0, ren_source_name='PE_III_T14', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T15', 22.0, ren_source_name='PE_III_T15', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T16', 22.0, ren_source_name='PE_III_T16', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T17', 22.0, ren_source_name='PE_III_T17', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T18', 22.0, ren_source_name='PE_III_T18', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T19', 22.0, ren_source_name='PE_III_T19', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T20', 22.0, ren_source_name='PE_III_T20', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T21', 22.0, ren_source_name='PE_III_T21', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T22', 22.0, ren_source_name='PE_III_T22', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T23', 22.0, ren_source_name='PE_III_T23', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T24', 22.0, ren_source_name='PE_III_T24', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T25', 22.0, ren_source_name='PE_III_T25', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T26', 22.0, ren_source_name='PE_III_T26', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T27', 22.0, ren_source_name='PE_III_T27', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T28', 22.0, ren_source_name='PE_III_T28', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T29', 22.0, ren_source_name='PE_III_T29', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T30', 22.0, ren_source_name='PE_III_T30', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T31', 22.0, ren_source_name='PE_III_T31', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T32', 22.0, ren_source_name='PE_III_T32', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T33', 22.0, ren_source_name='PE_III_T33', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T34', 22.0, ren_source_name='PE_III_T34', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T35', 22.0, ren_source_name='PE_III_T35', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T36', 22.0, ren_source_name='PE_III_T36', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T37', 22.0, ren_source_name='PE_III_T37', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T38', 22.0, ren_source_name='PE_III_T38', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T39', 22.0, ren_source_name='PE_III_T39', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T40', 22.0, ren_source_name='PE_III_T40', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T41', 22.0, ren_source_name='PE_III_T41', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T42', 22.0, ren_source_name='PE_III_T42', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T43', 22.0, ren_source_name='PE_III_T43', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T44', 22.0, ren_source_name='PE_III_T44', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T45', 22.0, ren_source_name='PE_III_T45', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T46', 22.0, ren_source_name='PE_III_T46', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T47', 22.0, ren_source_name='PE_III_T47', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T48', 22.0, ren_source_name='PE_III_T48', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T49', 22.0, ren_source_name='PE_III_T49', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T50', 22.0, ren_source_name='PE_III_T50', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T51', 22.0, ren_source_name='PE_III_T51', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T52', 22.0, ren_source_name='PE_III_T52', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T53', 22.0, ren_source_name='PE_III_T53', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T54', 22.0, ren_source_name='PE_III_T54', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T55', 22.0, ren_source_name='PE_III_T55', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T56', 22.0, ren_source_name='PE_III_T56', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T57', 22.0, ren_source_name='PE_III_T57', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T58', 22.0, ren_source_name='PE_III_T58', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T59', 22.0, ren_source_name='PE_III_T59', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T60', 22.0, ren_source_name='PE_III_T60', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T61', 22.0, ren_source_name='PE_III_T61', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T62', 22.0, ren_source_name='PE_III_T62', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T63', 22.0, ren_source_name='PE_III_T63', available=1, Offshore=False, MTDC=None)
-    pyf.add_RenSource(grid, 'PE_III_T64', 22.0, ren_source_name='PE_III_T64', available=1, Offshore=False, MTDC=None)
+    pyf.add_RenSource(grid, 'PE_I_T1', 22.0, ren_source_name='PE_I_T1')
+    pyf.add_RenSource(grid, 'PE_I_T2', 22.0, ren_source_name='PE_I_T2')
+    pyf.add_RenSource(grid, 'PE_I_T3', 22.0, ren_source_name='PE_I_T3')
+    pyf.add_RenSource(grid, 'PE_I_T4', 22.0, ren_source_name='PE_I_T4')
+    pyf.add_RenSource(grid, 'PE_I_T5', 22.0, ren_source_name='PE_I_T5')
+    pyf.add_RenSource(grid, 'PE_I_T6', 22.0, ren_source_name='PE_I_T6')
+    pyf.add_RenSource(grid, 'PE_I_T7', 22.0, ren_source_name='PE_I_T7')
+    pyf.add_RenSource(grid, 'PE_I_T8', 22.0, ren_source_name='PE_I_T8')
+    pyf.add_RenSource(grid, 'PE_I_T9', 22.0, ren_source_name='PE_I_T9')
+    pyf.add_RenSource(grid, 'PE_I_T10', 22.0, ren_source_name='PE_I_T10')
+    pyf.add_RenSource(grid, 'PE_I_T11', 22.0, ren_source_name='PE_I_T11')
+    pyf.add_RenSource(grid, 'PE_I_T12', 22.0, ren_source_name='PE_I_T12')
+    pyf.add_RenSource(grid, 'PE_I_T13', 22.0, ren_source_name='PE_I_T13')
+    pyf.add_RenSource(grid, 'PE_I_T14', 22.0, ren_source_name='PE_I_T14')
+    pyf.add_RenSource(grid, 'PE_I_T15', 22.0, ren_source_name='PE_I_T15')
+    pyf.add_RenSource(grid, 'PE_I_T16', 22.0, ren_source_name='PE_I_T16')
+    pyf.add_RenSource(grid, 'PE_I_T17', 22.0, ren_source_name='PE_I_T17')
+    pyf.add_RenSource(grid, 'PE_I_T18', 22.0, ren_source_name='PE_I_T18')
+    pyf.add_RenSource(grid, 'PE_I_T19', 22.0, ren_source_name='PE_I_T19')
+    pyf.add_RenSource(grid, 'PE_I_T20', 22.0, ren_source_name='PE_I_T20')
+    pyf.add_RenSource(grid, 'PE_I_T21', 22.0, ren_source_name='PE_I_T21')
+    pyf.add_RenSource(grid, 'PE_I_T22', 22.0, ren_source_name='PE_I_T22')
+    pyf.add_RenSource(grid, 'PE_I_T23', 22.0, ren_source_name='PE_I_T23')
+    pyf.add_RenSource(grid, 'PE_I_T24', 22.0, ren_source_name='PE_I_T24')
+    pyf.add_RenSource(grid, 'PE_I_T25', 22.0, ren_source_name='PE_I_T25')
+    pyf.add_RenSource(grid, 'PE_I_T26', 22.0, ren_source_name='PE_I_T26')
+    pyf.add_RenSource(grid, 'PE_I_T27', 22.0, ren_source_name='PE_I_T27')
+    pyf.add_RenSource(grid, 'PE_I_T28', 22.0, ren_source_name='PE_I_T28')
+    pyf.add_RenSource(grid, 'PE_I_T29', 22.0, ren_source_name='PE_I_T29')
+    pyf.add_RenSource(grid, 'PE_I_T30', 22.0, ren_source_name='PE_I_T30')
+    pyf.add_RenSource(grid, 'PE_I_T31', 22.0, ren_source_name='PE_I_T31')
+    pyf.add_RenSource(grid, 'PE_I_T32', 22.0, ren_source_name='PE_I_T32')
+    pyf.add_RenSource(grid, 'PE_II_T1', 22.0, ren_source_name='PE_II_T1')
+    pyf.add_RenSource(grid, 'PE_II_T2', 22.0, ren_source_name='PE_II_T2')
+    pyf.add_RenSource(grid, 'PE_II_T3', 22.0, ren_source_name='PE_II_T3')
+    pyf.add_RenSource(grid, 'PE_II_T4', 22.0, ren_source_name='PE_II_T4')
+    pyf.add_RenSource(grid, 'PE_II_T5', 22.0, ren_source_name='PE_II_T5')
+    pyf.add_RenSource(grid, 'PE_II_T6', 22.0, ren_source_name='PE_II_T6')
+    pyf.add_RenSource(grid, 'PE_II_T7', 22.0, ren_source_name='PE_II_T7')
+    pyf.add_RenSource(grid, 'PE_II_T8', 22.0, ren_source_name='PE_II_T8')
+    pyf.add_RenSource(grid, 'PE_II_T9', 22.0, ren_source_name='PE_II_T9')
+    pyf.add_RenSource(grid, 'PE_II_T10', 22.0, ren_source_name='PE_II_T10')
+    pyf.add_RenSource(grid, 'PE_II_T11', 22.0, ren_source_name='PE_II_T11')
+    pyf.add_RenSource(grid, 'PE_II_T12', 22.0, ren_source_name='PE_II_T12')
+    pyf.add_RenSource(grid, 'PE_II_T13', 22.0, ren_source_name='PE_II_T13')
+    pyf.add_RenSource(grid, 'PE_II_T14', 22.0, ren_source_name='PE_II_T14')
+    pyf.add_RenSource(grid, 'PE_II_T15', 22.0, ren_source_name='PE_II_T15')
+    pyf.add_RenSource(grid, 'PE_II_T16', 22.0, ren_source_name='PE_II_T16')
+    pyf.add_RenSource(grid, 'PE_II_T17', 22.0, ren_source_name='PE_II_T17')
+    pyf.add_RenSource(grid, 'PE_II_T18', 22.0, ren_source_name='PE_II_T18')
+    pyf.add_RenSource(grid, 'PE_II_T19', 22.0, ren_source_name='PE_II_T19')
+    pyf.add_RenSource(grid, 'PE_II_T20', 22.0, ren_source_name='PE_II_T20')
+    pyf.add_RenSource(grid, 'PE_II_T21', 22.0, ren_source_name='PE_II_T21')
+    pyf.add_RenSource(grid, 'PE_II_T22', 22.0, ren_source_name='PE_II_T22')
+    pyf.add_RenSource(grid, 'PE_II_T23', 22.0, ren_source_name='PE_II_T23')
+    pyf.add_RenSource(grid, 'PE_II_T24', 22.0, ren_source_name='PE_II_T24')
+    pyf.add_RenSource(grid, 'PE_II_T25', 22.0, ren_source_name='PE_II_T25')
+    pyf.add_RenSource(grid, 'PE_II_T26', 22.0, ren_source_name='PE_II_T26')
+    pyf.add_RenSource(grid, 'PE_II_T27', 22.0, ren_source_name='PE_II_T27')
+    pyf.add_RenSource(grid, 'PE_II_T28', 22.0, ren_source_name='PE_II_T28')
+    pyf.add_RenSource(grid, 'PE_II_T29', 22.0, ren_source_name='PE_II_T29')
+    pyf.add_RenSource(grid, 'PE_II_T30', 22.0, ren_source_name='PE_II_T30')
+    pyf.add_RenSource(grid, 'PE_II_T31', 22.0, ren_source_name='PE_II_T31')
+    pyf.add_RenSource(grid, 'PE_II_T32', 22.0, ren_source_name='PE_II_T32')
+    pyf.add_RenSource(grid, 'PE_II_T33', 22.0, ren_source_name='PE_II_T33')
+    pyf.add_RenSource(grid, 'PE_II_T34', 22.0, ren_source_name='PE_II_T34')
+    pyf.add_RenSource(grid, 'PE_II_T35', 22.0, ren_source_name='PE_II_T35')
+    pyf.add_RenSource(grid, 'PE_II_T36', 22.0, ren_source_name='PE_II_T36')
+    pyf.add_RenSource(grid, 'PE_II_T37', 22.0, ren_source_name='PE_II_T37')
+    pyf.add_RenSource(grid, 'PE_II_T38', 22.0, ren_source_name='PE_II_T38')
+    pyf.add_RenSource(grid, 'PE_II_T39', 22.0, ren_source_name='PE_II_T39')
+    pyf.add_RenSource(grid, 'PE_II_T40', 22.0, ren_source_name='PE_II_T40')
+    pyf.add_RenSource(grid, 'PE_II_T41', 22.0, ren_source_name='PE_II_T41')
+    pyf.add_RenSource(grid, 'PE_II_T42', 22.0, ren_source_name='PE_II_T42')
+    pyf.add_RenSource(grid, 'PE_II_T43', 22.0, ren_source_name='PE_II_T43')
+    pyf.add_RenSource(grid, 'PE_II_T44', 22.0, ren_source_name='PE_II_T44')
+    pyf.add_RenSource(grid, 'PE_II_T45', 22.0, ren_source_name='PE_II_T45')
+    pyf.add_RenSource(grid, 'PE_II_T46', 22.0, ren_source_name='PE_II_T46')
+    pyf.add_RenSource(grid, 'PE_II_T47', 22.0, ren_source_name='PE_II_T47')
+    pyf.add_RenSource(grid, 'PE_II_T48', 22.0, ren_source_name='PE_II_T48')
+    pyf.add_RenSource(grid, 'PE_II_T49', 22.0, ren_source_name='PE_II_T49')
+    pyf.add_RenSource(grid, 'PE_II_T50', 22.0, ren_source_name='PE_II_T50')
+    pyf.add_RenSource(grid, 'PE_II_T51', 22.0, ren_source_name='PE_II_T51')
+    pyf.add_RenSource(grid, 'PE_II_T52', 22.0, ren_source_name='PE_II_T52')
+    pyf.add_RenSource(grid, 'PE_II_T53', 22.0, ren_source_name='PE_II_T53')
+    pyf.add_RenSource(grid, 'PE_II_T54', 22.0, ren_source_name='PE_II_T54')
+    pyf.add_RenSource(grid, 'PE_II_T55', 22.0, ren_source_name='PE_II_T55')
+    pyf.add_RenSource(grid, 'PE_II_T56', 22.0, ren_source_name='PE_II_T56')
+    pyf.add_RenSource(grid, 'PE_II_T57', 22.0, ren_source_name='PE_II_T57')
+    pyf.add_RenSource(grid, 'PE_II_T58', 22.0, ren_source_name='PE_II_T58')
+    pyf.add_RenSource(grid, 'PE_II_T59', 22.0, ren_source_name='PE_II_T59')
+    pyf.add_RenSource(grid, 'PE_II_T60', 22.0, ren_source_name='PE_II_T60')
+    pyf.add_RenSource(grid, 'PE_II_T61', 22.0, ren_source_name='PE_II_T61')
+    pyf.add_RenSource(grid, 'PE_II_T62', 22.0, ren_source_name='PE_II_T62')
+    pyf.add_RenSource(grid, 'PE_II_T63', 22.0, ren_source_name='PE_II_T63')
+    pyf.add_RenSource(grid, 'PE_II_T64', 22.0, ren_source_name='PE_II_T64')
+    pyf.add_RenSource(grid, 'PE_III_T1', 22.0, ren_source_name='PE_III_T1')
+    pyf.add_RenSource(grid, 'PE_III_T2', 22.0, ren_source_name='PE_III_T2')
+    pyf.add_RenSource(grid, 'PE_III_T3', 22.0, ren_source_name='PE_III_T3')
+    pyf.add_RenSource(grid, 'PE_III_T4', 22.0, ren_source_name='PE_III_T4')
+    pyf.add_RenSource(grid, 'PE_III_T5', 22.0, ren_source_name='PE_III_T5')
+    pyf.add_RenSource(grid, 'PE_III_T6', 22.0, ren_source_name='PE_III_T6')
+    pyf.add_RenSource(grid, 'PE_III_T7', 22.0, ren_source_name='PE_III_T7')
+    pyf.add_RenSource(grid, 'PE_III_T8', 22.0, ren_source_name='PE_III_T8')
+    pyf.add_RenSource(grid, 'PE_III_T9', 22.0, ren_source_name='PE_III_T9')
+    pyf.add_RenSource(grid, 'PE_III_T10', 22.0, ren_source_name='PE_III_T10')
+    pyf.add_RenSource(grid, 'PE_III_T11', 22.0, ren_source_name='PE_III_T11')
+    pyf.add_RenSource(grid, 'PE_III_T12', 22.0, ren_source_name='PE_III_T12')
+    pyf.add_RenSource(grid, 'PE_III_T13', 22.0, ren_source_name='PE_III_T13')
+    pyf.add_RenSource(grid, 'PE_III_T14', 22.0, ren_source_name='PE_III_T14')
+    pyf.add_RenSource(grid, 'PE_III_T15', 22.0, ren_source_name='PE_III_T15')
+    pyf.add_RenSource(grid, 'PE_III_T16', 22.0, ren_source_name='PE_III_T16')
+    pyf.add_RenSource(grid, 'PE_III_T17', 22.0, ren_source_name='PE_III_T17')
+    pyf.add_RenSource(grid, 'PE_III_T18', 22.0, ren_source_name='PE_III_T18')
+    pyf.add_RenSource(grid, 'PE_III_T19', 22.0, ren_source_name='PE_III_T19')
+    pyf.add_RenSource(grid, 'PE_III_T20', 22.0, ren_source_name='PE_III_T20')
+    pyf.add_RenSource(grid, 'PE_III_T21', 22.0, ren_source_name='PE_III_T21')
+    pyf.add_RenSource(grid, 'PE_III_T22', 22.0, ren_source_name='PE_III_T22')
+    pyf.add_RenSource(grid, 'PE_III_T23', 22.0, ren_source_name='PE_III_T23')
+    pyf.add_RenSource(grid, 'PE_III_T24', 22.0, ren_source_name='PE_III_T24')
+    pyf.add_RenSource(grid, 'PE_III_T25', 22.0, ren_source_name='PE_III_T25')
+    pyf.add_RenSource(grid, 'PE_III_T26', 22.0, ren_source_name='PE_III_T26')
+    pyf.add_RenSource(grid, 'PE_III_T27', 22.0, ren_source_name='PE_III_T27')
+    pyf.add_RenSource(grid, 'PE_III_T28', 22.0, ren_source_name='PE_III_T28')
+    pyf.add_RenSource(grid, 'PE_III_T29', 22.0, ren_source_name='PE_III_T29')
+    pyf.add_RenSource(grid, 'PE_III_T30', 22.0, ren_source_name='PE_III_T30')
+    pyf.add_RenSource(grid, 'PE_III_T31', 22.0, ren_source_name='PE_III_T31')
+    pyf.add_RenSource(grid, 'PE_III_T32', 22.0, ren_source_name='PE_III_T32')
+    pyf.add_RenSource(grid, 'PE_III_T33', 22.0, ren_source_name='PE_III_T33')
+    pyf.add_RenSource(grid, 'PE_III_T34', 22.0, ren_source_name='PE_III_T34')
+    pyf.add_RenSource(grid, 'PE_III_T35', 22.0, ren_source_name='PE_III_T35')
+    pyf.add_RenSource(grid, 'PE_III_T36', 22.0, ren_source_name='PE_III_T36')
+    pyf.add_RenSource(grid, 'PE_III_T37', 22.0, ren_source_name='PE_III_T37')
+    pyf.add_RenSource(grid, 'PE_III_T38', 22.0, ren_source_name='PE_III_T38')
+    pyf.add_RenSource(grid, 'PE_III_T39', 22.0, ren_source_name='PE_III_T39')
+    pyf.add_RenSource(grid, 'PE_III_T40', 22.0, ren_source_name='PE_III_T40')
+    pyf.add_RenSource(grid, 'PE_III_T41', 22.0, ren_source_name='PE_III_T41')
+    pyf.add_RenSource(grid, 'PE_III_T42', 22.0, ren_source_name='PE_III_T42')
+    pyf.add_RenSource(grid, 'PE_III_T43', 22.0, ren_source_name='PE_III_T43')
+    pyf.add_RenSource(grid, 'PE_III_T44', 22.0, ren_source_name='PE_III_T44')
+    pyf.add_RenSource(grid, 'PE_III_T45', 22.0, ren_source_name='PE_III_T45')
+    pyf.add_RenSource(grid, 'PE_III_T46', 22.0, ren_source_name='PE_III_T46')
+    pyf.add_RenSource(grid, 'PE_III_T47', 22.0, ren_source_name='PE_III_T47')
+    pyf.add_RenSource(grid, 'PE_III_T48', 22.0, ren_source_name='PE_III_T48')
+    pyf.add_RenSource(grid, 'PE_III_T49', 22.0, ren_source_name='PE_III_T49')
+    pyf.add_RenSource(grid, 'PE_III_T50', 22.0, ren_source_name='PE_III_T50')
+    pyf.add_RenSource(grid, 'PE_III_T51', 22.0, ren_source_name='PE_III_T51')
+    pyf.add_RenSource(grid, 'PE_III_T52', 22.0, ren_source_name='PE_III_T52')
+    pyf.add_RenSource(grid, 'PE_III_T53', 22.0, ren_source_name='PE_III_T53')
+    pyf.add_RenSource(grid, 'PE_III_T54', 22.0, ren_source_name='PE_III_T54')
+    pyf.add_RenSource(grid, 'PE_III_T55', 22.0, ren_source_name='PE_III_T55')
+    pyf.add_RenSource(grid, 'PE_III_T56', 22.0, ren_source_name='PE_III_T56')
+    pyf.add_RenSource(grid, 'PE_III_T57', 22.0, ren_source_name='PE_III_T57')
+    pyf.add_RenSource(grid, 'PE_III_T58', 22.0, ren_source_name='PE_III_T58')
+    pyf.add_RenSource(grid, 'PE_III_T59', 22.0, ren_source_name='PE_III_T59')
+    pyf.add_RenSource(grid, 'PE_III_T60', 22.0, ren_source_name='PE_III_T60')
+    pyf.add_RenSource(grid, 'PE_III_T61', 22.0, ren_source_name='PE_III_T61')
+    pyf.add_RenSource(grid, 'PE_III_T62', 22.0, ren_source_name='PE_III_T62')
+    pyf.add_RenSource(grid, 'PE_III_T63', 22.0, ren_source_name='PE_III_T63')
+    pyf.add_RenSource(grid, 'PE_III_T64', 22.0, ren_source_name='PE_III_T64')
 
-    
-    # Return the grid
-    return grid,res
+    for ren_source in grid.RenSources:
+        if ren_source.name.startswith("PE_III_"):
+            pyf.assign_RenToZone(
+                grid, ren_source, PE_III_zone, link_availability=False)
+        elif ren_source.name.startswith("PE_II_"):
+            pyf.assign_RenToZone(
+                grid, ren_source, PE_II_zone, link_availability=False)
+        elif ren_source.name.startswith("PE_I_"):
+            pyf.assign_RenToZone(
+                grid, ren_source, PE_I_zone, link_availability=False)
+    BE = pyf.add_price_zone(grid,'Belgium',100)
+    pyf.add_extgrid(grid, 'BE_ON', link_cost='quadratic')
+    pyf.assign_nodeToPrice_Zone(grid,'BE_ON',BE)
+
+    if "GB" in include_countries:
+        GB = pyf.add_price_zone(grid,'Great Britain',100)
+        pyf.add_DC_node(
+            grid, 525, node_type=ConverterDCType.P, name='Na_DC_GB',
+            geometry=Point(0.717716, 51.445235),
+        )
+        pyf.add_AC_node(
+            grid, 220, node_type=NodeType.SLACK, name='Na_AC_GB',
+            geometry=Point(0.715474718, 51.44475984),
+        )
+        pyf.add_line_DC(
+            grid, 'PEI_DC', 'Na_DC_GB', name='Nautilus_uk',
+            R_Ohm_km=0.0095, A_rating=DC_BIPOLAR_A_RATING, Length_km=120,
+            polarity=Polarity.BIPOLAR,
+        )
+        pyf.add_ACDC_converter(
+            grid, 'Na_AC_GB', 'Na_DC_GB',
+            AC_type=NodeType.SLACK, DC_type=ConverterDCType.P,
+            kV_base=220, MVA_max=1000.0,
+            name='Nautilus_conv', **_CONV_KWARGS,
+        )
+        pyf.add_extgrid(grid, 'Na_AC_GB', link_cost='quadratic')
+        pyf.assign_nodeToPrice_Zone(grid,'Na_AC_GB',GB)
+       
+    if "DK" in include_countries:
+        DK = pyf.add_price_zone(grid,'Denmark',100)
+        pyf.add_DC_node(
+            grid, 525, node_type=ConverterDCType.P, name='Tr_DC_DK',
+            geometry=Point(8.519897, 56.353078),
+        )
+        pyf.add_AC_node(
+            grid, 220, node_type=NodeType.SLACK, name='Tr_AC_DK',
+            geometry=Point(8.552944588, 56.35138683),
+        )
+        pyf.add_line_DC(
+            grid, 'PEI_DC', 'Tr_DC_DK', name='Triton_Link',
+            R_Ohm_km=0.0095, A_rating=DC_BIPOLAR_A_RATING, Length_km=675,
+            polarity=Polarity.BIPOLAR,
+            geometry=LineString([
+                (2.502952, 51.528717), (2.539215, 51.56062), (2.596207, 51.591336),
+                (3.290405, 52.426269), (3.208008, 54.898965), (5.141602, 56.240152),
+                (7.322388, 56.468349), (8.519897, 56.353078),
+            ]),
+        )
+        pyf.add_ACDC_converter(
+            grid, 'Tr_AC_DK', 'Tr_DC_DK',
+            AC_type=NodeType.SLACK, DC_type=ConverterDCType.P,
+            kV_base=220, MVA_max=1000.0,
+            name='Triton_conv', **_CONV_KWARGS,
+        )
+        pyf.add_extgrid(grid, 'Tr_AC_DK', link_cost='quadratic')
+        pyf.assign_nodeToPrice_Zone(grid,'Tr_AC_DK',DK)
+    # GB/DK nodes are added after create_grid_from_data; refresh graphs and Ybus.
+    if grid.nn_AC > 0:
+        grid.update_graph_ac()
+        grid.update_pq_ac()
+        grid.create_Ybus_AC()
+    if grid.nn_DC > 0:
+        grid.update_graph_dc()
+        grid.update_p_dc()
+        grid.create_Ybus_DC()
+
+    # --- Optional BESS / H₂ / time series (see _pei_bess_data) ---
+    if data == pei_data.DATA_SEASON_COMPARISON:
+        seasons = pei_data.normalize_pei_seasons(seasons)
+        if attach_export_prices:
+            pei_data.attach_pei_export_prices(grid, seasons=seasons)
+        if attach_wind:
+            pei_data.attach_pei_wind_time_series(grid, seasons=seasons)
+    elif data == pei_data.DATA_FULL:
+        if attach_export_prices or attach_wind:
+            if not (attach_export_prices and attach_wind):
+                raise ValueError(
+                    "data='full' requires attach_wind=True and attach_export_prices=True"
+                )
+            pei_data.attach_pei_full_time_series(
+                grid, ts_start=ts_start, ts_end=ts_end
+            )
+
+    if storage:
+        pyf.add_storage(
+            grid,
+            pei_data.HUB_NODE,
+            E_max_MWh=pei_data.BESS_E_MAX_MWH,
+            P_charge_MW=pei_data.BESS_P_NOM_MW,
+            P_discharge_MW=pei_data.BESS_P_NOM_MW,
+            eta_charge=pei_data.BESS_ETA_C,
+            eta_discharge=pei_data.BESS_ETA_D,
+            soc_min=pei_data.BESS_SOC_MIN,
+            soc_max=pei_data.BESS_SOC_MAX,
+            soc_initial=pei_data.BESS_SOC_INITIAL,
+            soc_final=pei_data.BESS_SOC_FINAL,
+        )
+    if hydrogen:
+        pyf.add_electrolyser(
+            grid,
+            pei_data.HUB_NODE,
+            P_max_MW=pei_data.H2_P_MAX_MW,
+            P_min_MW=pei_data.H2_P_MIN_MW,
+            b_h=pei_data.H2_B_H,
+            c_h=pei_data.H2_C_H,
+            H2_mass_max_kg=pei_data.H2_MASS_MAX_KG,
+            H2_mass_initial_kg=0.0,
+            H2_mass_final_kg=pei_data.H2_MASS_FINAL_KG,
+        )
+
+    return grid, res
+
 

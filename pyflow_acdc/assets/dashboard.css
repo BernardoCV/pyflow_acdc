@@ -1,0 +1,88 @@
+/* pyflow_acdc Dash dashboards — shared styling.
+   Auto-loaded by Dash from pyflow_acdc/assets/ for every app in the package.
+   Palette mirrors docs/conf.py Furo "SCADA panel" light_css_variables. */
+
+body, .dash-app {
+    font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+#sidebar, #content {
+    font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+/* ---- Dropdown / select: dark text on light surfaces (readable over navy sidebar) ---- */
+#sidebar .Select-control,
+#sidebar .Select-menu-outer,
+#sidebar .Select-value-label,
+#sidebar .Select-placeholder,
+#sidebar .Select-input > input {
+    color: #172033 !important;
+}
+#sidebar .Select-menu-outer .VirtualizedSelectOption,
+#sidebar .Select-menu-outer .VirtualizedSelectFocusedOption {
+    color: #172033 !important;
+    background-color: #ffffff;
+}
+#sidebar .Select-menu-outer .VirtualizedSelectFocusedOption {
+    background-color: #dde6f1 !important;
+}
+/* Dash / react-select v4+ */
+#sidebar div[class*="-control"],
+#sidebar div[class*="-menu"],
+#sidebar div[class*="-option"],
+#sidebar div[class*="-singleValue"],
+#sidebar div[class*="-placeholder"],
+#sidebar div[class*="-Input"] input {
+    color: #172033 !important;
+}
+#sidebar div[class*="-option"] {
+    background-color: #ffffff;
+}
+#sidebar div[class*="-option"]:hover,
+#sidebar div[class*="-option"][aria-selected="true"],
+#sidebar div[class*="-option"][class*="focused"] {
+    background-color: #dde6f1 !important;
+    color: #172033 !important;
+}
+#sidebar input[type="number"] {
+    color: #172033 !important;
+    background-color: #ffffff;
+}
+#sidebar .dash-checklist label,
+#sidebar .dash-radio-items label {
+    color: #d0dbe7 !important;
+}
+
+/* ---- Buttons: hover / active states (impossible with inline styles) ---- */
+#add-plot,
+#toggle-sidebar,
+#hide-sidebar {
+    transition: background-color .15s ease, transform .05s ease;
+}
+#add-plot:hover,
+#toggle-sidebar:hover {
+    background-color: #1d4ed8 !important;
+}
+#add-plot:active,
+#toggle-sidebar:active {
+    transform: translateY(1px);
+}
+#hide-sidebar:hover {
+    background-color: #253a57 !important;
+    color: #f1f5f9 !important;
+}
+
+/* ---- Sidebar scrollbar (WebKit) ---- */
+#sidebar::-webkit-scrollbar {
+    width: 10px;
+}
+#sidebar::-webkit-scrollbar-track {
+    background: #142033;
+}
+#sidebar::-webkit-scrollbar-thumb {
+    background: #253a57;
+    border-radius: 6px;
+}
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: #35507a;
+}

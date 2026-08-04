@@ -122,6 +122,7 @@ Workflow guides
    usage_opf
    usage_tep
    usage_mp_tep
+   usage_window_opf
    usage_wf_array
 
 **References**

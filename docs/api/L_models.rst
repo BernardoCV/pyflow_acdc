@@ -1,26 +1,29 @@
 Linear Models (OPF and TEP)
 ===========================
 
-Linear (DC-style) counterparts of the :doc:`OPF <opf>` and :doc:`TEP <tep>`
+Linearised AC counterparts of the :doc:`OPF <opf>` and :doc:`TEP <tep>`
 modules. [1]_ They trade full AC accuracy for speed and LP/MILP-solvability,
 making them suitable for fast studies, large sweeps, and the Pyomo backend of
 :func:`~pyflow_acdc.wind_farm_CSS`.
 
-Model construction lives in ``pyflow_acdc.AC_OPF_L_model``; the drivers
+Model construction lives in ``pyflow_acdc.L_models.AC_OPF_L_model``; the drivers
 (:func:`~pyflow_acdc.optimal_l_pf`,
 :func:`~pyflow_acdc.linear_transmission_expansion`, and
 :func:`~pyflow_acdc.linear_multi_period_transmission_expansion`) live in
-``pyflow_acdc.ACDC_OPF`` and ``pyflow_acdc.ACDC_L_TEP``. Both TEP drivers accept
+``pyflow_acdc.ACDC_OPF`` and ``pyflow_acdc.L_models.ACDC_L_TEP``. Both TEP drivers accept
 ``build_only=True`` to build the Pyomo model and export initializer values without
 a solver (used by the doc tests when no LP/MIP solver is installed).
 
-Linear Optimal Power Flow
--------------------------
+Linearised AC Optimal Power Flow
+--------------------------------
 
-Sets up and solves the AC 'dc linear' OPF: it creates the
+Sets up and solves the linearised AC OPF: it creates the
 :ref:`linear model <L_model_creation>`, minimises the weighted objective, solves
-with a Pyomo LP solver, and exports the solution back to the ``grid``. The linear
-objective only accounts for AC-generator energy cost.
+with a Pyomo LP solver, and exports the solution back to the ``grid``. Supported
+objective terms are generator ``Energy_cost`` and optional ``H2_sale``.
+When ``grid.ESS`` / ``grid.H2``, BESS (P-only) and electrolysers are included.
+DC / hybrid grids (``grid.DCmode``) raise ``ValueError`` (AC networks only for
+now). ``SoC_deviation`` is not supported (quadratic).
 
 .. autofunction:: pyflow_acdc.optimal_l_pf
 
@@ -62,7 +65,7 @@ Linear Multi-Period Transmission Expansion
 ------------------------------------------
 
 Linear (MILP) counterpart of :func:`~pyflow_acdc.multi_period_transmission_expansion`
-for **AC-only** grids. Lives in ``pyflow_acdc.ACDC_L_TEP``; default solver is
+for **AC-only** grids. Lives in ``pyflow_acdc.L_models.ACDC_L_TEP``; default solver is
 Gurobi. See :doc:`../usage_mp_tep` for the nonlinear multi-period workflow and CSV
 setup; the linear driver reuses the same investment series.
 
@@ -79,7 +82,7 @@ setup; the linear driver reuses the same investment series.
 Creating the Linear model
 -------------------------
 
-.. autofunction:: pyflow_acdc.AC_OPF_L_model.opf_create_l_model_ac
+.. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_ac
 
 **Variables**
 
@@ -89,14 +92,19 @@ The linear model includes variables for:
 - Generator active power
 - Renewable generation via availability and curtailment factors
 - AC line active power flows
+- Optional BESS charge / discharge / SoC (when ``grid.ESS``; P-only, no Q)
+- Optional electrolyser power / H₂ mass (when ``grid.H2``; no Q)
 
 **Constraints**
 
 The model enforces constraints for:
 
-- AC nodal active power balance (linearized)
+- AC nodal active power balance (linearized), including storage injection and
+  electrolyser load when present
 - Generator aggregation at nodes
 - Renewable injection aggregation at nodes
+- Optional storage SoC balance and ``|P_net| ≤ S_max``
+- Optional electrolyser mass balance
 - AC branch linearized power flow equations
 - Thermal limits (including linear big-M formulations for REC/CT states)
 - Slack angle constraints
@@ -106,15 +114,15 @@ The model enforces constraints for:
 TEP/REC/CT Parameters and Variables
 -----------------------------------
 
-When ``TEP=True``, :func:`~pyflow_acdc.AC_OPF_L_model.opf_create_l_model_ac` adds
+When ``TEP=True``, :func:`~pyflow_acdc.L_models.AC_OPF_L_model.opf_create_l_model_ac` adds
 the investment layer used by :func:`~pyflow_acdc.linear_transmission_expansion`
 and :func:`~pyflow_acdc.wind_farm_CSS`.
 
-.. autofunction:: pyflow_acdc.AC_OPF_L_model.TEP_parameters
+.. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.TEP_parameters
 
    Sets parameters for TEP/REC/CT decisions (e.g., base multiplicities, initial configs, limits).
 
-.. autofunction:: pyflow_acdc.AC_OPF_L_model.TEP_variables
+.. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.TEP_variables
 
    Adds investment variables:
 
@@ -201,7 +209,7 @@ MIP solver.
 Exporting Results
 -----------------
 
-.. autofunction:: pyflow_acdc.AC_OPF_L_model.export_acdc_l_model_to_pyflow_acdc
+.. autofunction:: pyflow_acdc.L_models.AC_OPF_L_model.export_acdc_l_model_to_pyflow_acdc
 
    Exports the Pyomo solution back to the ``grid`` (internal helper; called by
    :func:`~pyflow_acdc.optimal_l_pf` and

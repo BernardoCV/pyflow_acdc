@@ -10,13 +10,10 @@ Layout::
     PEI_BESS/
       Spring|Summer|Autumn|Winter/
         power_matrix.csv   # 160 turbines × 24 h, MW
-        BE_Price.csv       # BE_ON, EUR/MWh
-        GB_Price.csv       # Na_AC_UK, EUR/MWh
-        DK_Price.csv       # Tr_AC_DK, EUR/MWh
+        BE_Price.csv       # Belgium PZ b_CG → node.lf → gen.lf (quadratic link)
+        GB_Price.csv       # Great Britain PZ b_CG
+        DK_Price.csv       # Denmark PZ b_CG
 
-<<<<<<< Updated upstream
-Usage (via ``pyflow_tests._bess_h2_pei_data``)::
-=======
 GitHub raw base (``main``)::
 
     https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/
@@ -25,7 +22,6 @@ GitHub raw base (``main``)::
 ``Full_data`` series (local ``examples/PEI_BESS`` checkout, else GitHub raw URL).
 
 Usage::
->>>>>>> Stashed changes
 
     import pyflow_acdc as pyf
 
@@ -38,9 +34,6 @@ Usage::
     )
 
     # All four seasons concatenated (96 h)
-<<<<<<< Updated upstream
-    grid = build_pei_bess_h2_grid(seasons=PEI_SEASONS)
-=======
     grid, _ = pyf.cases["PEI_grid"](
         include_countries=["GB", "DK"],
         storage=True,
@@ -51,4 +44,3 @@ Usage::
 
 Season-compare + Dash: see docs page ``usage_window_opf`` and
 ``pyflow_tests/doc_examples/window_opf/01_pei_season_compare_dash.py``.
->>>>>>> Stashed changes

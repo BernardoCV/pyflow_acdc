@@ -129,6 +129,15 @@ class Results:
                 self.ext_gen(print_table=print_table)
             if self.Grid.RenSources:
                 self.ext_ren(print_table=print_table)
+            if self.Grid.storage_elements:
+                self.ext_storage(print_table=print_table)
+            if self.Grid.electrolysers:
+                self.ext_electrolyser(print_table=print_table)
+            if getattr(self.Grid, "window_opf_run", False):
+                if self.Grid.storage_elements:
+                    self.storage_window(print_table=print_table)
+                if self.Grid.electrolysers:
+                    self.hydrogen_window(print_table=print_table)
             if not self.Grid.TEP_run and not self.Grid.MP_TEP_run:
                 self.obj_res(print_table=print_table)
             if self.Grid.Price_Zones != []:
@@ -1329,6 +1338,189 @@ class Results:
             print(table)
 
         return df
+
+    def ext_storage(self, print_table=True):
+        """Report BESS dispatch after snapshot NL OPF."""
+        rows = []
+        p_charge_tot = 0.0
+        p_discharge_tot = 0.0
+        q_tot = 0.0
+        energy_tot = 0.0
+
+        for storage in self.Grid.storage_elements:
+            p_charge_mw = storage.P_charge * self.Grid.S_base
+            p_discharge_mw = storage.P_discharge * self.Grid.S_base
+            soc_pu = storage.SoC
+            energy_mwh = storage.energy_MWh
+            loading = storage.loading
+
+            if storage.connected == AcDcSide.AC:
+                node = storage.Node_AC
+                side = AcDcSide.AC.value
+                q_mvar = storage.Q * self.Grid.S_base
+                q_tot += q_mvar
+            else:
+                node = storage.Node_DC
+                side = AcDcSide.DC.value
+                q_mvar = "----"
+
+            p_charge_tot += p_charge_mw
+            p_discharge_tot += p_discharge_mw
+            energy_tot += energy_mwh
+
+            rows.append({
+                "Name": storage.name,
+                "Node": node,
+                "Side": side,
+                "P charge (MW)": np.round(p_charge_mw, decimals=self.dec),
+                "P discharge (MW)": np.round(p_discharge_mw, decimals=self.dec),
+                "Q (MVAR)": np.round(q_mvar, decimals=self.dec) if q_mvar != "----" else q_mvar,
+                "SoC (pu)": np.round(soc_pu, decimals=self.dec),
+                "Energy (MWh)": np.round(energy_mwh, decimals=self.dec),
+                "Loading %": np.round(loading, decimals=self.dec),
+            })
+
+        if rows:
+            rows.append({
+                "Name": "Total",
+                "Node": "",
+                "Side": "",
+                "P charge (MW)": np.round(p_charge_tot, decimals=self.dec),
+                "P discharge (MW)": np.round(p_discharge_tot, decimals=self.dec),
+                "Q (MVAR)": np.round(q_tot, decimals=self.dec) if q_tot else "",
+                "SoC (pu)": "",
+                "Energy (MWh)": np.round(energy_tot, decimals=self.dec),
+                "Loading %": "",
+            })
+
+        columns = [
+            "Name", "Node", "Side", "P charge (MW)", "P discharge (MW)",
+            "Q (MVAR)", "SoC (pu)", "Energy (MWh)", "Loading %",
+        ]
+        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=columns)
+        self.tables["Ext_storage"] = df
+
+        if print_table:
+            print('--------------')
+            print('Battery energy storage (BESS)')
+            table = pt()
+            table.field_names = columns
+            for _, row in df.iterrows():
+                table.add_row([row[col] for col in columns])
+            print(table)
+
+        return df
+
+    def storage_window(self, print_table=True):
+        """Report BESS trajectories after coupled ``window_nl_opf``."""
+        if not getattr(self.Grid, "window_opf_run", False):
+            raise RuntimeError("window_nl_opf has not been run on this grid")
+
+        results = self.Grid.window_opf_results
+        soc_df = results['storage_soc'].copy()
+        p_df = results['storage_power'].copy()
+        summary_df = results['storage_summary'].copy()
+
+        for df in (soc_df, p_df, summary_df):
+            numeric_cols = df.select_dtypes(include='number').columns
+            df[numeric_cols] = df[numeric_cols].round(self.dec)
+
+        self.tables["Storage_window_soc"] = soc_df
+        self.tables["Storage_window_power"] = p_df
+        self.tables["Storage_window_summary"] = summary_df
+
+        if print_table:
+            print('--------------')
+            print('BESS window SoC trajectory (pu, by frame)')
+            print(soc_df.to_string(index=False))
+            print('--------------')
+            print('BESS window P (MW, discharge − charge, by frame)')
+            print(p_df.to_string(index=False))
+            print('--------------')
+            print('BESS window energy summary')
+            print(summary_df.to_string(index=False))
+
+        return soc_df, summary_df
+
+    def ext_electrolyser(self, print_table=True):
+        """Report electrolyser dispatch after snapshot NL OPF."""
+        rows = []
+        p_tot = 0.0
+        m_tot = 0.0
+
+        for el in self.Grid.electrolysers:
+            p_mw = el.P_electrolyser * self.Grid.S_base
+            m_kg = el.mass_H2
+            loading = el.loading
+            p_tot += p_mw
+            m_tot += m_kg
+
+            row = {
+                "Name": el.name,
+                "Node": el.Node_AC if el.connected == AcDcSide.AC else el.Node_DC,
+                "Side": el.connected.value,
+                "P (MW)": np.round(p_mw, decimals=self.dec),
+                "mass_H2 (kg)": np.round(m_kg, decimals=self.dec),
+                "Loading %": np.round(loading, decimals=self.dec),
+            }
+            if el.connected == AcDcSide.AC:
+                row["Q (MVAR)"] = np.round(el.Q_electrolyser * self.Grid.S_base, decimals=self.dec)
+            else:
+                row["Q (MVAR)"] = "----"
+            rows.append(row)
+
+        if rows:
+            rows.append({
+                "Name": "Total",
+                "Node": "",
+                "Side": "",
+                "P (MW)": np.round(p_tot, decimals=self.dec),
+                "mass_H2 (kg)": np.round(m_tot, decimals=self.dec),
+                "Loading %": "",
+                "Q (MVAR)": "",
+            })
+
+        columns = ["Name", "Node", "Side", "P (MW)", "Q (MVAR)", "mass_H2 (kg)", "Loading %"]
+        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=columns)
+        self.tables["Ext_electrolyser"] = df
+
+        if print_table:
+            print('--------------')
+            print('Electrolyser / H₂ storage')
+            table = pt()
+            table.field_names = columns
+            for _, row in df.iterrows():
+                table.add_row([row[col] for col in columns])
+            print(table)
+
+        return df
+
+    def hydrogen_window(self, print_table=True):
+        """Report H₂ trajectories after coupled ``window_nl_opf``."""
+        if not getattr(self.Grid, "window_opf_run", False):
+            raise RuntimeError("window_nl_opf has not been run on this grid")
+
+        results = self.Grid.window_opf_results
+        m_df = results['hydrogen_mass_H2'].copy()
+        pe_df = results['hydrogen_P_e'].copy()
+
+        for df in (m_df, pe_df):
+            numeric_cols = df.select_dtypes(include='number').columns
+            df[numeric_cols] = df[numeric_cols].round(self.dec)
+
+        self.tables["Hydrogen_window_mass_H2"] = m_df
+        self.tables["Hydrogen_window_P_e"] = pe_df
+
+        if print_table:
+            print('--------------')
+            print('H₂ mass trajectory (kg, by frame)')
+            print(m_df.to_string(index=False))
+            print('--------------')
+            print('Electrolyser P (MW, by frame)')
+            print(pe_df.to_string(index=False))
+
+        return m_df, pe_df
+
     def clustering_results(self, print_table=True):
         self.clustering_time_series_statistics()
         for key in self.Grid.Clustering_information:

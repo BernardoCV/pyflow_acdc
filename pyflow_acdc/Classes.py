@@ -26,10 +26,12 @@ from .constants import (
     CableType,
     ConverterOpfFxType,
     PricingStrategy,
+    LinkCost,
     default_obj_weights,
     DEFAULT_GENERATION_TYPES,
     DEFAULT_RENEWABLE_TYPES,
     DEFAULT_GEN_TYPE,
+    AcDcSide,
 )
 from .grid_analysis import pol2cartz, cartz2pol
 
@@ -37,6 +39,8 @@ __all__ = [
     'Grid',
     'Gen_AC',
     'Gen_DC',
+    'Storage',
+    'Electrolyser',
     'Ren_Source',
     'Node_AC',
     'Node_DC',
@@ -176,7 +180,11 @@ class Grid:
             'curtailment': pd.DataFrame(),  # Time_series_Opt_curtailment
             'converter_loading': pd.DataFrame(),  # Time_series_conv_res
             'real_power_by_zone': pd.DataFrame(),  # Time_series_Opt_Gen_perPriceZone
-            'prices_by_zone': pd.DataFrame()  # Time_series_price
+            'prices_by_zone': pd.DataFrame(),  # Time_series_price
+            'storage_soc': pd.DataFrame(),
+            'storage_p_charge': pd.DataFrame(),
+            'storage_p_discharge': pd.DataFrame(),
+            'storage_q': pd.DataFrame(),
             }
 
         self.Clustering_information = {}
@@ -223,6 +231,8 @@ class Grid:
         self.RenSource_zones=[]
         self.RenSource_zones_dic={}
         self.RenSources =[]
+        self.storage_elements = []
+        self.electrolysers = []
         self.rs2node = {'DC': {},
                         'AC': {}}
 
@@ -242,6 +252,9 @@ class Grid:
 
         self.Time_series = []
         self.Time_series_dic ={}
+        # Optional calendar axis aligned 1:1 with Time_series frame indices
+        # (length == len(Time_series[0].data) when set). Used by rolling / Dash.
+        self.ts_timestamps = None
 
         self.Price_Zones =[]
         self.Price_Zones_dic ={}
@@ -283,6 +296,8 @@ class Grid:
         self.MP_MS_TEP_run = False
         self.Seq_STEP_run = False
         self.Seq_MS_STEP_run = False
+        self.window_opf_run = False
+        self.rolling_window_opf_run = False
 
     @property
     def nodes_AC(self):
@@ -366,6 +381,14 @@ class Grid:
     @property
     def n_gen_DC(self):
         return len(self.Generators_DC) if self.Generators_DC is not None else 0
+
+    @property
+    def nstorage(self):
+        return len(self.storage_elements) if self.storage_elements is not None else 0
+
+    @property
+    def nelectrolysers(self):
+        return len(self.electrolysers) if self.electrolysers is not None else 0
 
     @property
     def tol_scaler(self):
@@ -721,11 +744,16 @@ class Grid:
             node.PGi_ren = sum(rs.PGi_ren*rs.gamma*rs.np_rsgen for rs in node.connected_RenSource)
             # Aggregate connected-generator dispatch the node sees (PGen is total output).
             node.PGi_opt = sum(gen.PGen for gen in node.connected_gen)
+            # BESS net injection (discharge - charge); electrolyser is a known load.
+            node.PGi_storage = sum(st.net_P_pu for st in node.connected_storage)
+            node.PLi_electrolyser = sum(el.P_electrolyser for el in node.connected_electrolyser)
 
         self.P_DC = np.vstack([node.PGi-node.PLi
                                +node.PconvDC
                                +node.PGi_ren
                                +node.PGi_opt
+                               +node.PGi_storage
+                               -node.PLi_electrolyser
                                 for node in self.nodes_DC])
         self.Pconv_DC = np.vstack([node.Pconv for node in self.nodes_DC])
 
@@ -742,15 +770,24 @@ class Grid:
             # Aggregate connected-generator dispatch the node sees (PGen/QGen are total output).
             node.PGi_opt = sum(gen.PGen for gen in node.connected_gen)
             node.QGi_opt = sum(gen.QGen for gen in node.connected_gen)
+            # BESS / H2 operating setpoints as known PQ (same signs as NL OPF nodal balance).
+            node.PGi_storage = sum(st.net_P_pu for st in node.connected_storage)
+            node.QGi_storage = sum(st.Q for st in node.connected_storage)
+            node.PLi_electrolyser = sum(el.P_electrolyser for el in node.connected_electrolyser)
+            node.QGi_electrolyser = sum(el.Q_electrolyser for el in node.connected_electrolyser)
         # # Negative means power leaving the system, positive means injected into the system at a node
 
         self.P_AC = np.vstack([node.PGi
                                +node.PGi_ren
                                +node.PGi_opt
-                               -node.PLi for node in self.nodes_AC])
+                               +node.PGi_storage
+                               -node.PLi
+                               -node.PLi_electrolyser for node in self.nodes_AC])
         self.Q_AC = np.vstack([node.QGi
                                 +node.QGi_ren
                                 +node.QGi_opt
+                                +node.QGi_storage
+                                +node.QGi_electrolyser
                                -node.QLi +node.Q_s_fx for node in self.nodes_AC])
         self.Ps_AC = np.vstack([node.P_s for node in self.nodes_AC])
         self.Qs_AC = np.vstack([node.Q_s for node in self.nodes_AC])
@@ -1124,8 +1161,11 @@ class Gen_AC:
     ----------
     PGen, QGen : float
         Total dispatched active/reactive power (setpoint × ``np_gen``; OPF result after solve).
-    price_zone_link : bool
-        If ``True``, ``lf``/``qf`` track the host price zone.
+    price_link : bool
+        Deprecated alias: ``True`` means ``link_cost='linear'``.
+    link_cost : LinkCost or str
+        ``'none'`` (default), ``'quadratic'`` (``qf``/``lf`` from node), or
+        ``'linear'`` (``lf`` from ``node.price``).
     is_ext_grid : bool
         External-grid (slack) generator flag.
     """
@@ -1194,8 +1234,27 @@ class Gen_AC:
     def apparent_MVA(self):
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
 
+    @property
+    def price_link(self):
+        """Deprecated: ``True`` iff ``link_cost == LinkCost.LINEAR``."""
+        return self.link_cost == LinkCost.LINEAR
+
+    @price_link.setter
+    def price_link(self, value):
+        self.link_cost = LinkCost.LINEAR if value else LinkCost.NONE
 
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type=DEFAULT_GEN_TYPE,installation_cost:float=0,S_base:float=100,np_gen: int = 1):
+        if S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if Min_pow_gen > Max_pow_gen:
+            raise ValueError("Min_pow_gen must be <= Max_pow_gen")
+        if Min_pow_genR > Max_pow_genR:
+            raise ValueError("Min_pow_genR must be <= Max_pow_genR")
+        if np_gen < 0:
+            raise ValueError("np_gen must be >= 0")
+        if S_rated is not None and S_rated <= 0:
+            raise ValueError("S_rated must be positive when provided")
+
         self.genNumber = Gen_AC.genNumber
         Gen_AC.genNumber += 1
         self.S_base = S_base
@@ -1263,7 +1322,7 @@ class Gen_AC:
             self.cost_perMVA = installation_cost
 
 
-        self.price_zone_link = False
+        self.link_cost = LinkCost.NONE
         self.is_ext_grid = False
         self.allow_sell = True
         self.p_load_base = 0.0
@@ -1312,6 +1371,15 @@ class Gen_DC:
         return self._name
 
     @property
+    def price_link(self):
+        """Deprecated: ``True`` iff ``link_cost == LinkCost.LINEAR``."""
+        return self.link_cost == LinkCost.LINEAR
+
+    @price_link.setter
+    def price_link(self, value):
+        self.link_cost = LinkCost.LINEAR if value else LinkCost.NONE
+
+    @property
     def base_cost(self):
         return self._base_cost * (1 + self.lambda_capex)
 
@@ -1349,12 +1417,20 @@ class Gen_DC:
 
 
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,gen_type=DEFAULT_GEN_TYPE,installation_cost:float=0,S_base:float=100,np_gen: int = 1):
+        if S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if Min_pow_gen > Max_pow_gen:
+            raise ValueError("Min_pow_gen must be <= Max_pow_gen")
+        if np_gen < 0:
+            raise ValueError("np_gen must be >= 0")
+
         self.genNumber_DC = Gen_DC.genNumber_DC
         Gen_DC.genNumber_DC += 1
 
         self.S_base = S_base
 
         self.Node_DC=node.name
+        self._node = node
         self.x_coord = node.x_coord
         self.y_coord = node.y_coord
         self.geometry= node.geometry
@@ -1390,7 +1466,7 @@ class Gen_DC:
         self.life_time = 50
         self.base_cost = installation_cost
 
-        self.price_zone_link = False
+        self.link_cost = LinkCost.NONE
 
         node.connected_gen.append(self)
 
@@ -1415,6 +1491,344 @@ class Gen_DC:
             self._name = name
 
         Gen_DC.names.add(self.name)
+
+
+class Storage:
+    """Battery energy storage (BESS) on an AC or DC bus.
+
+    Single class for AC and DC (``connected`` flag, like :class:`Electrolyser`).
+    Operation-only element for nonlinear OPF (Useche-Arteaga et al. 2026 §3.3).
+    Power flow treats operating ``net_P_pu`` (and AC ``Q``) as known injections,
+    like generator ``PGen``/``QGen``.
+
+    Sign convention: net active power **injected into the bus** is
+    ``P_discharge - P_charge`` (discharge counts as generation).
+
+    SoC is in **pu** (fraction of ``E_max``). ``E_max`` is physical capacity in MWh.
+    On AC: ``S_max`` and optional ``Q``. On DC: ``P_max`` net active limit.
+    ``soc_ref`` is the soft SoC target for ``ObjRule['SoC_deviation']`` (defaults to
+    ``soc_initial``); used by myopic ``ts_acdc_opf``.
+    """
+    storageNumber = 0
+    names = set()
+
+    @classmethod
+    def reset_class(cls):
+        cls.storageNumber = 0
+        cls.names = set()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.P_charge_max *= rate
+                self.P_discharge_max *= rate
+                self.P_charge *= rate
+                self.P_discharge *= rate
+                if self.connected == AcDcSide.AC:
+                    self.S_max *= rate
+                    self.Q *= rate
+                else:
+                    self.P_max *= rate
+        self._S_base = new_S_base
+
+    @property
+    def energy_MWh(self):
+        return self.SoC * self.E_max
+
+    @property
+    def net_P_pu(self):
+        return self.P_discharge - self.P_charge
+
+    @property
+    def apparent_pu(self):
+        if self.connected == AcDcSide.DC:
+            return abs(self.net_P_pu)
+        return (self.net_P_pu ** 2 + self.Q ** 2) ** 0.5
+
+    @property
+    def loading(self):
+        if self.connected == AcDcSide.AC:
+            return self.apparent_pu / self.S_max * 100 if self.S_max > 0 else 0.0
+        return abs(self.net_P_pu) / self.P_max * 100 if self.P_max > 0 else 0.0
+
+    def __init__(
+        self,
+        name,
+        node,
+        connected,
+        E_max: float,
+        P_charge_max: float,
+        P_discharge_max: float,
+        eta_charge: float,
+        eta_discharge: float,
+        S_max: float = None,
+        P_max: float = None,
+        soc_min: float = 0.0,
+        soc_max: float = 1.0,
+        soc_initial: float = 0.5,
+        soc_final=None,
+        soc_ref=None,
+        S_base: float = 100,
+        dt_hours: float = 1.0,
+    ):
+        if connected not in (AcDcSide.AC, AcDcSide.DC):
+            raise ValueError("connected must be AcDcSide.AC or AcDcSide.DC")
+        if E_max <= 0:
+            raise ValueError("E_max must be positive")
+        if not (0 < eta_charge <= 1):
+            raise ValueError("eta_charge must be in (0, 1]")
+        if not (0 < eta_discharge <= 1):
+            raise ValueError("eta_discharge must be in (0, 1]")
+        if soc_min >= soc_max:
+            raise ValueError("soc_min must be less than soc_max")
+        if not (soc_min <= soc_initial <= soc_max):
+            raise ValueError("soc_initial must lie within [soc_min, soc_max]")
+        if soc_final is not None and not (soc_min <= soc_final <= soc_max):
+            raise ValueError("soc_final must lie within [soc_min, soc_max]")
+        if soc_ref is None:
+            soc_ref = soc_initial
+        if not (soc_min <= soc_ref <= soc_max):
+            raise ValueError("soc_ref must lie within [soc_min, soc_max]")
+        if P_charge_max < 0 or P_discharge_max < 0:
+            raise ValueError("P_charge_max and P_discharge_max must be >= 0")
+        if connected == AcDcSide.AC:
+            if S_max is None or S_max <= 0:
+                raise ValueError("S_max must be positive for AC storage")
+        else:
+            if P_max is None or P_max <= 0:
+                raise ValueError("P_max must be positive for DC storage")
+        if dt_hours <= 0:
+            raise ValueError("dt_hours must be positive")
+
+        self.storageNumber = Storage.storageNumber
+        Storage.storageNumber += 1
+        self.S_base = S_base
+        self.connected = connected
+
+        self.Node = node.name
+        self._node = node
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
+        self.geometry = node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+
+        if connected == AcDcSide.AC:
+            self.Node_AC = node.name
+            self.S_max = S_max
+            self.Q = 0.0
+        else:
+            self.Node_DC = node.name
+            self.P_max = P_max
+            self.Q = 0.0
+
+        self.E_max = float(E_max)
+        self.P_charge_max = P_charge_max
+        self.P_discharge_max = P_discharge_max
+        self.eta_charge = eta_charge
+        self.eta_discharge = eta_discharge
+        self.soc_min = soc_min
+        self.soc_max = soc_max
+        self.soc_initial = soc_initial
+        self.soc_final = soc_final
+        self.soc_ref = float(soc_ref)
+        self.dt_hours = dt_hours
+
+        self.P_charge = 0.0
+        self.P_discharge = 0.0
+        self.SoC = soc_initial
+
+        node.connected_storage.append(self)
+
+        if name in Storage.names:
+            count = 1
+            new_name = f"{name}_{count}"
+            while new_name in Storage.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
+        if name is None:
+            self._name = f"storage_{node.name}"
+        else:
+            self._name = name
+
+        Storage.names.add(self.name)
+
+
+class Electrolyser:
+    """Electrolyser with linear H₂ production and inventory (paper §3.4).
+
+    Single class for AC and DC buses (``connected`` flag, like :class:`Ren_Source`).
+    Active power ``P_electrolyser`` is a **load**. On AC, optional ``Q_electrolyser``
+    bounds allow reactive compensation. ``mass_H2`` is in **kg**.
+    Power flow uses operating ``P_electrolyser`` as a known load (and AC
+    ``Q_electrolyser`` as a known reactive injection), like generator setpoints.
+
+    ``empty_tank_cycle`` controls out-of-opt inventory resets (not a Pyomo
+    constraint):
+
+    * ``None`` (default): myopic ``ts_acdc_opf`` never empties (mass carries until
+      ``H2_mass_max`` binds); rolling windows empty at every commit boundary.
+    * positive int ``N``: myopic empties after every ``N`` solved frames; rolling
+      empties at the first commit boundary whose 1-based end hour is
+      ``>= k·N`` (window boundary at or past each cycle multiple).
+    """
+    electrolyserNumber = 0
+    names = set()
+
+    @classmethod
+    def reset_class(cls):
+        cls.electrolyserNumber = 0
+        cls.names = set()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def S_base(self):
+        return self._S_base
+
+    @S_base.setter
+    def S_base(self, new_S_base):
+        if new_S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if hasattr(self, '_S_base'):
+            old_S_base = self._S_base
+            if old_S_base != new_S_base:
+                rate = old_S_base / new_S_base
+                self.P_max *= rate
+                self.P_min *= rate
+                self.P_electrolyser *= rate
+                if self.connected == AcDcSide.AC:
+                    self.Q_min *= rate
+                    self.Q_max *= rate
+                    self.Q_electrolyser *= rate
+        self._S_base = new_S_base
+
+    @property
+    def loading(self):
+        return self.P_electrolyser / self.P_max * 100 if self.P_max > 0 else 0.0
+
+    def empty_tank(self):
+        """Reset inventory to empty (carry / between-solve only; not an OPF constraint)."""
+        self.H2_mass_initial = 0.0
+        self.mass_H2 = 0.0
+
+    def __init__(
+        self,
+        name,
+        node,
+        connected,
+        P_max: float,
+        P_min: float,
+        b_h: float,
+        c_h: float,
+        H2_mass_max: float,
+        H2_mass_initial: float = 0.0,
+        H2_mass_final=None,
+        h2_price: float = 0.0,
+        Q_min: float = 0.0,
+        Q_max: float = 0.0,
+        S_base: float = 100,
+        dt_hours: float = 1.0,
+        empty_tank_cycle=None,
+    ):
+        if connected not in (AcDcSide.AC, AcDcSide.DC):
+            raise ValueError("connected must be AcDcSide.AC or AcDcSide.DC")
+        if P_max <= 0:
+            raise ValueError("P_max must be positive")
+        if P_min < 0 or P_min > P_max:
+            raise ValueError("P_min must satisfy 0 <= P_min <= P_max")
+        if H2_mass_max <= 0:
+            raise ValueError("H2_mass_max must be positive")
+        if not (0 <= H2_mass_initial <= H2_mass_max):
+            raise ValueError("H2_mass_initial must lie within [0, H2_mass_max]")
+        if H2_mass_final is not None and not (0 <= H2_mass_final <= H2_mass_max):
+            raise ValueError("H2_mass_final must lie within [0, H2_mass_max]")
+        if h2_price < 0:
+            raise ValueError("h2_price must be >= 0")
+        if connected == AcDcSide.AC and Q_min > Q_max:
+            raise ValueError("Q_min must be <= Q_max")
+        if dt_hours <= 0:
+            raise ValueError("dt_hours must be positive")
+        if empty_tank_cycle is not None:
+            if not isinstance(empty_tank_cycle, int) or empty_tank_cycle < 1:
+                raise ValueError(
+                    "empty_tank_cycle must be None or an int >= 1, "
+                    f"got {empty_tank_cycle!r}"
+                )
+
+        self.electrolyserNumber = Electrolyser.electrolyserNumber
+        Electrolyser.electrolyserNumber += 1
+        self.S_base = S_base
+        self.connected = connected
+
+        self.Node = node.name
+        self._node = node
+        self.x_coord = node.x_coord
+        self.y_coord = node.y_coord
+        self.geometry = node.geometry
+        self.kV_base = node.kV_base
+        self.PZ = node.PZ
+        self.hover_text = None
+
+        if connected == AcDcSide.AC:
+            self.Node_AC = node.name
+            self.Q_min = Q_min
+            self.Q_max = Q_max
+            self.Q_electrolyser = 0.0
+        else:
+            self.Node_DC = node.name
+            self.Q_min = 0.0
+            self.Q_max = 0.0
+            self.Q_electrolyser = 0.0
+
+        self.P_max = P_max
+        self.P_min = P_min
+        self.b_h = b_h
+        self.c_h = c_h
+        self.H2_mass_max = float(H2_mass_max)
+        self.H2_mass_initial = float(H2_mass_initial)
+        self.H2_mass_final = H2_mass_final
+        self.h2_price = float(h2_price)
+        self.dt_hours = dt_hours
+        self.empty_tank_cycle = empty_tank_cycle
+        self.TS_dict = {'h2_price': None}
+
+        self.P_electrolyser = 0.0
+        self.mass_H2 = H2_mass_initial
+
+        node.connected_electrolyser.append(self)
+
+        if name in Electrolyser.names:
+            count = 1
+            new_name = f"{name}_{count}"
+            while new_name in Electrolyser.names:
+                count += 1
+                new_name = f"{name}_{count}"
+            name = new_name
+        if name is None:
+            self._name = f"electrolyser_{node.name}"
+        else:
+            self._name = name
+
+        Electrolyser.names.add(self.name)
+
 
 class Ren_Source:
     """Renewable generation source attached to a node.
@@ -1516,6 +1930,15 @@ class Ren_Source:
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
 
     def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100,installation_cost:float=0,Max_S_factor:float=1,np_rsgen: int = 1):
+        if S_base <= 0:
+            raise ValueError("S_base must be positive")
+        if PGi_ren_base < 0:
+            raise ValueError("PGi_ren_base must be >= 0")
+        if np_rsgen < 0:
+            raise ValueError("np_rsgen must be >= 0")
+        if Max_S_factor <= 0:
+            raise ValueError("Max_S_factor must be positive")
+
         self.rsNumber = Ren_Source.rsNumber
         Ren_Source.rsNumber += 1
 
@@ -1746,7 +2169,9 @@ class Node_AC:
         self.P_INJ = 0
         self.Q_INJ = 0
 
-        self.price = 0.0
+        self._price = 0.0
+        self._qf = 0.0
+        self._lf = 0.0
         self.Num_conv_connected=0
         self.connected_conv=set()
 
@@ -1758,6 +2183,8 @@ class Node_AC:
 
         self.connected_gen=[]
         self.connected_RenSource=[]
+        self.connected_storage=[]
+        self.connected_electrolyser=[]
 
         self.connected_toExpLine=[]
         self.connected_fromExpLine=[]
@@ -1793,6 +2220,39 @@ class Node_AC:
         Node_AC.names.add(self.name)
 
         self.S_base = S_base
+
+    @property
+    def price(self):
+        return self._price
+
+    @price.setter
+    def price(self, value):
+        self._price = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.LINEAR:
+                gen.lf = value
+
+    @property
+    def qf(self):
+        return self._qf
+
+    @qf.setter
+    def qf(self, value):
+        self._qf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.qf = value
+
+    @property
+    def lf(self):
+        return self._lf
+
+    @lf.setter
+    def lf(self, value):
+        self._lf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.lf = value
 
     @property
     def S_base(self):
@@ -1987,7 +2447,9 @@ class Node_DC:
         self.connected_DCDC_to=set()
         self.connected_DCDC_from=set()
 
-        self.price = 0.0
+        self._price = 0.0
+        self._qf = 0.0
+        self._lf = 0.0
 
         self.Nconv= None
         self.Nconv_i=None
@@ -2007,6 +2469,9 @@ class Node_DC:
 
         self.connected_gen=[]
         self.connected_RenSource=[]
+        self.connected_storage=[]
+        self.connected_electrolyser=[]
+
         self.PGi_ren = 0
         self.PGi_opt = 0
 
@@ -2022,6 +2487,39 @@ class Node_DC:
         Node_DC.names.add(self.name)
 
         self.S_base = S_base
+
+    @property
+    def price(self):
+        return self._price
+
+    @price.setter
+    def price(self, value):
+        self._price = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.LINEAR:
+                gen.lf = value
+
+    @property
+    def qf(self):
+        return self._qf
+
+    @qf.setter
+    def qf(self, value):
+        self._qf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.qf = value
+
+    @property
+    def lf(self):
+        return self._lf
+
+    @lf.setter
+    def lf(self, value):
+        self._lf = value
+        for gen in self.connected_gen:
+            if gen.link_cost == LinkCost.QUADRATIC:
+                gen.lf = value
 
     @property
     def S_base(self):
@@ -3600,7 +4098,8 @@ class Ren_source_zone:
     def PRGi_available(self, value):
         self._PRGi_available = value
         for ren_source in self.RenSources:
-                ren_source.PRGi_available=value
+            if ren_source.PGRi_linked:
+                ren_source.PRGi_available = value
                 ren_source.Ren_source_zone = self.name
 
     def __init__(self,name=None):
@@ -3697,20 +4196,36 @@ class Price_Zone:
 
     @price.setter
     def price(self, value):
+        """Zone ``price`` → member ``node.price`` only (gens via node ``link_cost``)."""
         self._price = value
         for node in self.nodes_AC:
-            node.price=value
-            for gen in node.connected_gen:
-                if gen.price_zone_link:
-                    gen.lf=value
-                    gen.qf=0
+            node.price = value
+        for node in self.nodes_DC:
+            node.price = value
         # Notify all linked MTDC price_zones about the price change
         for mtdc_price_zone in self.mtdc_price_zones:
-            mtdc_price_zone.update_price()  # Automatically update MTDC price_zone's price
+            mtdc_price_zone.update_price()
 
         # If this price_zone has a linked price_zone, update the linked price_zone's price
         if self.linked_price_zone is not None:
-            self.linked_price_zone.price = value  # This will trigger the price setter of the offshore price_zone
+            self.linked_price_zone.price = value
+
+    def _push_a_to_nodes(self):
+        """Zone ``a`` → member ``node.qf``."""
+        a = self.a
+        for node in self.nodes_AC:
+            node.qf = a
+        for node in self.nodes_DC:
+            node.qf = a
+
+    def _push_b_to_nodes(self):
+        """Zone ``b`` → member ``node.lf``."""
+        b = self._b
+        for node in self.nodes_AC:
+            node.lf = b
+        for node in self.nodes_DC:
+            node.lf = b
+
     @property
     def a_base(self):
         return self._a_base
@@ -3738,8 +4253,10 @@ class Price_Zone:
         self._b = value
         if self.expand_import:
             self.calc_import_expand()
+            self._push_a_to_nodes()
         else:
             self.calc_curvature_effect()
+        self._push_b_to_nodes()
 
     @property
     def PGL_min_base(self):
@@ -3750,6 +4267,7 @@ class Price_Zone:
         self._PGL_min_base = value
         if self.expand_import:
             self.calc_import_expand()
+            self._push_a_to_nodes()
         else:
             self.calc_curvature_effect()
 
@@ -3758,6 +4276,7 @@ class Price_Zone:
             self.calc_import_expand()
         else:
             self.calc_curvature_effect()
+        self._push_a_to_nodes()
 
     @property
     def import_expand(self):

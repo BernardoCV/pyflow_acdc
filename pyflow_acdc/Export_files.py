@@ -113,8 +113,8 @@ def generate_add_gen_code(gens, S_base):
     for gen in gens:
         if gen.get("is_ext_grid"):
             code += f"    pyf.add_extgrid(grid, '{gen['node']}', gen_name='{gen['name']}', "
-            if gen["price_zone_link"]:
-                code += f"price_zone_link={gen['price_zone_link']}, "
+            if gen["price_link"]:
+                code += f"price_link={gen['price_link']}, "
             code += (
                 f"lf={gen['lf']}, qf={gen['qf']}, "
                 f"MVAmax={gen['MVAmax']}, MWmax={gen['MWmax']}, MWmin={gen['MWmin']}, "
@@ -124,8 +124,8 @@ def generate_add_gen_code(gens, S_base):
             continue
 
         code += f"    pyf.add_gen(grid, '{gen['node']}', '{gen['name']}', "
-        if gen["price_zone_link"]:
-            code += f"price_zone_link={gen['price_zone_link']}, "
+        if gen["price_link"]:
+            code += f"price_link={gen['price_link']}, "
         code += (
             f"np_gen={gen['np_gen']}, fc={gen['fc']}, lf={gen['lf']}, qf={gen['qf']}, "
             f"MWmax={gen['Max_pow_gen'] * S_base}, MWmin={gen['Min_pow_gen'] * S_base}, "
@@ -151,8 +151,8 @@ def generate_add_gen_dc_code(gens, S_base):
 
     for gen in gens:
         code += f"    pyf.add_gen_DC(grid, '{gen['node']}', gen_name='{gen['name']}', "
-        if gen["price_zone_link"]:
-            code += f"price_zone_link={gen['price_zone_link']}, "
+        if gen["price_link"]:
+            code += f"price_link={gen['price_link']}, "
         code += (
             f"np_gen={gen['np_gen']}, fc={gen['fc']}, lf={gen['lf']}, qf={gen['qf']}, "
             f"MWmax={gen['Max_pow_gen'] * S_base}, MWmin={gen['Min_pow_gen'] * S_base}, "
@@ -429,7 +429,7 @@ def create_dictionaries(grid):
                     "Pset": gen.Pset,
                     "Qset": gen.Qset,
                     "S_rated": gen.Max_S,
-                    "price_zone_link": gen.price_zone_link,
+                    "price_link": gen.price_link,
                     "is_ext_grid": gen.is_ext_grid,
                     "allow_sell": gen.allow_sell,
                     "P_load_MW": gen.p_load_base * grid.S_base,
@@ -461,7 +461,7 @@ def create_dictionaries(grid):
                     "lf": gen.lf,
                     "fc": gen.fc,
                     "Pset": gen.Pset,
-                    "price_zone_link": gen.price_zone_link,
+                    "price_link": gen.price_link,
                     "fuel_type": gen.gen_type,
                     "installation_cost": gen._base_cost,
                 })
