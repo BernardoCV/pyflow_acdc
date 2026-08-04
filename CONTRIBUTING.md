@@ -11,7 +11,8 @@ cd pyflow_acdc
 pip install -e .
 ```
 
-Requires **Python 3.10+**. Install the optional extras you need (see the
+Requires **Python 3.10+**. Package version is set in `pyproject.toml`
+(this branch is **0.6.4**). Install the optional extras you need (see the
 README for the full list), e.g.:
 
 ```bash
