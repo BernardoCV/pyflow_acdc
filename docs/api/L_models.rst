@@ -6,10 +6,9 @@ modules. [1]_ They trade full AC (and nonlinear DC/converter) accuracy for
 speed and LP/MILP-solvability, making them suitable for fast studies, large
 sweeps, and the Pyomo backend of :func:`~pyflow_acdc.wind_farm_CSS`.
 
-**Not SOCP.** This stack is an **LP** linearization of the existing NL OPF
-(Bθ AC; fixed-``V_ini`` DC; thin converter ``a + b·Ps``). Second-order cone /
-CCP formulations are out of scope (see the convex SOCP plan if present). Prefer
-:func:`~pyflow_acdc.optimal_pf` / :doc:`window` when you need full NL physics.
+Component formulations (Non-linear vs Linear) are documented on the system
+modelling pages: :doc:`modelling_ac`, :doc:`modelling_dc`,
+:doc:`modelling_acdc_converter`, and :doc:`modelling_storage_hydrogen`.
 
 Model construction lives in ``pyflow_acdc.L_models.AC_OPF_L_model``; operational
 drivers are :func:`~pyflow_acdc.optimal_l_pf`,

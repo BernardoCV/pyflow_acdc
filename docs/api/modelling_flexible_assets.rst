@@ -78,6 +78,27 @@ with bounds ``soc_min`` / ``soc_max``, optional window terminal ``soc_final``,
 and AC S-circle / DC net-:math:`P` limits. **Sign convention:** net active
 power injected into the bus is ``P_discharge - P_charge``.
 
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same SoC update is used, with a net active-power
+limit and no reactive storage power:
+
+.. math::
+    :label: eq:bess_l
+
+    \begin{align}
+        \mathrm{SoC}_{t}
+        &=
+        \mathrm{SoC}_{t-1}
+        +
+        \frac{\Delta t\, S_{\mathrm{base}}}{E_{\max}}
+        \Bigl(
+            \eta_c P_{t}^{c} - \frac{P_{t}^{d}}{\eta_d}
+        \Bigr) \\
+        |P_{t}^{d}-P_{t}^{c}| &\leq P^{\max}
+    \end{align}
+
 * :attr:`~pyflow_acdc.Node_AC.connected_storage` /
   :attr:`~pyflow_acdc.Node_DC.connected_storage` /
   :attr:`~pyflow_acdc.Grid.storage_elements`
@@ -141,6 +162,19 @@ resets between solves (not a Pyomo constraint) — see :doc:`../usage_window_opf
 and :func:`~pyflow_acdc.ts_acdc_opf`. Optional ``H2_mass_final`` is enforced in
 coupled window / rolling OPF when set. Economics use ``h2_price`` with
 ``ObjRule['H2_sale']``.
+
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same inventory update is used with electrolyser
+active power only:
+
+.. math::
+    :label: eq:h2_l
+
+    h = b_{h}\, P_{e}\, S_{\mathrm{base}}\, \Delta t + c_{h},
+    \qquad
+    M_{t} = M_{t-1} + h
 
 * :attr:`~pyflow_acdc.Node_AC.connected_electrolyser` /
   :attr:`~pyflow_acdc.Node_DC.connected_electrolyser` /
