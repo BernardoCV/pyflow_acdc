@@ -457,11 +457,6 @@ def _run_sequential_core(
                 total_row[col] = ""
         seq_results_df = pd.concat([seq_results_df, pd.DataFrame([total_row])], ignore_index=True)
 
-    run_results["_meta"] = {
-        "aborted": bool(aborted),
-        "abort_reason": abort_reason,
-    }
-
     setattr(grid, run_results_attr, run_results)
     setattr(grid, run_flag_attr, True)
     setattr(grid, results_attr, seq_results_df)

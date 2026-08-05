@@ -7,11 +7,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.8**.
+> packaged version is **0.6.9**.
 
 ## [Unreleased]
 
-## [0.6.8]
+## [0.6.9]
 
 Controllable heat pumps (NL + linear P-only twin).
 
@@ -32,6 +32,13 @@ Controllable heat pumps (NL + linear P-only twin).
   ``_modify_parameters_l`` and myopic carry include heat-pump ``E_heat_pump_prev``
   / refs when ``grid.HP``; ``window_block=True`` skips rewriting
   ``E_heat_pump_prev`` (parent window owns the energy chain).
+
+## [0.6.8]
+
+### Fixed
+- **Sequential STEP results export**: removed redundant ``run_results["_meta"]``
+  (abort status stays on ``grid.Seq_*_aborted`` / ``abort_reason``), so
+  ``pyomo_model_results_sequential`` no longer hits mixed str/int key sorting.
 
 ## [0.6.7]
 
