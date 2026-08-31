@@ -7,9 +7,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.9**.
+> packaged version is **0.6.10**.
 
 ## [Unreleased]
+
+## [0.6.10]
+
+### Fixed
+- **case118 TEP benchmark export interfaces**: ``add_extgrid`` at nodes 10/119/120
+  no longer pass ``MWmax=0``; ``MVAmax=export_capacity/3`` now sets the active-power
+  limit so TS OPF ``grid_state`` bounds and external-grid export capacity match the
+  benchmark.
 
 ## [0.6.9]
 
