@@ -12,6 +12,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from pyflow_acdc.example_grids._example_data_paths import resolve_example_data_path
+
 # Table 1 BESS in physical MW/MWh (0.33 pu @ 3500 MVA).
 BESS_P_NOM_MW = 0.33 * 3500.0
 BESS_E_MAX_MWH = 3500.0
@@ -56,8 +58,6 @@ EXPORT_PRICE_NODES = {
 PEI_OBJ_RULE = {"Energy_cost": 1}
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-PEI_DATA_DIR = _REPO_ROOT / "examples" / "PEI_BESS"
-PEI_FULL_DATA_DIR = PEI_DATA_DIR / "Full_data"
 PEI_BESS_GITHUB_BASE = (
     "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/PEI_BESS/"
 )
@@ -94,11 +94,18 @@ def normalize_pei_seasons(seasons=None):
     return out
 
 
+def _pei_data_source(filename, *, relative_path=""):
+    return resolve_example_data_path(
+        filename,
+        example_subdir="PEI_BESS",
+        github_base=PEI_BESS_GITHUB_BASE,
+        repo_root=_REPO_ROOT,
+        relative_path=relative_path,
+    )
+
+
 def _pei_season_source(season, filename):
-    path = PEI_DATA_DIR / season / filename
-    if path.is_file():
-        return path
-    return f"{PEI_BESS_GITHUB_BASE}{season}/{filename}"
+    return _pei_data_source(filename, relative_path=season)
 
 
 def load_pei_power_matrix(seasons=None):
@@ -204,12 +211,8 @@ def load_pei_full_frames(ts_start=None, ts_end=None):
     b_cg : DataFrame
     wind_avail : DataFrame
     """
-    market_path = PEI_FULL_DATA_DIR / FULL_MARKET_CSV
-    wind_path = PEI_FULL_DATA_DIR / FULL_WIND_CSV
-    if not market_path.is_file():
-        raise FileNotFoundError(market_path)
-    if not wind_path.is_file():
-        raise FileNotFoundError(wind_path)
+    market_path = _pei_data_source(FULL_MARKET_CSV, relative_path="Full_data")
+    wind_path = _pei_data_source(FULL_WIND_CSV, relative_path="Full_data")
 
     market = pd.read_csv(market_path)
     m_ts = _parse_utc(market.iloc[2:, 0])

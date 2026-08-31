@@ -68,3 +68,31 @@ jobs:
 
           print("import ok")
           PY
+
+      - name: Example grid smoke test (installed wheel only)
+        run: |
+          python - <<'PY'
+          import pyflow_acdc as pyf
+
+          CASES = (
+              ("case118_TEP_benchmark", lambda: pyf.cases["case118_TEP_benchmark"]()),
+              ("case24_MP", lambda: pyf.cases["case24_MP"]()),
+              ("CigreB4_ACDC", lambda: pyf.cases["CigreB4_ACDC"]()),
+              (
+                  "NS_MTDC_2025",
+                  lambda: pyf.cases["NS_MTDC_2025"](
+                      years_data="24", expandable=False, online=False
+                  ),
+              ),
+          )
+
+          for name, load in CASES:
+              grid, res = load()
+              if grid is None or res is None:
+                  raise SystemExit(f"{name}: factory returned None")
+              if not grid.nodes_AC and not grid.nodes_DC:
+                  raise SystemExit(f"{name}: grid has no nodes")
+              print(f"ok {name}")
+
+          print("wheel example-grid smoke ok")
+          PY
