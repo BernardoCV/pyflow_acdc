@@ -17,35 +17,29 @@ import pandas as pd
 import pyflow_acdc as pyf
 from shapely.geometry import LineString, Point
 
+from pyflow_acdc.example_grids._example_data_paths import (
+    first_example_data_dir,
+    resolve_example_data_path,
+)
+
 NORTH_SEA_GRID_DATA_GITHUB_BASE = (
     "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/North_Sea_grid_data/"
 )
-
-
-def _is_url(path):
-    text = str(path)
-    return text.startswith("http://") or text.startswith("https://")
-
-
-def _north_sea_data_dir():
-    data_dir = Path(__file__).resolve().parents[3] / "examples" / "North_Sea_grid_data"
-    if not data_dir.is_dir():
-        raise FileNotFoundError(
-            f"North Sea grid data directory not found: {data_dir}. "
-            "Expected examples/North_Sea_grid_data/ at the pyflow_acdc repository root."
-        )
-    return data_dir
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve_example_path(filename, *, online=True):
-    if _is_url(filename):
-        return str(filename)
-    if online:
-        return NORTH_SEA_GRID_DATA_GITHUB_BASE + Path(filename).name
-    path = _north_sea_data_dir() / filename
-    if not path.exists():
-        raise FileNotFoundError(f"North Sea grid data file not found: {path}")
-    return str(path)
+    return resolve_example_data_path(
+        filename,
+        example_subdir="North_Sea_grid_data",
+        github_base=NORTH_SEA_GRID_DATA_GITHUB_BASE,
+        repo_root=_REPO_ROOT,
+        online=online,
+    )
+
+
+def _north_sea_output_dir():
+    return first_example_data_dir("North_Sea_grid_data", repo_root=_REPO_ROOT)
 
 
 def NS_MTDC_2025(
@@ -306,7 +300,7 @@ if __name__ == "__main__":
         inv_load = pz.investment_decisions.get('Load', None)
         print(f"zone={pz.name} PLi_inv_factor={pz.PLi_inv_factor} inv_Load={inv_load}")
 
-    costs_csv_path = _ns_mp_data_dir() / "NS_MTDC_2025_costs_by_investment_period.csv"
+    costs_csv_path = _north_sea_output_dir() / "NS_MTDC_2025_costs_by_investment_period.csv"
     costs_csv_path.parent.mkdir(parents=True, exist_ok=True)
     costs_df = _export_element_unit_costs_by_inv_period_csv(
         grid_obj=grid,
@@ -522,7 +516,7 @@ if __name__ == "__main__":
 
         pyf.save_network_svg(
             grid,
-            name=str(_ns_mp_data_dir() / f"NS_MTDC_2025_{np_tag}_svg"),
+            name=str(_north_sea_output_dir() / f"NS_MTDC_2025_{np_tag}_svg"),
             square_ratio=True,
             line_size_factor=0.5,
             scale_ac_nodes_with_rs=True,
@@ -534,7 +528,7 @@ if __name__ == "__main__":
         if np_tag in ("np1", "npmax") or np_tag.startswith("npmax_inv"):
             pyf.plot_folium(
                 grid,
-                name=str(_ns_mp_data_dir() / f"NS_MTDC_2025_{np_tag}"),
+                name=str(_north_sea_output_dir() / f"NS_MTDC_2025_{np_tag}"),
             )
     
     print('\n[NS_MTDC_2025_setup __main__] Post-install state debug')

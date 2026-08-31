@@ -7,9 +7,25 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.8**.
+> packaged version is **0.6.9**.
 
 ## [Unreleased]
+
+## [0.6.9]
+
+### Fixed
+- **Pip example data paths**: ``case118_TEP_benchmark``, ``case24_MP``,
+  ``NS_MTDC_2025``, and PEI BESS loaders now resolve CSVs from the git-checkout
+  ``examples/`` tree and ``{sys.prefix}/examples/...`` (pip ``data-files``),
+  with GitHub raw fallback when local copies are missing. Shared helper:
+  ``example_grids/_example_data_paths.py``. Fixes ``FileNotFoundError`` after
+  ``pip install pyflow_acdc`` for benchmark and multi-period example cases.
+- **Wheel packaging**: include ``example_grids/PF/CigreB4/*.csv`` so
+  ``CigreB4_ACDC`` works after ``pip install`` (CSVs live beside the case, not
+  under top-level ``examples/``).
+- **CI package check**: load ``case118_TEP_benchmark``, ``case24_MP``,
+  ``CigreB4_ACDC``, and ``NS_MTDC_2025`` (``online=False``) from the installed
+  wheel to catch missing example data in distributions.
 
 ## [0.6.8]
 
