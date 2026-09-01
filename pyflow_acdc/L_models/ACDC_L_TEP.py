@@ -292,7 +292,7 @@ def linear_transmission_expansion(
             model, grid, solver_results=model_results, tee=tee
         )
         for obj in weights_def:
-            weights_def[obj]['v'] = calculate_objective(grid, obj, True)
+            weights_def[obj]['v'] = calculate_objective(grid, obj)
             weights_def[obj]['NPV'] = weights_def[obj]['v'] * present_value
     t2 = time.perf_counter()
 

@@ -778,7 +778,7 @@ def transmission_expansion(
             grid.create_Ybus_DC()
         export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ,TEP=True)
         for obj in weights_def:
-            weights_def[obj]['v']=calculate_objective(grid,obj,True)
+            weights_def[obj]['v']=calculate_objective(grid,obj)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
     t2 = time.perf_counter()
 
