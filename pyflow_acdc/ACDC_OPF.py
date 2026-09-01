@@ -43,7 +43,7 @@ def pack_variables(*args):
     return args
 
 
-def obj_w_rule(grid,ObjRule,OnlyGen):
+def obj_w_rule(grid,ObjRule):
     weights_def = default_obj_weights()
 
     # If user provides specific weights, merge them with the default
@@ -52,8 +52,6 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
            if key in weights_def:
                weights_def[key]['w'] = ObjRule[key]
 
-    if OnlyGen == False:
-        grid.OnlyGen=False
     Price_Zones = False
     if  weights_def[ObjComponent.PZ_COST_OF_GENERATION]['w']!=0 :
         Price_Zones=True
@@ -64,7 +62,7 @@ def obj_w_rule(grid,ObjRule,OnlyGen):
 
 
 
-def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0,build_only=False):
+def optimal_l_pf(grid,ObjRule=None,Price_Zones=False,solver='glpk',tee=False,callback=False,obj_scaling=1.0,build_only=False):
     """Build and solve the linearised AC(/DC) OPF for ``grid``.
 
     Constructs the linearised Pyomo model (AC Bθ; when ``grid.DCmode``, also
@@ -82,8 +80,6 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
         Network to optimise (mutated in place).
     ObjRule : dict or None, optional
         Objective-component weights; ``None`` uses the grid defaults.
-    OnlyGen : bool, optional
-        Restrict the objective to generator-based costs.
     Price_Zones : bool, optional
         Enable price-zone pricing (resolved from the objective rule).
     solver : str, optional
@@ -107,12 +103,12 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     Examples
     --------
     >>> pyf.optimal_l_pf(
-    ...     grid, ObjRule=None, OnlyGen=True, Price_Zones=False, solver='glpk', tee=False)
+    ...     grid, ObjRule=None, Price_Zones=False, solver='glpk', tee=False)
     """
     grid.reset_run_flags()
     analyse_grid(grid)
 
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule)
 
     check_linear_opf_weights(weights_def)
 
@@ -155,7 +151,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     export_acdc_l_model_to_pyflow_acdc(model, grid)
 
     for obj in weights_def:
-        weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
+        weights_def[obj]['v']=calculate_objective(grid,obj)
 
     t2 = time.perf_counter()
     t_modelexport = t2-t1
@@ -170,7 +166,7 @@ def optimal_l_pf(grid,ObjRule=None,OnlyGen=True,Price_Zones=False,solver='glpk',
     }
     return model, model_res , timing_info, solver_stats
 
-def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0,build_only=False,export_if_feasible=False):
+def optimal_pf(grid,ObjRule=None,PV_set=False,Price_Zones=False,limit_flow_rate=True,solver='ipopt',tee=False,callback=False,obj_scaling=1.0,build_only=False,export_if_feasible=False):
     """Build and solve the non-linear AC/DC OPF for ``grid``.
 
     Constructs the full non-linear Pyomo model (AC/DC physics, converters,
@@ -185,8 +181,6 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
         Objective-component weights; ``None`` uses the grid defaults.
     PV_set : bool, optional
         Fix PV-bus setpoints instead of optimising them.
-    OnlyGen : bool, optional
-        Restrict the objective to generator-based costs.
     Price_Zones : bool, optional
         Enable price-zone pricing (resolved from the objective rule).
     limit_flow_rate : bool, optional
@@ -215,12 +209,12 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
     Examples
     --------
     >>> model, model_res, timing_info, solver_stats = pyf.optimal_pf(
-    ...     grid, ObjRule=None, PV_set=False, OnlyGen=True, solver='ipopt')
+    ...     grid, ObjRule=None, PV_set=False, solver='ipopt')
     """
     grid.reset_run_flags()
     analyse_grid(grid)
 
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,OnlyGen)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule)
 
     model = pyo.ConcreteModel()
     model.name="AC/DC hybrid OPF"
@@ -238,7 +232,7 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
 
 
 
-    obj_rule= opf_obj(model,grid,weights_def,OnlyGen)
+    obj_rule= opf_obj(model,grid,weights_def)
 
     if obj_scaling != 1.0:
         obj_rule = obj_rule / obj_scaling
@@ -265,7 +259,7 @@ def optimal_pf(grid,ObjRule=None,PV_set=False,OnlyGen=True,Price_Zones=False,lim
         export_acdc_nl_model_to_pyflow_acdc(model, grid, Price_Zones)
 
         for obj in weights_def:
-            weights_def[obj]['v']=calculate_objective(grid,obj,OnlyGen)
+            weights_def[obj]['v']=calculate_objective(grid,obj)
 
         grid.OPF_run=True
         grid.OPF_obj=weights_def
@@ -336,6 +330,14 @@ def opf_obj_l(model,grid,ObjRule):
                 )
                 for gen in grid.Generators
             )
+            if grid.RenSources:
+                total += sum(
+                    model.np_rsgen[rs] * (
+                        model.P_renSource[rs] * model.gamma[rs] * grid.S_base
+                        * grid.RenSources[rs].lf
+                    )
+                    for rs in model.ren_sources
+                )
         if grid.DCmode and grid.Generators_DC:
             total += sum(
                 (
@@ -403,7 +405,7 @@ def opf_obj_l_array_losses(model, grid, ObjRule):
     return (ren_injected + substations_extracted) * grid.LCoE * grid.S_base
 
 
-def opf_obj(model,grid,weights_def,OnlyGen=True):
+def opf_obj(model,grid,weights_def):
     """Build the weighted OPF objective from component weights.
 
     Parameters
@@ -414,8 +416,6 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
         Network being optimised.
     weights_def : dict
         Mapping of objective component names to ``{'w': weight}`` entries.
-    OnlyGen : bool, optional
-        Restrict energy-cost terms to generators only.
 
     Returns
     -------
@@ -445,15 +445,18 @@ def opf_obj(model,grid,weights_def,OnlyGen=True):
         if grid.DCmode:
             DC= sum(((model.PGi_gen_DC[gen.genNumber_DC]*grid.S_base)**2*gen.qf/(model.np_gen_DC[gen.genNumber_DC] + np_den_eps)+model.PGi_gen_DC[gen.genNumber_DC]*grid.S_base*model.lf_dc[gen.genNumber_DC]+model.np_gen_DC[gen.genNumber_DC]*gen.fc) for gen in grid.Generators_DC)
 
-        if OnlyGen:
-            return AC+DC
-
-        else :
-            nodes_with_RenSource = [node for node in model.nodes_AC if grid.nodes_AC[node].RenSource]
-            nodes_with_conv= [node for node in model.nodes_AC if grid.nodes_AC[node].Num_conv_connected != 0]
-            return AC+DC  \
-                   + sum(model.PGi_ren[node]*model.price[node] for node in nodes_with_RenSource)*grid.S_base \
-                   + sum(model.P_conv_AC[node]*model.price[node] for node in nodes_with_conv)*grid.S_base
+        REN = 0
+        if grid.RenSources:
+            REN = sum(
+                model.np_rsgen[rs] * (
+                    (model.P_renSource[rs] * model.gamma[rs] * grid.S_base) ** 2
+                    * grid.RenSources[rs].qf
+                    + model.P_renSource[rs] * model.gamma[rs] * grid.S_base
+                    * grid.RenSources[rs].lf
+                )
+                for rs in model.ren_sources
+            )
+        return AC + DC + REN
     def formula_AC_losses():
         if weights_def[ObjComponent.AC_LOSSES]['w']==0:
             return 0
@@ -1165,7 +1168,7 @@ def opf_step_results_l(model, grid):
     )
 
 
-def calculate_objective(grid,obj,OnlyGen=True):
+def calculate_objective(grid,obj):
 
     if obj ==ObjComponent.EXT_GEN:
         return sum((node.PGi_opt*grid.S_base) for node in grid.nodes_AC)
@@ -1181,7 +1184,16 @@ def calculate_objective(grid,obj,OnlyGen=True):
                 AC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators)
         if grid.DCmode:
             DC= sum(((gen.PGen*grid.S_base)**2*gen.qf+gen.PGen*grid.S_base*gen.lf+gen.np_gen*gen.fc) for gen in grid.Generators_DC)
-        return AC+DC
+        REN = 0
+        if grid.RenSources:
+            REN = sum(
+                rs.np_rsgen * (
+                    (rs.PGi_ren * rs.gamma * grid.S_base) ** 2 * rs.qf
+                    + rs.PGi_ren * rs.gamma * grid.S_base * rs.lf
+                )
+                for rs in grid.RenSources
+            )
+        return AC + DC + REN
 
 
 
@@ -1247,7 +1259,7 @@ def calculate_objective(grid,obj,OnlyGen=True):
 
     return 0
 
-def calculate_objective_from_model(model, grid, weights_def, OnlyGen=True):
+def calculate_objective_from_model(model, grid, weights_def):
     """
     Calculate weighted objective value directly from a solved Pyomo model.
     Uses opf_obj() to build the expression, then evaluates it once.
@@ -1255,14 +1267,13 @@ def calculate_objective_from_model(model, grid, weights_def, OnlyGen=True):
     Args:
         model: Solved Pyomo model
         grid: Grid object (needed for generator properties and grid structure)
-        ObjRule: Dictionary with objective rules (same format as opf_obj)
-        OnlyGen: Boolean flag for energy cost calculation
+        weights_def: Objective weights (same format as opf_obj)
 
     Returns:
         Weighted sum of objectives (float)
     """
     # Build the objective expression (Pyomo expression)
-    obj = opf_obj(model, grid, weights_def, OnlyGen)
+    obj = opf_obj(model, grid, weights_def)
     # Evaluate it once
     obj_value = pyo.value(obj)
     return obj_value

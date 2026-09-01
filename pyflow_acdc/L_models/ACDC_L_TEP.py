@@ -103,7 +103,7 @@ def _post_process_l_mptep_with_nl_opf(
 
     present_value_opf = present_value_factor(Hy, discount_rate, n_years)
     n_periods = int(grid.TEP_n_periods)
-    _, PZ = obj_w_rule(grid, ObjRule, True)
+    _, PZ = obj_w_rule(grid, ObjRule)
 
     # NL post-process always uses obj_scaling=1 (MP scaling is for the MILP only).
     nl_obj_scaling = 1.0
@@ -133,7 +133,7 @@ def _post_process_l_mptep_with_nl_opf(
         termination = nl_stats.get("termination_condition", "unknown") if nl_stats else "unknown"
 
         if solution_found:
-            nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj, True))
+            nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj))
             npv_nl_opf = nl_opf * present_value_opf
             economic_nl_step = tep_obj + npv_nl_opf
             if alpha is None:
@@ -245,7 +245,7 @@ def linear_transmission_expansion(
     grid.reset_run_flags()
     analyse_grid(grid)
 
-    weights_def, _ = obj_w_rule(grid, ObjRule, True)
+    weights_def, _ = obj_w_rule(grid, ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate = discount_rate
@@ -292,7 +292,7 @@ def linear_transmission_expansion(
             model, grid, solver_results=model_results, tee=tee
         )
         for obj in weights_def:
-            weights_def[obj]['v'] = calculate_objective(grid, obj, True)
+            weights_def[obj]['v'] = calculate_objective(grid, obj)
             weights_def[obj]['NPV'] = weights_def[obj]['v'] * present_value
     t2 = time.perf_counter()
 
@@ -428,7 +428,7 @@ def linear_multi_period_transmission_expansion(
             "DCmode is set."
         )
 
-    weights_def, PZ = obj_w_rule(grid, ObjRule, True)
+    weights_def, PZ = obj_w_rule(grid, ObjRule)
     if PZ:
         raise ValueError(
             "linear_multi_period_transmission_expansion does not support Price_Zones."

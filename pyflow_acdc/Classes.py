@@ -204,7 +204,6 @@ class Grid:
         self.Clustering_information = {}
 
         self.VarPrice = False
-        self.OnlyGen = True
         self.CurtCost=False
 
         self.MixedBinCont = False
@@ -1987,6 +1986,10 @@ class Ren_Source:
         Installation cost for TEP (stored as ``base_cost`` before ``lambda_capex``).
     Max_S_factor : float, optional
         Multiplier for apparent-power rating (``Max_S = PGi_ren_base * Max_S_factor``).
+    quadratic_cost_factor : float, optional
+        Quadratic ``Energy_cost`` coefficient (stored as ``qf``).
+    linear_cost_factor : float, optional
+        Linear ``Energy_cost`` coefficient (stored as ``lf``).
     np_rsgen : int, optional
         Number of parallel renewable units.
 
@@ -2053,7 +2056,7 @@ class Ren_Source:
     def apparent_MVA(self):
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
 
-    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100,installation_cost:float=0,Max_S_factor:float=1,np_rsgen: int = 1):
+    def __init__(self,name,node,PGi_ren_base: float,rs_type='Wind',S_base:float=100,installation_cost:float=0,Max_S_factor:float=1,np_rsgen: int = 1,quadratic_cost_factor: float=0,linear_cost_factor: float=0):
         if S_base <= 0:
             raise ValueError("S_base must be positive")
         if PGi_ren_base < 0:
@@ -2112,6 +2115,9 @@ class Ren_Source:
         }
 
         self.base_cost = installation_cost
+
+        self.qf = quadratic_cost_factor
+        self.lf = linear_cost_factor
 
         self.TS_dict = {
             'PRGi_available': None

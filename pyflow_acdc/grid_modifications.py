@@ -1706,7 +1706,7 @@ def add_extgrid(grid, node, gen_name=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDE
     grid.Generators.append(gen)
     return gen
 
-def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0,Qmin=None,Qmax=None,np_rsgen: int = 1):
+def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=None, price_zone=None, Offshore=False, MTDC=None, geometry=None, ren_type='Wind', min_gamma=0, Qrel=0,Qmin=None,Qmax=None,np_rsgen: int = 1, quadratic_cost_factor: float=0, linear_cost_factor: float=0):
     """Append a renewable source to ``grid.RenSources``.
 
     Optionally assigns renewable zone, price zone, offshore, or MTDC pricing in
@@ -1764,7 +1764,7 @@ def add_RenSource(grid, node, base_MW, ren_source_name=None, available=1, zone=N
         ren_source_name = f'rsgen_{node.name}'
 
     # Create renewable source
-    rensource = Ren_Source(ren_source_name, node, base_MW/grid.S_base,S_base=grid.S_base,np_rsgen=np_rsgen)
+    rensource = Ren_Source(ren_source_name, node, base_MW/grid.S_base,S_base=grid.S_base,np_rsgen=np_rsgen,quadratic_cost_factor=quadratic_cost_factor,linear_cost_factor=linear_cost_factor)
     rensource.PRGi_available = available
     rensource.rs_type = ren_type
     rensource.min_gamma = min_gamma

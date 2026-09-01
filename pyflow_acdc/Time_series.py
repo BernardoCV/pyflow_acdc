@@ -1456,7 +1456,7 @@ def ts_acdc_opf(
 
         opf_create_nl_model_acdc(model_obj,grid,PV_set,price_zone_restrictions,limit_flow_rate=limit_flow_rate)
 
-        obj_rule_local = opf_obj(model_obj,grid,weights_def,OnlyGen=True)
+        obj_rule_local = opf_obj(model_obj,grid,weights_def)
         if obj_scaling != 1.0:
             obj_rule_local = obj_rule_local / obj_scaling
         model_obj.obj = pyo.Objective(rule=obj_rule_local, sense=pyo.minimize)
@@ -1676,7 +1676,6 @@ def ts_acdc_l_opf(
     start=1,
     end=None,
     ObjRule=None,
-    OnlyGen=True,
     print_step=False,
     solver='glpk',
     obj_scaling=1.0,
@@ -1702,8 +1701,6 @@ def ts_acdc_l_opf(
         Inclusive **1-based** hour indices (same as :func:`ts_acdc_opf`).
     ObjRule : dict or None, optional
         Objective weights; linear path accepts ``Energy_cost`` / ``H2_sale``.
-    OnlyGen : bool, optional
-        Passed to :func:`~pyflow_acdc.ACDC_OPF.obj_w_rule`.
     print_step : bool, optional
         Print the current hour index while running.
     solver : str, optional
@@ -1763,7 +1760,7 @@ def ts_acdc_l_opf(
     Time_series_heat_pump_energy = []
 
     analyse_grid(grid)
-    weights_def, price_zones = obj_w_rule(grid, ObjRule, OnlyGen)
+    weights_def, price_zones = obj_w_rule(grid, ObjRule)
     check_linear_opf_weights(weights_def)
 
     def _snapshot_initial_values(model_obj):

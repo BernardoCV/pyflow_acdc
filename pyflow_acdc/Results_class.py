@@ -1253,7 +1253,6 @@ class Results:
         tcur_total=0
         totcost=0
         totcurcost=0
-        price=0
         for rs in self.Grid.RenSources:
                 Pgi=rs.PGi_ren*self.Grid.S_base
                 bp+=Pgi
@@ -1264,8 +1263,13 @@ class Results:
                 bp_total += Pgi * rs.np_rsgen
                 tcur_total += Pgi * (1-rs.gamma) * rs.np_rsgen
 
-                if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
-
+                cost = rs.np_rsgen * (
+                    (Pgi * rs.gamma) ** 2 * rs.qf
+                    + Pgi * rs.gamma * rs.lf
+                ) / 1000
+                if self.Grid.CurtCost==False:
+                    curcost=0
+                else:
                     if rs.connected == AcDcSide.AC:
                         node_num = self.Grid.rs2node[AcDcSide.AC.value][rs.rsNumber]
                         node = self.Grid.nodes_AC[node_num]
@@ -1274,12 +1278,6 @@ class Results:
                         node_num = self.Grid.rs2node[AcDcSide.DC.value][rs.rsNumber]
                         node = self.Grid.nodes_DC[node_num]
                         price=node.price
-                    cost=PGicur*price/1000
-                else:
-                    cost=0
-                if self.Grid.CurtCost==False:
-                    curcost=0
-                else:
                     curcost= (Pgi*rs.np_rsgen-PGicur)*price*(self.Grid.sigma)/1000
                 rows.append({
                     "Name": rs.name,
@@ -1289,7 +1287,8 @@ class Results:
                     "Curtailment %": np.round(cur, decimals=self.dec),
                     "Power Injected (MW)": np.round(PGicur, decimals=self.dec),
                     "Reactive Power Injected (MVAR)": np.round(QGi, decimals=self.dec),
-                    "Price €/MWh": np.round(price, decimals=self.dec),
+                    "Quadratic Price €/MWh^2": np.round(rs.qf, decimals=self.dec),
+                    "Linear Price €/MWh": np.round(rs.lf, decimals=self.dec),
                     "Cost k€": np.round(cost, decimals=0),
                     "Curtailment Cost [k€]": np.round(curcost, decimals=0)
                 })
@@ -1307,7 +1306,8 @@ class Results:
             "Curtailment %": np.round(cur, decimals=self.dec),
             "Power Injected (MW)": np.round(PGicur, decimals=self.dec),
             "Reactive Power Injected (MVAR)": "",
-            "Price €/MWh": "",
+            "Quadratic Price €/MWh^2": "",
+            "Linear Price €/MWh": "",
             "Cost k€": np.round(totcost, decimals=0),
             "Curtailment Cost [k€]": np.round(totcurcost, decimals=0)
         })
@@ -1315,7 +1315,8 @@ class Results:
         df = pd.DataFrame(rows) if rows else pd.DataFrame(
             columns=["Name","Bus", "Num. gen", "Base Power (MW)", "Curtailment %",
                      "Power Injected (MW)","Reactive Power Injected (MVAR)",
-                     "Price €/MWh","Cost k€","Curtailment Cost [k€]"]
+                     "Quadratic Price €/MWh^2", "Linear Price €/MWh",
+                     "Cost k€","Curtailment Cost [k€]"]
         )
         self.tables["Ext_REN"] = df
 
@@ -1325,7 +1326,8 @@ class Results:
             table = pt()
             table.field_names = ["Name","Bus", "Num. gen", "Base Power (MW)", "Curtailment %",
                                  "Power Injected (MW)","Reactive Power Injected (MVAR)",
-                                 "Price €/MWh","Cost k€","Curtailment Cost [k€]"]
+                                 "Quadratic Price €/MWh^2", "Linear Price €/MWh",
+                                 "Cost k€","Curtailment Cost [k€]"]
             for _, row in df.iterrows():
                 table.add_row([
                     row["Name"],
@@ -1335,7 +1337,8 @@ class Results:
                     row["Curtailment %"],
                     row["Power Injected (MW)"],
                     row["Reactive Power Injected (MVAR)"],
-                    row["Price €/MWh"],
+                    row["Quadratic Price €/MWh^2"],
+                    row["Linear Price €/MWh"],
                     row["Cost k€"],
                     row["Curtailment Cost [k€]"],
                 ])
@@ -2904,10 +2907,13 @@ class Results:
             price=m.price
 
             sc = (m.a*ie**2+ie*m.b)/1000
-            if not self.Grid.OnlyGen or self.Grid.OPF_Price_Zones_constraints_used:
-                Rgen_cost=Rgen*m.price/1000
-            else:
-                Rgen_cost= 0
+            Rgen_cost = sum(
+                rs.np_rsgen * (
+                    (rs.PGi_ren * rs.gamma * self.Grid.S_base) ** 2 * rs.qf
+                    + rs.PGi_ren * rs.gamma * self.Grid.S_base * rs.lf
+                )
+                for node in m.nodes_AC for rs in node.connected_RenSource
+            ) / 1000
             gen_cost = gen*m.price/1000
             if self.Grid.CurtCost==False:
                 curt_cost=0
