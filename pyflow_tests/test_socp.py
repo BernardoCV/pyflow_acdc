@@ -114,6 +114,38 @@ def test_socp_builds_with_bess_mi_exclusivity():
     assert stats["n_vars"] > 0
 
 
+def test_socp_ccp_builds_case39_acdc():
+    require_socp()
+    grid = _case39_socp_grid()
+    problem, variables, _, stats = pyf.socp_ccp_optimise(
+        grid,
+        confidence_level=0.95,
+        build_only=True,
+        weights_def=SOCP_ENERGY,
+    )
+
+    assert problem is not None
+    assert variables.ac is not None
+    assert stats["n_vars"] > 0
+
+
+def test_apply_ccp_quantiles_tightens_wind_cap():
+    require_socp()
+    from pyflow_acdc.ACDC_convex import apply_ccp_quantiles, translate_pyf_socp
+
+    grid = _case39_socp_grid()
+    pyf.add_RenSource(grid, "30", base_MW=100.0, available=0.5)
+    pyf.analyse_grid(grid)
+    socp_data = translate_pyf_socp(grid, frame_ids=[0])
+    node = next(iter(socp_data.P_ren))
+    p_before = float(socp_data.P_ren[node][0])
+
+    apply_ccp_quantiles(socp_data, grid, confidence_level=0.95)
+    p_after = float(socp_data.P_ren[node][0])
+
+    assert p_after < p_before
+
+
 def test_resolve_socp_solver_warns_on_non_mi_solver():
     require_socp()
     from pyflow_acdc.solver_utils import SOCP_MI_CAPABLE_SOLVERS, resolve_socp_solver

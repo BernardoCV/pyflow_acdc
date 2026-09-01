@@ -11,7 +11,7 @@ status (what is coded vs not)** is consolidated in **§0.4** — read that first
 Locked owner decisions: **§0.0** (L1–L28). Do not re-litigate L/Q locks without an
 explicit change.
 
-**Next work:** Phase **10** — ``socp_chance_*`` chance-constrained runners (§0.4 / §5.5).
+**Next work:** Phase **11** — ``socp_robust_*`` robust box + C&CG runners (§0.4 / §5.5).
 
 **Primary reference (Paper A — sparse SOCP + CCP)**
 
@@ -77,7 +77,7 @@ Mario reference (workspace): `mario_implementation/scop/ACDC_PE_Simplified_Effic
 | L19 | **Sparse only — GREEN LIGHT.** Ship sparse edge-set SOCP exclusively. Do **not** plan or implement a dense SOCP path (paper Table 2 comparison is optional later research, not a product requirement). |
 | L20 | Model is **grid pu only**; € scaling only in objective / reporting via `S_base`. |
 | L21 | **One CVXPY model with `(…, T)` indexing**, not Pyomo-style per-frame submodels. Single-period = `T=1`; window = ordered `frame_ids` with `T = len(frame_ids)`. |
-| L22 | Internal builder name: **`socp_model(grid, d)`**. Public runners — **deterministic:** **`socp_optimise`** + **`soc_window_optimisation`** (optional ``bess_mi_exclusivity``, L18); **chance-constrained (Phase 10):** **`socp_chance_optimise`** + **`socp_chance_window_optimisation`**; **robust box (Phase 11):** **`socp_robust_optimise`** + **`socp_robust_window_optimisation`**. All share one builder; uncertainty layers differ (§5.5). |
+| L22 | Internal builder name: **`socp_model(grid, d)`**. Public runners — **deterministic:** **`socp_optimise`** + **`soc_window_optimisation`** (optional ``bess_mi_exclusivity``, L18); **chance-constrained (Phase 10):** **`socp_ccp_optimise`** + **`socp_ccp_window_optimisation`**; **robust box (Phase 11):** **`socp_robust_optimise`** + **`socp_robust_window_optimisation`**. All share one builder; uncertainty layers differ (§5.5). |
 | L23 | Builder consumes a **prepared SOCP data object** only (no ad hoc `P_ren` / `P_ext_bounds` kwargs on the builder). Translation owns `T`, `frame_ids`, profiles. |
 | L24 | **AC generators (incl. ext-grids) are decision variables** (`PGi_gen`, `QGi_gen`) with OPF-NL-style bounds. Ext-grids are **not** a separate asset class — same gen family, different limits / sell logic. |
 | L25 | **Renewables stay separate** from gens: availability from TS → fixed (parameter) injection v1 (`gamma` param, L12). |
@@ -128,7 +128,7 @@ Subsystem detail and equations remain in §5; paper background in §1.
 
 #### Already done — logic implemented
 
-Phases **0–4**, **6–8**, and **9** (optional MI-BESS exclusivity).
+Phases **0–4**, **6–9**, and **10** (chance-constrained runners).
 
 | Area | Logic in code | Where |
 |------|---------------|-------|
@@ -143,6 +143,7 @@ Phases **0–4**, **6–8**, and **9** (optional MI-BESS exclusivity).
 | **H₂ (linear)** | `P_electrolyser`, optional AC `Q`; mass chain `h=b_h·P·S_base·dt+c_h`; optional `H2_mass_final` | `hydrogen_*` |
 | **Heat pumps** | NL Q twin (Q-18 **A**): `P`/`Q`/`E` chain; TS profiles; AC load injection | `heat_pump_*`, `translate_pyf_socp` |
 | **Objective** | `ObjComponent` weights: `Energy_cost`, `Ext_Gen`, `AC_losses`, `DC_losses`, `Converter_Losses`, `H2_sale`, `SoC_deviation` | `ACDC_convex._build_objective` |
+| **Chance (CCP)** | ``socp_ccp_optimise`` / ``socp_ccp_window_optimisation``; ``apply_ccp_quantiles`` on ``P_ren`` + prices | `ACDC_convex.py` |
 | **Solver / CI** | `resolve_socp_solver` (MOSEK → CLARABEL → SCS); smoke tests build + solve | `solver_utils.py`, `test_socp.py` |
 | **Docs** | Usage/API/modelling NL+L+SOCP pages; architecture pointer | `docs/`, `ARCHITECTURE.md` |
 
@@ -156,9 +157,8 @@ analyse_grid → translate_pyf_socp → socp_model → _build_objective → solv
 
 | Priority | Phase | Logic to add | Entry / trigger | Detail |
 |----------|-------|--------------|-----------------|--------|
-| **1 — next** | **10** | Chance constraints (wind + price quantiles) | ``socp_chance_optimise``, ``socp_chance_window_optimisation`` | §5.5 family A; Paper A §4 |
-| **2** | **11** | Robust box uncertainty + C&CG loop | ``socp_robust_optimise``, ``socp_robust_window_optimisation`` | §5.5 family B; Paper R §3.3 |
-| **3 — later** | — | Converter AC RL in Ybus | ``CONVEX_Ybus`` / L8 option A | Not started |
+| **1 — next** | **11** | Robust box uncertainty + C&CG loop | ``socp_robust_optimise``, ``socp_robust_window_optimisation`` | §5.5 family B; Paper R §3.3 |
+| **2 — later** | — | Converter AC RL in Ybus | ``CONVEX_Ybus`` / L8 option A | Not started |
 | **Optional** | — | PEI / paper-table parity; H₂ mandatory daily quota; NLP cross-benchmark | Tests / fixtures (L2) | §1.6, Q-16, Q-19 |
 
 **Explicit non-goals (unchanged):** dense SOCP; in-place NLP builder edits; BESS sizing.
@@ -168,7 +168,7 @@ analyse_grid → translate_pyf_socp → socp_model → _build_objective → solv
 | File | Status |
 |------|--------|
 | `convex_model/convex_model.py` | **Done** — Phase 9 adds MI gating in `storage_*` |
-| `ACDC_convex.py` | **Done** — Phase 9 kwarg; Phases 10–11 new runners |
+| `ACDC_convex.py` | **Done** — Phase 9 kwarg; **Phase 10** chance runners; Phases 11 new runners |
 | `solver_utils.py` | **Done** — Phase 9 MI backend selection |
 | `test_socp.py` | **Done** — extend for MI / chance / robust smokes |
 
@@ -379,7 +379,7 @@ internals.
 | File | Responsibility | Analogue in codebase |
 |------|----------------|----------------------|
 | **`convex_model.py`** | `build_socp_data` + `socp_model`: edge sets, `h`/`w`, SOC, AC/DC balance, **AC+DC thermals**, converters, gens; later BESS/H₂/CCP | `ACDC_OPF_NL_model.py` |
-| **`ACDC_convex.py`** | `translate_pyf_socp`; public **`socp_optimise`** + **`soc_window_optimisation`** (landed; **Phase 9** ``bess_mi_exclusivity``); **`socp_chance_*`** (Phase 10); **`socp_robust_*`** (Phase 11); weighted objective; solve; export | `ACDC_OPF.py` |
+| **`ACDC_convex.py`** | `translate_pyf_socp`; public **`socp_optimise`** + **`soc_window_optimisation`** (landed; **Phase 9** ``bess_mi_exclusivity``); **`socp_ccp_*`** (Phase 10); **`socp_robust_*`** (Phase 11); weighted objective; solve; export | `ACDC_OPF.py` |
 
 Rationale for **two files**:
 
@@ -393,7 +393,7 @@ Rationale for **two files**:
 | Item | Locked / status |
 |------|-----------------|
 | Entry points (deterministic) | **`socp_optimise`** (single / `T=1`) + **`soc_window_optimisation`** (multiperiod) — **landed**; optional ``bess_mi_exclusivity`` (Phase 9, L18) |
-| Entry points (chance-constrained) | **`socp_chance_optimise`** + **`socp_chance_window_optimisation`** — **Phase 10** (Paper A CCP) |
+| Entry points (chance-constrained) | **`socp_ccp_optimise`** + **`socp_ccp_window_optimisation`** — **Phase 10** (Paper A CCP) |
 | Entry points (robust box) | **`socp_robust_optimise`** + **`socp_robust_window_optimisation`** — **Phase 11** (Paper R + C&CG) |
 | Translate | **`translate_pyf_socp`** — shared by all runners (Q-7 locked) |
 | Uncertainty config | Per-runner kwargs; **distinct names** for the two γ notions: `confidence_level` (CCP) vs `wind_deviation_fraction` (robust box). Missing required inputs → **hard error** (no silent fallback to deterministic). |
@@ -405,7 +405,7 @@ Rationale for **two files**:
 | Runner | Uncertainty | Solve | Paper |
 |--------|-------------|-------|-------|
 | `socp_optimise` / `soc_window_optimisation` | none | single SOCP | — (landed) |
-| `socp_chance_optimise` / `socp_chance_window_optimisation` | truncated-normal quantiles on wind + price | single SOCP | Paper A §4 (Phase 10) |
+| `socp_ccp_optimise` / `socp_ccp_window_optimisation` | truncated-normal quantiles on wind + price | single SOCP | Paper A §4 (Phase 10) |
 | `socp_robust_optimise` / `socp_robust_window_optimisation` | box on wind availability ``G`` | C&CG loop (master ↔ subproblem) | Paper R §3.3 (Phase 11) |
 
 All six call the same `build_socp_data` / `socp_model` core; chance and robust runners
@@ -517,7 +517,7 @@ convex_model.py
 | AC gens / ext-grids | — | **In** — decision vars `PGi_gen`/`QGi_gen` (L24) |
 | BESS G6 (continuous) | (17)–(25) without MI | **Done** — `storage_*`; MI exclusivity Phase 9 |
 | H₂ subsystem | (13)–(16) | **Done** — `hydrogen_*` (continuous linear) |
-| **CCP layer** | (70)–(72) | **Phase 10** — `socp_chance_*` runners |
+| **CCP layer** | (70)–(72) | **Phase 10** — `socp_ccp_*` runners |
 
 **Sparse only — GREEN LIGHT (L19).** No dense SOCP mode in the product plan.
 
@@ -547,7 +547,7 @@ CVXPY solve; export.
 | Coupling | Multi-hour SoC / H₂ links | Multi-period network (`T`); no BESS/H₂ yet |
 | Physics | Polar NLP | Sparse SOCP + AC/DC thermals |
 | BESS exclusivity | No (G6) | Optional via ``bess_mi_exclusivity`` (Phase 9) |
-| Uncertainty | None in deterministic v1 | **`socp_chance_*`** (Phase 10) / **`socp_robust_*`** (Phase 11) |
+| Uncertainty | None in deterministic v1 | **`socp_ccp_*`** (Phase 10) / **`socp_robust_*`** (Phase 11) |
 | Solver | IPOPT (Pyomo) | CVXPY + conic solver |
 | Single-period sibling | `optimal_pf` | `socp_optimise` (`T=1`) |
 
@@ -622,7 +622,7 @@ y^c_k,t, y^d_k,t ∈ {0,1}
 
 | Layer | What to implement | Where |
 |-------|-------------------|-------|
-| **API** | ``bess_mi_exclusivity: bool = False`` on ``socp_optimise`` and ``soc_window_optimisation``; propagate through ``socp_model`` / ``storage_constraints``. Same flag on ``socp_chance_*`` / ``socp_robust_*`` when those land. | `ACDC_convex.py` |
+| **API** | ``bess_mi_exclusivity: bool = False`` on ``socp_optimise`` and ``soc_window_optimisation``; propagate through ``socp_model`` / ``storage_constraints``. Same flag on ``socp_ccp_*`` / ``socp_robust_*`` when those land. | `ACDC_convex.py` |
 | **Model** | When flag set: ``cp.Variable(boolean=True)`` ``y^c``/``y^d`` per storage×``T``; replace direct ``P_charge``/``P_discharge`` upper bounds with gated bounds; keep SoC chain and AC/DC rating constraints unchanged. | `convex_model.py` (`storage_variables`, `storage_constraints`) |
 | **Solver** | ``resolve_socp_solver`` prefers MI-capable backend (MOSEK / Gurobi / SCIP) when flag is ``True``; **warn** if a non-MI solver is resolved or passed explicitly. | `solver_utils.py` |
 | **Tests** | Continuous default smoke unchanged; optional MI smoke (skip if no MI solver in CI). | `test_socp.py` |
@@ -643,7 +643,7 @@ robust box uncertainty as **separate public runner families** (L22), not a singl
 `socp_optimise(..., mode=…)` switch. Shared deterministic core; different pre/post
 layers and solve orchestration.
 
-#### Runner family A — chance constraints (Paper A §4) — **Phase 10**
+#### Runner family A — chance constraints (Paper A §4) — **Done (Phase 10)**
 
 Per-node truncated-normal quantiles tighten wind and price caps before a **single** SOCP
 solve:
@@ -657,7 +657,7 @@ C_k,t   ≤ Ĉ_k,t   + Q_{1−confidence_level}(ε_c)
 |-------|-------------------|-------|
 | **Translate** | Optional wind/price forecast-error params; precompute quantiles per ``(k,t)`` | `translate_pyf_socp` or chance-runner prep |
 | **Model** | Quantile-shifted RHS on renewable caps and price terms in objective/bounds | `convex_model.py` or data object fields |
-| **Runners** | **`socp_chance_optimise`**, **`socp_chance_window_optimisation`** — same export path as deterministic | `ACDC_convex.py` |
+| **Runners** | **`socp_ccp_optimise`**, **`socp_ccp_window_optimisation`** — same export path as deterministic | `ACDC_convex.py` |
 | **Config** | `confidence_level` (Paper A γ); wind/price error σ and truncated-normal bounds | runner kwargs |
 | **Solver** | Continuous SOCP — CLARABEL/MOSEK/SCS still OK | existing `resolve_socp_solver` |
 | **Tests** | Build + solve smoke; optional PEI revenue sensitivity vs Paper A Table 4 | `test_socp.py` |
@@ -723,8 +723,8 @@ Mirror of **§0.4** for phase numbering. **Done** = phases 0–4, 6–8. **Todo*
 | **7** | Docs, Results, CI | **Done** |
 | **8** | Heat pumps (Q-18 **A**) | **Done** |
 | **9** | Optional MI-BESS (``bess_mi_exclusivity``) | **Done** — §5.4 |
-| **10** | ``socp_chance_*`` (Paper A CCP) | **Next** — §5.5 |
-| **11** | ``socp_robust_*`` (Paper R box + C&CG) | Planned — §5.5 |
+| **10** | ``socp_ccp_*`` (Paper A CCP) | **Done** — §5.5 |
+| **11** | ``socp_robust_*`` (Paper R box + C&CG) | **Next** — §5.5 |
 
 ---
 
@@ -738,7 +738,7 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 |------|----------|--------|
 | Q-1 | Paper A only? | **Locked L1** |
 | Q-5 | Two-file split? | **Locked L4** |
-| Q-6 | Public entry `socp_optimise`? | **Locked L5** (+ window L22); optional ``bess_mi_exclusivity`` (Phase 9); **Phase 10–11** add `socp_chance_*` / `socp_robust_*` (Q-27) |
+| Q-6 | Public entry `socp_optimise`? | **Locked L5** (+ window L22); optional ``bess_mi_exclusivity`` (Phase 9); **Phase 10–11** add `socp_ccp_*` / `socp_robust_*` (Q-27) |
 | Q-7 | Dedicated `translate_pyf_socp` vs fork `translate_pyf_opf`? | **Locked** — dedicated `translate_pyf_socp` (L23/L26) |
 | Q-8 | Multi-period: standalone vs `window_*`? | **Locked L21/L22** — one `socp_model(…, T)`; `socp_optimise` + `soc_window_optimisation` |
 | Q-9 | `w_{km}` complex vs Re/Im? | **Locked** — complex dict like Mario |
@@ -759,10 +759,10 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 | Q-14 | Linear priced exports vs `Price_Zone` quadratic? | **L16 paper form**; default objective **L27 `Energy_cost`** |
 | Q-15 | BESS MI exclusivity? | **Locked Phase 9** — optional ``bess_mi_exclusivity=False`` (default G6); ``True`` → Paper R Eqs. 56–59 (L18) |
 | Q-16 | H₂ daily quota? | **Deferred** |
-| Q-17 | CCP quantiles? | **Locked Phase 10** — `socp_chance_*` runners; truncated-normal precompute per ``(k,t)`` |
+| Q-17 | CCP quantiles? | **Locked Phase 10** — `socp_ccp_*` runners; truncated-normal precompute per ``(k,t)`` |
 | Q-18 | SOCP heat pumps: NL Q twin (**A**) vs L P-only (**B**)? | **Locked A** — NL Q twin (§5.7 / Phase 8) |
 | Q-19 | Paper parity tolerances | **Open** / deferred with L2 |
-| Q-27 | Wind uncertainty: one method or both? | **Locked** — **both**, as separate runner families: `socp_chance_*` (Phase 10) + `socp_robust_*` (Phase 11); not a single `mode=` kwarg (L22) |
+| Q-27 | Wind uncertainty: one method or both? | **Locked** — **both**, as separate runner families: `socp_ccp_*` (Phase 10) + `socp_robust_*` (Phase 11); not a single `mode=` kwarg (L22) |
 | Q-28 | Adopt Paper R beyond robust box (MI-BESS, converter-in-``Ybus``)? | **Partial** — **MI-BESS opt-in Phase 9** (L18); robust box Phase 11; converter-in-``Ybus`` (L8 option A) still deferred |
 
 ### 7.4 Data and reference
@@ -783,7 +783,7 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 
 ### 7.6 Where to start
 
-See **§0.4 Still to do**. Next gate: Phase **10** (``socp_chance_*``).
+See **§0.4 Still to do**. Next gate: Phase **10** (``socp_ccp_*``).
 
 ---
 
@@ -851,7 +851,7 @@ See **§0.4 Still to do**. Next gate: Phase **10** (``socp_chance_*``).
 ### 8.7 Suggested resolution order
 
 1. ~~Phases 0–9 (deterministic SOCP + optional MI-BESS).~~ **Done** — §0.4.
-2. **Phase 10:** ``socp_chance_*`` (§5.5).
+2. **Phase 10:** ``socp_ccp_*`` (§5.5).
 3. **Phase 11:** ``socp_robust_*`` (§5.5).
 4. Later: ``CONVEX_Ybus`` (L8 option A); optional PEI parity (L2).
 
@@ -862,7 +862,7 @@ See **§0.4 Still to do**. Next gate: Phase **10** (``socp_chance_*``).
 | File | Action / status |
 |------|-----------------|
 | **`pyflow_acdc/convex_model/convex_model.py`** | **Landed** — `build_socp_data`, `socp_model`, subsystem vars/constraints; **Phase 9:** MI gating in `storage_variables`/`storage_constraints` |
-| **`pyflow_acdc/ACDC_convex.py`** | **Landed** — deterministic runners; **Phase 9:** ``bess_mi_exclusivity``; **Phase 10–11:** `socp_chance_*`, `socp_robust_*` |
+| **`pyflow_acdc/ACDC_convex.py`** | **Landed** — deterministic runners; **Phase 9:** ``bess_mi_exclusivity``; **Phase 10–11:** `socp_ccp_*`, `socp_robust_*` |
 | `solver_utils.py` | **Landed** — `resolve_socp_solver` / `cvxpy_available`; **Phase 9:** MI backend when ``bess_mi_exclusivity=True`` |
 | `__init__.py` | **Landed** — guarded export of deterministic runners + translate; extend for chance/robust when landed |
 | `pyproject.toml` | **Landed** — `SOCP = ["cvxpy", "clarabel"]`; folded into `All` |

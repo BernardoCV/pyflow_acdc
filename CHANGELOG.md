@@ -11,6 +11,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **SOCP CCP runners (Phase 10):** ``socp_ccp_optimise`` and
+  ``socp_ccp_window_optimisation`` apply truncated-normal quantiles to wind
+  caps (``P_ren``) and nodal prices before a single SOCP solve (Paper A §4).
+  ``apply_ccp_quantiles`` is exported for inspection / reuse.
+
 ## [0.7.0]
 
 CVXPY sparse SOCP scaffolding (convex AC/DC stack).

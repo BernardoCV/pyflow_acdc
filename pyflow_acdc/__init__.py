@@ -291,8 +291,22 @@ except ImportError:
 
 # SOCP stack — optional; requires [SOCP] extra (cvxpy)
 try:
-    from .ACDC_convex import socp_optimise, soc_window_optimisation, translate_pyf_socp
-    __all__.extend(['socp_optimise', 'soc_window_optimisation', 'translate_pyf_socp'])
+    from .ACDC_convex import (
+        apply_ccp_quantiles,
+        socp_ccp_optimise,
+        socp_ccp_window_optimisation,
+        socp_optimise,
+        soc_window_optimisation,
+        translate_pyf_socp,
+    )
+    __all__.extend([
+        'apply_ccp_quantiles',
+        'socp_ccp_optimise',
+        'socp_ccp_window_optimisation',
+        'socp_optimise',
+        'soc_window_optimisation',
+        'translate_pyf_socp',
+    ])
     HAS_SOCP = True
 except ImportError:
     HAS_SOCP = False

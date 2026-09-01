@@ -86,12 +86,12 @@ Lower layers never import from higher layers. `constants` is a leaf module
   under Planning. Myopic linear TS lives in `Time_series.ts_acdc_l_opf`.
 - **`convex_model/`** + **`ACDC_convex.py`** — CVXPY sparse SOCP / MI-SOCP
   stack (optional `[SOCP]` extra): `build_socp_data` / `socp_model` builders;
-  runners `socp_optimise`, `soc_window_optimisation`, `translate_pyf_socp`.
-  Distinct from Pyomo NL/L OPF. Includes BESS (continuous charge/discharge, no
-  exclusivity binaries), linear H₂, and heat pumps (reactive power bounded as in
-  the NL OPF); mixed-integer exclusivity and chance-constrained programming are
-  deferred. See `plans/convex_acdc_socp_plan.md` for the full formulation and
-  design decisions.
+  runners `socp_optimise`, `soc_window_optimisation`, `socp_ccp_optimise`,
+  `socp_ccp_window_optimisation`, `translate_pyf_socp`. Distinct from Pyomo
+  NL/L OPF. Includes BESS (continuous by default; optional MI exclusivity),
+  linear H₂, heat pumps, and chance constraints on wind/price (Paper A §4).
+  Robust box uncertainty (Paper R) is still planned. See
+  `plans/convex_acdc_socp_plan.md` for the full formulation and design decisions.
 
 ## Planning and sizing
 

@@ -24,10 +24,16 @@ Public runners
 
 .. autofunction:: pyflow_acdc.soc_window_optimisation
 
+.. autofunction:: pyflow_acdc.socp_ccp_optimise
+
+.. autofunction:: pyflow_acdc.socp_ccp_window_optimisation
+
 Input translation
 -----------------
 
 .. autofunction:: pyflow_acdc.translate_pyf_socp
+
+.. autofunction:: pyflow_acdc.apply_ccp_quantiles
 
 Current logic
 -------------
@@ -59,6 +65,8 @@ grids. It supports:
 
 - single-period runs with :func:`~pyflow_acdc.socp_optimise`
 - explicit multiperiod runs with :func:`~pyflow_acdc.soc_window_optimisation`
+- chance-constrained (CCP) runs with :func:`~pyflow_acdc.socp_ccp_optimise`
+  and :func:`~pyflow_acdc.socp_ccp_window_optimisation` (Paper A §4)
 - AC/DC network constraints on the existing grid topology
 - converter coupling, renewable injections, and optional BESS / H2 operation
 - the public objective keys listed above

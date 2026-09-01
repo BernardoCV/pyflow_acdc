@@ -38,9 +38,18 @@ except ImportError as exc:  # pragma: no cover
         "Install it with: pip install pyflow_acdc[SOCP]"
     ) from exc
 
+from scipy.stats import truncnorm
+
 from .convex_model.convex_model import build_socp_data, socp_model
 
-__all__ = ["socp_optimise", "soc_window_optimisation", "translate_pyf_socp"]
+__all__ = [
+    "socp_optimise",
+    "soc_window_optimisation",
+    "socp_ccp_optimise",
+    "socp_ccp_window_optimisation",
+    "translate_pyf_socp",
+    "apply_ccp_quantiles",
+]
 
 
 def _rs_node_number(grid, rs):
@@ -492,6 +501,175 @@ def _export_to_grid(grid, variables, socp_data):
 
 
 # ---------------------------------------------------------------------------
+# Chance-constrained prep (Paper A §4)
+# ---------------------------------------------------------------------------
+
+def _truncated_normal_quantile(confidence_level, sigma, lower, upper):
+    """Left-tail quantile of N(0, σ²) truncated to ``[lower, upper]``."""
+    if sigma <= 0 or lower >= upper:
+        return 0.0
+    q = 1.0 - confidence_level
+    a = lower / sigma
+    b = upper / sigma
+    return float(truncnorm.ppf(q, a, b, loc=0.0, scale=sigma))
+
+
+def _ren_rated_pu_by_node(grid, gamma=1.0):
+    """Max renewable active power [pu] per AC node at availability 1."""
+    nodes = {n.name: n for n in grid.nodes_AC}
+    rated = {}
+    for rs in grid.RenSources:
+        node = nodes.get(rs.Node)
+        if node is None:
+            continue
+        k = node.nodeNumber
+        cap = rs.PGi_ren_base * getattr(rs, 'np_rsgen', 1) * gamma
+        rated[k] = rated.get(k, 0.0) + cap
+    return rated
+
+
+def apply_ccp_quantiles(
+    socp_data,
+    grid,
+    confidence_level,
+    *,
+    gamma=1.0,
+    wind_error_sigma_frac=0.10,
+    price_error_sigma_frac=0.10,
+    price_error_sigma_bounds=3.0,
+):
+    """Tighten wind caps and nodal prices using truncated-normal quantiles.
+
+    Implements Paper A Eqs. 61–69 in place on ``socp_data.P_ren`` and
+    ``socp_data.prices`` before :func:`socp_model` is called.
+
+    Wind: ``p^w ≤ p̂ + Q_{1−confidence_level}(ε_w)`` with
+    ``σ_w = wind_error_sigma_frac · |p̂|``, error truncated to keep
+    injection in ``[0, P_rated]``.
+
+    Price: ``C ≤ Ĉ + Q_{1−confidence_level}(ε_c)`` with
+    ``σ_c = price_error_sigma_frac · |Ĉ|``, error truncated to
+    ``± price_error_sigma_bounds · σ_c``.
+    """
+    if not (0.0 < confidence_level < 1.0):
+        raise ValueError(
+            f"confidence_level must be in (0, 1); got {confidence_level!r}"
+        )
+    if wind_error_sigma_frac < 0:
+        raise ValueError("wind_error_sigma_frac must be non-negative")
+    if price_error_sigma_frac < 0:
+        raise ValueError("price_error_sigma_frac must be non-negative")
+    if price_error_sigma_bounds <= 0:
+        raise ValueError("price_error_sigma_bounds must be positive")
+
+    rated_by_node = _ren_rated_pu_by_node(grid, gamma=gamma)
+
+    for k, profile in socp_data.P_ren.items():
+        p_rated = rated_by_node.get(k, float(np.max(profile)) if len(profile) else 0.0)
+        new_profile = np.asarray(profile, dtype=float).copy()
+        for t, p_hat in enumerate(new_profile):
+            sigma = wind_error_sigma_frac * abs(p_hat)
+            lower = -p_hat
+            upper = max(p_rated - p_hat, lower)
+            q_err = _truncated_normal_quantile(confidence_level, sigma, lower, upper)
+            cap = p_rated if p_rated > 0 else max(p_hat, 0.0)
+            new_profile[t] = np.clip(p_hat + q_err, 0.0, cap)
+        socp_data.P_ren[k] = new_profile
+
+    for k, profile in socp_data.prices.items():
+        new_profile = np.asarray(profile, dtype=float).copy()
+        for t, c_hat in enumerate(new_profile):
+            sigma_c = price_error_sigma_frac * abs(c_hat)
+            if sigma_c <= 0:
+                continue
+            span = price_error_sigma_bounds * sigma_c
+            q_err = _truncated_normal_quantile(
+                confidence_level, sigma_c, -span, span,
+            )
+            new_profile[t] = c_hat + q_err
+        socp_data.prices[k] = new_profile
+
+    socp_data.confidence_level = confidence_level
+
+
+def _execute_socp(
+    grid,
+    socp_data,
+    *,
+    weights_def,
+    solver,
+    solver_opts,
+    build_only,
+    verbose,
+    bess_mi_exclusivity,
+    t0,
+    t1,
+    runner_name="socp_optimise",
+):
+    """Build, optionally solve, and export a prepared SOCP."""
+    socp_data.bess_mi_exclusivity = bess_mi_exclusivity
+
+    constraints, variables = socp_model(grid, socp_data)
+
+    objective = _build_objective(
+        variables,
+        socp_data,
+        grid,
+        weights_def=weights_def,
+    )
+    problem = cp.Problem(objective, constraints)
+
+    t2 = time.perf_counter()
+
+    solver_stats = {
+        'status': None,
+        'value': None,
+        'time': 0.0,
+        'n_vars': problem.variables().__len__(),
+        'n_constr': len(problem.constraints),
+    }
+
+    if build_only:
+        timing_info = {'translate': t1 - t0, 'build': t2 - t1, 'solve': 0.0}
+        return problem, variables, timing_info, solver_stats
+
+    solve_kwargs = {'verbose': verbose}
+    chosen_solver = resolve_socp_solver(
+        mi_required=bess_mi_exclusivity and bool(socp_data.storage_data),
+        solver=solver,
+    )
+    if chosen_solver is not None:
+        solve_kwargs['solver'] = chosen_solver
+    if solver_opts:
+        solve_kwargs.update(solver_opts)
+
+    t3 = time.perf_counter()
+    problem.solve(**solve_kwargs)
+    t4 = time.perf_counter()
+
+    solver_stats['status'] = problem.status
+    solver_stats['value'] = problem.value
+    solver_stats['time'] = t4 - t3
+    solver_stats['solver'] = chosen_solver
+
+    if problem.status not in ('optimal', 'optimal_inaccurate'):
+        warnings.warn(
+            f"{runner_name}: solver returned status '{problem.status}'.",
+            stacklevel=2,
+        )
+    else:
+        _export_to_grid(grid, variables, socp_data)
+
+    timing_info = {
+        'translate': t1 - t0,
+        'build': t2 - t1,
+        'solve': t4 - t3,
+    }
+
+    return problem, variables, timing_info, solver_stats
+
+
+# ---------------------------------------------------------------------------
 # Main public function
 # ---------------------------------------------------------------------------
 
@@ -562,64 +740,80 @@ def socp_optimise(
 
     t1 = time.perf_counter()
 
-    constraints, variables = socp_model(grid, socp_data)
+    return _execute_socp(
+        grid,
+        socp_data,
+        weights_def=weights_def,
+        solver=solver,
+        solver_opts=solver_opts,
+        build_only=build_only,
+        verbose=verbose,
+        bess_mi_exclusivity=bess_mi_exclusivity,
+        t0=t0,
+        t1=t1,
+        runner_name="socp_optimise",
+    )
 
-    objective = _build_objective(
-        variables,
+
+def socp_ccp_optimise(
+    grid,
+    confidence_level,
+    gamma=1.0,
+    frame_id=0,
+    P_ext_bounds=None,
+    weights_def=None,
+    solver=None,
+    solver_opts=None,
+    build_only=False,
+    verbose=False,
+    bess_mi_exclusivity=False,
+    wind_error_sigma_frac=0.10,
+    price_error_sigma_frac=0.10,
+    price_error_sigma_bounds=3.0,
+):
+    """Build and solve the CCP sparse AC/DC SOCP (single period).
+
+    Chance-constrained programming (Paper A §4): same as
+    :func:`socp_optimise`, but tightens renewable caps and nodal prices with
+    truncated-normal quantiles at ``confidence_level`` before the SOCP is built.
+
+    See :func:`socp_optimise` for remaining parameters and
+    :func:`apply_ccp_quantiles` for the uncertainty model.
+    """
+    analyse_grid(grid)
+    grid.reset_run_flags()
+
+    t0 = time.perf_counter()
+    socp_data = translate_pyf_socp(
+        grid,
+        gamma=gamma,
+        frame_ids=[frame_id],
+        P_ext_bounds=P_ext_bounds,
+    )
+    apply_ccp_quantiles(
         socp_data,
         grid,
+        confidence_level,
+        gamma=gamma,
+        wind_error_sigma_frac=wind_error_sigma_frac,
+        price_error_sigma_frac=price_error_sigma_frac,
+        price_error_sigma_bounds=price_error_sigma_bounds,
+    )
+    t1 = time.perf_counter()
+
+    return _execute_socp(
+        grid,
+        socp_data,
         weights_def=weights_def,
-    )
-    problem   = cp.Problem(objective, constraints)
-
-    t2 = time.perf_counter()
-
-    solver_stats = {
-        'status':   None,
-        'value':    None,
-        'time':     0.0,
-        'n_vars':   problem.variables().__len__(),
-        'n_constr': len(problem.constraints),
-    }
-
-    if build_only:
-        timing_info = {'translate': t1 - t0, 'build': t2 - t1, 'solve': 0.0}
-        return problem, variables, timing_info, solver_stats
-
-    solve_kwargs = {'verbose': verbose}
-    chosen_solver = resolve_socp_solver(
-        mi_required=bess_mi_exclusivity and bool(socp_data.storage_data),
         solver=solver,
+        solver_opts=solver_opts,
+        build_only=build_only,
+        verbose=verbose,
+        bess_mi_exclusivity=bess_mi_exclusivity,
+        t0=t0,
+        t1=t1,
+        runner_name="socp_ccp_optimise",
     )
-    if chosen_solver is not None:
-        solve_kwargs['solver'] = chosen_solver
-    if solver_opts:
-        solve_kwargs.update(solver_opts)
-
-    t3 = time.perf_counter()
-    problem.solve(**solve_kwargs)
-    t4 = time.perf_counter()
-
-    solver_stats['status'] = problem.status
-    solver_stats['value']  = problem.value
-    solver_stats['time']   = t4 - t3
-    solver_stats['solver'] = chosen_solver
-
-    if problem.status not in ('optimal', 'optimal_inaccurate'):
-        warnings.warn(
-            f"socp_optimise: solver returned status '{problem.status}'.",
-            stacklevel=2,
-        )
-    else:
-        _export_to_grid(grid, variables, socp_data)
-
-    timing_info = {
-        'translate': t1 - t0,
-        'build':     t2 - t1,
-        'solve':     t4 - t3,
-    }
-
-    return problem, variables, timing_info, solver_stats
 
 
 def soc_window_optimisation(
@@ -654,59 +848,74 @@ def soc_window_optimisation(
     socp_data.bess_mi_exclusivity = bess_mi_exclusivity
     t1 = time.perf_counter()
 
-    constraints, variables = socp_model(grid, socp_data)
-    objective = _build_objective(
-        variables,
+    return _execute_socp(
+        grid,
+        socp_data,
+        weights_def=weights_def,
+        solver=solver,
+        solver_opts=solver_opts,
+        build_only=build_only,
+        verbose=verbose,
+        bess_mi_exclusivity=bess_mi_exclusivity,
+        t0=t0,
+        t1=t1,
+        runner_name="soc_window_optimisation",
+    )
+
+
+def socp_ccp_window_optimisation(
+    grid,
+    confidence_level,
+    gamma=1.0,
+    frame_ids=None,
+    P_ext_bounds=None,
+    weights_def=None,
+    solver=None,
+    solver_opts=None,
+    build_only=False,
+    verbose=False,
+    bess_mi_exclusivity=False,
+    wind_error_sigma_frac=0.10,
+    price_error_sigma_frac=0.10,
+    price_error_sigma_bounds=3.0,
+):
+    """Build and solve the CCP multiperiod SOCP for *grid*.
+
+    Chance-constrained programming (Paper A §4): same as
+    :func:`soc_window_optimisation`, but applies :func:`apply_ccp_quantiles`
+    at ``confidence_level`` before building.
+    """
+    analyse_grid(grid)
+    grid.reset_run_flags()
+
+    t0 = time.perf_counter()
+    socp_data = translate_pyf_socp(
+        grid,
+        gamma=gamma,
+        frame_ids=frame_ids,
+        P_ext_bounds=P_ext_bounds,
+    )
+    apply_ccp_quantiles(
         socp_data,
         grid,
+        confidence_level,
+        gamma=gamma,
+        wind_error_sigma_frac=wind_error_sigma_frac,
+        price_error_sigma_frac=price_error_sigma_frac,
+        price_error_sigma_bounds=price_error_sigma_bounds,
+    )
+    t1 = time.perf_counter()
+
+    return _execute_socp(
+        grid,
+        socp_data,
         weights_def=weights_def,
-    )
-    problem = cp.Problem(objective, constraints)
-    t2 = time.perf_counter()
-
-    solver_stats = {
-        'status': None,
-        'value': None,
-        'time': 0.0,
-        'n_vars': problem.variables().__len__(),
-        'n_constr': len(problem.constraints),
-    }
-
-    if build_only:
-        timing_info = {'translate': t1 - t0, 'build': t2 - t1, 'solve': 0.0}
-        return problem, variables, timing_info, solver_stats
-
-    solve_kwargs = {'verbose': verbose}
-    chosen_solver = resolve_socp_solver(
-        mi_required=bess_mi_exclusivity and bool(socp_data.storage_data),
         solver=solver,
+        solver_opts=solver_opts,
+        build_only=build_only,
+        verbose=verbose,
+        bess_mi_exclusivity=bess_mi_exclusivity,
+        t0=t0,
+        t1=t1,
+        runner_name="socp_ccp_window_optimisation",
     )
-    if chosen_solver is not None:
-        solve_kwargs['solver'] = chosen_solver
-    if solver_opts:
-        solve_kwargs.update(solver_opts)
-
-    t3 = time.perf_counter()
-    problem.solve(**solve_kwargs)
-    t4 = time.perf_counter()
-
-    solver_stats['status'] = problem.status
-    solver_stats['value'] = problem.value
-    solver_stats['time'] = t4 - t3
-    solver_stats['solver'] = chosen_solver
-
-    if problem.status not in ('optimal', 'optimal_inaccurate'):
-        warnings.warn(
-            f"soc_window_optimisation: solver returned status '{problem.status}'.",
-            stacklevel=2,
-        )
-    else:
-        _export_to_grid(grid, variables, socp_data)
-
-    timing_info = {
-        'translate': t1 - t0,
-        'build': t2 - t1,
-        'solve': t4 - t3,
-    }
-
-    return problem, variables, timing_info, solver_stats
