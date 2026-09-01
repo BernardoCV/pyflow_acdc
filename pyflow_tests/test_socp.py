@@ -279,16 +279,21 @@ def test_soc_window_optimisation_solves_case39_with_heat_pump():
     P = grid.socp_results.P_heat_pump
     assert P is not None and P.shape == (1, 3)
 
-    # served P stays within [P_ref - n*P_unit_max, P_ref] every frame (Q-18 A)
     p_ref = hp.P_ref
     p_cap = hp.n_units * hp.P_unit_max
     assert (P[0, :] <= p_ref + 1e-6).all()
     assert (P[0, :] >= p_ref - p_cap - 1e-6).all()
 
-    # Q twin bound: Q_ref <= Q_hp <= 0
+    Q_shed = grid.socp_results.Q_shed
+    assert Q_shed is not None and Q_shed.shape == (1, 3)
+    q_lim = hp.Q_lim_shed
+    assert (Q_shed[0, :] <= q_lim + 1e-6).all()
+    assert (Q_shed[0, :] >= -q_lim - 1e-6).all()
+
     Q = grid.socp_results.Q_heat_pump
-    assert (Q[0, :] <= 1e-6).all()
-    assert (Q[0, :] >= hp.Q_ref - 1e-6).all()
+    assert Q is not None and Q.shape == (1, 3)
+    assert (Q[0, :] <= hp.Q_ref + 1e-6).all()
+    assert (Q[0, :] >= hp.Q_ref - q_lim - 1e-6).all()
 
 
 def test_pei_soc_window_builds_short_horizon():

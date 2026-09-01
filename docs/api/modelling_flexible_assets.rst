@@ -272,25 +272,35 @@ limits derived offline from building simulations; pyflow-acdc does **not**
 embed a thermal model.
 
 **pyflow-acdc implementation.** Baseline electrical demand is stored as
-``P_ref`` / ``Q_ref`` in **pu** on ``S_base``. Instantaneous flexibility is
-bounded by the aggregate unit rating ``n_units * P_unit_max``:
+``P_ref`` / ``Q_ref`` in **pu** on ``S_base``. Optimisation uses explicit shed
+actuators with served power
+
+.. math::
+    :label: eq:hp_pyflow_shed
+
+    P_{\mathrm{hp}} = P_{\mathrm{ref}} - P_{\mathrm{shed}}, \qquad
+    Q_{\mathrm{hp}} = Q_{\mathrm{ref}} - Q_{\mathrm{shed}}
+
+Active shedding is bounded by the aggregate unit rating and the energy envelope:
 
 .. math::
     :label: eq:hp_pyflow_p
 
-    P_{\mathrm{ref}} - n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
-    \leq
-    P_{\mathrm{hp}}
-    \leq
-    P_{\mathrm{ref}}
+    0 \leq P_{\mathrm{shed}} \leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
 
-Reactive demand follows the load sign convention used in the NL AC balance
-(subtracted at the bus), with
+Reactive shedding uses symmetric limits from the installed apparent-power
+rating (``Max_S`` in pu, default ``n_units * P_unit_max``):
 
 .. math::
     :label: eq:hp_pyflow_q
 
-    Q_{\mathrm{ref}} \leq Q_{\mathrm{hp}} \leq 0
+    -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} \leq Q_{\mathrm{lim}}^{\mathrm{shed}},
+    \qquad
+    Q_{\mathrm{lim}}^{\mathrm{shed}} = S_{\mathrm{rated}}\, f_Q
+
+``Energy_cost`` penalises shed directly:
+:math:`P_{\mathrm{shed}}^2 q_f + P_{\mathrm{shed}} \ell_f` and the Q twin
+(same MW/MVAR scaling as generators via ``S_base``).
 
 Cumulative energy state ``E_state`` is in **kWh**. The discrete update in
 :mod:`~pyflow_acdc.NL_models.ACDC_OPF_NL_model` / sequential OPF is:
@@ -339,13 +349,26 @@ with reactive heat-pump power fixed at zero:
 SOCP model
 ^^^^^^^^^^
 
-In the sparse SOCP stack the heat pump keeps the non-linear surface: served
-:math:`P_{\mathrm{hp}}` bound by :eq:`eq:hp_pyflow_p`, the reactive twin
-:math:`Q_{\mathrm{ref}} \leq Q_{\mathrm{hp}} \leq 0` :eq:`eq:hp_pyflow_q`, and
-the cumulative energy chain :eq:`eq:hp_energy_pyflow` with its
-:math:`E_{t-1}`-linked active-power reformulation :eq:`eq:hp_bounds`. All
-constraints are linear, so no conic lift is added. The heat pump (AC-only)
-enters the AC nodal balance as a load, subtracting :math:`P_{\mathrm{hp}}` and
+In the sparse SOCP stack the heat pump uses the same ``P_shed`` / ``Q_shed``
+actuators as the NL model:
+
+.. math::
+    :label: eq:hp_socp_shed
+
+    \begin{align}
+        P_{\mathrm{hp}} &= P_{\mathrm{ref}} - P_{\mathrm{shed}}, \\
+        Q_{\mathrm{hp}} &= Q_{\mathrm{ref}} - Q_{\mathrm{shed}}, \\
+        0 \leq P_{\mathrm{shed}} &\leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}, \\
+        -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} &\leq Q_{\mathrm{lim}}^{\mathrm{shed}},
+    \end{align}
+
+with :math:`Q_{\mathrm{lim}}^{\mathrm{shed}} = S_{\mathrm{rated}}\,
+f_Q` (``Max_S * Q_shed_lim_frac`` in pu). The cumulative energy chain
+:eq:`eq:hp_energy_pyflow` and its :math:`E_{t-1}`-linked :math:`P_{\mathrm{shed}}`
+reformulations match the NL OPF. ``Energy_cost`` penalises shed directly:
+:math:`P_{\mathrm{shed}}^2 q_f + P_{\mathrm{shed}} \ell_f` and the Q twin.
+All constraints are linear. The heat pump (AC-only) enters the AC nodal
+balance as a load, subtracting :math:`P_{\mathrm{hp}}` and
 :math:`Q_{\mathrm{hp}}`. Time-varying references and energy envelopes are read
 from ``grid.Time_series`` (``hp_P_ref``, ``hp_Q_ref``, ``hp_E_min``,
 ``hp_E_max``) by :func:`~pyflow_acdc.translate_pyf_socp`.

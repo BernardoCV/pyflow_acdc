@@ -152,6 +152,11 @@ def translate_pyf_socp(grid, gamma=1.0, frame_ids=None, P_ext_bounds=None):
                     avail[linked.name] = profile
 
     P_ren_out = {}
+    ren_P_source = {}
+    rs_by_number = {rs.rsNumber: rs for rs in grid.RenSources}
+    for ri, rd in enumerate(socp_data.ren_data):
+        rs = rs_by_number[rd['idx']]
+        ren_P_source[ri] = avail[rs.name] * rd['p_base']
     for rs in grid.RenSources:
         n = _rs_node_number(grid, rs)
         scale = rs.PGi_ren_base * getattr(rs, 'np_rsgen', 1) * gamma
@@ -248,6 +253,8 @@ def translate_pyf_socp(grid, gamma=1.0, frame_ids=None, P_ext_bounds=None):
         T=T,
         frame_ids=frame_ids,
         P_ren=P_ren_out,
+        ren_P_source=ren_P_source,
+        ren_gamma=gamma,
         prices=prices_out,
         h2_prices=h2_prices,
         hp_P_ref=hp_P_ref,
@@ -301,8 +308,9 @@ def _build_objective(variables, d, grid, weights_def=None):
 
     Supported v1 components:
     - ``Energy_cost``       : generator quadratic costs; gens with
-      ``link_cost=LINEAR`` use ``d.prices[node,t]`` for the linear term
-      (plus ``P_ren·price`` until only-gen parity is finalised)
+      ``link_cost=LINEAR`` use ``d.prices[node,t]`` for the linear term;
+      renewable ``qf``/``lf`` on per-source availability profiles; heat-pump
+      shed quadratic/linear costs on ``P_shed``/``Q_shed``
     - ``Ext_Gen``           : total external-grid active power
     - ``AC_losses``         : AC branch active losses
     - ``DC_losses``         : DC branch active losses
@@ -321,6 +329,7 @@ def _build_objective(variables, d, grid, weights_def=None):
     conv = variables.conv
     st = variables.storage
     h2 = variables.hydrogen
+    hp = variables.heat_pump
     terms = []
     np_den_eps = 1e-3
 
@@ -330,36 +339,47 @@ def _build_objective(variables, d, grid, weights_def=None):
             continue
 
         if component == ObjComponent.ENERGY_COST.value:
-            if gen is None:
-                continue
-            for gi, gd in enumerate(d.gen_data_AC):
-                node = gd['node']
-                for t in range(d.T):
-                    p_mw = gen.PGi_gen[gi, t] * d.Sbase
-                    if gd['link_cost'] == LinkCost.LINEAR:
-                        lf_t = float(d.prices[node][t])
-                    else:
-                        lf_t = gd['lf']
-                    terms.append(
-                        weight * (
-                            (p_mw ** 2) * gd['qf'] / (gd['np_gen'] + np_den_eps)
-                            + p_mw * lf_t
-                            + gd['np_gen'] * gd['fc']
+            if gen is not None:
+                for gi, gd in enumerate(d.gen_data_AC):
+                    node = gd['node']
+                    for t in range(d.T):
+                        p_mw = gen.PGi_gen[gi, t] * d.Sbase
+                        if gd['link_cost'] == LinkCost.LINEAR:
+                            lf_t = float(d.prices[node][t])
+                        else:
+                            lf_t = gd['lf']
+                        terms.append(
+                            weight * (
+                                (p_mw ** 2) * gd['qf'] / (gd['np_gen'] + np_den_eps)
+                                + p_mw * lf_t
+                                + gd['np_gen'] * gd['fc']
+                            )
                         )
-                    )
             if grid.DCmode and grid.Generators_DC:
                 raise NotImplementedError(
                     "SOCP Energy_cost does not yet include DC generator costs."
                 )
-            for k in set(d.ren_nodes_AC) | set(d.P_ren):
-                if k not in d.P_ren:
-                    continue
-                prices_k = d.prices.get(k)
+            ren_gamma = getattr(d, 'ren_gamma', 1.0)
+            for ri, rd in enumerate(getattr(d, 'ren_data', ())):
+                p_src = d.ren_P_source[ri]
                 for t in range(d.T):
-                    price = float(prices_k[t]) if prices_k is not None else 0.0
+                    p_mw = float(p_src[t]) * ren_gamma * d.Sbase
                     terms.append(
-                        weight * float(d.P_ren[k][t]) * price * d.Sbase
+                        weight * rd['np_rsgen'] * (
+                            (p_mw ** 2) * rd['qf'] + p_mw * rd['lf']
+                        )
                     )
+            if hp is not None:
+                for hi, hd in enumerate(d.hp_data):
+                    for t in range(d.T):
+                        p_mw = hp.P_shed[hi, t] * d.Sbase
+                        q_mvar = hp.Q_shed[hi, t] * d.Sbase
+                        terms.append(
+                            weight * (
+                                (p_mw ** 2) * hd['qf'] + p_mw * hd['lf']
+                                + (q_mvar ** 2) * hd['qf_q'] + q_mvar * hd['lf_q']
+                            )
+                        )
         elif component == ObjComponent.EXT_GEN.value:
             if gen is None:
                 continue
@@ -481,7 +501,7 @@ def _export_to_grid(grid, variables, socp_data):
             el.mass_H2 = float(h2.mass_H2.value[ei, t_last])
 
     # Heat-pump results
-    if hp is not None and hp.P_heat_pump.value is not None:
+    if hp is not None and hp.P_shed.value is not None:
         t_last = socp_data.T - 1
         for hi, hd in enumerate(socp_data.hp_data):
             h_obj = grid.heat_pumps[hi]
@@ -490,9 +510,24 @@ def _export_to_grid(grid, variables, socp_data):
                     f"hp_data index mismatch: expected heatPumpNumber "
                     f"{hd['idx']}, got {h_obj.heatPumpNumber}"
                 )
-            h_obj.P_hp = float(hp.P_heat_pump.value[hi, 0])
-            h_obj.Q_hp = float(hp.Q_heat_pump.value[hi, 0])
+            p_ref_0 = float(socp_data.hp_P_ref[hi][0])
+            q_ref_0 = float(socp_data.hp_Q_ref[hi][0])
+            h_obj.P_shed = float(hp.P_shed.value[hi, 0])
+            h_obj.Q_shed = float(hp.Q_shed.value[hi, 0])
+            h_obj.P_hp = p_ref_0 - h_obj.P_shed
+            h_obj.Q_hp = q_ref_0 - h_obj.Q_shed
             h_obj.E_state = float(hp.E_heat_pump.value[hi, t_last])
+
+    hp_P_served = None
+    hp_Q_served = None
+    if hp is not None and hp.P_shed.value is not None:
+        n_hp = len(socp_data.hp_data)
+        T = socp_data.T
+        hp_P_served = np.zeros((n_hp, T))
+        hp_Q_served = np.zeros((n_hp, T))
+        for hi in range(n_hp):
+            hp_P_served[hi, :] = socp_data.hp_P_ref[hi] - hp.P_shed.value[hi, :]
+            hp_Q_served[hi, :] = socp_data.hp_Q_ref[hi] - hp.Q_shed.value[hi, :]
 
     # Store full time-series for post-processing
     grid.socp_results = SimpleNamespace(
@@ -511,8 +546,10 @@ def _export_to_grid(grid, variables, socp_data):
         P_electrolyser = h2.P_electrolyser.value if h2 is not None else None,
         Q_electrolyser = h2.Q_electrolyser.value if h2 is not None else None,
         mass_H2 = h2.mass_H2.value if h2 is not None else None,
-        P_heat_pump = hp.P_heat_pump.value if hp is not None else None,
-        Q_heat_pump = hp.Q_heat_pump.value if hp is not None else None,
+        P_heat_pump = hp_P_served,
+        Q_heat_pump = hp_Q_served,
+        P_shed = hp.P_shed.value if hp is not None else None,
+        Q_shed = hp.Q_shed.value if hp is not None else None,
         E_heat_pump = hp.E_heat_pump.value if hp is not None else None,
         T     = socp_data.T,
         frame_ids = socp_data.frame_ids,

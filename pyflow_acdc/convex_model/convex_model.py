@@ -190,6 +190,7 @@ def build_socp_data(grid):
         })
 
     nodes_ac = {n.name: n for n in grid.nodes_AC}
+    ren_data = []
     for rs in grid.RenSources:
         node = nodes_ac.get(rs.Node)
         if node is None:
@@ -198,6 +199,14 @@ def build_socp_data(grid):
             rs.PGi_ren_base * rs.PRGi_available * getattr(rs, 'np_rsgen', 1),
             0.0,
         )  # Q=0 (L12)
+        ren_data.append({
+            'idx': rs.rsNumber,
+            'node': node.nodeNumber,
+            'p_base': rs.PGi_ren_base,
+            'qf': rs.qf,
+            'lf': rs.lf,
+            'np_rsgen': getattr(rs, 'np_rsgen', 1),
+        })
 
     # --------------------------------------------------------------- storage
     # Separate continuous charge/discharge powers; optional MI exclusivity via
@@ -273,11 +282,16 @@ def build_socp_data(grid):
             'P_ref': hp.P_ref,
             'Q_ref': hp.Q_ref,
             'P_unit_cap': hp.n_units * hp.P_unit_max,
+            'Q_lim_shed': hp.Q_lim_shed,
             'E_min': hp.E_min,
             'E_max': hp.E_max,
             'E_state': hp.E_state,
             'dt_hours': hp.dt_hours,
             'S_base': hp.S_base,
+            'qf': hp.qf,
+            'lf': hp.lf,
+            'qf_q': hp.qf_q,
+            'lf_q': hp.lf_q,
         }
         hp_data.append(entry)
         hp_by_ac_node.setdefault(node_num, []).append(len(hp_data) - 1)
@@ -301,7 +315,7 @@ def build_socp_data(grid):
         V_min_DC=V_min_DC, V_max_DC=V_max_DC, dc_slack=dc_slack,
         dc_line_limits=dc_line_limits,
         conv_data=conv_data, conv_ac_nodes=conv_ac_nodes, dc_pol=dc_pol,
-        gen_data_AC=gen_data_AC, ren_nodes_AC=ren_nodes_AC,
+        gen_data_AC=gen_data_AC, ren_nodes_AC=ren_nodes_AC, ren_data=ren_data,
         storage_data=storage_data,
         storage_by_ac_node=storage_by_ac_node,
         storage_by_dc_node=storage_by_dc_node,
@@ -541,57 +555,56 @@ def hydrogen_constraints(d, h2_vars):
 # ---------------------------------------------------------------------------
 
 def heat_pump_variables(d, T):
-    """Declare served P, Q (NL twin), and cumulative energy state over ``T``."""
+    """Declare P/Q shed actuators and cumulative energy state over ``T``."""
     n_hp = len(d.hp_data)
     if n_hp == 0:
         raise ValueError("heat_pump_variables called with empty hp_data")
 
-    P_heat_pump = cp.Variable((n_hp, T), name="P_heat_pump")
-    Q_heat_pump = cp.Variable((n_hp, T), name="Q_heat_pump")
+    P_shed = cp.Variable((n_hp, T), nonneg=True, name="P_shed")
+    Q_shed = cp.Variable((n_hp, T), name="Q_shed")
     E_heat_pump = cp.Variable((n_hp, T), name="E_heat_pump")
 
     return SimpleNamespace(
-        P_heat_pump=P_heat_pump,
-        Q_heat_pump=Q_heat_pump,
+        P_shed=P_shed,
+        Q_shed=Q_shed,
         E_heat_pump=E_heat_pump,
     )
 
 
 def heat_pump_constraints(d, hp_vars):
-    """Served-load bounds, Q twin bounds, and cumulative energy chain.
+    """P/Q shed bounds and cumulative energy chain (NL twin).
 
-    Mirrors the NL heat-pump formulation (planning-oriented flexible load):
-    instantaneous P/Q/E bounds every ``t`` plus the E chain and its P
-    reformulations linked to the previous energy state. Refs and E bounds are
-    time-varying (from ``translate_pyf_socp``).
+    Served power follows ``P_hp = P_ref - P_shed``, ``Q_hp = Q_ref - Q_shed``.
+    Refs and energy envelopes are time-varying (from ``translate_pyf_socp``).
     """
     constrs = []
     T = d.T
-    P = hp_vars.P_heat_pump
-    Q = hp_vars.Q_heat_pump
+    P_shed = hp_vars.P_shed
+    Q_shed = hp_vars.Q_shed
     E = hp_vars.E_heat_pump
 
     for hi, hd in enumerate(d.hp_data):
         p_ref = d.hp_P_ref[hi]
-        q_ref = d.hp_Q_ref[hi]
         e_min = d.hp_E_min[hi]
         e_max = d.hp_E_max[hi]
         p_cap = hd['P_unit_cap']
+        q_lim = hd['Q_lim_shed']
         dt = hd['dt_hours']
         scale = hd['S_base'] * dt
 
         for t in range(T):
             e_prev = hd['E_state'] if t == 0 else E[hi, t - 1]
+            p_ref_t = p_ref[t]
             constrs += [
-                P[hi, t] >= p_ref[t] - p_cap,
-                P[hi, t] <= p_ref[t],
-                Q[hi, t] >= q_ref[t],
-                Q[hi, t] <= 0,
+                P_shed[hi, t] >= 0,
+                P_shed[hi, t] <= p_cap,
+                Q_shed[hi, t] >= -q_lim,
+                Q_shed[hi, t] <= q_lim,
                 E[hi, t] >= e_min[t],
                 E[hi, t] <= e_max[t],
-                E[hi, t] == e_prev + P[hi, t] * scale,
-                P[hi, t] >= e_prev / dt + p_ref[t] - e_max[t] / dt,
-                P[hi, t] <= e_prev / dt + p_ref[t] - e_min[t] / dt,
+                E[hi, t] == e_prev + (p_ref_t - P_shed[hi, t]) * scale,
+                P_shed[hi, t] >= e_min[t] / dt - e_prev / dt,
+                P_shed[hi, t] <= e_max[t] / dt - e_prev / dt,
             ]
 
     return constrs
@@ -963,10 +976,9 @@ def _ac_node_injection(k, t, d, gen_vars, Ss, st_vars=None, h2_vars=None, hp_var
 
     if hp_vars is not None and k in d.hp_by_ac_node:
         for hi in d.hp_by_ac_node[k]:
-            # heat pump is a load: subtract served P and Q (NL sign convention)
-            parts.append(
-                -hp_vars.P_heat_pump[hi, t] - 1j * hp_vars.Q_heat_pump[hi, t]
-            )
+            p_hp = d.hp_P_ref[hi][t] - hp_vars.P_shed[hi, t]
+            q_hp = d.hp_Q_ref[hi][t] - hp_vars.Q_shed[hi, t]
+            parts.append(-p_hp - 1j * q_hp)
 
     if not parts:
         return None

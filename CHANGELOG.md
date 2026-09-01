@@ -18,7 +18,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   ``apply_ccp_quantiles`` is exported for inspection / reuse. Price CCP applies
   when ``Energy_cost`` has non-zero weight in ``weights_def``.
 - **SOCP ``Energy_cost``:** matches Pyomo ``formula_Energy_cost`` — generator
-  quadratic costs plus ``P_ren·price`` when weighted.
+  quadratic costs, per-renewable ``qf``/``lf`` on availability profiles, and
+  heat-pump ``P_shed``/``Q_shed`` quadratic/linear shed costs when weighted.
 
 ## [0.7.0]
 
@@ -37,10 +38,10 @@ CVXPY sparse SOCP scaffolding (convex AC/DC stack).
   nodal injection, ``H2_sale`` / ``SoC_deviation`` objectives, and export.
 - **SOCP heat pumps**: ``socp_optimise`` / ``soc_window_optimisation`` accept
   ``grid.HP``. ``build_socp_data`` packs ``hp_data`` / ``hp_by_ac_node``;
-  ``heat_pump_variables`` / ``heat_pump_constraints`` add served
-  ``P_heat_pump`` / ``Q_heat_pump`` and the cumulative ``E_heat_pump`` chain
-  across ``T`` (reactive power bounded as in the NL OPF, ``Q_ref ≤ Q ≤ 0``).
-  AC-only load injection;
+  ``heat_pump_variables`` / ``heat_pump_constraints`` use ``P_shed`` /
+  ``Q_shed`` actuators with ``P_hp = P_ref - P_shed``, ``Q_hp = Q_ref - Q_shed``,
+  symmetric ``Q_shed`` bounds from ``Max_S * Q_shed_lim_frac``, and the
+  cumulative ``E_heat_pump`` chain across ``T``. AC-only load injection;
   ``translate_pyf_socp`` reads ``hp_P_ref`` / ``hp_Q_ref`` / ``hp_E_min`` /
   ``hp_E_max`` profiles from ``grid.Time_series``; results exported to
   ``grid.socp_results`` and heat-pump elements.

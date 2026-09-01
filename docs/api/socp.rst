@@ -47,8 +47,9 @@ Current logic
 
 The current public SOCP objective support is:
 
-- ``Energy_cost`` — Pyomo-style generator quadratic costs plus
-  ``P_ren·price`` when this component is weighted
+- ``Energy_cost`` — Pyomo-style generator quadratic costs; per-renewable
+  ``qf``/``lf`` on availability profiles; heat-pump ``P_shed``/``Q_shed`` shed
+  costs when this component is weighted
 - ``Ext_Gen``
 - ``AC_losses``
 - ``DC_losses``
