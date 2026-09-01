@@ -1559,6 +1559,11 @@ def _migrate_legacy_grid_attrs(grid):
         _migrate_legacy_line_rxgb(line)
     for conv in grid.Converters_ACDC:
         _migrate_legacy_converter_impedance(conv)
+    for rs in getattr(grid, 'RenSources', []):
+        if not hasattr(rs, 'qf'):
+            rs.qf = 0.0
+        if not hasattr(rs, 'lf'):
+            rs.lf = 0.0
     for pz in getattr(grid, 'Price_Zones', []):
         if not hasattr(pz, '_S_base'):
             pz._S_base = grid.S_base

@@ -133,7 +133,7 @@ def _post_process_l_mptep_with_nl_opf(
         termination = nl_stats.get("termination_condition", "unknown") if nl_stats else "unknown"
 
         if solution_found:
-            nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj, True))
+            nl_opf = float(calculate_objective_from_model(nl_model, grid, grid.OPF_obj))
             npv_nl_opf = nl_opf * present_value_opf
             economic_nl_step = tep_obj + npv_nl_opf
             if alpha is None:
