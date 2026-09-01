@@ -26,7 +26,9 @@ from .constants import (
     default_obj_weights,
 )
 from .grid_analysis import analyse_grid
-from .solver_utils import resolve_socp_solver
+from .solver_utils import (
+    resolve_socp_solver,
+)
 
 try:
     import cvxpy as cp
@@ -503,6 +505,7 @@ def socp_optimise(
     solver_opts=None,
     build_only=False,
     verbose=False,
+    bess_mi_exclusivity=False,
 ):
     """Build and solve the sparse AC/DC SOCP for *grid* (single period).
 
@@ -524,8 +527,10 @@ def socp_optimise(
         ``{'Energy_cost': {'w': 1}}``.
     solver : str or None
         CVXPY solver name, e.g. ``'MOSEK'``, ``'GUROBI'``, ``'CLARABEL'``.
-        If ``None``, prefers ``'MOSEK'`` when installed, then ``'CLARABEL'``,
-        then ``'SCS'``; otherwise CVXPY picks automatically.
+        If ``None``, picks the first installed solver from the default SOCP
+        list (MOSEK, GUROBI, SCIP, CLARABEL, SCS). When
+        ``bess_mi_exclusivity=True``, an MI-capable solver (MOSEK, GUROBI, or
+        SCIP) is preferred; a non-MI choice emits a warning but is not blocked.
     solver_opts : dict or None
         Keyword options forwarded to ``problem.solve()``.
     build_only : bool
@@ -533,6 +538,9 @@ def socp_optimise(
         inspecting model size or CI without a commercial solver.
     verbose : bool
         Stream solver output.
+    bess_mi_exclusivity : bool
+        If ``True``, add MI charge/discharge exclusivity binaries on BESS
+        (Paper R Eqs. 56–59). Default ``False`` keeps G6 continuous overlap.
 
     Returns
     -------
@@ -550,6 +558,7 @@ def socp_optimise(
         frame_ids=[frame_id],
         P_ext_bounds=P_ext_bounds,
     )
+    socp_data.bess_mi_exclusivity = bess_mi_exclusivity
 
     t1 = time.perf_counter()
 
@@ -578,7 +587,10 @@ def socp_optimise(
         return problem, variables, timing_info, solver_stats
 
     solve_kwargs = {'verbose': verbose}
-    chosen_solver = solver if solver is not None else resolve_socp_solver()
+    chosen_solver = resolve_socp_solver(
+        mi_required=bess_mi_exclusivity and bool(socp_data.storage_data),
+        solver=solver,
+    )
     if chosen_solver is not None:
         solve_kwargs['solver'] = chosen_solver
     if solver_opts:
@@ -620,11 +632,14 @@ def soc_window_optimisation(
     solver_opts=None,
     build_only=False,
     verbose=False,
+    bess_mi_exclusivity=False,
 ):
     """Build and solve the multiperiod/window SOCP for *grid*.
 
     Profiles come from ``grid.Time_series``.  If ``frame_ids`` is ``None``,
     the full TS horizon is used.
+
+    See :func:`socp_optimise` for ``bess_mi_exclusivity`` and solver behaviour.
     """
     analyse_grid(grid)
     grid.reset_run_flags()
@@ -636,6 +651,7 @@ def soc_window_optimisation(
         frame_ids=frame_ids,
         P_ext_bounds=P_ext_bounds,
     )
+    socp_data.bess_mi_exclusivity = bess_mi_exclusivity
     t1 = time.perf_counter()
 
     constraints, variables = socp_model(grid, socp_data)
@@ -661,7 +677,10 @@ def soc_window_optimisation(
         return problem, variables, timing_info, solver_stats
 
     solve_kwargs = {'verbose': verbose}
-    chosen_solver = solver if solver is not None else resolve_socp_solver()
+    chosen_solver = resolve_socp_solver(
+        mi_required=bess_mi_exclusivity and bool(socp_data.storage_data),
+        solver=solver,
+    )
     if chosen_solver is not None:
         solve_kwargs['solver'] = chosen_solver
     if solver_opts:

@@ -66,6 +66,16 @@ def socp_solver():
     return chosen
 
 
+def socp_mi_solver():
+    """Return preferred MI-capable CVXPY conic solver, or skip if none."""
+    require_socp()
+    from pyflow_acdc.solver_utils import SOCP_MI_CAPABLE_SOLVERS, resolve_socp_solver
+    chosen = resolve_socp_solver(mi_required=True)
+    if chosen is None or chosen not in SOCP_MI_CAPABLE_SOLVERS:
+        pytest.skip("no MI-capable SOCP solver (need MOSEK, GUROBI, or SCIP)")
+    return chosen
+
+
 def ipopt_available():
     return _pyomo_available() and pyf.is_pyomo_solver_available("ipopt")
 

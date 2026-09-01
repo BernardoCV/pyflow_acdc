@@ -9,7 +9,7 @@ Structure mirrors ACDC_OPF_NL_model.py:
   build_socp_data        – extract topology/data from Grid → SimpleNamespace
   socp_model             – top-level orchestrator on prepared SOCP data
     generator_variables  – PGi_gen, QGi_gen
-    storage_variables    – P_charge/P_discharge, Q, SoC (G6, no binaries)
+    storage_variables    – P_charge/P_discharge, Q, SoC (continuous by default)
     hydrogen_variables   – P_electrolyser, Q, mass_H2 (linear)
     ac_variables         – h_AC, w_AC
     ac_constraints       – voltage bounds, SOC lifts, nodal balance, thermals
@@ -199,7 +199,8 @@ def build_socp_data(grid):
         )  # Q=0 (L12)
 
     # --------------------------------------------------------------- storage
-    # G6: separate continuous charge/discharge; no exclusivity binaries.
+    # Separate continuous charge/discharge powers; optional MI exclusivity via
+    # bess_mi_exclusivity on the prepared SOCP data.
     storage_data = []
     storage_by_ac_node = {}
     storage_by_dc_node = {}
@@ -356,11 +357,21 @@ def generator_constraints(d, gen_vars):
 
 
 # ---------------------------------------------------------------------------
-# Storage variables / constraints (G6 — no exclusivity binaries)
+# Storage variables / constraints (continuous overlap or optional MI exclusivity)
 # ---------------------------------------------------------------------------
 
 def storage_variables(d, T):
-    """Declare BESS charge/discharge, Q (AC), and SoC over ``T``."""
+    """Declare BESS charge/discharge, Q (AC), SoC over ``T``.
+
+    By default, ``P_charge`` and ``P_discharge`` are separate non-negative
+    continuous variables, so both may be positive in the same period (no
+    charge/discharge exclusivity).
+
+    When ``d.bess_mi_exclusivity`` is True, also declares binary mode
+    variables ``y_charge`` and ``y_discharge`` that gate charge and discharge
+    power; constraints in :func:`storage_constraints` then forbid simultaneous
+    charge and discharge.
+    """
     n_st = len(d.storage_data)
     if n_st == 0:
         raise ValueError("storage_variables called with empty storage_data")
@@ -370,27 +381,66 @@ def storage_variables(d, T):
     Q_storage = cp.Variable((n_st, T), name="Q_storage")
     SoC = cp.Variable((n_st, T), name="SoC")
 
+    mi = bool(getattr(d, "bess_mi_exclusivity", False))
+    y_charge = y_discharge = None
+    if mi:
+        y_charge = cp.Variable((n_st, T), boolean=True, name="y_storage_charge")
+        y_discharge = cp.Variable((n_st, T), boolean=True, name="y_storage_discharge")
+
     return SimpleNamespace(
         P_charge=P_charge,
         P_discharge=P_discharge,
         Q_storage=Q_storage,
         SoC=SoC,
+        y_charge=y_charge,
+        y_discharge=y_discharge,
     )
 
 
 def storage_constraints(d, st_vars):
-    """SoC chain, power limits, and AC S-circle / DC |P_net| (G6)."""
+    """SoC dynamics, charge/discharge limits, and apparent-power limits.
+
+    **Continuous mode** (``bess_mi_exclusivity=False``, default): bounds
+    ``P_charge`` and ``P_discharge`` independently. Both can be non-zero in
+    the same period — a convex relaxation that allows overlapping charge and
+    discharge.
+
+    **MI exclusivity mode** (``bess_mi_exclusivity=True``): charge and
+    discharge are gated by binary mode variables so
+    ``P_charge <= P_charge_max * y_charge``,
+    ``P_discharge <= P_discharge_max * y_discharge``, and
+    ``y_charge + y_discharge <= 1`` (at most one direction active per period).
+
+    AC-connected storage uses the S-circle on net power and ``Q``; DC-connected
+    storage bounds ``|P_discharge - P_charge|``.
+    """
     constrs = []
     T = d.T
     Pc = st_vars.P_charge
     Pd = st_vars.P_discharge
     Qs = st_vars.Q_storage
     SoC = st_vars.SoC
+    mi = bool(getattr(d, "bess_mi_exclusivity", False))
+    y_c = st_vars.y_charge
+    y_d = st_vars.y_discharge
+    if mi and (y_c is None or y_d is None):
+        raise ValueError(
+            "bess_mi_exclusivity=True requires storage y_charge/y_discharge variables"
+        )
 
     for si, sd in enumerate(d.storage_data):
+        if mi:
+            constrs += [
+                Pc[si, :] <= sd['P_charge_max'] * y_c[si, :],
+                Pd[si, :] <= sd['P_discharge_max'] * y_d[si, :],
+                y_c[si, :] + y_d[si, :] <= 1,
+            ]
+        else:
+            constrs += [
+                Pc[si, :] <= sd['P_charge_max'],
+                Pd[si, :] <= sd['P_discharge_max'],
+            ]
         constrs += [
-            Pc[si, :] <= sd['P_charge_max'],
-            Pd[si, :] <= sd['P_discharge_max'],
             SoC[si, :] >= sd['soc_min'],
             SoC[si, :] <= sd['soc_max'],
         ]

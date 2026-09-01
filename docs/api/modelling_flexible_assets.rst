@@ -125,6 +125,12 @@ an apparent-power limit; on DC buses it is a net active-power limit:
           \qquad \text{(DC)}
     \end{align}
 
+Optional **mutually exclusive** charge/discharge (Paper R MI-BESS) is available
+via ``bess_mi_exclusivity=True`` on :func:`~pyflow_acdc.socp_optimise` /
+:func:`~pyflow_acdc.soc_window_optimisation``. Default is G6 continuous (overlap
+allowed). MI mode prefers an MI-capable conic solver (MOSEK, GUROBI, or SCIP)
+and warns if a non-MI backend is selected.
+
 * :attr:`~pyflow_acdc.Node_AC.connected_storage` /
   :attr:`~pyflow_acdc.Node_DC.connected_storage` /
   :attr:`~pyflow_acdc.Grid.storage_elements`

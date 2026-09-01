@@ -98,6 +98,54 @@ def test_soc_window_optimisation_solves_case39_with_bess_h2():
     assert grid.electrolysers[0].mass_H2 >= 0
 
 
+def test_socp_builds_with_bess_mi_exclusivity():
+    require_socp()
+    grid = _case39_socp_grid_with_flex_and_ts(n_frames=1)
+    _, variables, _, stats = pyf.socp_optimise(
+        grid,
+        build_only=True,
+        bess_mi_exclusivity=True,
+        weights_def=SOCP_ENERGY,
+    )
+
+    assert variables.storage is not None
+    assert variables.storage.y_charge is not None
+    assert variables.storage.y_discharge is not None
+    assert stats["n_vars"] > 0
+
+
+def test_resolve_socp_solver_warns_on_non_mi_solver():
+    require_socp()
+    from pyflow_acdc.solver_utils import SOCP_MI_CAPABLE_SOLVERS, resolve_socp_solver
+
+    cont = resolve_socp_solver()
+    if cont is None or cont in SOCP_MI_CAPABLE_SOLVERS:
+        pytest.skip("need a non-MI SOCP solver (e.g. CLARABEL or SCS only)")
+
+    with pytest.warns(UserWarning, match="may not support SOCP with boolean"):
+        resolve_socp_solver(mi_required=True, solver=cont)
+
+
+def test_soc_window_optimisation_solves_with_bess_mi_exclusivity():
+    from pyflow_tests._test_solver_deps import socp_mi_solver
+
+    require_socp()
+    grid = _case39_socp_grid_with_flex_and_ts()
+    _, variables, _, stats = pyf.soc_window_optimisation(
+        grid,
+        frame_ids=[0, 1, 2],
+        solver=socp_mi_solver(),
+        bess_mi_exclusivity=True,
+        weights_def=SOCP_ENERGY,
+    )
+
+    assert stats["status"] in ("optimal", "optimal_inaccurate")
+    yc = variables.storage.y_charge.value
+    yd = variables.storage.y_discharge.value
+    assert yc is not None and yd is not None
+    assert (yc + yd <= 1.0 + 1e-5).all()
+
+
 def _case39_socp_grid_with_heat_pump(n_frames=3):
     grid = _case39_socp_grid()
     hp = pyf.add_heat_pump(

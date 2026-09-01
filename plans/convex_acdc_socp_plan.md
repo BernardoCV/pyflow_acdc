@@ -11,8 +11,7 @@ status (what is coded vs not)** is consolidated in **§0.4** — read that first
 Locked owner decisions: **§0.0** (L1–L28). Do not re-litigate L/Q locks without an
 explicit change.
 
-**Next work:** Phase **9** — optional ``bess_mi_exclusivity`` on deterministic SOCP
-runners (§0.4 / §5.4).
+**Next work:** Phase **10** — ``socp_chance_*`` chance-constrained runners (§0.4 / §5.5).
 
 **Primary reference (Paper A — sparse SOCP + CCP)**
 
@@ -74,7 +73,7 @@ Mario reference (workspace): `mario_implementation/scop/ACDC_PE_Simplified_Effic
 | L15 | **AC and DC thermal / rating limits are mandatory** (Paper A Eqs. 4–7 → SOCP 40–43). Mario’s script omitted AC limits — **do not** omit them in pyflow. |
 | L16 | Exports = ext-grid **negative** injections (pyflow). Paper/Mario revenue form: **`min Σ Re(S_export)·price`**. **Superseded for default runner by L27** (`Energy_cost`); `Ext_Gen` weight still available for priced-export style. |
 | L17 | Mario Autumn price CSVs are **demo only**, not a canonical paper-table target. |
-| L18 | **BESS default = G6 continuous** (NL twin): separate ``P_charge``/``P_discharge``, no exclusivity binaries, ``T``-indexed SoC. **Optional MI exclusivity (Phase 9):** runner kwarg ``bess_mi_exclusivity=False`` (default) on ``socp_optimise`` / ``soc_window_optimisation`` (and on chance/robust runners when they land). When ``True``: Paper R / Paper A MI block (Eqs. 20–23 / 56–59) — binaries ``y^c``/``y^d`` gate charge/discharge; ``y^c+y^d≤1``; SoC chain and S-circle unchanged; **MI-capable conic solver required** (fail hard if only CLARABEL/SCS). |
+| L18 | **BESS default = G6 continuous** (NL twin): separate ``P_charge``/``P_discharge``, no exclusivity binaries, ``T``-indexed SoC. **Optional MI exclusivity (Phase 9):** runner kwarg ``bess_mi_exclusivity=False`` (default) on ``socp_optimise`` / ``soc_window_optimisation`` (and on chance/robust runners when they land). When ``True``: Paper R / Paper A MI block (Eqs. 20–23 / 56–59) — binaries ``y^c``/``y^d`` gate charge/discharge; ``y^c+y^d≤1``; SoC chain and S-circle unchanged; **MI-capable conic solver preferred** (MOSEK / Gurobi / SCIP); **warn** if only CLARABEL/SCS available or explicitly chosen. |
 | L19 | **Sparse only — GREEN LIGHT.** Ship sparse edge-set SOCP exclusively. Do **not** plan or implement a dense SOCP path (paper Table 2 comparison is optional later research, not a product requirement). |
 | L20 | Model is **grid pu only**; € scaling only in objective / reporting via `S_base`. |
 | L21 | **One CVXPY model with `(…, T)` indexing**, not Pyomo-style per-frame submodels. Single-period = `T=1`; window = ordered `frame_ids` with `T = len(frame_ids)`. |
@@ -129,7 +128,7 @@ Subsystem detail and equations remain in §5; paper background in §1.
 
 #### Already done — logic implemented
 
-Phases **0–4**, **6–8** (continuous deterministic SOCP stack).
+Phases **0–4**, **6–8**, and **9** (optional MI-BESS exclusivity).
 
 | Area | Logic in code | Where |
 |------|---------------|-------|
@@ -140,6 +139,7 @@ Phases **0–4**, **6–8** (continuous deterministic SOCP stack).
 | **Converters** | `Re(Ss)+Pdc+Ploss=0`; DCP loss `Ploss=a+b·t`, `t≥|Re(Ss)|`; `‖Ss‖≤Smax`; option B (no conv in Ybus, L8) | `converter_*` |
 | **Gens / wind** | `PGi_gen`/`QGi_gen`; ren injection from `grid.Time_series` + `gamma` param | `generator_*`, `translate_pyf_socp` |
 | **BESS (G6)** | Continuous `P_charge`/`P_discharge`, SoC chain, AC S-circle / DC `\|P_net\|`; AC+DC nodes | `storage_*` |
+| **BESS (MI opt-in)** | ``bess_mi_exclusivity=True``: ``y_charge``/``y_discharge`` gate charge/discharge; ``y_c+y_d≤1`` (Paper R 56–59) | `storage_*`, `ACDC_convex.py` |
 | **H₂ (linear)** | `P_electrolyser`, optional AC `Q`; mass chain `h=b_h·P·S_base·dt+c_h`; optional `H2_mass_final` | `hydrogen_*` |
 | **Heat pumps** | NL Q twin (Q-18 **A**): `P`/`Q`/`E` chain; TS profiles; AC load injection | `heat_pump_*`, `translate_pyf_socp` |
 | **Objective** | `ObjComponent` weights: `Energy_cost`, `Ext_Gen`, `AC_losses`, `DC_losses`, `Converter_Losses`, `H2_sale`, `SoC_deviation` | `ACDC_convex._build_objective` |
@@ -156,10 +156,9 @@ analyse_grid → translate_pyf_socp → socp_model → _build_objective → solv
 
 | Priority | Phase | Logic to add | Entry / trigger | Detail |
 |----------|-------|--------------|-----------------|--------|
-| **1 — next** | **9** | MI-BESS charge/discharge exclusivity | ``bess_mi_exclusivity=True`` on ``socp_optimise`` / ``soc_window_optimisation`` | §5.4; Paper R Eqs. 56–59; MI solver required |
-| **2** | **10** | Chance constraints (wind + price quantiles) | New runners ``socp_chance_optimise``, ``socp_chance_window_optimisation`` | §5.5 family A; Paper A §4 |
-| **3** | **11** | Robust box uncertainty + C&CG loop | New runners ``socp_robust_optimise``, ``socp_robust_window_optimisation`` | §5.5 family B; Paper R §3.3 |
-| **4 — later** | — | Converter AC RL in Ybus | ``CONVEX_Ybus`` / L8 option A | Not started |
+| **1 — next** | **10** | Chance constraints (wind + price quantiles) | ``socp_chance_optimise``, ``socp_chance_window_optimisation`` | §5.5 family A; Paper A §4 |
+| **2** | **11** | Robust box uncertainty + C&CG loop | ``socp_robust_optimise``, ``socp_robust_window_optimisation`` | §5.5 family B; Paper R §3.3 |
+| **3 — later** | — | Converter AC RL in Ybus | ``CONVEX_Ybus`` / L8 option A | Not started |
 | **Optional** | — | PEI / paper-table parity; H₂ mandatory daily quota; NLP cross-benchmark | Tests / fixtures (L2) | §1.6, Q-16, Q-19 |
 
 **Explicit non-goals (unchanged):** dense SOCP; in-place NLP builder edits; BESS sizing.
@@ -349,7 +348,7 @@ Deterministic full-system revenue reference in paper: **7,112,732 €** / 24 h (
 |---------|-------------------|---------------------------|
 | Model builder | `ACDC_OPF_NL_model.py` (Pyomo) | `convex_model.py` (CVXPY) — **done** |
 | Runners | `optimal_pf`, `window_nl_opf` | `socp_optimise`, `soc_window_optimisation` — **done** |
-| MI-BESS exclusivity | G6 continuous (overlap allowed) | Optional flag Phase 9 — **todo** |
+| MI-BESS exclusivity | G6 continuous (overlap allowed) | ``bess_mi_exclusivity=True`` — **done** (Phase 9) |
 | Chance / robust uncertainty | — | Phase 10–11 runners — **todo** |
 | Optional extra | `[OPF]` | `[SOCP]` — **done** |
 
@@ -601,7 +600,7 @@ Status key: **Done** = logic in tree (§0.4); **Next** / **Planned** = §0.4 sti
 | **Model** | `Re(Ss)+Pdc+Ploss=0`; `Ploss=a+b·t`, `t≥|Re(Ss)|` (L13); `‖Ss‖≤Smax`; no conv AC Ybus (L8) | `convex_model.py` |
 | **Classes** | `a_conv`, `b_conv`, polarity `pcn` | Existing converter attrs |
 
-### 5.4 MI-SOCP BESS — optional exclusivity — **Next (Phase 9)**
+### 5.4 MI-SOCP BESS — optional exclusivity — **Done (Phase 9)**
 
 **Owner decision (Q-15):** MI charge/discharge exclusivity is the **largest BESS gap**
 vs Paper R (Eqs. 56–59). Implement as an **opt-in runner flag** on the existing
@@ -625,7 +624,7 @@ y^c_k,t, y^d_k,t ∈ {0,1}
 |-------|-------------------|-------|
 | **API** | ``bess_mi_exclusivity: bool = False`` on ``socp_optimise`` and ``soc_window_optimisation``; propagate through ``socp_model`` / ``storage_constraints``. Same flag on ``socp_chance_*`` / ``socp_robust_*`` when those land. | `ACDC_convex.py` |
 | **Model** | When flag set: ``cp.Variable(boolean=True)`` ``y^c``/``y^d`` per storage×``T``; replace direct ``P_charge``/``P_discharge`` upper bounds with gated bounds; keep SoC chain and AC/DC rating constraints unchanged. | `convex_model.py` (`storage_variables`, `storage_constraints`) |
-| **Solver** | ``resolve_socp_solver`` must pick MI-capable backend (MOSEK / Gurobi / SCIP) when flag is ``True``; **fail hard** if only CLARABEL/SCS available. | `solver_utils.py` |
+| **Solver** | ``resolve_socp_solver`` prefers MI-capable backend (MOSEK / Gurobi / SCIP) when flag is ``True``; **warn** if a non-MI solver is resolved or passed explicitly. | `solver_utils.py` |
 | **Tests** | Continuous default smoke unchanged; optional MI smoke (skip if no MI solver in CI). | `test_socp.py` |
 | **Docs** | SOCP modelling page: G6 default vs MI opt-in; Paper R parity note. | `modelling_flexible_assets.rst` |
 
@@ -723,8 +722,8 @@ Mirror of **§0.4** for phase numbering. **Done** = phases 0–4, 6–8. **Todo*
 | **6** | BESS G6 + H₂ linear | **Done** |
 | **7** | Docs, Results, CI | **Done** |
 | **8** | Heat pumps (Q-18 **A**) | **Done** |
-| **9** | Optional MI-BESS (``bess_mi_exclusivity``) | **Next** — §5.4 |
-| **10** | ``socp_chance_*`` (Paper A CCP) | Planned — §5.5 |
+| **9** | Optional MI-BESS (``bess_mi_exclusivity``) | **Done** — §5.4 |
+| **10** | ``socp_chance_*`` (Paper A CCP) | **Next** — §5.5 |
 | **11** | ``socp_robust_*`` (Paper R box + C&CG) | Planned — §5.5 |
 
 ---
@@ -784,7 +783,7 @@ Owner-locked items (**L1–L28**) are answered. Remaining opens below.
 
 ### 7.6 Where to start
 
-See **§0.4 Still to do**. Next gate: Phase **9** (``bess_mi_exclusivity``).
+See **§0.4 Still to do**. Next gate: Phase **10** (``socp_chance_*``).
 
 ---
 
@@ -851,11 +850,10 @@ See **§0.4 Still to do**. Next gate: Phase **9** (``bess_mi_exclusivity``).
 
 ### 8.7 Suggested resolution order
 
-1. ~~Phases 0–8 (deterministic SOCP stack).~~ **Done** — §0.4.
-2. **Phase 9:** optional ``bess_mi_exclusivity`` (§5.4).
-3. **Phase 10:** ``socp_chance_*`` (§5.5).
-4. **Phase 11:** ``socp_robust_*`` (§5.5).
-5. Later: ``CONVEX_Ybus`` (L8 option A); optional PEI parity (L2).
+1. ~~Phases 0–9 (deterministic SOCP + optional MI-BESS).~~ **Done** — §0.4.
+2. **Phase 10:** ``socp_chance_*`` (§5.5).
+3. **Phase 11:** ``socp_robust_*`` (§5.5).
+4. Later: ``CONVEX_Ybus`` (L8 option A); optional PEI parity (L2).
 
 ---
 
