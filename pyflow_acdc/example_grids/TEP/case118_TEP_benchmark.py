@@ -737,9 +737,9 @@ def case118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=
     range_price = price_alpha*max(gen.lf for gen in grid.Generators)+(1-price_alpha)*min(gen.lf for gen in grid.Generators)
  
     
-    pyf.add_extgrid(grid,'10','Ext_10',lf=0,MVAmax=export_capacity/3,MWmax=0) 
-    pyf.add_extgrid(grid, '119','Ext_119',lf=0,MVAmax=export_capacity/3,MWmax=0)  
-    pyf.add_extgrid(grid, '120','Ext_120',lf=0,MVAmax=export_capacity/3,MWmax=0) 
+    pyf.add_extgrid(grid,'10','Ext_10',lf=0,MVAmax=export_capacity/3,MWmin=-export_capacity/3,MWmax=0) 
+    pyf.add_extgrid(grid, '119','Ext_119',lf=0,MVAmax=export_capacity/3,MWmin=-export_capacity/3,MWmax=0)  
+    pyf.add_extgrid(grid, '120','Ext_120',lf=0,MVAmax=export_capacity/3,MWmin=-export_capacity/3,MWmax=0) 
     pyf.create_geometries_from_coords(grid)
     rec_exp_info=[
         {'kV': 220, 'rec_cost': 275000, 'rec_Rating':  900, 'exp_cost':  700000},

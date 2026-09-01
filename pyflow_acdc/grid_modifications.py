@@ -1649,10 +1649,13 @@ def add_extgrid(grid, node, gen_name=None,lf=0,qf=0,MVAmax=MAX_RATING_PLACEHOLDE
         OPF cost coefficients.
     MVAmax : float, optional
         Apparent power rating in MVA (also sets ``MWmax`` when omitted).
-    MWmax, MVArmin, MVArmax : float, optional
-        Power limits in MW / MVAr.
+    MWmax, MWmin, MVArmin, MVArmax : float, optional
+        Active/reactive power limits in MW / MVAr. When ``Allow_sell=True`` and
+        ``MWmax=0``, ``MWmin`` sets the export-only lower bound (e.g.
+        ``MWmin=-MVAmax``).
     Allow_sell : bool, optional
-        Allow negative export ( selling ) through the external grid.
+        Allow negative export ( selling ) through the external grid. With
+        ``MWmax=0``, only export down to ``MWmin`` is permitted.
     P_load_MW : float, optional
         Fixed load component modelled at the external grid in MW.
 

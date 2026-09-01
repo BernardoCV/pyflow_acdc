@@ -366,7 +366,7 @@ def heat_pump_constraints_l(model, grid, heat_pump_info, window_block=False):
 
 
 def Generation_variables(model,grid,gen_info,TEP):
-    from ..ACDC_OPF import get_gen_p_min_eff
+    from ..grid_analysis import get_gen_p_min_eff
 
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     lf,qf,fc,np_gen,lista_gen = gen_AC_info
@@ -1547,7 +1547,7 @@ def TEP_parameters(model,grid):
 def TEP_variables(model,grid):
 
     from ..NL_models.ACDC_Static_TEP import get_TEP_variables
-    from ..ACDC_OPF import get_gen_p_min_eff
+    from ..grid_analysis import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 

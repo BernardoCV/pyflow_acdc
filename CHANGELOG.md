@@ -7,11 +7,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.10**.
+> packaged version is **0.6.12**.
 
 ## [Unreleased]
 
-## [0.6.10]
+## [0.6.12]
 
 Controllable heat pumps (NL + linear P-only twin).
 
@@ -32,6 +32,22 @@ Controllable heat pumps (NL + linear P-only twin).
   ``_modify_parameters_l`` and myopic carry include heat-pump ``E_heat_pump_prev``
   / refs when ``grid.HP``; ``window_block=True`` skips rewriting
   ``E_heat_pump_prev`` (parent window owns the energy chain).
+
+## [0.6.11]
+
+### Added
+- **Export-only external grids**: with ``Allow_sell=True`` and ``MWmax=0``,
+  ``MWmin`` sets the active-power export lower bound (e.g. ``MWmin=-MVAmax``).
+  ``get_gen_p_min_eff`` lives in ``grid_analysis`` and is used consistently
+  across NL/L OPF, time-series bound updates, and ``grid_state``.
+
+## [0.6.10]
+
+### Fixed
+- **case118 TEP benchmark export interfaces**: ``add_extgrid`` at nodes 10/119/120
+  no longer pass ``MWmax=0``; ``MVAmax=export_capacity/3`` now sets the active-power
+  limit so TS OPF ``grid_state`` bounds and external-grid export capacity match the
+  benchmark.
 
 ## [0.6.9]
 

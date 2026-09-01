@@ -123,7 +123,7 @@ def opf_create_nl_model_acdc(model,grid,PV_set,Price_Zones,TEP=False,limit_flow_
 
 
 def Generation_variables(model,grid,gen_info,TEP):
-    from ..ACDC_OPF import get_gen_p_min_eff
+    from ..grid_analysis import get_gen_p_min_eff
 
     gen_AC_info, gen_DC_info, gen_rs_info = gen_info
     _,_,_,_,lista_gen = gen_AC_info
@@ -2429,7 +2429,7 @@ def TEP_variables(model,grid,n_init_install=None):
         raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
 
     from .ACDC_Static_TEP import get_TEP_variables
-    from ..ACDC_OPF import get_gen_p_min_eff
+    from ..grid_analysis import get_gen_p_min_eff
 
     tep_vars = get_TEP_variables(grid)
 
