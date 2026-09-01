@@ -86,7 +86,6 @@ def window_l_opf(
     start=0,
     end=23,
     ObjRule=None,
-    OnlyGen=True,
     solver='glpk',
     tee=False,
     callback=False,
@@ -133,7 +132,7 @@ def window_l_opf(
             f"end={end} out of range for Time_series length {ts_len} (0-based)"
         )
 
-    weights_def, price_zones = obj_w_rule(grid, ObjRule, OnlyGen)
+    weights_def, price_zones = obj_w_rule(grid, ObjRule)
     check_linear_opf_weights(weights_def)
 
     ts_base = start
@@ -258,7 +257,7 @@ def window_l_opf(
         export_acdc_l_model_to_pyflow_acdc(model.frame_model[last_local], grid)
 
     for obj in weights_def:
-        weights_def[obj]['v'] = calculate_objective(grid, obj, OnlyGen)
+        weights_def[obj]['v'] = calculate_objective(grid, obj)
 
     t4 = time.perf_counter()
 
@@ -284,7 +283,6 @@ def rolling_window_l_opf(
     soc_final_every_m=1,
     future_sight=0.0,
     ObjRule=None,
-    OnlyGen=True,
     solver='glpk',
     tee=False,
     callback=False,
@@ -404,7 +402,6 @@ def rolling_window_l_opf(
             start=solve_start,
             end=solve_end,
             ObjRule=ObjRule,
-            OnlyGen=OnlyGen,
             solver=solver,
             tee=tee,
             callback=callback,

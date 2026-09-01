@@ -11,6 +11,16 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **`Energy_cost`**: removed ``OnlyGen`` flag from OPF runners and ``grid.OnlyGen``;
+  renewable sources use per-element ``qf`` / ``lf`` on ``Ren_Source`` (default ``0``),
+  with the same MW-scaled quadratic form as generators; converter
+  ``P_conv·price`` and nodal ``PGi_ren·price`` terms removed from ``Energy_cost``.
+
+### Added
+- ``Ren_Source.quadratic_cost_factor`` / ``linear_cost_factor`` (``qf`` / ``lf``);
+  ``add_RenSource(..., quadratic_cost_factor=, linear_cost_factor=)``.
+
 ## [0.6.11]
 
 ### Added
