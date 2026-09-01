@@ -129,8 +129,7 @@ def sequential_CSS(grid,NPV=True,LCoE=None,n_years=25,Hy=HOURS_PER_YEAR,discount
     seq_css_time = 0
     weights_def, PZ = obj_w_rule(
         grid,
-        {ObjComponent.ARRAY_LOSSES.value: 1} if L_OPEX else None,
-        True)
+        {ObjComponent.ARRAY_LOSSES.value: 1} if L_OPEX else None)
     t0 = time.perf_counter()
     t_MW = grid.RenSources[0].PGi_ren_base*grid.S_base
 

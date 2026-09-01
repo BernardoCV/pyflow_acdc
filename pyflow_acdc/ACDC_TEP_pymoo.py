@@ -417,7 +417,7 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,disc
 
     analyse_grid(grid)
 
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(grid,ObjRule)
     # Create problem
     if solver == 'GA':
         algorithm = GA(pop_size=50)

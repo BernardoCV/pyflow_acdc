@@ -956,7 +956,7 @@ def multi_period_transmission_expansion(
 
     grid.reset_run_flags()
     analyse_grid(grid)
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(grid,ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -1749,7 +1749,7 @@ def multi_period_MS_TEP(
         raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
     grid.reset_run_flags()
     analyse_grid(grid)
-    weights_def, Price_Zones = obj_w_rule(grid, ObjRule, True)
+    weights_def, Price_Zones = obj_w_rule(grid, ObjRule)
 
     if alpha is not None:
         try:
@@ -2012,7 +2012,7 @@ def run_opf_for_investment_period(
         )
 
 
-    _, PZ = obj_w_rule(grid,ObjRule,True)
+    _, PZ = obj_w_rule(grid,ObjRule)
     _set_grid_to_multiperiod_state(grid, period_idx,PZ)
     model, model_res, timing_info, solver_stats = optimal_pf(
         grid,
@@ -2159,7 +2159,7 @@ def run_ts_opf_for_investment_period(
         period_tag = period_idx
         if print_step:
             print(f"[run_ts_opf_for_investment_period] applying state: investment_period={period_idx}")
-        _, PZ = obj_w_rule(grid, ObjRule, True)
+        _, PZ = obj_w_rule(grid, ObjRule)
         _set_grid_to_multiperiod_state(grid, period_idx, PZ)
 
     times = ts_acdc_opf(

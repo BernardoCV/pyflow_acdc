@@ -586,7 +586,7 @@ def _prepare_TEP_model(
 
     analyse_grid(grid)
 
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(grid,ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -1225,7 +1225,7 @@ def multi_scenario_TEP(
     """
     analyse_grid(grid)
 
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
