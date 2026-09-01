@@ -22,7 +22,7 @@ Controllable heat pumps (NL + linear P-only twin).
   ``ext_heat_pump`` / ``heat_pump_window``. TS types ``hp_P_ref``, ``hp_Q_ref``,
   ``hp_E_min``, ``hp_E_max``. Linear twin (P-only): ``optimal_l_pf`` /
   ``ts_acdc_l_opf`` / ``window_l_opf`` with ``Q_hp`` fixed at 0. Docs
-  ``usage_heat_pump`` / ``api/heat_pump`` / ``api/modelling_flexible_assets``;
+  ``api/modelling_flexible_assets`` (heat-pump section) and ``api/grid_mod``;
   plan ``plans/heat_pump_plan.md``; tests ``test_heat_pump_opf.py``.
 - ``Ren_Source.quadratic_cost_factor`` / ``linear_cost_factor`` (``qf`` / ``lf``);
   ``add_RenSource(..., quadratic_cost_factor=, linear_cost_factor=)``.

@@ -22,8 +22,8 @@ Communities*, CIRED 2026 Brussels Workshop, Paper 1361, 2026.
 
 | Document | Link |
 |----------|------|
-| User guide | [docs/usage_heat_pump.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/heat_pumps/docs/usage_heat_pump.rst) |
-| API | [docs/api/heat_pump.rst](https://github.com/CITCEA-UPC/pyflow_acdc/blob/heat_pumps/docs/api/heat_pump.rst) |
+| User guide | `docs/api/modelling_flexible_assets.rst` (heat-pump section) + `docs/usage_window_opf.rst` |
+| API | `docs/api/grid_mod.rst` (`add_heat_pump`) + `docs/api/modelling_flexible_assets.rst` |
 | BESS / H₂ operation (separate) | [bess_integration_plan.md](https://github.com/CITCEA-UPC/pyflow_acdc/blob/heat_pumps/plans/bess_integration_plan.md) |
 | Tests | [pyflow_tests/test_heat_pump_opf.py](https://github.com/CITCEA-UPC/pyflow_acdc/blob/heat_pumps/pyflow_tests/test_heat_pump_opf.py) |
 | Sibling plans | [plans/](https://github.com/CITCEA-UPC/pyflow_acdc/tree/heat_pumps/plans) |
@@ -36,11 +36,11 @@ Communities*, CIRED 2026 Brussels Workshop, Paper 1361, 2026.
 |------|--------|
 | `HeatPump` class + `add_heat_pump` | Done |
 | `grid.HP` / nodal hooks | Done |
-| Snapshot NL OPF (`P_heat_pump`, `Q_heat_pump`, `E_heat_pump`) | Done |
+| Snapshot NL OPF (`P_shed`, `Q_shed`, `E_heat_pump`) | Done |
 | Myopic `ts_acdc_opf` energy-state carry | Done |
 | Coupled `window_nl_opf` parent energy chain | Done |
 | `Results.ext_heat_pump` / `heat_pump_window` | Done |
-| Docs (`usage_heat_pump`, `api/heat_pump`) | Done |
+| Docs (`modelling_flexible_assets`, `grid_mod`) | Done |
 | Tests (`test_heat_pump_opf.py`) | Done |
 | TS types `hp_P_ref` / `hp_Q_ref` / `hp_E_min` / `hp_E_max` | Done |
 | Operation-oriented FEL (`E_flex`, terminal neutrality) | Deferred |
@@ -66,7 +66,9 @@ Communities*, CIRED 2026 Brussels Workshop, Paper 1361, 2026.
 - Admissible shedding range uses `num_con_load * 1.76 kW`, cumulative `LOAD_cap`, and time-varying `e_min` / `e_max`.
 - Served power: `P_hp = P_baseline - P_shedding` (same for Q).
 
-**pyflow v1 mapping:** optimize **served** `P_heat_pump` / `Q_heat_pump` directly (not a separate shed variable in the model). Shed is derived for reporting: `P_shed = P_ref - P_hp`.
+**pyflow v1 mapping:** optimize explicit `P_shed` / `Q_shed` with
+`P_hp = P_ref - P_shed`, `Q_hp = Q_ref - Q_shed`. Shed costs in `Energy_cost`
+on the shed vars (Montse shedding-sgen `cp*_loads_C` / `cq*_loads_C` pattern).
 
 ---
 
@@ -82,14 +84,17 @@ class HeatPump:  # Classes.py
 | Attribute | Units / meaning |
 |-----------|-----------------|
 | `P_ref`, `Q_ref` | Baseline demand [pu on `S_base`] |
-| `n_units`, `P_unit_max` | Instantaneous shed capability → `n_units * P_unit_max` [pu] |
+| `n_units`, `P_unit_max` | Active shed capability → `n_units * P_unit_max` [pu] |
+| `Max_S` | Installed apparent-power rating [pu]; default `n_units * P_unit_max` |
+| `Q_lim_shed` | `Max_S * Q_shed_lim_frac` [pu]; fixed at creation |
+| `qf`, `lf`, `qf_q`, `lf_q` | `Energy_cost` coefficients on `P_shed` / `Q_shed` |
 | `E_state`, `E_state_initial` | Cumulative energy state [kWh] |
 | `E_min`, `E_max` | Comfort bounds on `E_state` [kWh] |
 | `dt_hours` | Timestep duration [h] |
 | `P_hp`, `Q_hp` | Served demand after solve [pu] |
-| `P_shed`, `Q_shed` | Derived shed after solve [pu] |
+| `P_shed`, `Q_shed` | Optimized shed after solve [pu] |
 
-Public entry: `add_heat_pump(grid, node, *, P_ref_MW, Q_ref_MVAR=0, n_units, E_min_kWh, E_max_kWh, …)` → appends to `grid.heat_pumps`. `analyse_grid` sets `grid.HP`.
+Public entry: `add_heat_pump(grid, node, *, P_ref_MW, Q_ref_MVAR=0, n_units, E_min_kWh, E_max_kWh, S_rated_MVAR=, q_shed_lim_frac=1, quadratic_cost_factor=0, …)` → appends to `grid.heat_pumps`. `analyse_grid` sets `grid.HP`.
 
 Multi-hour overrides via `TSType`:
 
@@ -106,27 +111,31 @@ Multi-hour overrides via `TSType`:
 
 ### Snapshot / myopic (`window_block=False`)
 
-Decision vars: `P_heat_pump[h]`, `Q_heat_pump[h]`, `E_heat_pump[h]`.
+Decision vars: `P_shed[h]`, `Q_shed[h]`, `E_heat_pump[h]`.
+
+Expressions: `P_heat_pump = P_ref - P_shed`, `Q_heat_pump = Q_ref - Q_shed`.
 
 Mutable params: `hp_p_ref`, `hp_q_ref`, `hp_e_min`, `hp_e_max`, `E_heat_pump_prev`.
 
 Bounds (every frame):
 
 ```text
-P_ref - n_units * P_unit_max  <=  P_hp  <=  P_ref
-Q_ref                          <=  Q_hp  <=  0
-E_min                          <=  E     <=  E_max
+0 <= P_shed <= n_units * P_unit_max
+-Q_lim_shed <= Q_shed <= Q_lim_shed
+E_min <= E <= E_max
 ```
 
-Energy balance and Montse-style energy-linked P bounds (skip when `window_block`):
+Energy balance and energy-linked P_shed bounds (skip when `window_block`):
 
 ```text
 E = E_prev + P_hp * S_base * dt_hours          # E in kWh; P_hp in pu
-P_hp >= E_prev/dt + P_ref - E_max/dt
-P_hp <= E_prev/dt + P_ref - E_min/dt
+P_shed >= E_min/dt - E_prev/dt
+P_shed <= E_max/dt - E_prev/dt
 ```
 
 Nodal load hook (`Gen_Pheatpump_constraint`): subtract `P_heat_pump` / `Q_heat_pump` from AC nodal injection (same load sign as electrolyser / load).
+
+`Energy_cost`: `P_shed²·qf + P_shed·lf` and Q twin (MW/MVAR via `S_base`).
 
 ### Window (`window_nl_opf`)
 
@@ -139,11 +148,11 @@ Nodal load hook (`Gen_Pheatpump_constraint`): subtract `P_heat_pump` / `Q_heat_p
 
 ### Linear OPF (P-only, shipped)
 
-Same P/E formulation as NL on `optimal_l_pf` / `ts_acdc_l_opf` / `window_l_opf`
+Same `P_shed` / `E_heat_pump` formulation as NL on `optimal_l_pf` / `ts_acdc_l_opf` / `window_l_opf`
 (`heat_pump_variables_l` / `heat_pump_constraints_l`). Differences:
 
-- No Q nodal injection; `Q_heat_pump` is a fixed-0 Var (shared window export).
-- Export sets `Q_hp = 0` (shed reporting still uses `Q_ref - Q_hp`).
+- `Q_shed` fixed at `Q_ref` (Param) → `Q_hp = 0`; no Q nodal injection.
+- Only `P_shed` linear/quadratic costs in `Energy_cost`.
 - Parent chain reuses `window_heat_pump_constraints`.
 
 ---
@@ -176,7 +185,7 @@ Same P/E formulation as NL on `optimal_l_pf` / `ts_acdc_l_opf` / `window_l_opf`
 | `Time_series.py` | `_modify_parameters_l` HP params; `ts_acdc_l_opf` carry / TS keys |
 | `Results_class.py` | `ext_heat_pump`, `heat_pump_window` |
 | `__init__.py` | export `HeatPump`, `add_heat_pump` |
-| `docs/usage_heat_pump.rst`, `docs/api/heat_pump.rst` | user + API docs |
+| `docs/api/modelling_flexible_assets.rst`, `docs/api/grid_mod.rst` | user + API docs |
 | `pyflow_tests/test_heat_pump_opf.py` | bounds + TS + window smoke |
 
 ---
@@ -187,9 +196,8 @@ Not in v1:
 
 - Normalized FEL state `E_flex` with terminal neutrality `E_flex[t0] = E_flex[tn] = 0`
 - Post-solve reserve envelopes `R_up` / `R_down` from power + comfort headroom
-- Explicit Pyomo `P_shed` / `Q_shed` actuator vars (reporting-only shed is enough today)
 
-Keep planning-oriented served-P model as the stable base; add FEL as a second step if needed.
+Keep planning-oriented `P_shed`/`Q_shed` model as the stable base; add FEL as a second step if needed.
 
 ---
 

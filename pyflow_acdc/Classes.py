@@ -1844,7 +1844,8 @@ class HeatPump:
     :func:`~pyflow_acdc.update_grid_data`.
 
     Power flow uses ``P_ref`` / ``Q_ref`` as known nodal loads (see
-    :meth:`Grid.update_pq_ac`). OPF optimizes served ``P_hp`` / ``Q_hp`` within
+    :meth:`Grid.update_pq_ac`). OPF optimizes ``P_shed`` / ``Q_shed`` with
+    served power ``P_hp = P_ref - P_shed``, ``Q_hp = Q_ref - Q_shed`` within
     the planning-oriented bounds of Montalà-Palau et al. (2026).
     """
     heatPumpNumber = 0

@@ -125,7 +125,7 @@ The linear model includes variables for (gated by ``grid.ACmode`` /
   ``P_conv_s_AC`` / DC converter injections
 - Optional BESS charge / discharge / SoC (when ``grid.ESS``; P-only, no Q)
 - Optional electrolyser power / H₂ mass (when ``grid.H2``; no Q)
-- Optional heat-pump served power / energy state (when ``grid.HP``; P-only, no Q)
+- Optional heat-pump ``P_shed`` / energy state (when ``grid.HP``; P-only, ``Q_hp=0``)
 
 **Constraints**
 
@@ -138,7 +138,7 @@ The model enforces constraints for:
 - Generator / renewable aggregation at nodes
 - Optional storage SoC balance and ``|P_net| ≤ P_max``
 - Optional electrolyser mass balance
-- Optional heat-pump energy-state balance and instantaneous P bounds
+- Optional heat-pump energy-state balance and ``P_shed`` bounds (Q fixed at ``Q_ref``)
 - AC branch linearized power flow equations
 - Thermal limits (including linear big-M formulations for REC/CT states)
 - Slack angle constraints
