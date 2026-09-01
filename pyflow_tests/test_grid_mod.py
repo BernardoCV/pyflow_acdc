@@ -271,6 +271,39 @@ def test_cable_database_expand_and_orbit_import_do_not_persist():
     assert len(Line_AC._cable_database) == ac_count_before
 
 
+def test_get_gen_p_min_eff_ext_grid_export_only():
+    """MWmax=0 with Allow_sell uses MWmin as the export lower bound."""
+    from pyflow_acdc.grid_analysis import get_gen_p_min_eff
+
+    grid, _ = pyf.cases["Stagg5MATACDC"]()
+    export_mw = 250.0
+    pyf.add_extgrid(
+        grid,
+        "1",
+        gen_name="ext_export",
+        MVAmax=export_mw,
+        MWmax=0,
+        MWmin=-export_mw,
+        Allow_sell=True,
+    )
+    ext = next(g for g in grid.Generators if g.name == "ext_export")
+
+    assert get_gen_p_min_eff(ext, 1) == pytest.approx(-export_mw / grid.S_base)
+    assert ext.Max_pow_gen * 1 == pytest.approx(0.0)
+
+
+def test_get_gen_p_min_eff_ext_grid_bidirectional():
+    """Bidirectional ext grids keep the symmetric allow_sell bound."""
+    from pyflow_acdc.grid_analysis import get_gen_p_min_eff
+
+    grid, _ = pyf.cases["Stagg5MATACDC"]()
+    import_mw = 300.0
+    pyf.add_extgrid(grid, "2", gen_name="ext_bidir", MVAmax=import_mw, Allow_sell=True)
+    ext = next(g for g in grid.Generators if g.name == "ext_bidir")
+
+    assert get_gen_p_min_eff(ext, 1) == pytest.approx(-import_mw / grid.S_base)
+
+
 def run_test():
     import tempfile
 

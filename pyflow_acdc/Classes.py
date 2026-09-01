@@ -77,12 +77,22 @@ class Grid:
     ----------
     S_base : float
         System power base in MVA.
-    S_base_ref : float
-        Power base at grid creation (unchanged by :func:`~pyflow_acdc.change_S_base`).
-        Used for :attr:`tol_scaler` when rescaling PF tolerances after a base change.
-    nodes_AC, lines_AC, Converters, nodes_DC, lines_DC : list, optional
-        Initial element lists; default to empty and are normally populated via
-        the ``add_*`` helpers.
+    nodes_AC : list, optional
+        Initial AC buses; default empty (normally populated via ``add_*`` helpers).
+    lines_AC : list, optional
+        Initial AC lines.
+    Converters : list, optional
+        Initial AC/DC converters.
+    nodes_DC : list, optional
+        Initial DC buses.
+    lines_DC : list, optional
+        Initial DC lines.
+
+    Notes
+    -----
+    ``S_base_ref`` is set to ``S_base`` at creation and is unchanged by
+    :func:`~pyflow_acdc.change_S_base` (used for ``tol_scaler`` when rescaling
+    PF tolerances).
 
     Examples
     --------
@@ -1173,17 +1183,13 @@ class Gen_AC:
     np_gen : int, optional
         Number of parallel generator units.
 
-    Attributes
-    ----------
-    PGen, QGen : float
-        Total dispatched active/reactive power (setpoint × ``np_gen``; OPF result after solve).
-    price_link : bool
-        Deprecated alias: ``True`` means ``link_cost='linear'``.
-    link_cost : LinkCost or str
-        ``'none'`` (default), ``'quadratic'`` (``qf``/``lf`` from node), or
-        ``'linear'`` (``lf`` from ``node.price``).
-    is_ext_grid : bool
-        External-grid (slack) generator flag.
+    Notes
+    -----
+    After solve, ``PGen`` / ``QGen`` (pu) hold total dispatch
+    (per-unit setpoint × ``np_gen``). ``link_cost`` is ``'none'`` (default),
+    ``'quadratic'`` (``qf``/``lf`` from the host bus), or ``'linear'``
+    (``lf`` from ``node.price``). ``is_ext_grid`` marks an external-grid
+    (slack) generator.
     """
     genNumber =0
     names = set()
@@ -1249,15 +1255,6 @@ class Gen_AC:
     @property
     def apparent_MVA(self):
         return max(abs(self.PGen), abs(self.QGen)) * self.S_base
-
-    @property
-    def price_link(self):
-        """Deprecated: ``True`` iff ``link_cost == LinkCost.LINEAR``."""
-        return self.link_cost == LinkCost.LINEAR
-
-    @price_link.setter
-    def price_link(self, value):
-        self.link_cost = LinkCost.LINEAR if value else LinkCost.NONE
 
     def __init__(self,name, node,Max_pow_gen: float,Min_pow_gen: float,Max_pow_genR: float,Min_pow_genR: float,quadratic_cost_factor: float=0,linear_cost_factor: float=0,fixed_cost:float =0,Pset:float=0,Qset:float=0,S_rated:float=None,gen_type=DEFAULT_GEN_TYPE,installation_cost:float=0,S_base:float=100,np_gen: int = 1):
         if S_base <= 0:
@@ -1385,15 +1382,6 @@ class Gen_DC:
     @property
     def name(self):
         return self._name
-
-    @property
-    def price_link(self):
-        """Deprecated: ``True`` iff ``link_cost == LinkCost.LINEAR``."""
-        return self.link_cost == LinkCost.LINEAR
-
-    @price_link.setter
-    def price_link(self, value):
-        self.link_cost = LinkCost.LINEAR if value else LinkCost.NONE
 
     @property
     def base_cost(self):
@@ -2003,22 +1991,13 @@ class Ren_Source:
     np_rsgen : int, optional
         Number of parallel renewable units.
 
-    Attributes
-    ----------
-    PGi_ren : float
-        Available active power in pu (``PGi_ren_base * PRGi_available``).
-    PRGi_available : float
-        Availability factor in [0, 1].
-    gamma : float
-        Curtailment factor in [``min_gamma``, 1].
-    min_gamma : float
-        Minimum allowed curtailment factor.
-    curtailable : bool
-        Whether the source may be curtailed in OPF.
-    Qmin, Qmax : float
-        Reactive power limits in pu (AC-connected sources).
-    Max_S : float
-        Apparent-power rating in pu.
+    Notes
+    -----
+    ``PGi_ren`` is available active power in pu
+    (``PGi_ren_base * PRGi_available``, with ``PRGi_available`` in [0, 1]).
+    Curtailment ``gamma`` lies in [``min_gamma``, 1] when ``curtailable``
+    (else fixed at 1). AC-connected sources also use ``Qmin`` / ``Qmax`` (pu)
+    and apparent-power rating ``Max_S`` (pu).
     """
     rsNumber =0
     names = set()
@@ -2236,14 +2215,11 @@ class Node_AC:
     y_coord : float, optional
         y-coordinate, preferably in latitude decimal format.
 
-    Attributes
-    ----------
-    price : float
-        Nodal energy price when the bus belongs to a price zone.
-    PLi_factor : float
-        Time-series/scenario load scaling factor.
-    PLi_inv_factor : float
-        Investment-period load scaling factor.
+    Notes
+    -----
+    When the bus belongs to a price zone, ``price`` is the nodal energy price.
+    ``PLi_factor`` scales load for time-series / scenarios; ``PLi_inv_factor``
+    scales load across investment periods (both default to 1).
     """
     nodeNumber = 0
     names = set()
@@ -2536,14 +2512,11 @@ class Node_DC:
     y_coord : float, optional
         y-coordinate, preferably in latitude decimal format.
 
-    Attributes
-    ----------
-    price : float
-        Nodal energy price when the bus belongs to a price zone.
-    PLi_factor : float
-        Time-series/scenario load scaling factor.
-    PLi_inv_factor : float
-        Investment-period load scaling factor.
+    Notes
+    -----
+    When the bus belongs to a price zone, ``price`` is the nodal energy price.
+    ``PLi_factor`` scales load for time-series / scenarios; ``PLi_inv_factor``
+    scales load across investment periods (both default to 1).
     """
     nodeNumber = 0
     names = set()
@@ -4303,28 +4276,15 @@ class Price_Zone:
     positive_price_delta : float, optional
         Maximum allowed price increase; caps ``PGL_max`` when set.
 
-    Attributes
-    ----------
-    nodes_AC, nodes_DC : list
-        Member AC and DC buses in the zone.
-    ConvACDC : list
-        AC/DC converters assigned to the zone.
-    PLi : float
-        Aggregated zone load in pu.
-    PLi_factor, PLi_inv_factor : float
-        Time-series and investment load scaling (propagate to linked nodes).
-    PGL_min, PGL_max : float
-        Minimum and maximum generation limits in pu.
-    PGL_min_base : float
-        Base lower generation limit before curve adjustments.
-    PN : float
-        Net active power at the zone.
-    expand_import : bool
-        Import-expand mode flag (derives ``a`` and ``PGL_min`` from ``import_expand``).
-    linked_price_zone : Price_Zone, optional
-        Linked offshore or coupled price zone.
-    mtdc_price_zones : list
-        MTDC price zones notified when this zone's price changes.
+    Notes
+    -----
+    Member buses are in ``nodes_AC`` / ``nodes_DC``; assigned converters in
+    ``ConvACDC``. Aggregated load ``PLi`` (pu) follows ``PLi_factor`` /
+    ``PLi_inv_factor``. Generation bounds are ``PGL_min`` / ``PGL_max`` (pu),
+    with ``PGL_min_base`` before curve adjustments. ``PN`` is net zone power
+    (pu). ``expand_import`` derives ``a`` and ``PGL_min`` from
+    ``import_expand``. Linked offshore / MTDC zones use ``linked_price_zone``
+    and ``mtdc_price_zones``.
     """
     price_zone_num = 0
     names = set()

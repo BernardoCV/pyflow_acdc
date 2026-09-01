@@ -7,11 +7,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.6**.
+> packaged version is **0.7.0**.
 
 ## [Unreleased]
 
-## [0.6.6]
+## [0.7.0]
 
 CVXPY sparse SOCP scaffolding (convex AC/DC stack).
 
@@ -37,7 +37,7 @@ CVXPY sparse SOCP scaffolding (convex AC/DC stack).
   ``t ≥ |Re(Ss)|``, ``Ploss = a_conv + b_conv · t`` (replaces non-DCP
   ``Ploss = a + c_rect·|Ss|²`` equality).
 
-## [0.6.5]
+## [0.6.12]
 
 Controllable heat pumps (NL + linear P-only twin).
 
@@ -58,6 +58,73 @@ Controllable heat pumps (NL + linear P-only twin).
   ``_modify_parameters_l`` and myopic carry include heat-pump ``E_heat_pump_prev``
   / refs when ``grid.HP``; ``window_block=True`` skips rewriting
   ``E_heat_pump_prev`` (parent window owns the energy chain).
+
+## [0.6.11]
+
+### Added
+- **Export-only external grids**: with ``Allow_sell=True`` and ``MWmax=0``,
+  ``MWmin`` sets the active-power export lower bound (e.g. ``MWmin=-MVAmax``).
+  ``get_gen_p_min_eff`` lives in ``grid_analysis`` and is used consistently
+  across NL/L OPF, time-series bound updates, and ``grid_state``.
+
+## [0.6.10]
+
+### Fixed
+- **case118 TEP benchmark export interfaces**: ``add_extgrid`` at nodes 10/119/120
+  no longer pass ``MWmax=0``; ``MVAmax=export_capacity/3`` now sets the active-power
+  limit so TS OPF ``grid_state`` bounds and external-grid export capacity match the
+  benchmark.
+
+## [0.6.9]
+
+### Fixed
+- **Pip example data paths**: ``case118_TEP_benchmark``, ``case24_MP``,
+  ``NS_MTDC_2025``, and PEI BESS loaders now resolve CSVs from the git-checkout
+  ``examples/`` tree and ``{sys.prefix}/examples/...`` (pip ``data-files``),
+  with GitHub raw fallback when local copies are missing. Shared helper:
+  ``example_grids/_example_data_paths.py``. Fixes ``FileNotFoundError`` after
+  ``pip install pyflow_acdc`` for benchmark and multi-period example cases.
+- **Wheel packaging**: include ``example_grids/PF/CigreB4/*.csv`` so
+  ``CigreB4_ACDC`` works after ``pip install`` (CSVs live beside the case, not
+  under top-level ``examples/``).
+- **CI package check**: load ``case118_TEP_benchmark``, ``case24_MP``,
+  ``CigreB4_ACDC``, and ``NS_MTDC_2025`` (``online=False``) from the installed
+  wheel to catch missing example data in distributions.
+
+## [0.6.8]
+
+### Fixed
+- **Sequential STEP results export**: removed redundant ``run_results["_meta"]``
+  (abort status stays on ``grid.Seq_*_aborted`` / ``abort_reason``), so
+  ``pyomo_model_results_sequential`` no longer hits mixed str/int key sorting.
+
+## [0.6.7]
+
+### Fixed
+- **Wheel packaging**: ship ``pyflow_acdc.NL_models`` and ``pyflow_acdc.L_models``
+  subpackages (setuptools ``packages.find``). ``0.6.6`` omitted them, so OPF /
+  TEP / STEP imports failed with ``No module named 'pyflow_acdc.NL_models'``.
+- **CI package check**: install the built wheel with pyomo and assert NL/L
+  subpackages plus TEP/STEP public attributes are importable (top-level
+  ``import pyflow_acdc`` alone no longer counts as success).
+
+## [0.6.6]
+
+### Fixed
+- **Expandable setup always available**: moved ``expand_elements_from_pd``,
+  ``expand_element``, ``repurpose_element_from_pd``, ``update_attributes``, and
+  ``base_cost_calculation`` from OPF-gated ``ACDC_Static_TEP`` into
+  ``grid_modifications``, so example cases that mark elements expandable no
+  longer fail with ``AttributeError`` when the soft-fail OPF import path does
+  not attach TEP symbols.
+
+## [0.6.5]
+
+### Added
+- **Sequential STEP** ``build_only``: skips the period-1 solve, extracts init
+  values as usual, then stops before building later periods.
+- **North Sea example data**: ``clusters_kmeans_medoids_k24.json`` for 2023+2024
+  MS TEP (alongside existing k4).
 
 ## [0.6.4]
 
@@ -103,6 +170,9 @@ and related packaging / docs / tooling.
 
 ### Removed
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
+- **``price_link``**: removed from ``Gen_AC`` / ``Gen_DC`` and ``add_gen`` /
+  ``add_gen_DC`` / ``add_extgrid``. Use ``link_cost='linear'`` instead. Legacy
+  pickles are still migrated by ``_migrate_legacy_gen_link_cost``.
 
 ### Changed
 - **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same

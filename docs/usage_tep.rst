@@ -22,6 +22,7 @@ Workflow
 - :func:`~pyflow_acdc.add_gen` (with ``installation_cost``)
 - :func:`~pyflow_acdc.add_RenSource` (with ``base_cost``)
 - expandable table → :func:`~pyflow_acdc.expand_elements_from_pd`
+  (API: :doc:`api/grid_mod`)
 
   Candidate line types — :ref:`expandable <AC_expandable_branch>`,
   :ref:`reconducting <AC_reconducting_branch>`, and

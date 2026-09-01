@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.6.6"
+version = "0.7.0"
 license = {file = "LICENSE"}
 requires-python = ">= 3.10"
 
@@ -105,8 +105,8 @@ Homepage       = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Repository     = "https://github.com/CITCEA-UPC/pyflow_acdc"
 Documentation  = "https://pyflow-acdc.readthedocs.io/en/latest/"
 
-[tool.setuptools]
-packages = ["pyflow_acdc","pyflow_tests"]
+[tool.setuptools.packages.find]
+include = ["pyflow_acdc*", "pyflow_tests*"]
 
 [tool.setuptools.package-data]
 "pyflow_acdc" = [
@@ -116,6 +116,7 @@ packages = ["pyflow_acdc","pyflow_tests"]
     "Cable_database/*.yaml",
     "example_grids/*.py",
     "example_grids/PF/*.py",
+    "example_grids/PF/CigreB4/*.csv",
     "example_grids/OPF/*.py",
     "example_grids/TEP/*.py",
     "example_grids/TEP/*.csv",

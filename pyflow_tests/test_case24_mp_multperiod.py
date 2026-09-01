@@ -117,8 +117,52 @@ def test_case24_sequential_step_orchestration_fake_solve(monkeypatch):
     )
 
     assert len(solve_calls) == 1
-    assert run_results["_meta"]["aborted"] is True
-    assert "no feasible solution" in run_results["_meta"]["abort_reason"]
+    assert grid.Seq_STEP_run_aborted is True
+    assert "no feasible solution" in grid.Seq_STEP_run_abort_reason
+
+
+def test_case24_sequential_step_build_only():
+    """build_only: build period 1, extract init values, do not build period 2+."""
+    require_pyomo()
+
+    grid, res, mod = _case24_mp_grid_with_csvs()
+    inv_csv = mod._resolve_example_path("case24_MP_TEP_inv_series_10.csv")
+    mix_csv = mod._resolve_example_path("case24_MP_TEP_gen_mix_limits.csv")
+
+    run_results = pyf.sequential_STEP(
+        grid=grid,
+        inv_data=inv_csv,
+        mix_data=mix_csv,
+        n_years=mod.DEFAULT_N_YEARS,
+        Hy=8760,
+        discount_rate=0.02,
+        ObjRule=mod.DEFAULT_OBJ_RULE,
+        solver=tep_solver(),
+        tee=False,
+        obj_scaling=1e9,
+        save_svgs=False,
+        export_steps=False,
+        build_only=True,
+    )
+
+    assert grid.Seq_STEP_run_aborted is False
+    assert grid.Seq_STEP_run_abort_reason is None
+    assert 0 in run_results
+    assert 1 not in run_results
+
+    stats = run_results[0]["solver_stats"]
+    assert stats["termination_condition"] == "build_only"
+    assert stats["solution_found"] is False
+    assert run_results[0]["timing_info"]["solve"] == 0.0
+    assert run_results[0]["model"] is not None
+
+    assert grid.Seq_STEP_run is True
+    assert grid.Seq_STEP_obj_res is not None
+    assert len(grid.Seq_STEP_obj_res) == 1
+
+    df = res.pyomo_model_results_sequential(run_results, print_table=False)
+    assert df is not None
+    assert "Pyomo_Model_Results" in res.tables
 
 
 def run_test():

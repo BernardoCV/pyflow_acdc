@@ -18,39 +18,27 @@ Power & Energy Systems, Volume 174, 2026, 111459,
 https://doi.org/10.1016/j.ijepes.2025.111459.
 """
 
-import pyflow_acdc as pyf
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
+import pyflow_acdc as pyf
+
+from pyflow_acdc.example_grids._example_data_paths import resolve_example_data_path
 
 CASE118_BENCHMARK_GITHUB_BASE = (
     "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/Case118_benchmark/"
 )
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _is_url(path):
-    text = str(path)
-    return text.startswith("http://") or text.startswith("https://")
-
-
-def _case118_benchmark_data_dir():
-    data_dir = Path(__file__).resolve().parents[3] / "examples" / "Case118_benchmark"
-    if not data_dir.is_dir():
-        raise FileNotFoundError(
-            f"Case118_benchmark example data directory not found: {data_dir}. "
-            "Expected examples/Case118_benchmark/ at the pyflow_acdc repository root."
-        )
-    return data_dir
-
-
-def _resolve_example_path(filename, *, online=False):
-    if _is_url(filename):
-        return str(filename)
-    if online:
-        return CASE118_BENCHMARK_GITHUB_BASE + Path(filename).name
-    path = _case118_benchmark_data_dir() / filename
-    if not path.exists():
-        raise FileNotFoundError(f"Case118_benchmark example file not found: {path}")
-    return str(path)
+def _resolve_example_path(filename, *, online=True):
+    return resolve_example_data_path(
+        filename,
+        example_subdir="Case118_benchmark",
+        github_base=CASE118_BENCHMARK_GITHUB_BASE,
+        repo_root=_REPO_ROOT,
+        online=online,
+    )
 
 
 def _add_benchmark_time_series(grid, gen_ac):
@@ -749,9 +737,9 @@ def case118_TEP_benchmark(exp_220=None,exp_380=None,slack=1,curtailment_allowed=
     range_price = price_alpha*max(gen.lf for gen in grid.Generators)+(1-price_alpha)*min(gen.lf for gen in grid.Generators)
  
     
-    pyf.add_extgrid(grid,'10','Ext_10',lf=0,MVAmax=export_capacity/3,MWmax=0) 
-    pyf.add_extgrid(grid, '119','Ext_119',lf=0,MVAmax=export_capacity/3,MWmax=0)  
-    pyf.add_extgrid(grid, '120','Ext_120',lf=0,MVAmax=export_capacity/3,MWmax=0) 
+    pyf.add_extgrid(grid,'10','Ext_10',lf=0,MVAmax=export_capacity/3,MWmin=-export_capacity/3,MWmax=0) 
+    pyf.add_extgrid(grid, '119','Ext_119',lf=0,MVAmax=export_capacity/3,MWmin=-export_capacity/3,MWmax=0)  
+    pyf.add_extgrid(grid, '120','Ext_120',lf=0,MVAmax=export_capacity/3,MWmin=-export_capacity/3,MWmax=0) 
     pyf.create_geometries_from_coords(grid)
     rec_exp_info=[
         {'kV': 220, 'rec_cost': 275000, 'rec_Rating':  900, 'exp_cost':  700000},
