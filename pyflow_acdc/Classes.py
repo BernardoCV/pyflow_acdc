@@ -1863,6 +1863,10 @@ class HeatPump:
     def S_base(self):
         return self._S_base
 
+    @property
+    def S_rated(self):
+        return self.Max_S * self.S_base
+
     @S_base.setter
     def S_base(self, new_S_base):
         if new_S_base <= 0:
@@ -1873,6 +1877,8 @@ class HeatPump:
                 rate = old_S_base / new_S_base
                 self.P_ref *= rate
                 self.Q_ref *= rate
+                self.Max_S *= rate
+                self.Q_lim_shed *= rate
                 self.P_unit_max *= rate
                 self.P_hp *= rate
                 self.Q_hp *= rate
@@ -1893,6 +1899,12 @@ class HeatPump:
         E_state_initial: float = 0.0,
         dt_hours: float = 1.0,
         S_base: float = 100,
+        quadratic_cost_factor: float = 0,
+        linear_cost_factor: float = 0,
+        quadratic_cost_factor_q: float = 0,
+        linear_cost_factor_q: float = 0,
+        q_shed_lim_frac: float = 1.0,
+        S_rated: float | None = None,
     ):
         if n_units <= 0:
             raise ValueError("n_units must be positive")
@@ -1926,6 +1938,16 @@ class HeatPump:
         self.Q_ref = float(Q_ref)
         self.n_units = int(n_units)
         self.P_unit_max = float(P_unit_max)
+        if S_rated is None:
+            self.Max_S = self.n_units * self.P_unit_max
+        else:
+            self.Max_S = float(S_rated)
+        if self.Max_S < 0:
+            raise ValueError("Max_S must be >= 0")
+        self.Q_shed_lim_frac = float(q_shed_lim_frac)
+        if self.Q_shed_lim_frac < 0:
+            raise ValueError("q_shed_lim_frac must be >= 0")
+        self.Q_lim_shed = self.Max_S * self.Q_shed_lim_frac
         self.dt_hours = float(dt_hours)
 
         self.E_min = e_min
@@ -1937,6 +1959,10 @@ class HeatPump:
         self.Q_hp = self.Q_ref
         self.P_shed = 0.0
         self.Q_shed = 0.0
+        self.qf = float(quadratic_cost_factor)
+        self.lf = float(linear_cost_factor)
+        self.qf_q = float(quadratic_cost_factor_q)
+        self.lf_q = float(linear_cost_factor_q)
 
         self.TS_dict = {
             'hp_P_ref': None,

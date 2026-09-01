@@ -338,6 +338,9 @@ def opf_obj_l(model,grid,ObjRule):
                     )
                     for rs in model.ren_sources
                 )
+            if grid.HP:
+                total += sum(model.P_shed[hp.heatPumpNumber] * grid.S_base * hp.lf for hp in grid.heat_pumps)
+                total += sum(model.Q_shed[hp.heatPumpNumber] * grid.S_base * hp.lf_q for hp in grid.heat_pumps)
         if grid.DCmode and grid.Generators_DC:
             total += sum(
                 (
@@ -456,7 +459,11 @@ def opf_obj(model,grid,weights_def):
                 )
                 for rs in model.ren_sources
             )
-        return AC + DC + REN
+        HP = 0
+        if grid.HP:
+            HP = sum((model.P_shed[hp.heatPumpNumber] ** 2 * grid.S_base ** 2 * hp.qf + model.P_shed[hp.heatPumpNumber] * grid.S_base * hp.lf) for hp in grid.heat_pumps)
+            HP += sum((model.Q_shed[hp.heatPumpNumber] ** 2 * grid.S_base ** 2 * hp.qf_q + model.Q_shed[hp.heatPumpNumber] * grid.S_base * hp.lf_q) for hp in grid.heat_pumps)
+        return AC + DC + REN + HP
     def formula_AC_losses():
         if weights_def[ObjComponent.AC_LOSSES]['w']==0:
             return 0
@@ -1193,7 +1200,10 @@ def calculate_objective(grid,obj):
                 )
                 for rs in grid.RenSources
             )
-        return AC + DC + REN
+        HP = 0
+        if grid.HP:
+            HP = sum((hp.P_shed ** 2 * grid.S_base ** 2 * hp.qf + hp.P_shed * grid.S_base * hp.lf + hp.Q_shed ** 2 * grid.S_base ** 2 * hp.qf_q + hp.Q_shed * grid.S_base * hp.lf_q) for hp in grid.heat_pumps)
+        return AC + DC + REN + HP
 
 
 

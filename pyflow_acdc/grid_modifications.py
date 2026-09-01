@@ -2079,6 +2079,12 @@ def add_heat_pump(
     E_state_initial_kWh=0.0,
     dt_hours=1.0,
     geometry=None,
+    quadratic_cost_factor=0,
+    linear_cost_factor=0,
+    quadratic_cost_factor_q=0,
+    linear_cost_factor_q=0,
+    q_shed_lim_frac=1.0,
+    S_rated_MVAR=None,
 ):
     """Append an AC-only controllable heat pump to ``grid.heat_pumps``.
 
@@ -2103,6 +2109,12 @@ def add_heat_pump(
         E_state_initial=float(E_state_initial_kWh),
         dt_hours=dt_hours,
         S_base=grid.S_base,
+        quadratic_cost_factor=quadratic_cost_factor,
+        linear_cost_factor=linear_cost_factor,
+        quadratic_cost_factor_q=quadratic_cost_factor_q,
+        linear_cost_factor_q=linear_cost_factor_q,
+        q_shed_lim_frac=q_shed_lim_frac,
+        S_rated=None if S_rated_MVAR is None else S_rated_MVAR / grid.S_base,
     )
 
     if geometry is not None:
