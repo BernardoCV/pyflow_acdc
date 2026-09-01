@@ -13,7 +13,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [1.0.0]
 
-Optional desktop GUI shell (PySide6) plus latest SOCP CCP enhancements.
+Optional desktop GUI shell (PySide6).
 
 ### Added
 - **Desktop GUI** (optional ``[GUI]`` extra: ``PySide6``, ``kaleido``): package
@@ -21,14 +21,6 @@ Optional desktop GUI shell (PySide6) plus latest SOCP CCP enhancements.
   ``Results`` / plots. Console entry ``pyflow-acdc-gui``. Phase 0 bones
   (tabs / widgets / workers). Plan ``plans/gui_plan.md``. Does not replace
   Dash; core install stays Qt-free (``HAS_GUI`` / ImportError guard).
-- **SOCP CCP runners (Phase 10):** ``socp_ccp_optimise`` and
-  ``socp_ccp_window_optimisation`` apply truncated-normal quantiles to wind
-  caps (``P_ren``) and nodal prices before a single SOCP solve (Paper A §4).
-  ``apply_ccp_quantiles`` is exported for inspection / reuse. Price CCP applies
-  when ``Energy_cost`` has non-zero weight in ``weights_def``.
-- **SOCP ``Energy_cost``:** matches Pyomo ``formula_Energy_cost`` — generator
-  quadratic costs, per-renewable ``qf``/``lf`` on availability profiles, and
-  heat-pump ``P_shed``/``Q_shed`` quadratic/linear shed costs when weighted.
 
 ## [0.7.0]
 
@@ -40,7 +32,15 @@ CVXPY sparse SOCP scaffolding (convex AC/DC stack).
   ``socp_model``); runners in ``ACDC_convex`` (``socp_optimise``,
   ``soc_window_optimisation``, ``translate_pyf_socp``). ``T``-indexed
   variables for window / inventory coupling. Architecture documents the stack
-  next to NL / L OPF. CCP and MI exclusivity still deferred.
+  next to NL / L OPF. MI exclusivity still deferred.
+- **SOCP CCP runners (Phase 10):** ``socp_ccp_optimise`` and
+  ``socp_ccp_window_optimisation`` apply truncated-normal quantiles to wind
+  caps (``P_ren``) and nodal prices before a single SOCP solve (Paper A §4).
+  ``apply_ccp_quantiles`` is exported for inspection / reuse. Price CCP applies
+  when ``Energy_cost`` has non-zero weight in ``weights_def``.
+- **SOCP ``Energy_cost``:** matches Pyomo ``formula_Energy_cost`` — generator
+  quadratic costs, per-renewable ``qf``/``lf`` on availability profiles, and
+  heat-pump ``P_shed``/``Q_shed`` quadratic/linear shed costs when weighted.
 - **SOCP BESS + H₂**: continuous ``P_charge``/``P_discharge``
   (no exclusivity binaries), AC S-circle / DC ``|P_net|``, SoC chain across
   ``T``; electrolyser P (+ AC Q) and linear mass balance. Wired into AC/DC
