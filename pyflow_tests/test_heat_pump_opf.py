@@ -59,25 +59,27 @@ def test_heat_pump_model_builds_and_bounds_match_montse():
     )
 
     h = hp.heatPumpNumber
-    expected_lb = max(
-        hp.P_ref - hp.n_units * hp.P_unit_max,
-        hp.E_state / hp.dt_hours + hp.P_ref - hp.E_max / hp.dt_hours,
-    )
-    expected_ub = min(
-        hp.P_ref,
-        hp.E_state / hp.dt_hours + hp.P_ref - hp.E_min / hp.dt_hours,
-    )
+    energy_p_shed_lb = hp.E_min / hp.dt_hours - hp.E_state / hp.dt_hours
+    energy_p_shed_ub = hp.E_max / hp.dt_hours - hp.E_state / hp.dt_hours
 
     assert hasattr(model, "heat_pumps")
+    assert hasattr(model, "P_shed")
+    assert hasattr(model, "Q_shed")
     assert hasattr(model, "P_heat_pump")
     assert hasattr(model, "E_heat_pump")
     assert hasattr(model, "Gen_Pheatpump_constraint")
     assert model.hp_p_ref[h].value == pytest.approx(hp.P_ref)
     assert model.hp_q_ref[h].value == pytest.approx(hp.Q_ref)
+    assert hp.Max_S == pytest.approx(hp.n_units * hp.P_unit_max)
+    assert float(model.hp_q_lim_shed[h]) == pytest.approx(hp.Q_lim_shed)
     assert model.hp_e_min[h].value == pytest.approx(hp.E_min)
     assert model.hp_e_max[h].value == pytest.approx(hp.E_max)
-    assert pyo.value(model.heat_pump_p_lower_constraint[h].lower) == pytest.approx(expected_lb)
-    assert pyo.value(model.heat_pump_p_upper_constraint[h].upper) == pytest.approx(expected_ub)
+    assert pyo.value(model.heat_pump_p_shed_nonneg_constraint[h].lower) == pytest.approx(0.0)
+    assert pyo.value(model.heat_pump_p_shed_cap_constraint[h].upper) == pytest.approx(hp.n_units * hp.P_unit_max)
+    assert model.Q_shed[h].lb == pytest.approx(-hp.Q_lim_shed)
+    assert model.Q_shed[h].ub == pytest.approx(hp.Q_lim_shed)
+    assert pyo.value(model.heat_pump_p_shed_energy_lower_constraint[h].lower) == pytest.approx(energy_p_shed_lb)
+    assert pyo.value(model.heat_pump_p_shed_energy_upper_constraint[h].upper) == pytest.approx(energy_p_shed_ub)
 
 
 def test_ext_heat_pump_reporting():
@@ -141,29 +143,20 @@ def test_heat_pump_linear_build_only_p_only():
     )
 
     h = hp.heatPumpNumber
-    expected_lb = max(
-        hp.P_ref - hp.n_units * hp.P_unit_max,
-        hp.E_state / hp.dt_hours + hp.P_ref - hp.E_max / hp.dt_hours,
-    )
-    expected_ub = min(
-        hp.P_ref,
-        hp.E_state / hp.dt_hours + hp.P_ref - hp.E_min / hp.dt_hours,
-    )
+    energy_p_shed_lb = hp.E_min / hp.dt_hours - hp.E_state / hp.dt_hours
+    energy_p_shed_ub = hp.E_max / hp.dt_hours - hp.E_state / hp.dt_hours
 
+    assert hasattr(model, "P_shed")
     assert hasattr(model, "P_heat_pump")
     assert hasattr(model, "E_heat_pump")
     assert hasattr(model, "Gen_Pheatpump_constraint")
     assert not hasattr(model, "Gen_Qheatpump_constraint")
-    assert model.Q_heat_pump[h].lb == 0
-    assert model.Q_heat_pump[h].ub == 0
+    assert pyo.value(model.Q_heat_pump[h]) == pytest.approx(0.0)
+    assert pyo.value(model.Q_shed[h]) == pytest.approx(hp.Q_ref)
     assert model.hp_p_ref[h].value == pytest.approx(hp.P_ref)
-    assert not hasattr(model, "hp_q_ref")
-    assert pyo.value(model.heat_pump_p_lower_constraint[h].lower) == pytest.approx(
-        expected_lb
-    )
-    assert pyo.value(model.heat_pump_p_upper_constraint[h].upper) == pytest.approx(
-        expected_ub
-    )
+    assert model.hp_q_ref[h].value == pytest.approx(hp.Q_ref)
+    assert pyo.value(model.heat_pump_p_shed_energy_lower_constraint[h].lower) == pytest.approx(energy_p_shed_lb)
+    assert pyo.value(model.heat_pump_p_shed_energy_upper_constraint[h].upper) == pytest.approx(energy_p_shed_ub)
 
 
 def test_heat_pump_linear_ts_and_window_build():

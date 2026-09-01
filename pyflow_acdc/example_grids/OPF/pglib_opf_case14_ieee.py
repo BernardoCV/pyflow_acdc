@@ -97,11 +97,11 @@ def pglib_opf_case14_ieee():
             pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone,ACDC)
     
     # Add Generators
-    pyf.add_gen(grid, '1.0', '1', price_link=False, lf=7.920951, qf=0.0, MWmax=340.0, MWmin=0.0, MVArmax=10.0, MVArmin=0.0, PsetMW=170.0, QsetMVA=5.0)
-    pyf.add_gen(grid, '2.0', '2', price_link=False, lf=23.269494, qf=0.0, MWmax=59.0, MWmin=0.0, MVArmax=30.0, MVArmin=-30.0, PsetMW=29.5, QsetMVA=0.0)
-    pyf.add_gen(grid, '3.0', '3', price_link=False, lf=0.0, qf=0.0, MWmax=0.0, MWmin=0.0, MVArmax=40.0, MVArmin=0.0, PsetMW=0.0, QsetMVA=20.0)
-    pyf.add_gen(grid, '6.0', '4', price_link=False, lf=0.0, qf=0.0, MWmax=0.0, MWmin=0.0, MVArmax=24.0, MVArmin=-6.0, PsetMW=0.0, QsetMVA=9.0)
-    pyf.add_gen(grid, '8.0', '5', price_link=False, lf=0.0, qf=0.0, MWmax=0.0, MWmin=0.0, MVArmax=24.0, MVArmin=-6.0, PsetMW=0.0, QsetMVA=9.0)
+    pyf.add_gen(grid, '1.0', '1', lf=7.920951, qf=0.0, MWmax=340.0, MWmin=0.0, MVArmax=10.0, MVArmin=0.0, PsetMW=170.0, QsetMVA=5.0)
+    pyf.add_gen(grid, '2.0', '2', lf=23.269494, qf=0.0, MWmax=59.0, MWmin=0.0, MVArmax=30.0, MVArmin=-30.0, PsetMW=29.5, QsetMVA=0.0)
+    pyf.add_gen(grid, '3.0', '3', lf=0.0, qf=0.0, MWmax=0.0, MWmin=0.0, MVArmax=40.0, MVArmin=0.0, PsetMW=0.0, QsetMVA=20.0)
+    pyf.add_gen(grid, '6.0', '4', lf=0.0, qf=0.0, MWmax=0.0, MWmin=0.0, MVArmax=24.0, MVArmin=-6.0, PsetMW=0.0, QsetMVA=9.0)
+    pyf.add_gen(grid, '8.0', '5', lf=0.0, qf=0.0, MWmax=0.0, MWmin=0.0, MVArmax=24.0, MVArmin=-6.0, PsetMW=0.0, QsetMVA=9.0)
     
     
     # Add Renewable Source Zones

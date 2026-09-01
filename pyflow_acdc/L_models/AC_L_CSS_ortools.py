@@ -15,8 +15,8 @@ import time
 
 __all__ = ['optimal_l_css_ortools']
 
-from ..ACDC_OPF import obj_w_rule, calculate_objective, get_gen_p_min_eff
-from ..grid_analysis import analyse_grid
+from ..ACDC_OPF import obj_w_rule, calculate_objective
+from ..grid_analysis import get_gen_p_min_eff, analyse_grid
 from ..constants import (
     HOURS_PER_YEAR,
     DEFAULT_DISCOUNT_RATE,
@@ -78,7 +78,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
     if not grid.CT_AC:
         raise ValueError("No conductor size selection connections found in the grid")
 
-    weights_def, _ = obj_w_rule(grid, ObjRule, True)
+    weights_def, _ = obj_w_rule(grid, ObjRule)
 
     model_res = None
     solver_stats = None
@@ -128,7 +128,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
 
     present_value = present_value_factor(Hy, discount_rate, n_years)
     for obj_key in weights_def:
-        weights_def[obj_key]['v'] = calculate_objective(grid, obj_key, True)
+        weights_def[obj_key]['v'] = calculate_objective(grid, obj_key)
         weights_def[obj_key]['NPV'] = weights_def[obj_key]['v'] * present_value
     t5 = time.perf_counter()
     t_modelexport = t5 - t4

@@ -33,6 +33,9 @@ AC/DC Converter
 
 Equivalent converter model is taken from [1]_.
 
+Non-linear model
+----------------
+
 .. math::
     :label: eq:PsQs
 
@@ -83,7 +86,40 @@ Equivalent converter model is taken from [1]_.
         |P_{cn_{DC}}| &\leq S_{cn_{rating}}  \qquad \forall cn \in \mathcal{C}n
     \end{align}
 
+Linear model
+------------
 
+In the linear OPF stack (:doc:`L_models`), converters use an active-power link
+with affine losses in :math:`P_s`:
+
+.. math::
+    :label: eq:Conv_L
+
+    \begin{align}
+        p_{cn}\, P_{s}
+        + P_{cn_{DC}}
+        + p_{cn}\,(a_{conv}+b_{conv} P_{s})
+        &= 0 \\
+        |P_{s}| &\leq S_{cn_{rating}}
+          \qquad \forall cn \in \mathcal{C}n
+    \end{align}
+
+SOCP model
+----------
+
+In the sparse SOCP stack (:doc:`socp`), converters use AC-side apparent power
+:math:`S_s`, DC injection, and an affine loss epigraph in :math:`|\Re(S_s)|`:
+
+.. math::
+    :label: eq:Conv_SOCP
+
+    \begin{align}
+        \Re(S_{s}) + P_{cn_{DC}} + P_{cn_{loss}} &= 0 \\
+        t &\geq |\Re(S_{s})| \\
+        P_{cn_{loss}} &= a_{conv} + b_{conv}\, t \\
+        \|S_{s}\| &\leq S_{cn_{rating}}
+          \qquad \forall cn \in \mathcal{C}n
+    \end{align}
 
 Class Reference: :class:`pyflow_acdc.Classes.AC_DC_converter`
 

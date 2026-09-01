@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyflow_acdc"
-version = "0.7.0"
+version = "1.0.0"
 license = {file = "LICENSE"}
 requires-python = ">= 3.10"
 
@@ -84,7 +84,7 @@ LINEAR_ARRAY = ["ortools", "highspy==1.14.0"]
 TEP_pymoo = ["pymoo",
              "pyomo"]
 
-SOCP = ["cvxpy"]
+SOCP = ["cvxpy", "clarabel"]
 
 Gurobi = ["gurobipy"]
 
@@ -101,7 +101,8 @@ All = ["folium",
        "highspy==1.14.0",
        "pymoo",
        "kaleido",
-       "cvxpy"]
+       "cvxpy",
+       "clarabel"]
 
 [project.urls]
 Homepage       = "https://github.com/CITCEA-UPC/pyflow_acdc"
@@ -131,6 +132,7 @@ packages = [
     "Cable_database/*.yaml",
     "example_grids/*.py",
     "example_grids/PF/*.py",
+    "example_grids/PF/CigreB4/*.csv",
     "example_grids/OPF/*.py",
     "example_grids/TEP/*.py",
     "example_grids/TEP/*.csv",

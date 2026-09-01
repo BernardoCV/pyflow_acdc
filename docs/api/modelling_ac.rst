@@ -15,6 +15,9 @@ AC node
 
 The active and reactive power injections at the AC node are given by [1]_:
 
+Non-linear model
+~~~~~~~~~~~~~~~~
+
 .. math::
     :label: eq:PnodeAC
 
@@ -53,6 +56,61 @@ The AC node is modeled using a complex voltage phasor :math:`V_i = V_i \angle \t
 * :math:`P_g` is the active power injection of generator in pu
 * :math:`S_l` is the complex power demand in pu
 
+Linear model
+~~~~~~~~~~~~
+
+In the linear OPF stack (:doc:`L_models`), the AC node uses a B-:math:`\theta`
+active-power balance. Reactive power is not included in the network equations.
+
+.. math::
+    :label: eq:PnodeAC_L
+
+    \begin{align}
+      P_{net}^{ac} &= P_{flow}^{ac} \\
+      P_{net}^{ac} &= \sum P_{g_i} + \sum \gamma_{rg_i}P_{rg_i} - P_{l_i}
+                    + \sum P_{cn_i} \\
+      P_{flow}^{ac} &= \sum_{k \in \mathcal{N}_{ac}}
+        -\Im(Y_{ik})\,(\theta_i-\theta_k)
+        \qquad \forall i \in \mathcal{N}_{ac} \\
+      \theta_{i} &= 0
+        \qquad \forall i \in \mathcal{N}_{ac}^{\mathrm{slack}}
+    \end{align}
+
+Optional flexible injections (storage, electrolyser, heat pump) enter
+:math:`P_{net}^{ac}` with the same sign convention as in the nonlinear model.
+
+SOCP model
+~~~~~~~~~~
+
+In the sparse SOCP stack (:doc:`socp`), the AC node is written on lifted
+variables :math:`h_i = |V_i|^2` and sparse edge products
+:math:`w_{ik} = V_i^{*} V_k` on existing branches:
+
+.. math::
+    :label: eq:PnodeAC_SOCP
+
+    \begin{align}
+      V_{\min}^{2} &\leq h_{i} \leq V_{\max}^{2}
+        \qquad \forall i \in \mathcal{N}_{ac} \\
+      h_{i} &= 1
+        \qquad \forall i \in \mathcal{N}_{ac}^{\mathrm{slack}} \\
+      \left\|
+        \begin{bmatrix}
+          2\Re(w_{ik}) \\
+          2\Im(w_{ik}) \\
+          h_{i}-h_{k}
+        \end{bmatrix}
+      \right\|_{2}
+      &\leq h_{i}+h_{k}
+        \qquad \forall (i,k)\in\mathcal{E}_{ac} \\
+      S_{i}^{*} &= Y_{ii}h_{i}
+        + \sum_{k\neq i} Y_{ik}w_{ik}
+        \qquad \forall i \in \mathcal{N}_{ac}
+    \end{align}
+
+where :math:`S_i` collects the nodal active/reactive injections
+(generators, renewables, loads, converters, and optional flexible assets).
+
 Class Reference: :class:`pyflow_acdc.Classes.Node_AC`
 
 .. autoclass:: pyflow_acdc.Node_AC
@@ -80,6 +138,9 @@ AC branch
    AC line π-model
 
 The AC branch is modeled with pi model from [1]_, [2]_ :
+
+Non-linear model
+~~~~~~~~~~~~~~~~
 
 .. math::
     :label: eq:Ybusbranch
@@ -110,6 +171,45 @@ The AC branch is modeled with pi model from [1]_, [2]_ :
     \begin{align}
         P_{j,to}^2+Q_{j,to}^2 &\leq S_{j,rating}^2 \qquad \forall j \in \mathcal{B}_{ac}\\
         P_{j,from}^2+Q_{j,from}^2 &\leq S_{j,rating}^2  \qquad \forall j \in \mathcal{B}_{ac}
+    \end{align}
+
+Linear model
+~~~~~~~~~~~~
+
+In the linear OPF stack, AC branch flows are written from the branch
+susceptance and voltage-angle difference:
+
+.. math::
+    :label: eq:PAC_branch_L
+
+    \begin{align}
+        P_{j,\mathrm{from}} &= -B_{ft}\,(\theta_{f}-\theta_{t}) \\
+        P_{j,\mathrm{to}} &= -B_{tf}\,(\theta_{t}-\theta_{f}) \\
+        |P_{j,\mathrm{from}}| &\leq S_{j,\mathrm{rating}}
+          \qquad \forall j \in \mathcal{B}_{ac} \\
+        |P_{j,\mathrm{to}}| &\leq S_{j,\mathrm{rating}}
+          \qquad \forall j \in \mathcal{B}_{ac}
+    \end{align}
+
+with :math:`B_{ft}=\Im(Y_{ft})` and :math:`B_{tf}=\Im(Y_{tf})` taken from the
+branch admittance matrix.
+
+SOCP model
+~~~~~~~~~~
+
+In the sparse SOCP stack, AC branch flows and thermal limits use the lifted
+edge variables:
+
+.. math::
+    :label: eq:PAC_branch_SOCP
+
+    \begin{align}
+        S_{ik} &= Y_{ik}^{*}\,(h_{i}-w_{ik}) \\
+        S_{ki} &= Y_{ki}^{*}\,(h_{k}-w_{ik}^{*}) \\
+        \|S_{ik}\| &\leq S_{j,\mathrm{rating}}
+          \qquad \forall (i,k)\in\mathcal{E}_{ac} \\
+        \|S_{ki}\| &\leq S_{j,\mathrm{rating}}
+          \qquad \forall (i,k)\in\mathcal{E}_{ac}
     \end{align}
 
 Class Reference: :class:`pyflow_acdc.Classes.Line_AC`

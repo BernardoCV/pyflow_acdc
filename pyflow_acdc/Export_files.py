@@ -19,6 +19,7 @@ from .constants import (
     AcDcSide,
     DataInput,
     PriceZoneCategory,
+    LinkCost,
 )
 
 
@@ -113,8 +114,8 @@ def generate_add_gen_code(gens, S_base):
     for gen in gens:
         if gen.get("is_ext_grid"):
             code += f"    pyf.add_extgrid(grid, '{gen['node']}', gen_name='{gen['name']}', "
-            if gen["price_link"]:
-                code += f"price_link={gen['price_link']}, "
+            if gen.get("link_cost") not in (None, "none", LinkCost.NONE):
+                code += f"link_cost='{gen['link_cost']}', "
             code += (
                 f"lf={gen['lf']}, qf={gen['qf']}, "
                 f"MVAmax={gen['MVAmax']}, MWmax={gen['MWmax']}, MWmin={gen['MWmin']}, "
@@ -124,8 +125,8 @@ def generate_add_gen_code(gens, S_base):
             continue
 
         code += f"    pyf.add_gen(grid, '{gen['node']}', '{gen['name']}', "
-        if gen["price_link"]:
-            code += f"price_link={gen['price_link']}, "
+        if gen.get("link_cost") not in (None, "none", LinkCost.NONE):
+            code += f"link_cost='{gen['link_cost']}', "
         code += (
             f"np_gen={gen['np_gen']}, fc={gen['fc']}, lf={gen['lf']}, qf={gen['qf']}, "
             f"MWmax={gen['Max_pow_gen'] * S_base}, MWmin={gen['Min_pow_gen'] * S_base}, "
@@ -151,8 +152,8 @@ def generate_add_gen_dc_code(gens, S_base):
 
     for gen in gens:
         code += f"    pyf.add_gen_DC(grid, '{gen['node']}', gen_name='{gen['name']}', "
-        if gen["price_link"]:
-            code += f"price_link={gen['price_link']}, "
+        if gen.get("link_cost") not in (None, "none", LinkCost.NONE):
+            code += f"link_cost='{gen['link_cost']}', "
         code += (
             f"np_gen={gen['np_gen']}, fc={gen['fc']}, lf={gen['lf']}, qf={gen['qf']}, "
             f"MWmax={gen['Max_pow_gen'] * S_base}, MWmin={gen['Min_pow_gen'] * S_base}, "
@@ -223,6 +224,10 @@ def generate_add_ren_source_code(ren_sources,S_base):
             code += f"min_gamma={ren_source['min_gamma']}, "
         if ren_source.get("np_rsgen", 1) != 1:
             code += f"np_rsgen={ren_source['np_rsgen']}, "
+        if ren_source.get("qf"):
+            code += f"quadratic_cost_factor={ren_source['qf']}, "
+        if ren_source.get("lf"):
+            code += f"linear_cost_factor={ren_source['lf']}, "
         if ren_source.get("Qmin") is not None:
             code += f"Qmin={ren_source['Qmin'] * S_base}, "
         if ren_source.get("Qmax") is not None:
@@ -429,7 +434,7 @@ def create_dictionaries(grid):
                     "Pset": gen.Pset,
                     "Qset": gen.Qset,
                     "S_rated": gen.Max_S,
-                    "price_link": gen.price_link,
+                    "link_cost": _enum_value(gen.link_cost),
                     "is_ext_grid": gen.is_ext_grid,
                     "allow_sell": gen.allow_sell,
                     "P_load_MW": gen.p_load_base * grid.S_base,
@@ -461,7 +466,7 @@ def create_dictionaries(grid):
                     "lf": gen.lf,
                     "fc": gen.fc,
                     "Pset": gen.Pset,
-                    "price_link": gen.price_link,
+                    "link_cost": _enum_value(gen.link_cost),
                     "fuel_type": gen.gen_type,
                     "installation_cost": gen._base_cost,
                 })
@@ -482,6 +487,8 @@ def create_dictionaries(grid):
                     "ren_type": ren_source.rs_type,
                     "min_gamma": ren_source.min_gamma,
                     "np_rsgen": ren_source.np_rsgen,
+                    "qf": ren_source.qf,
+                    "lf": ren_source.lf,
                     "Qmin": ren_source.Qmin,
                     "Qmax": ren_source.Qmax,
                     "geometry": ren_source.geometry.wkt if ren_source.geometry is not None else None,

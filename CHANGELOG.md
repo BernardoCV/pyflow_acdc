@@ -7,13 +7,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.7.0**.
+> packaged version is **1.0.0**.
 
 ## [Unreleased]
 
-## [0.7.0]
+## [1.0.0]
 
-Optional desktop GUI shell (PySide6).
+Optional desktop GUI shell (PySide6) plus latest SOCP CCP enhancements.
 
 ### Added
 - **Desktop GUI** (optional ``[GUI]`` extra: ``PySide6``, ``kaleido``): package
@@ -21,41 +21,154 @@ Optional desktop GUI shell (PySide6).
   ``Results`` / plots. Console entry ``pyflow-acdc-gui``. Phase 0 bones
   (tabs / widgets / workers). Plan ``plans/gui_plan.md``. Does not replace
   Dash; core install stays Qt-free (``HAS_GUI`` / ImportError guard).
+- **SOCP CCP runners (Phase 10):** ``socp_ccp_optimise`` and
+  ``socp_ccp_window_optimisation`` apply truncated-normal quantiles to wind
+  caps (``P_ren``) and nodal prices before a single SOCP solve (Paper A §4).
+  ``apply_ccp_quantiles`` is exported for inspection / reuse. Price CCP applies
+  when ``Energy_cost`` has non-zero weight in ``weights_def``.
+- **SOCP ``Energy_cost``:** matches Pyomo ``formula_Energy_cost`` — generator
+  quadratic costs, per-renewable ``qf``/``lf`` on availability profiles, and
+  heat-pump ``P_shed``/``Q_shed`` quadratic/linear shed costs when weighted.
 
-## [0.6.6]
+## [0.7.0]
 
 CVXPY sparse SOCP scaffolding (convex AC/DC stack).
 
 ### Added
-- **SOCP / MI-SOCP stack (CVXPY)**: optional ``[SOCP]`` extra (``cvxpy``).
-  Builders in ``convex_model/`` (``build_socp_data``, ``socp_model``);
-  runners in ``ACDC_convex`` (``socp_optimise``, ``soc_window_optimisation``,
-  ``translate_pyf_socp``). ``T``-indexed variables for future window /
-  inventory coupling. BESS / H₂ / CCP constraints deferred. Plan
-  ``plans/convex_acdc_socp_plan.md``; architecture documents the stack next to
-  NL / L OPF.
+- **SOCP / MI-SOCP stack (CVXPY)**: optional ``[SOCP]`` extra (``cvxpy`` +
+  ``clarabel``). Builders in ``convex_model/`` (``build_socp_data``,
+  ``socp_model``); runners in ``ACDC_convex`` (``socp_optimise``,
+  ``soc_window_optimisation``, ``translate_pyf_socp``). ``T``-indexed
+  variables for window / inventory coupling. Architecture documents the stack
+  next to NL / L OPF. CCP and MI exclusivity still deferred.
+- **SOCP BESS + H₂**: continuous ``P_charge``/``P_discharge``
+  (no exclusivity binaries), AC S-circle / DC ``|P_net|``, SoC chain across
+  ``T``; electrolyser P (+ AC Q) and linear mass balance. Wired into AC/DC
+  nodal injection, ``H2_sale`` / ``SoC_deviation`` objectives, and export.
+- **SOCP heat pumps**: ``socp_optimise`` / ``soc_window_optimisation`` accept
+  ``grid.HP``. ``build_socp_data`` packs ``hp_data`` / ``hp_by_ac_node``;
+  ``heat_pump_variables`` / ``heat_pump_constraints`` use ``P_shed`` /
+  ``Q_shed`` actuators with ``P_hp = P_ref - P_shed``, ``Q_hp = Q_ref - Q_shed``,
+  symmetric ``Q_shed`` bounds from ``Max_S * Q_shed_lim_frac``, and the
+  cumulative ``E_heat_pump`` chain across ``T``. AC-only load injection;
+  ``translate_pyf_socp`` reads ``hp_P_ref`` / ``hp_Q_ref`` / ``hp_E_min`` /
+  ``hp_E_max`` profiles from ``grid.Time_series``; results exported to
+  ``grid.socp_results`` and heat-pump elements.
+- **SOCP docs / Results / CI**: usage + API pages; NL/L/SOCP modelling
+  sections; ``grid.socp_run`` reporting in ``Results.all``; smoke tests in
+  ``test_socp.py``; open-source Clarabel in ``[SOCP]`` / ``All`` so CI does
+  not need MOSEK.
 
-## [0.6.5]
+### Changed
+- **SOCP converter loss**: Paper affine form via DCP epigraph
+  ``t ≥ |Re(Ss)|``, ``Ploss = a_conv + b_conv · t`` (replaces non-DCP
+  ``Ploss = a + c_rect·|Ss|²`` equality).
+
+## [0.6.12]
 
 Controllable heat pumps (NL + linear P-only twin).
 
 ### Added
 - **Controllable heat pumps**: ``HeatPump`` class, ``add_heat_pump``, and NL OPF
   when ``grid.HP`` (AC-only planning-oriented flexible load: baseline
-  ``P_ref``/``Q_ref``, served ``P_heat_pump``/``Q_heat_pump``, cumulative
-  ``E_heat_pump`` in kWh). Myopic carry in ``ts_acdc_opf``; parent energy chain
-  in ``window_nl_opf`` (``window_heat_pump_constraints``). Results
+  ``P_ref``/``Q_ref``, served ``P_hp``/``Q_hp`` via ``P_shed``/``Q_shed``,
+  cumulative ``E_heat_pump`` in kWh). Myopic carry in ``ts_acdc_opf``; parent
+  energy chain in ``window_nl_opf`` (``window_heat_pump_constraints``). Results
   ``ext_heat_pump`` / ``heat_pump_window``. TS types ``hp_P_ref``, ``hp_Q_ref``,
   ``hp_E_min``, ``hp_E_max``. Linear twin (P-only): ``optimal_l_pf`` /
-  ``ts_acdc_l_opf`` / ``window_l_opf`` with ``Q_heat_pump`` fixed at 0. Docs
-  ``usage_heat_pump`` / ``api/heat_pump`` / ``api/modelling_flexible_assets``;
+  ``ts_acdc_l_opf`` / ``window_l_opf`` with ``Q_hp`` fixed at 0. Docs
+  ``api/modelling_flexible_assets`` (heat-pump section) and ``api/grid_mod``;
   plan ``plans/heat_pump_plan.md``; tests ``test_heat_pump_opf.py``.
+- ``Ren_Source.quadratic_cost_factor`` / ``linear_cost_factor`` (``qf`` / ``lf``);
+  ``add_RenSource(..., quadratic_cost_factor=, linear_cost_factor=)``.
 
 ### Changed
+- **Heat pumps**: optimize explicit ``P_shed`` / ``Q_shed`` with
+  ``P_hp = P_ref - P_shed``, ``Q_hp = Q_ref - Q_shed``; reactive
+  ``Q_shed`` bounds ``-Q_lim_shed <= Q_shed <= Q_lim_shed`` with
+  ``Q_lim_shed = Max_S * Q_shed_lim_frac`` (``Max_S`` in pu, default
+  ``n_units * P_unit_max``; ``add_heat_pump(..., S_rated_MVAR=)``;
+  ``Q_shed_lim_frac`` default ``1``).
+  ``Energy_cost`` penalizes shed vars directly (Montse shedding-sgen pattern):
+  ``P_shed²·qf + P_shed·lf`` and
+  ``Q_shed²·qf_q + Q_shed·lf_q`` (MW/MVAR via ``S_base``); cost kwargs on
+  ``add_heat_pump`` default ``0``.
 - **Window / TS parameter updates**: ``_modify_parameters`` /
   ``_modify_parameters_l`` and myopic carry include heat-pump ``E_heat_pump_prev``
-  / refs when ``grid.HP``; ``window_block=True`` skips rewriting
-  ``E_heat_pump_prev`` (parent window owns the energy chain).
+  / refs when ``grid.HP``;
+  ``window_block=True`` skips rewriting ``E_heat_pump_prev`` (parent window owns
+  the energy chain).
+- **`Energy_cost`**: removed ``OnlyGen`` flag from OPF runners and ``grid.OnlyGen``;
+  renewable sources use per-element ``qf`` / ``lf`` on ``Ren_Source`` (default ``0``),
+  with the same MW-scaled quadratic form as generators; converter
+  ``P_conv·price`` and nodal ``PGi_ren·price`` terms removed from ``Energy_cost``.
+
+## [0.6.11]
+
+### Added
+- **Export-only external grids**: with ``Allow_sell=True`` and ``MWmax=0``,
+  ``MWmin`` sets the active-power export lower bound (e.g. ``MWmin=-MVAmax``).
+  ``get_gen_p_min_eff`` lives in ``grid_analysis`` and is used consistently
+  across NL/L OPF, time-series bound updates, and ``grid_state``.
+
+## [0.6.10]
+
+### Fixed
+- **case118 TEP benchmark export interfaces**: ``add_extgrid`` at nodes 10/119/120
+  no longer pass ``MWmax=0``; ``MVAmax=export_capacity/3`` now sets the active-power
+  limit so TS OPF ``grid_state`` bounds and external-grid export capacity match the
+  benchmark.
+
+## [0.6.9]
+
+### Fixed
+- **Pip example data paths**: ``case118_TEP_benchmark``, ``case24_MP``,
+  ``NS_MTDC_2025``, and PEI BESS loaders now resolve CSVs from the git-checkout
+  ``examples/`` tree and ``{sys.prefix}/examples/...`` (pip ``data-files``),
+  with GitHub raw fallback when local copies are missing. Shared helper:
+  ``example_grids/_example_data_paths.py``. Fixes ``FileNotFoundError`` after
+  ``pip install pyflow_acdc`` for benchmark and multi-period example cases.
+- **Wheel packaging**: include ``example_grids/PF/CigreB4/*.csv`` so
+  ``CigreB4_ACDC`` works after ``pip install`` (CSVs live beside the case, not
+  under top-level ``examples/``).
+- **CI package check**: load ``case118_TEP_benchmark``, ``case24_MP``,
+  ``CigreB4_ACDC``, and ``NS_MTDC_2025`` (``online=False``) from the installed
+  wheel to catch missing example data in distributions.
+
+## [0.6.8]
+
+### Fixed
+- **Sequential STEP results export**: removed redundant ``run_results["_meta"]``
+  (abort status stays on ``grid.Seq_*_aborted`` / ``abort_reason``), so
+  ``pyomo_model_results_sequential`` no longer hits mixed str/int key sorting.
+
+## [0.6.7]
+
+### Fixed
+- **Wheel packaging**: ship ``pyflow_acdc.NL_models`` and ``pyflow_acdc.L_models``
+  subpackages (setuptools ``packages.find``). ``0.6.6`` omitted them, so OPF /
+  TEP / STEP imports failed with ``No module named 'pyflow_acdc.NL_models'``.
+- **CI package check**: install the built wheel with pyomo and assert NL/L
+  subpackages plus TEP/STEP public attributes are importable (top-level
+  ``import pyflow_acdc`` alone no longer counts as success).
+
+## [0.6.6]
+
+### Fixed
+- **Expandable setup always available**: moved ``expand_elements_from_pd``,
+  ``expand_element``, ``repurpose_element_from_pd``, ``update_attributes``, and
+  ``base_cost_calculation`` from OPF-gated ``ACDC_Static_TEP`` into
+  ``grid_modifications``, so example cases that mark elements expandable no
+  longer fail with ``AttributeError`` when the soft-fail OPF import path does
+  not attach TEP symbols.
+
+## [0.6.5]
+
+### Added
+- **Sequential STEP** ``build_only``: skips the period-1 solve, extracts init
+  values as usual, then stops before building later periods.
+- **North Sea example data**: ``clusters_kmeans_medoids_k24.json`` for 2023+2024
+  MS TEP (alongside existing k4).
 
 ## [0.6.4]
 
@@ -101,6 +214,9 @@ and related packaging / docs / tooling.
 
 ### Removed
 - **`TEST_COVERAGE.md`**: removed in favor of Codecov-only coverage tracking.
+- **``price_link``**: removed from ``Gen_AC`` / ``Gen_DC`` and ``add_gen`` /
+  ``add_gen_DC`` / ``add_extgrid``. Use ``link_cost='linear'`` instead. Legacy
+  pickles are still migrated by ``_migrate_legacy_gen_link_cost``.
 
 ### Changed
 - **Rename**: ``opf_create_l_model_ac`` → ``opf_create_l_model_acdc`` (same

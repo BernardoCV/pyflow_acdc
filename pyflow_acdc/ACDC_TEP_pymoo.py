@@ -417,7 +417,7 @@ def transmission_expansion_pymoo(grid,NPV=True,n_years=25,Hy=HOURS_PER_YEAR,disc
 
     analyse_grid(grid)
 
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(grid,ObjRule)
     # Create problem
     if solver == 'GA':
         algorithm = GA(pop_size=50)
@@ -452,7 +452,7 @@ def _handle_single_objective_result(res, problem, grid,show_plot=False):
 
     problem.export_solution_to_grid(best_solution,grid)
     for obj in problem.weights_def:
-        problem.weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        problem.weights_def[obj]['v']=calculate_objective(grid,obj)
         problem.weights_def[obj]['NPV']=problem.weights_def[obj]['v']*problem.present_value
     grid.TEP_run=True
     grid.OPF_obj = problem.weights_def
@@ -518,7 +518,7 @@ def _handle_pareto_result(res, problem, grid, pareto_result='balanced', show_plo
         raise ValueError("pareto_result must be 'balanced', 'min_capex', or 'min_opex'")
     problem.export_solution_to_grid(chosen_solution,grid)
     for obj in problem.weights_def:
-        problem.weights_def[obj]['v']=calculate_objective(grid,obj,True)
+        problem.weights_def[obj]['v']=calculate_objective(grid,obj)
         problem.weights_def[obj]['NPV']=problem.weights_def[obj]['v']*problem.present_value
     grid.TEP_run=True
     grid.OPF_obj = problem.weights_def

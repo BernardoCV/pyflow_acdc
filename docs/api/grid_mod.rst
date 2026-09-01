@@ -2,8 +2,9 @@ Grid Modifications
 ==================
 
 Functions for modifying an existing :class:`~pyflow_acdc.Classes.Grid` — add
-components and zones, attach time or investment series, convert line types, and
-assign elements to zones or cable options.
+components and zones, attach time or investment series, convert line types,
+mark elements expandable / reconductorable, and assign elements to zones or
+cable options.
 
 Implemented in :mod:`pyflow_acdc.grid_modifications`. See also
 :doc:`cable_database` (bundled cable types and source attributions),
@@ -95,7 +96,8 @@ See :doc:`modelling_flexible_assets` for the electrolyser model. Coupled runs:
 Add Heat Pump
 ^^^^^^^^^^^^^
 
-See :doc:`modelling_flexible_assets` for the heat-pump model. Coupled runs:
+See :doc:`modelling_flexible_assets` for the heat-pump model (``P_shed`` /
+``Q_shed``, ``Energy_cost`` shed penalties). Coupled runs:
 :doc:`window` / :doc:`../usage_window_opf`.
 
 .. autofunction:: pyflow_acdc.add_heat_pump
@@ -219,3 +221,43 @@ Change Line to Transformer
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: pyflow_acdc.change_line_AC_to_tap_transformer
+
+Expandable / reconductoring setup
+---------------------------------
+
+Mark elements as expandable (or apply reconductoring data) before TEP / MP-TEP.
+These helpers live in :mod:`pyflow_acdc.grid_modifications` and do **not** require
+Pyomo. TEP solvers are documented in :doc:`tep` / :doc:`tep_dynamic`.
+
+Expand Elements from Table
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.expand_elements_from_pd
+
+   Applies expansion definitions from a pandas table.
+
+Expand One Element
+^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.expand_element
+
+   Enables or updates one element for TEP investment modeling.
+
+Update Expansion Attributes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.update_attributes
+
+   Updates expansion-related attributes of a TEP-enabled element.
+
+Base Cost Calculation
+^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.base_cost_calculation
+
+Repurpose / Reconductoring from Table
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: pyflow_acdc.repurpose_element_from_pd
+
+   Applies reconductoring/repurposing definitions from a pandas table.

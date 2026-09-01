@@ -78,6 +78,59 @@ with bounds ``soc_min`` / ``soc_max``, optional window terminal ``soc_final``,
 and AC S-circle / DC net-:math:`P` limits. **Sign convention:** net active
 power injected into the bus is ``P_discharge - P_charge``.
 
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same SoC update is used, with a net active-power
+limit and no reactive storage power:
+
+.. math::
+    :label: eq:bess_l
+
+    \begin{align}
+        \mathrm{SoC}_{t}
+        &=
+        \mathrm{SoC}_{t-1}
+        +
+        \frac{\Delta t\, S_{\mathrm{base}}}{E_{\max}}
+        \Bigl(
+            \eta_c P_{t}^{c} - \frac{P_{t}^{d}}{\eta_d}
+        \Bigr) \\
+        |P_{t}^{d}-P_{t}^{c}| &\leq P^{\max}
+    \end{align}
+
+SOCP model
+^^^^^^^^^^
+
+In the sparse SOCP stack the same SoC update is used. On AC buses the rating is
+an apparent-power limit; on DC buses it is a net active-power limit:
+
+.. math::
+    :label: eq:bess_socp
+
+    \begin{align}
+        \mathrm{SoC}_{t}
+        &=
+        \mathrm{SoC}_{t-1}
+        +
+        \frac{\Delta t\, S_{\mathrm{base}}}{E_{\max}}
+        \Bigl(
+            \eta_c P_{t}^{c} - \frac{P_{t}^{d}}{\eta_d}
+        \Bigr) \\
+        \bigl\|(P_{t}^{d}-P_{t}^{c})+j\,q_{t}^{b}\bigr\|
+        &\leq s_{b}^{\max}
+          \qquad \text{(AC)} \\
+        |P_{t}^{d}-P_{t}^{c}|
+        &\leq P^{\max}
+          \qquad \text{(DC)}
+    \end{align}
+
+Optional **mutually exclusive** charge/discharge (Paper R MI-BESS) is available
+via ``bess_mi_exclusivity=True`` on :func:`~pyflow_acdc.socp_optimise` /
+:func:`~pyflow_acdc.soc_window_optimisation``. Default is G6 continuous (overlap
+allowed). MI mode prefers an MI-capable conic solver (MOSEK, GUROBI, or SCIP)
+and warns if a non-MI backend is selected.
+
 * :attr:`~pyflow_acdc.Node_AC.connected_storage` /
   :attr:`~pyflow_acdc.Node_DC.connected_storage` /
   :attr:`~pyflow_acdc.Grid.storage_elements`
@@ -142,6 +195,26 @@ and :func:`~pyflow_acdc.ts_acdc_opf`. Optional ``H2_mass_final`` is enforced in
 coupled window / rolling OPF when set. Economics use ``h2_price`` with
 ``ObjRule['H2_sale']``.
 
+Linear model
+^^^^^^^^^^^^
+
+In the linear OPF stack the same inventory update is used with electrolyser
+active power only:
+
+.. math::
+    :label: eq:h2_l
+
+    h = b_{h}\, P_{e}\, S_{\mathrm{base}}\, \Delta t + c_{h},
+    \qquad
+    M_{t} = M_{t-1} + h
+
+SOCP model
+^^^^^^^^^^
+
+In the sparse SOCP stack the same inventory update is used. On AC buses,
+optional reactive compensation is available through ``Q_min_MVAR`` /
+``Q_max_MVAR``; on DC buses reactive power is zero.
+
 * :attr:`~pyflow_acdc.Node_AC.connected_electrolyser` /
   :attr:`~pyflow_acdc.Node_DC.connected_electrolyser` /
   :attr:`~pyflow_acdc.Grid.electrolysers`
@@ -199,28 +272,46 @@ limits derived offline from building simulations; pyflow-acdc does **not**
 embed a thermal model.
 
 **pyflow-acdc implementation.** Baseline electrical demand is stored as
-``P_ref`` / ``Q_ref`` in **pu** on ``S_base``. Instantaneous flexibility is
-bounded by the aggregate unit rating ``n_units * P_unit_max``:
+``P_ref`` / ``Q_ref`` in **pu** on ``S_base``. OPF uses explicit shed
+actuators (Montse ``…_shedding`` sgen pattern): served power is
 
 .. math::
-    :label: eq:hp_pyflow_p
+    :label: eq:hp_pyflow_served
 
-    P_{\mathrm{ref}} - n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
-    \leq
-    P_{\mathrm{hp}}
-    \leq
-    P_{\mathrm{ref}}
+    P_{\mathrm{hp}} = P_{\mathrm{ref}} - P_{\mathrm{shed}}, \qquad
+    Q_{\mathrm{hp}} = Q_{\mathrm{ref}} - Q_{\mathrm{shed}}
 
-Reactive demand follows the load sign convention used in the NL AC balance
-(subtracted at the bus), with
+Installed apparent-power rating ``Max_S`` [pu] defaults to
+``n_units * P_unit_max``; override with ``add_heat_pump(..., S_rated_MVAR=)``.
+Reactive shed limits are fixed at creation:
+``Q_lim_shed = Max_S * Q_shed_lim_frac`` (default ``q_shed_lim_frac=1``).
+
+Non-linear model
+^^^^^^^^^^^^^^^^
+
+Decision variables: ``P_shed``, ``Q_shed``, ``E_heat_pump``. Expressions:
+``P_heat_pump = P_ref - P_shed``, ``Q_heat_pump = Q_ref - Q_shed``.
+
+Instantaneous bounds (every frame, including window blocks):
 
 .. math::
-    :label: eq:hp_pyflow_q
+    :label: eq:hp_pyflow_p_shed
 
-    Q_{\mathrm{ref}} \leq Q_{\mathrm{hp}} \leq 0
+    0 \leq P_{\mathrm{shed}} \leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
 
-Cumulative energy state ``E_state`` is in **kWh**. The discrete update in
-:mod:`~pyflow_acdc.NL_models.ACDC_OPF_NL_model` / sequential OPF is:
+.. math::
+    :label: eq:hp_pyflow_q_shed
+
+    -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} \leq Q_{\mathrm{lim}}^{\mathrm{shed}}
+
+.. math::
+    :label: eq:hp_pyflow_e
+
+    E_{\min} \leq E \leq E_{\max}
+
+Energy balance and :math:`E_{t-1}`-linked active shedding (snapshot / myopic /
+in-block only; skipped when ``window_block=True`` — parent window owns the
+chain):
 
 .. math::
     :label: eq:hp_energy_pyflow
@@ -231,8 +322,31 @@ Cumulative energy state ``E_state`` is in **kWh**. The discrete update in
     +
     P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t
 
-with bounds ``E_min`` / ``E_max``. Window OPF owns the energy chain across
-frames (:func:`~pyflow_acdc.NL_models.window_opf.window_heat_pump_constraints`).
+.. math::
+    :label: eq:hp_p_shed_energy
+
+    \frac{E_{\min}}{ \Delta t} - \frac{E_{t-1}}{ \Delta t}
+    \leq
+    P_{\mathrm{shed}}
+    \leq
+    \frac{E_{\max}}{ \Delta t} - \frac{E_{t-1}}{ \Delta t}
+
+``Energy_cost`` penalises shed directly (MW/MVAR via ``S_base``):
+
+.. math::
+    :label: eq:hp_energy_cost
+
+    P_{\mathrm{shed}}^{2}\, S_{\mathrm{base}}^{2}\, q_f
+    + P_{\mathrm{shed}}\, S_{\mathrm{base}}\, \ell_f
+    + Q_{\mathrm{shed}}^{2}\, S_{\mathrm{base}}^{2}\, q_{f,Q}
+    + Q_{\mathrm{shed}}\, S_{\mathrm{base}}\, \ell_{f,Q}
+
+Coefficients are set on ``add_heat_pump`` (``quadratic_cost_factor`` /
+``linear_cost_factor`` and Q twins; default ``0``). Nodal injection subtracts
+``P_heat_pump`` / ``Q_heat_pump`` from the AC balance (load sign).
+
+Window OPF owns the energy chain across frames
+(:func:`~pyflow_acdc.NL_models.window_opf.window_heat_pump_constraints`).
 
 **Power flow.** Unlike BESS / H₂ PF setpoint series (``storage_P``, ``h2_P``,
 … via :func:`~pyflow_acdc.update_grid_for_pf`), heat-pump baselines stay on
@@ -240,6 +354,59 @@ frames (:func:`~pyflow_acdc.NL_models.window_opf.window_heat_pump_constraints`).
 ``hp_E_min``, ``hp_E_max``). In AC power flow,
 :meth:`~pyflow_acdc.Grid.update_pq_ac` treats ``P_ref`` / ``Q_ref`` as known
 nodal loads (same sign convention as NL OPF).
+
+Linear model
+^^^^^^^^^^^^
+
+Same ``P_shed`` / ``E_heat_pump`` chain as the non-linear model. Reactive
+shedding is not optimised: ``Q_shed`` is fixed at ``Q_ref``, so
+``Q_{\mathrm{hp}} = 0`` every frame.
+
+.. math::
+    :label: eq:hp_l
+
+    \begin{align}
+        0 &\leq P_{\mathrm{shed}} \leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max} \\
+        \frac{E_{\min}}{ \Delta t} - \frac{E_{t-1}}{ \Delta t}
+        &\leq P_{\mathrm{shed}}
+        \leq \frac{E_{\max}}{ \Delta t} - \frac{E_{t-1}}{ \Delta t} \\
+        E_{t}
+        &=
+        E_{t-1}
+        +
+        P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t,
+        \qquad
+        P_{\mathrm{hp}} = P_{\mathrm{ref}} - P_{\mathrm{shed}}
+    \end{align}
+
+Only active ``P_shed`` shed costs enter ``Energy_cost`` in the linear stack
+(same ``qf`` / ``lf`` scaling as NL).
+
+SOCP model
+^^^^^^^^^^
+
+In the sparse SOCP stack the heat pump uses the same ``P_shed`` / ``Q_shed``
+actuators as the NL model:
+
+.. math::
+    :label: eq:hp_socp_shed
+
+    \begin{align}
+        P_{\mathrm{hp}} &= P_{\mathrm{ref}} - P_{\mathrm{shed}}, \\
+        Q_{\mathrm{hp}} &= Q_{\mathrm{ref}} - Q_{\mathrm{shed}}, \\
+        0 \leq P_{\mathrm{shed}} &\leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}, \\
+        -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} &\leq Q_{\mathrm{lim}}^{\mathrm{shed}},
+    \end{align}
+
+with ``Q_lim_shed = Max_S * Q_shed_lim_frac`` (pu). The cumulative energy chain
+:eq:`eq:hp_energy_pyflow` and its :math:`E_{t-1}`-linked :math:`P_{\mathrm{shed}}`
+reformulations match the NL OPF. ``Energy_cost`` penalises shed directly
+(MW/MVAR via ``S_base``; same formula as :eq:`eq:hp_energy_cost`). All
+constraints are linear. The heat pump (AC-only) enters the AC nodal balance as
+a load, subtracting :math:`P_{\mathrm{hp}}` and :math:`Q_{\mathrm{hp}}`.
+Time-varying references and energy envelopes are read from ``grid.Time_series``
+(``hp_P_ref``, ``hp_Q_ref``, ``hp_E_min``, ``hp_E_max``) by
+:func:`~pyflow_acdc.translate_pyf_socp`.
 
 * :attr:`~pyflow_acdc.Node_AC.connected_heat_pumps` /
   :attr:`~pyflow_acdc.Grid.heat_pumps`
@@ -269,6 +436,8 @@ one-step OPF; for multi-hour studies attach time series to the heat-pump name
         E_min_kWh=-5.0,
         E_max_kWh=5.0,
         E_state_initial_kWh=0.0,
+        quadratic_cost_factor=50.0,
+        linear_cost_factor=0.0,
     )
     pyf.add_TimeSeries(grid, df_p_ref, associated=hp.name, TS_type="hp_P_ref")
     pyf.add_TimeSeries(grid, df_q_ref, associated=hp.name, TS_type="hp_Q_ref")

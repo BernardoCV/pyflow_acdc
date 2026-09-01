@@ -17,35 +17,29 @@ import pandas as pd
 import pyflow_acdc as pyf
 from shapely.geometry import LineString, Point
 
+from pyflow_acdc.example_grids._example_data_paths import (
+    first_example_data_dir,
+    resolve_example_data_path,
+)
+
 NORTH_SEA_GRID_DATA_GITHUB_BASE = (
     "https://raw.githubusercontent.com/CITCEA-UPC/pyflow_acdc/main/examples/North_Sea_grid_data/"
 )
-
-
-def _is_url(path):
-    text = str(path)
-    return text.startswith("http://") or text.startswith("https://")
-
-
-def _north_sea_data_dir():
-    data_dir = Path(__file__).resolve().parents[3] / "examples" / "North_Sea_grid_data"
-    if not data_dir.is_dir():
-        raise FileNotFoundError(
-            f"North Sea grid data directory not found: {data_dir}. "
-            "Expected examples/North_Sea_grid_data/ at the pyflow_acdc repository root."
-        )
-    return data_dir
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve_example_path(filename, *, online=True):
-    if _is_url(filename):
-        return str(filename)
-    if online:
-        return NORTH_SEA_GRID_DATA_GITHUB_BASE + Path(filename).name
-    path = _north_sea_data_dir() / filename
-    if not path.exists():
-        raise FileNotFoundError(f"North Sea grid data file not found: {path}")
-    return str(path)
+    return resolve_example_data_path(
+        filename,
+        example_subdir="North_Sea_grid_data",
+        github_base=NORTH_SEA_GRID_DATA_GITHUB_BASE,
+        repo_root=_REPO_ROOT,
+        online=online,
+    )
+
+
+def _north_sea_output_dir():
+    return first_example_data_dir("North_Sea_grid_data", repo_root=_REPO_ROOT)
 
 
 def NS_MTDC_2025(
@@ -134,24 +128,24 @@ def NS_MTDC_2025(
         price_zone = AC_node_data.at[index, 'Market']
         pyf.assign_nodeToPrice_Zone(grid, node_name, price_zone, 'AC')
 
-    pyf.add_extgrid(grid, 'BE4', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE4'])
-    pyf.add_extgrid(grid, 'BE7', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE7'])
-    pyf.add_extgrid(grid, 'DE1', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE1'])
-    pyf.add_extgrid(grid, 'DE3', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE3'])
-    pyf.add_extgrid(grid, 'DE4', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE4'])
-    pyf.add_extgrid(grid, 'DE6', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE6'])
-    pyf.add_extgrid(grid, 'DK4', MVAmax=1744, price_link=True, MVArmax=1744 / 3, MVArmin=-1744 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK4'])
-    pyf.add_extgrid(grid, 'DK7', MVAmax=2330, price_link=True, MVArmax=2330 / 3, MVArmin=-2330 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK7'])
-    pyf.add_extgrid(grid, 'GB1', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB1'])
-    pyf.add_extgrid(grid, 'GB5', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB5'])
-    pyf.add_extgrid(grid, 'GB21', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB21'])
-    pyf.add_extgrid(grid, 'GB23', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB23'])
-    pyf.add_extgrid(grid, 'GB25', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB25'])
-    pyf.add_extgrid(grid, 'NL6', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL6'])
-    pyf.add_extgrid(grid, 'NL10', MVAmax=4670, price_link=True, MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL10'])
-    pyf.add_extgrid(grid, 'NO8', MVAmax=2173, price_link=True, MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO8'])
-    pyf.add_extgrid(grid, 'NO9', MVAmax=2173, price_link=True, MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO9'])
-    pyf.add_gen(grid, 'GB20', MWmax=545, MWmin=490.5, price_link=True)
+    pyf.add_extgrid(grid, 'BE4', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE4'])
+    pyf.add_extgrid(grid, 'BE7', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['BE7'])
+    pyf.add_extgrid(grid, 'DE1', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE1'])
+    pyf.add_extgrid(grid, 'DE3', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE3'])
+    pyf.add_extgrid(grid, 'DE4', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE4'])
+    pyf.add_extgrid(grid, 'DE6', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DE6'])
+    pyf.add_extgrid(grid, 'DK4', MVAmax=1744, link_cost='linear', MVArmax=1744 / 3, MVArmin=-1744 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK4'])
+    pyf.add_extgrid(grid, 'DK7', MVAmax=2330, link_cost='linear', MVArmax=2330 / 3, MVArmin=-2330 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['DK7'])
+    pyf.add_extgrid(grid, 'GB1', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB1'])
+    pyf.add_extgrid(grid, 'GB5', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB5'])
+    pyf.add_extgrid(grid, 'GB21', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB21'])
+    pyf.add_extgrid(grid, 'GB23', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB23'])
+    pyf.add_extgrid(grid, 'GB25', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['GB25'])
+    pyf.add_extgrid(grid, 'NL6', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL6'])
+    pyf.add_extgrid(grid, 'NL10', MVAmax=4670, link_cost='linear', MVArmax=4670 / 3, MVArmin=-4670 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NL10'])
+    pyf.add_extgrid(grid, 'NO8', MVAmax=2173, link_cost='linear', MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO8'])
+    pyf.add_extgrid(grid, 'NO9', MVAmax=2173, link_cost='linear', MVArmax=2173 / 3, MVArmin=-2173 / 3, Allow_sell=AS, P_load_MW=extgrid_loads_mw['NO9'])
+    pyf.add_gen(grid, 'GB20', MWmax=545, MWmin=490.5, link_cost='linear')
 
     for z in ['BE', 'DE', 'DK', 'NL', 'NO', 'GB']:
         pyf.add_RenSource_zone(grid, z)
@@ -306,7 +300,7 @@ if __name__ == "__main__":
         inv_load = pz.investment_decisions.get('Load', None)
         print(f"zone={pz.name} PLi_inv_factor={pz.PLi_inv_factor} inv_Load={inv_load}")
 
-    costs_csv_path = _ns_mp_data_dir() / "NS_MTDC_2025_costs_by_investment_period.csv"
+    costs_csv_path = _north_sea_output_dir() / "NS_MTDC_2025_costs_by_investment_period.csv"
     costs_csv_path.parent.mkdir(parents=True, exist_ok=True)
     costs_df = _export_element_unit_costs_by_inv_period_csv(
         grid_obj=grid,
@@ -522,7 +516,7 @@ if __name__ == "__main__":
 
         pyf.save_network_svg(
             grid,
-            name=str(_ns_mp_data_dir() / f"NS_MTDC_2025_{np_tag}_svg"),
+            name=str(_north_sea_output_dir() / f"NS_MTDC_2025_{np_tag}_svg"),
             square_ratio=True,
             line_size_factor=0.5,
             scale_ac_nodes_with_rs=True,
@@ -534,7 +528,7 @@ if __name__ == "__main__":
         if np_tag in ("np1", "npmax") or np_tag.startswith("npmax_inv"):
             pyf.plot_folium(
                 grid,
-                name=str(_ns_mp_data_dir() / f"NS_MTDC_2025_{np_tag}"),
+                name=str(_north_sea_output_dir() / f"NS_MTDC_2025_{np_tag}"),
             )
     
     print('\n[NS_MTDC_2025_setup __main__] Post-install state debug')
