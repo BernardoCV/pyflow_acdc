@@ -330,6 +330,20 @@ with reactive heat-pump power fixed at zero:
         P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t
     \end{align}
 
+SOCP model
+^^^^^^^^^^
+
+In the sparse SOCP stack the heat pump keeps the non-linear surface: served
+:math:`P_{\mathrm{hp}}` bound by :eq:`eq:hp_pyflow_p`, the reactive twin
+:math:`Q_{\mathrm{ref}} \leq Q_{\mathrm{hp}} \leq 0` :eq:`eq:hp_pyflow_q`, and
+the cumulative energy chain :eq:`eq:hp_energy_pyflow` with its
+:math:`E_{t-1}`-linked active-power reformulation :eq:`eq:hp_bounds`. All
+constraints are linear, so no conic lift is added. The heat pump (AC-only)
+enters the AC nodal balance as a load, subtracting :math:`P_{\mathrm{hp}}` and
+:math:`Q_{\mathrm{hp}}`. Time-varying references and energy envelopes are read
+from ``grid.Time_series`` (``hp_P_ref``, ``hp_Q_ref``, ``hp_E_min``,
+``hp_E_max``) by :func:`~pyflow_acdc.translate_pyf_socp`.
+
 * :attr:`~pyflow_acdc.Node_AC.connected_heat_pumps` /
   :attr:`~pyflow_acdc.Grid.heat_pumps`
 * ``analyse_grid`` sets ``grid.HP`` when heat pumps are present

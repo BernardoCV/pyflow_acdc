@@ -9,13 +9,13 @@ Mario Useche-Arteaga et al. (SEGAN 2026 energy-hub paper).
 Publication-grounded; remaining open items are in §7–§8. Owner decisions already locked
 are in **§0.0** (L1–L28) and progress is in **§0.4** (do not re-litigate without an explicit change).
 
-**Status:** Phase **0–4** and **7** largely complete (2026-08-04). Deterministic
-sparse SOCP builder + runners solve; BESS G6 + linear H₂ scaffolded; usage/API/
-modelling docs and smoke tests landed. **Phase 8** (heat pumps, Q-18 = **A** NL Q
-twin) is next. CCP and MI-BESS exclusivity remain deferred (L18).
+**Status:** Phase **0–4**, **7**, and **8** complete. Deterministic sparse SOCP
+builder + runners solve; BESS G6 + linear H₂ scaffolded; heat pumps (Q-18 = **A**
+NL Q twin) landed; usage/API/modelling docs and smoke tests landed. CCP and
+MI-BESS exclusivity remain deferred (L18).
 
-**Handoff note (2026-08-04):** Resume from **Phase 8** (§5.7) with Q-18 locked to
-**A**. Do not re-litigate L1–L28 or Q-18 without an explicit change.
+**Handoff note:** Phase 8 heat pumps done. Next open work is **CCP** and
+**MI-BESS exclusivity**. Do not re-litigate L1–L28 or Q-18 without an explicit change.
 
 **Primary reference**
 
@@ -179,7 +179,7 @@ translate_pyf_socp(grid, gamma, frame_ids, P_ext_bounds)
 |------|------------------|
 | Scaffold + sparse AC/DC/conv + thermals | Install `cvxpy` + solver; smoke `build_only` / solve |
 | Gen variables + ren from `grid.Time_series` | Load TS into balance if needed; validate vs Mario / NLP |
-| Window + single runners + `T` indexing + BESS G6 / H₂ linear | MI exclusivity (lifts L18 further); CCP; **heat pumps (§5.7)** |
+| Window + single runners + `T` indexing + BESS G6 / H₂ linear + **heat pumps (§5.7)** | MI exclusivity (lifts L18 further); CCP |
 | `[SOCP]` + guarded exports | Docs, Results section name, CI without commercial solver |
 | Weighted `ObjComponent` objective | Map Paper A AC thermal expressions precisely (U-A8) |
 
@@ -574,8 +574,10 @@ window energy chain). Full physics / API lock lives in
 [`heat_pump_plan.md`](heat_pump_plan.md). This section is the **SOCP adoption
 plan** only — do not invent HP rules beyond that document.
 
-**Status today:** `convex_model` / `ACDC_convex` have **no** `HP` hooks yet. Phase
-**8** below. **Q-18 locked: option A (NL Q twin).**
+**Status today:** **Done.** `convex_model` (`heat_pump_variables` /
+`heat_pump_constraints`, `hp_data`) and `ACDC_convex` (`translate_pyf_socp`
+HP profiles + `_export_to_grid`) now support `grid.HP`. **Q-18 locked: option A
+(NL Q twin).**
 
 #### Why add them to SOCP
 
@@ -664,7 +666,7 @@ no Paper A dependency.
 | **5** | CCP (optional later) | Deferred | Wind / price modes |
 | **6** | BESS G6 + H₂ linear (MI exclusivity still deferred) | **Done** for continuous G6/H₂ (smoke); MI exclusivity deferred | Coupled assets continuous |
 | **7** | Docs, `Results`, CI | **Done** — usage/API/modelling pages; `socp_run` in Results; open-source Clarabel in `[SOCP]`; `test_socp.py` | `[SOCP]` documented; smoke tests |
-| **8** | Heat pumps in SOCP (§5.7; **Q-18 = A**) | **Ready** (not started) | `grid.HP` parity with NL Q twin |
+| **8** | Heat pumps in SOCP (§5.7; **Q-18 = A**) | **Done** — `hp_data` + `heat_pump_variables`/`heat_pump_constraints`; AC load injection; TS-driven refs/E bounds; export + smoke tests | `grid.HP` parity with NL Q twin |
 
 Prefer Mario’s script (L7) for SOC / balance / converter patterns; **add AC limits from the paper** (L15) even though his script lacks them.
 
@@ -676,7 +678,8 @@ Prefer Mario’s script (L7) for SOC / balance / converter patterns; **add AC li
 4. ~~Solver defaults / `[SOCP]` extra docs (Q-10); optional BESS/H₂ + window smoke.~~ Done — MOSEK-first docs + SOCP usage/API pages + smoke tests.
 5. ~~Phase 7 docs / Results / CI.~~ Done.
 6. ~~Q-18.~~ Locked **A** (NL Q twin).
-7. **Next:** Phase 8 heat pumps (§5.7 checklist). Later: CCP; MI-BESS exclusivity.
+7. ~~Phase 8 heat pumps (§5.7 checklist).~~ Done — SOCP `grid.HP` with NL Q twin.
+8. **Next:** CCP; MI-BESS exclusivity; option A `CONVEX_Ybus`.
 
 ---
 

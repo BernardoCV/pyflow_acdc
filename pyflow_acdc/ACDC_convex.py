@@ -199,6 +199,38 @@ def translate_pyf_socp(grid, gamma=1.0, frame_ids=None, P_ext_bounds=None):
                 f"Electrolyser {el.name!r} not found in h2_data"
             )
 
+    # ---- heat-pump refs / energy bounds: hp index → array(T) --------------
+    # Static scalars from build_socp_data, overridden per-frame by TS profiles.
+    hp_by_name = {hp.name: hp for hp in grid.heat_pumps}
+    hp_idx_by_number = {hd['idx']: hi for hi, hd in enumerate(socp_data.hp_data)}
+    hp_P_ref = {hi: np.full(T, hd['P_ref'], dtype=float) for hi, hd in enumerate(socp_data.hp_data)}
+    hp_Q_ref = {hi: np.full(T, hd['Q_ref'], dtype=float) for hi, hd in enumerate(socp_data.hp_data)}
+    hp_E_min = {hi: np.full(T, hd['E_min'], dtype=float) for hi, hd in enumerate(socp_data.hp_data)}
+    hp_E_max = {hi: np.full(T, hd['E_max'], dtype=float) for hi, hd in enumerate(socp_data.hp_data)}
+
+    _hp_ts_targets = {
+        TSType.HP_P_REF: hp_P_ref,
+        TSType.HP_Q_REF: hp_Q_ref,
+        TSType.HP_E_MIN: hp_E_min,
+        TSType.HP_E_MAX: hp_E_max,
+    }
+    for ts in series:
+        typ = _ts_type(ts)
+        target = next((store for k, store in _hp_ts_targets.items() if typ == k), None)
+        if target is None:
+            continue
+        hp = hp_by_name.get(ts.element_name)
+        if hp is None:
+            raise ValueError(
+                f"Heat-pump time series element_name={ts.element_name!r} "
+                f"does not match any heat pump"
+            )
+        hi = hp_idx_by_number.get(hp.heatPumpNumber)
+        if hi is None:
+            raise ValueError(f"Heat pump {hp.name!r} not found in hp_data")
+        data = np.asarray(ts.data, dtype=float)
+        target[hi] = np.array([data[abs_t] for abs_t in frame_ids], dtype=float)
+
     return SimpleNamespace(
         **vars(socp_data),
         T=T,
@@ -206,6 +238,10 @@ def translate_pyf_socp(grid, gamma=1.0, frame_ids=None, P_ext_bounds=None):
         P_ren=P_ren_out,
         prices=prices_out,
         h2_prices=h2_prices,
+        hp_P_ref=hp_P_ref,
+        hp_Q_ref=hp_Q_ref,
+        hp_E_min=hp_E_min,
+        hp_E_max=hp_E_max,
         P_ext_bounds=P_ext_bounds or {},
     )
 
@@ -354,6 +390,7 @@ def _export_to_grid(grid, variables, socp_data):
     conv = variables.conv
     st   = variables.storage
     h2   = variables.hydrogen
+    hp   = variables.heat_pump
 
     # Voltage magnitudes → AC nodes
     if ac.h_AC.value is not None:
@@ -411,6 +448,20 @@ def _export_to_grid(grid, variables, socp_data):
             el.Q_electrolyser = float(h2.Q_electrolyser.value[ei, 0])
             el.mass_H2 = float(h2.mass_H2.value[ei, t_last])
 
+    # Heat-pump results
+    if hp is not None and hp.P_heat_pump.value is not None:
+        t_last = socp_data.T - 1
+        for hi, hd in enumerate(socp_data.hp_data):
+            h_obj = grid.heat_pumps[hi]
+            if h_obj.heatPumpNumber != hd['idx']:
+                raise ValueError(
+                    f"hp_data index mismatch: expected heatPumpNumber "
+                    f"{hd['idx']}, got {h_obj.heatPumpNumber}"
+                )
+            h_obj.P_hp = float(hp.P_heat_pump.value[hi, 0])
+            h_obj.Q_hp = float(hp.Q_heat_pump.value[hi, 0])
+            h_obj.E_state = float(hp.E_heat_pump.value[hi, t_last])
+
     # Store full time-series for post-processing
     grid.socp_results = SimpleNamespace(
         h_AC  = ac.h_AC.value,
@@ -428,6 +479,9 @@ def _export_to_grid(grid, variables, socp_data):
         P_electrolyser = h2.P_electrolyser.value if h2 is not None else None,
         Q_electrolyser = h2.Q_electrolyser.value if h2 is not None else None,
         mass_H2 = h2.mass_H2.value if h2 is not None else None,
+        P_heat_pump = hp.P_heat_pump.value if hp is not None else None,
+        Q_heat_pump = hp.Q_heat_pump.value if hp is not None else None,
+        E_heat_pump = hp.E_heat_pump.value if hp is not None else None,
         T     = socp_data.T,
         frame_ids = socp_data.frame_ids,
     )

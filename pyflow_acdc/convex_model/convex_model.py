@@ -51,6 +51,8 @@ __all__ = [
     "storage_constraints",
     "hydrogen_variables",
     "hydrogen_constraints",
+    "heat_pump_variables",
+    "heat_pump_constraints",
     "ac_variables",
     "ac_constraints",
     "dc_variables",
@@ -257,6 +259,27 @@ def build_socp_data(grid):
         else:
             h2_by_dc_node.setdefault(node_num, []).append(len(h2_data) - 1)
 
+    # ------------------------------------------------------------- heat pumps
+    # AC-only controllable load with cumulative energy state (Q-18 A: NL twin).
+    hp_data = []
+    hp_by_ac_node = {}
+    for hp in grid.heat_pumps:
+        node_num = hp._node.nodeNumber
+        entry = {
+            'idx': hp.heatPumpNumber,
+            'node': node_num,
+            'P_ref': hp.P_ref,
+            'Q_ref': hp.Q_ref,
+            'P_unit_cap': hp.n_units * hp.P_unit_max,
+            'E_min': hp.E_min,
+            'E_max': hp.E_max,
+            'E_state': hp.E_state,
+            'dt_hours': hp.dt_hours,
+            'S_base': hp.S_base,
+        }
+        hp_data.append(entry)
+        hp_by_ac_node.setdefault(node_num, []).append(len(hp_data) - 1)
+
     # DC node polarity from converters (L14); conflict → hard error
     dc_pol = {}
     for cd in conv_data:
@@ -283,6 +306,8 @@ def build_socp_data(grid):
         h2_data=h2_data,
         h2_by_ac_node=h2_by_ac_node,
         h2_by_dc_node=h2_by_dc_node,
+        hp_data=hp_data,
+        hp_by_ac_node=hp_by_ac_node,
         Sbase=Sbase,
     )
 
@@ -461,6 +486,67 @@ def hydrogen_constraints(d, h2_vars):
 
 
 # ---------------------------------------------------------------------------
+# Heat-pump variables / constraints (Q-18 A: NL Q twin, AC-only, linear)
+# ---------------------------------------------------------------------------
+
+def heat_pump_variables(d, T):
+    """Declare served P, Q (NL twin), and cumulative energy state over ``T``."""
+    n_hp = len(d.hp_data)
+    if n_hp == 0:
+        raise ValueError("heat_pump_variables called with empty hp_data")
+
+    P_heat_pump = cp.Variable((n_hp, T), name="P_heat_pump")
+    Q_heat_pump = cp.Variable((n_hp, T), name="Q_heat_pump")
+    E_heat_pump = cp.Variable((n_hp, T), name="E_heat_pump")
+
+    return SimpleNamespace(
+        P_heat_pump=P_heat_pump,
+        Q_heat_pump=Q_heat_pump,
+        E_heat_pump=E_heat_pump,
+    )
+
+
+def heat_pump_constraints(d, hp_vars):
+    """Served-load bounds, Q twin bounds, and cumulative energy chain.
+
+    Mirrors the NL heat-pump formulation (planning-oriented flexible load):
+    instantaneous P/Q/E bounds every ``t`` plus the E chain and its P
+    reformulations linked to the previous energy state. Refs and E bounds are
+    time-varying (from ``translate_pyf_socp``).
+    """
+    constrs = []
+    T = d.T
+    P = hp_vars.P_heat_pump
+    Q = hp_vars.Q_heat_pump
+    E = hp_vars.E_heat_pump
+
+    for hi, hd in enumerate(d.hp_data):
+        p_ref = d.hp_P_ref[hi]
+        q_ref = d.hp_Q_ref[hi]
+        e_min = d.hp_E_min[hi]
+        e_max = d.hp_E_max[hi]
+        p_cap = hd['P_unit_cap']
+        dt = hd['dt_hours']
+        scale = hd['S_base'] * dt
+
+        for t in range(T):
+            e_prev = hd['E_state'] if t == 0 else E[hi, t - 1]
+            constrs += [
+                P[hi, t] >= p_ref[t] - p_cap,
+                P[hi, t] <= p_ref[t],
+                Q[hi, t] >= q_ref[t],
+                Q[hi, t] <= 0,
+                E[hi, t] >= e_min[t],
+                E[hi, t] <= e_max[t],
+                E[hi, t] == e_prev + P[hi, t] * scale,
+                P[hi, t] >= e_prev / dt + p_ref[t] - e_max[t] / dt,
+                P[hi, t] <= e_prev / dt + p_ref[t] - e_min[t] / dt,
+            ]
+
+    return constrs
+
+
+# ---------------------------------------------------------------------------
 # AC variables
 # ---------------------------------------------------------------------------
 
@@ -484,7 +570,7 @@ def ac_variables(d, T):
 # AC constraints
 # ---------------------------------------------------------------------------
 
-def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars=None, h2_vars=None):
+def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars=None, h2_vars=None, hp_vars=None):
     """Build AC constraints: voltage bounds, SOC lifts, nodal balance, thermals.
 
     Parameters
@@ -501,6 +587,8 @@ def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars=None, h2_vars=
         Output of :func:`storage_variables`, or ``None`` if no BESS.
     h2_vars : SimpleNamespace or None
         Output of :func:`hydrogen_variables`, or ``None`` if no H₂.
+    hp_vars : SimpleNamespace or None
+        Output of :func:`heat_pump_variables`, or ``None`` if no heat pumps.
     Returns
     -------
     list
@@ -545,7 +633,7 @@ def ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars=None, h2_vars=
                 w_km_t = w_AC[(k, m)][t] if (k, m) in w_AC else cp.conj(w_AC[(m, k)][t])
                 flow_k = flow_k + d.Ybus_AC[k, m] * w_km_t
 
-            S_k = _ac_node_injection(k, t, d, gen_vars, Ss, st_vars, h2_vars)
+            S_k = _ac_node_injection(k, t, d, gen_vars, Ss, st_vars, h2_vars, hp_vars)
             constrs += [flow_k == 0] if S_k is None else [cp.conj(S_k) == flow_k]
 
         # thermal limits (L15)
@@ -747,11 +835,14 @@ def socp_model(grid, d):
     conv_vars = converter_variables(d, T) if grid.ACmode and grid.DCmode and d.conv_data else None
     st_vars   = storage_variables(d, T) if grid.ESS and d.storage_data else None
     h2_vars   = hydrogen_variables(d, T) if grid.H2 and d.h2_data else None
+    hp_vars   = heat_pump_variables(d, T) if grid.HP and d.hp_data else None
 
     if grid.ESS and not d.storage_data:
         raise ValueError("grid.ESS is True but storage_data is empty")
     if grid.H2 and not d.h2_data:
         raise ValueError("grid.H2 is True but h2_data is empty")
+    if grid.HP and not d.hp_data:
+        raise ValueError("grid.HP is True but hp_data is empty")
 
     # -- constraints ---------------------------------------------------------
     constrs  = generator_constraints(d, gen_vars) if gen_vars is not None else []
@@ -759,7 +850,9 @@ def socp_model(grid, d):
         constrs += storage_constraints(d, st_vars)
     if h2_vars is not None:
         constrs += hydrogen_constraints(d, h2_vars)
-    constrs += ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars, h2_vars)
+    if hp_vars is not None:
+        constrs += heat_pump_constraints(d, hp_vars)
+    constrs += ac_constraints(d, grid, ac_vars, gen_vars, conv_vars, st_vars, h2_vars, hp_vars)
     if grid.DCmode:
         constrs += dc_constraints(d, dc_vars, st_vars, h2_vars)
     if grid.ACmode and grid.DCmode and d.conv_data:
@@ -772,6 +865,7 @@ def socp_model(grid, d):
         conv=conv_vars,
         storage=st_vars,
         hydrogen=h2_vars,
+        heat_pump=hp_vars,
     )
 
     return constrs, variables
@@ -781,7 +875,7 @@ def socp_model(grid, d):
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _ac_node_injection(k, t, d, gen_vars, Ss, st_vars=None, h2_vars=None):
+def _ac_node_injection(k, t, d, gen_vars, Ss, st_vars=None, h2_vars=None, hp_vars=None):
     """Return the net complex injection at AC node *k*, time *t*.
 
     Returns ``None`` for zero-injection nodes.
@@ -814,6 +908,13 @@ def _ac_node_injection(k, t, d, gen_vars, Ss, st_vars=None, h2_vars=None):
             # P is a load; Q is reactive injection (NL sign convention)
             parts.append(
                 -h2_vars.P_electrolyser[ei, t] + 1j * h2_vars.Q_electrolyser[ei, t]
+            )
+
+    if hp_vars is not None and k in d.hp_by_ac_node:
+        for hi in d.hp_by_ac_node[k]:
+            # heat pump is a load: subtract served P and Q (NL sign convention)
+            parts.append(
+                -hp_vars.P_heat_pump[hi, t] - 1j * hp_vars.Q_heat_pump[hi, t]
             )
 
     if not parts:

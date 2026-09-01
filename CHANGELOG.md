@@ -20,20 +20,28 @@ CVXPY sparse SOCP scaffolding (convex AC/DC stack).
   ``clarabel``). Builders in ``convex_model/`` (``build_socp_data``,
   ``socp_model``); runners in ``ACDC_convex`` (``socp_optimise``,
   ``soc_window_optimisation``, ``translate_pyf_socp``). ``T``-indexed
-  variables for window / inventory coupling. Plan
-  ``plans/convex_acdc_socp_plan.md``; architecture documents the stack next
-  to NL / L OPF. CCP and MI exclusivity still deferred.
-- **SOCP BESS + H₂ (G6 / linear)**: continuous ``P_charge``/``P_discharge``
+  variables for window / inventory coupling. Architecture documents the stack
+  next to NL / L OPF. CCP and MI exclusivity still deferred.
+- **SOCP BESS + H₂**: continuous ``P_charge``/``P_discharge``
   (no exclusivity binaries), AC S-circle / DC ``|P_net|``, SoC chain across
   ``T``; electrolyser P (+ AC Q) and linear mass balance. Wired into AC/DC
   nodal injection, ``H2_sale`` / ``SoC_deviation`` objectives, and export.
+- **SOCP heat pumps**: ``socp_optimise`` / ``soc_window_optimisation`` accept
+  ``grid.HP``. ``build_socp_data`` packs ``hp_data`` / ``hp_by_ac_node``;
+  ``heat_pump_variables`` / ``heat_pump_constraints`` add served
+  ``P_heat_pump`` / ``Q_heat_pump`` and the cumulative ``E_heat_pump`` chain
+  across ``T`` (reactive power bounded as in the NL OPF, ``Q_ref ≤ Q ≤ 0``).
+  AC-only load injection;
+  ``translate_pyf_socp`` reads ``hp_P_ref`` / ``hp_Q_ref`` / ``hp_E_min`` /
+  ``hp_E_max`` profiles from ``grid.Time_series``; results exported to
+  ``grid.socp_results`` and heat-pump elements.
 - **SOCP docs / Results / CI**: usage + API pages; NL/L/SOCP modelling
   sections; ``grid.socp_run`` reporting in ``Results.all``; smoke tests in
   ``test_socp.py``; open-source Clarabel in ``[SOCP]`` / ``All`` so CI does
   not need MOSEK.
 
 ### Changed
-- **SOCP converter loss (L13)**: Paper affine form via DCP epigraph
+- **SOCP converter loss**: Paper affine form via DCP epigraph
   ``t ≥ |Re(Ss)|``, ``Ploss = a_conv + b_conv · t`` (replaces non-DCP
   ``Ploss = a + c_rect·|Ss|²`` equality).
 

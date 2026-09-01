@@ -98,6 +98,70 @@ def test_soc_window_optimisation_solves_case39_with_bess_h2():
     assert grid.electrolysers[0].mass_H2 >= 0
 
 
+def _case39_socp_grid_with_heat_pump(n_frames=3):
+    grid = _case39_socp_grid()
+    hp = pyf.add_heat_pump(
+        grid,
+        "30",
+        P_ref_MW=0.08,
+        Q_ref_MVAR=-0.02,
+        n_units=2,
+        P_unit_max_MW=1.76 / 1000,
+        E_min_kWh=-5.0,
+        E_max_kWh=5.0,
+        E_state_initial_kWh=0.0,
+    )
+    pyf.add_TimeSeries(
+        grid,
+        pd.DataFrame({"load": [1.0, 0.92, 1.05][:n_frames]}),
+        associated="30",
+        TS_type="Load",
+    )
+    return grid, hp
+
+
+def test_socp_builds_case39_acdc_with_heat_pump():
+    require_socp()
+    grid, _ = _case39_socp_grid_with_heat_pump()
+    problem, variables, _, stats = pyf.socp_optimise(
+        grid,
+        build_only=True,
+        weights_def=SOCP_ENERGY,
+    )
+
+    assert problem is not None
+    assert variables.heat_pump is not None
+    assert stats["n_vars"] > 0
+
+
+def test_soc_window_optimisation_solves_case39_with_heat_pump():
+    require_socp()
+    grid, hp = _case39_socp_grid_with_heat_pump()
+    _, variables, _, stats = pyf.soc_window_optimisation(
+        grid,
+        frame_ids=[0, 1, 2],
+        solver=socp_solver(),
+        weights_def=SOCP_ENERGY,
+    )
+
+    assert stats["status"] in ("optimal", "optimal_inaccurate")
+    assert variables.heat_pump is not None
+
+    P = grid.socp_results.P_heat_pump
+    assert P is not None and P.shape == (1, 3)
+
+    # served P stays within [P_ref - n*P_unit_max, P_ref] every frame (Q-18 A)
+    p_ref = hp.P_ref
+    p_cap = hp.n_units * hp.P_unit_max
+    assert (P[0, :] <= p_ref + 1e-6).all()
+    assert (P[0, :] >= p_ref - p_cap - 1e-6).all()
+
+    # Q twin bound: Q_ref <= Q_hp <= 0
+    Q = grid.socp_results.Q_heat_pump
+    assert (Q[0, :] <= 1e-6).all()
+    assert (Q[0, :] >= hp.Q_ref - 1e-6).all()
+
+
 def test_pei_soc_window_builds_short_horizon():
     require_socp()
     grid, _ = pyf.cases["PEI_grid"](

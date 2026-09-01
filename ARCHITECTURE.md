@@ -87,9 +87,11 @@ Lower layers never import from higher layers. `constants` is a leaf module
 - **`convex_model/`** + **`ACDC_convex.py`** — CVXPY sparse SOCP / MI-SOCP
   stack (optional `[SOCP]` extra): `build_socp_data` / `socp_model` builders;
   runners `socp_optimise`, `soc_window_optimisation`, `translate_pyf_socp`.
-  Distinct from Pyomo NL/L OPF. BESS (G6 continuous) + linear H₂ included;
-  heat pumps planned as NL Q twin (Phase 8 / Q-18 A); MI exclusivity and CCP
-  deferred (see `plans/convex_acdc_socp_plan.md`).
+  Distinct from Pyomo NL/L OPF. Includes BESS (continuous charge/discharge, no
+  exclusivity binaries), linear H₂, and heat pumps (reactive power bounded as in
+  the NL OPF); mixed-integer exclusivity and chance-constrained programming are
+  deferred. See `plans/convex_acdc_socp_plan.md` for the full formulation and
+  design decisions.
 
 ## Planning and sizing
 
