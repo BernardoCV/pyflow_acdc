@@ -78,7 +78,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
     if not grid.CT_AC:
         raise ValueError("No conductor size selection connections found in the grid")
 
-    weights_def, _ = obj_w_rule(grid, ObjRule, True)
+    weights_def, _ = obj_w_rule(grid, ObjRule)
 
     model_res = None
     solver_stats = None
@@ -128,7 +128,7 @@ def optimal_l_css_ortools(grid, ObjRule=None, NPV=True, n_years=25, Hy=HOURS_PER
 
     present_value = present_value_factor(Hy, discount_rate, n_years)
     for obj_key in weights_def:
-        weights_def[obj_key]['v'] = calculate_objective(grid, obj_key, True)
+        weights_def[obj_key]['v'] = calculate_objective(grid, obj_key)
         weights_def[obj_key]['NPV'] = weights_def[obj_key]['v'] * present_value
     t5 = time.perf_counter()
     t_modelexport = t5 - t4
