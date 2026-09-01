@@ -15,7 +15,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **SOCP CCP runners (Phase 10):** ``socp_ccp_optimise`` and
   ``socp_ccp_window_optimisation`` apply truncated-normal quantiles to wind
   caps (``P_ren``) and nodal prices before a single SOCP solve (Paper A §4).
-  ``apply_ccp_quantiles`` is exported for inspection / reuse.
+  ``apply_ccp_quantiles`` is exported for inspection / reuse. Price CCP applies
+  when ``Energy_cost`` has non-zero weight in ``weights_def``.
+- **SOCP ``Energy_cost``:** matches Pyomo ``formula_Energy_cost`` — generator
+  quadratic costs plus ``P_ren·price`` when weighted.
 
 ## [0.7.0]
 

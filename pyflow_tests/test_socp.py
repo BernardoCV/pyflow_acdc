@@ -146,6 +146,55 @@ def test_apply_ccp_quantiles_tightens_wind_cap():
     assert p_after < p_before
 
 
+def test_socp_builds_with_energy_cost_pricing():
+    require_socp()
+    grid = _case39_socp_grid()
+    grid.nodes_AC[0].price = 50.0
+    problem, _, _, stats = pyf.socp_optimise(
+        grid,
+        build_only=True,
+        weights_def=SOCP_ENERGY,
+    )
+    assert problem is not None
+    assert stats["n_vars"] > 0
+
+
+def test_apply_ccp_quantiles_skips_price_without_energy_cost_weight():
+    require_socp()
+    from pyflow_acdc.ACDC_convex import apply_ccp_quantiles, translate_pyf_socp
+
+    grid = _case39_socp_grid()
+    grid.nodes_AC[0].price = 100.0
+    pyf.analyse_grid(grid)
+    socp_data = translate_pyf_socp(grid, frame_ids=[0])
+    before = socp_data.prices[0][0]
+    apply_ccp_quantiles(
+        socp_data,
+        grid,
+        confidence_level=0.95,
+        weights_def={"AC_losses": {"w": 1}},
+    )
+    assert socp_data.prices[0][0] == before
+
+
+def test_apply_ccp_quantiles_applies_price_with_energy_cost_weight():
+    require_socp()
+    from pyflow_acdc.ACDC_convex import apply_ccp_quantiles, translate_pyf_socp
+
+    grid = _case39_socp_grid()
+    grid.nodes_AC[0].price = 100.0
+    pyf.analyse_grid(grid)
+    socp_data = translate_pyf_socp(grid, frame_ids=[0])
+    before = socp_data.prices[0][0]
+    apply_ccp_quantiles(
+        socp_data,
+        grid,
+        confidence_level=0.95,
+        weights_def=SOCP_ENERGY,
+    )
+    assert socp_data.prices[0][0] != before
+
+
 def test_resolve_socp_solver_warns_on_non_mi_solver():
     require_socp()
     from pyflow_acdc.solver_utils import SOCP_MI_CAPABLE_SOLVERS, resolve_socp_solver

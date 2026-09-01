@@ -20,6 +20,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from .constants import (
+    LinkCost,
     ObjComponent,
     TSType,
     TS_RENEWABLE_TYPES,
@@ -299,7 +300,9 @@ def _build_objective(variables, d, grid, weights_def=None):
     """Construct the weighted SOCP objective using NLP OPF component names.
 
     Supported v1 components:
-    - ``Energy_cost``       : OPF-like generator energy cost
+    - ``Energy_cost``       : generator quadratic costs; gens with
+      ``link_cost=LINEAR`` use ``d.prices[node,t]`` for the linear term
+      (plus ``P_ren·price`` until only-gen parity is finalised)
     - ``Ext_Gen``           : total external-grid active power
     - ``AC_losses``         : AC branch active losses
     - ``DC_losses``         : DC branch active losses
@@ -310,7 +313,7 @@ def _build_objective(variables, d, grid, weights_def=None):
     Any active unsupported component raises ``NotImplementedError``.
     """
     if weights_def is None:
-        weights_def = getattr(grid, 'OPF_obj', None) or _default_socp_obj_weights()
+        weights_def = _default_socp_obj_weights()
 
     ac = variables.ac
     gen = variables.gen
@@ -330,14 +333,32 @@ def _build_objective(variables, d, grid, weights_def=None):
             if gen is None:
                 continue
             for gi, gd in enumerate(d.gen_data_AC):
+                node = gd['node']
                 for t in range(d.T):
                     p_mw = gen.PGi_gen[gi, t] * d.Sbase
+                    if gd['link_cost'] == LinkCost.LINEAR:
+                        lf_t = float(d.prices[node][t])
+                    else:
+                        lf_t = gd['lf']
                     terms.append(
                         weight * (
                             (p_mw ** 2) * gd['qf'] / (gd['np_gen'] + np_den_eps)
-                            + p_mw * gd['lf']
+                            + p_mw * lf_t
                             + gd['np_gen'] * gd['fc']
                         )
+                    )
+            if grid.DCmode and grid.Generators_DC:
+                raise NotImplementedError(
+                    "SOCP Energy_cost does not yet include DC generator costs."
+                )
+            for k in set(d.ren_nodes_AC) | set(d.P_ren):
+                if k not in d.P_ren:
+                    continue
+                prices_k = d.prices.get(k)
+                for t in range(d.T):
+                    price = float(prices_k[t]) if prices_k is not None else 0.0
+                    terms.append(
+                        weight * float(d.P_ren[k][t]) * price * d.Sbase
                     )
         elif component == ObjComponent.EXT_GEN.value:
             if gen is None:
@@ -537,11 +558,16 @@ def apply_ccp_quantiles(
     wind_error_sigma_frac=0.10,
     price_error_sigma_frac=0.10,
     price_error_sigma_bounds=3.0,
+    weights_def=None,
 ):
     """Tighten wind caps and nodal prices using truncated-normal quantiles.
 
     Implements Paper A Eqs. 61–69 in place on ``socp_data.P_ren`` and
     ``socp_data.prices`` before :func:`socp_model` is called.
+
+    Wind quantiles apply whenever ``P_ren`` is present. Price quantiles apply
+    when ``Energy_cost`` has non-zero weight in ``weights_def`` (same rule as
+    the objective using ``socp_data.prices``).
 
     Wind: ``p^w ≤ p̂ + Q_{1−confidence_level}(ε_w)`` with
     ``σ_w = wind_error_sigma_frac · |p̂|``, error truncated to keep
@@ -563,6 +589,11 @@ def apply_ccp_quantiles(
         raise ValueError("price_error_sigma_bounds must be positive")
 
     rated_by_node = _ren_rated_pu_by_node(grid, gamma=gamma)
+    if weights_def is None:
+        weights_def = _default_socp_obj_weights()
+    apply_price_ccp = (
+        weights_def.get(ObjComponent.ENERGY_COST.value, {}).get('w', 0) != 0
+    )
 
     for k, profile in socp_data.P_ren.items():
         p_rated = rated_by_node.get(k, float(np.max(profile)) if len(profile) else 0.0)
@@ -576,18 +607,19 @@ def apply_ccp_quantiles(
             new_profile[t] = np.clip(p_hat + q_err, 0.0, cap)
         socp_data.P_ren[k] = new_profile
 
-    for k, profile in socp_data.prices.items():
-        new_profile = np.asarray(profile, dtype=float).copy()
-        for t, c_hat in enumerate(new_profile):
-            sigma_c = price_error_sigma_frac * abs(c_hat)
-            if sigma_c <= 0:
-                continue
-            span = price_error_sigma_bounds * sigma_c
-            q_err = _truncated_normal_quantile(
-                confidence_level, sigma_c, -span, span,
-            )
-            new_profile[t] = c_hat + q_err
-        socp_data.prices[k] = new_profile
+    if apply_price_ccp:
+        for k, profile in socp_data.prices.items():
+            new_profile = np.asarray(profile, dtype=float).copy()
+            for t, c_hat in enumerate(new_profile):
+                sigma_c = price_error_sigma_frac * abs(c_hat)
+                if sigma_c <= 0:
+                    continue
+                span = price_error_sigma_bounds * sigma_c
+                q_err = _truncated_normal_quantile(
+                    confidence_level, sigma_c, -span, span,
+                )
+                new_profile[t] = c_hat + q_err
+            socp_data.prices[k] = new_profile
 
     socp_data.confidence_level = confidence_level
 
@@ -700,8 +732,7 @@ def socp_optimise(
         ``{node_AC: (P_min_pu, P_max_pu)}`` for export buses.
     weights_def : dict or None
         Objective-component weights using the same public keys as NLP OPF
-        (for example ``Energy_cost`` or ``AC_losses``). If ``None``, uses
-        ``grid.OPF_obj`` when available, otherwise defaults to
+        (for example ``Energy_cost`` or ``AC_losses``). If ``None``, defaults to
         ``{'Energy_cost': {'w': 1}}``.
     solver : str or None
         CVXPY solver name, e.g. ``'MOSEK'``, ``'GUROBI'``, ``'CLARABEL'``.
@@ -798,6 +829,7 @@ def socp_ccp_optimise(
         wind_error_sigma_frac=wind_error_sigma_frac,
         price_error_sigma_frac=price_error_sigma_frac,
         price_error_sigma_bounds=price_error_sigma_bounds,
+        weights_def=weights_def,
     )
     t1 = time.perf_counter()
 
@@ -903,6 +935,7 @@ def socp_ccp_window_optimisation(
         wind_error_sigma_frac=wind_error_sigma_frac,
         price_error_sigma_frac=price_error_sigma_frac,
         price_error_sigma_bounds=price_error_sigma_bounds,
+        weights_def=weights_def,
     )
     t1 = time.perf_counter()
 

@@ -175,6 +175,7 @@ def build_socp_data(grid):
             'idx': gen.genNumber,
             'node': gen._node.nodeNumber,
             'is_ext_grid': getattr(gen, 'is_ext_grid', False),
+            'link_cost': gen.link_cost,
             'p_min': p_min,
             'p_max': p_max,
             'q_min': q_min,
