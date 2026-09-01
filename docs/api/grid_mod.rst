@@ -96,7 +96,8 @@ See :doc:`modelling_flexible_assets` for the electrolyser model. Coupled runs:
 Add Heat Pump
 ^^^^^^^^^^^^^
 
-See :doc:`modelling_flexible_assets` for the heat-pump model. Coupled runs:
+See :doc:`modelling_flexible_assets` for the heat-pump model (``P_shed`` /
+``Q_shed``, ``Energy_cost`` shed penalties). Coupled runs:
 :doc:`window` / :doc:`../usage_window_opf`.
 
 .. autofunction:: pyflow_acdc.add_heat_pump

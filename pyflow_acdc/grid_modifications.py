@@ -2091,6 +2091,12 @@ def add_heat_pump(
     Snapshot inputs are scalars for one-step OPF. For multi-hour studies, attach
     ``TSType.HP_P_REF`` / ``HP_Q_REF`` (pu) and ``HP_E_MIN`` / ``HP_E_MAX``
     (kWh) series to the heat-pump name; those override the scalars per frame.
+
+    OPF optimizes ``P_shed`` / ``Q_shed`` with ``P_hp = P_ref - P_shed`` and
+    ``Q_hp = Q_ref - Q_shed``. Reactive shed limits use ``Max_S`` (pu, default
+    ``n_units * P_unit_max``) times ``q_shed_lim_frac``. Shed penalties in
+    ``Energy_cost`` use ``quadratic_cost_factor`` / ``linear_cost_factor`` (P)
+    and ``quadratic_cost_factor_q`` / ``linear_cost_factor_q`` (Q).
     """
     node = _look_up_node(grid, node, ac_or_dc="AC")
 
