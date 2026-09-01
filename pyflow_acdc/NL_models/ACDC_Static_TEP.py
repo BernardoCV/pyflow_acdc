@@ -586,7 +586,7 @@ def _prepare_TEP_model(
 
     analyse_grid(grid)
 
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(grid,ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -604,7 +604,7 @@ def _prepare_TEP_model(
 
 
     obj_TEP = tep_obj(model,grid,NPV)
-    obj_OPF = opf_obj(model,grid,weights_def,True)
+    obj_OPF = opf_obj(model,grid,weights_def)
 
 
     return model, obj_TEP, obj_OPF,weights_def,PZ
@@ -778,7 +778,7 @@ def transmission_expansion(
             grid.create_Ybus_DC()
         export_acdc_nl_model_to_pyflow_acdc(model, grid, PZ,TEP=True)
         for obj in weights_def:
-            weights_def[obj]['v']=calculate_objective(grid,obj,True)
+            weights_def[obj]['v']=calculate_objective(grid,obj)
             weights_def[obj]['NPV']=weights_def[obj]['v']*present_value
     t2 = time.perf_counter()
 
@@ -1225,7 +1225,7 @@ def multi_scenario_TEP(
     """
     analyse_grid(grid)
 
-    weights_def, Price_Zones = obj_w_rule(grid,ObjRule,True)
+    weights_def, Price_Zones = obj_w_rule(grid,ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -1315,9 +1315,7 @@ def multi_scenario_TEP(
 
 
 def tep_sub_obj(scenario_model,grid,ObjRule):
-    OnlyGen=True
-
-    obj_rule= opf_obj(scenario_model,grid,ObjRule,OnlyGen)
+    obj_rule= opf_obj(scenario_model,grid,ObjRule)
     scenario_model.obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
     s=1
 
@@ -2104,10 +2102,10 @@ def calculate_STEP_objective_from_model(model,grid,weights_def,multi_scenario=Fa
     opf_objs = []
     if multi_scenario:
         for t in model.scenario_frames:
-            opf_obj = calculate_objective_from_model(model.scenario_model[t],grid,weights_def,True)
+            opf_obj = calculate_objective_from_model(model.scenario_model[t],grid,weights_def)
             opf_objs.append(opf_obj)
     else:
-        opf_objs = [calculate_objective_from_model(model,grid,weights_def,True)]
+        opf_objs = [calculate_objective_from_model(model,grid,weights_def)]
 
     tep_obj_expr = tep_obj(model,grid,True)
     tep_obj_value = pyo.value(tep_obj_expr)

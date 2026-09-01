@@ -302,7 +302,6 @@ def _create_frame_blocks(
     price_zones,
     limit_flow_rate,
     weights_def,
-    only_gen,
     ts_base,
 ):
     base_model = pyo.ConcreteModel()
@@ -327,7 +326,7 @@ def _create_frame_blocks(
         for ts in grid.Time_series:
             update_grid_data(grid, ts, abs_t, price_zone_restrictions=price_zones)
         _modify_parameters(grid, model.frame_model[i], price_zones, window_block=True)
-        obj_rule = opf_obj(model.frame_model[i], grid, weights_def, only_gen)
+        obj_rule = opf_obj(model.frame_model[i], grid, weights_def)
         model.frame_model[i].obj = pyo.Objective(rule=obj_rule, sense=pyo.minimize)
         if grid.nn_DC != 0 and any(conv.OPF_fx for conv in grid.Converters_ACDC):
             fx_conv(model.frame_model[i], grid)
@@ -656,7 +655,6 @@ def window_nl_opf(
     end=23,
     ObjRule=None,
     PV_set=False,
-    OnlyGen=True,
     limit_flow_rate=True,
     solver='ipopt',
     tee=False,
@@ -713,7 +711,7 @@ def window_nl_opf(
         raise ValueError(
             f"end={end} out of range for Time_series length {ts_len} (0-based)")
 
-    weights_def, price_zones = obj_w_rule(grid, ObjRule, OnlyGen)
+    weights_def, price_zones = obj_w_rule(grid, ObjRule)
     ts_base = start
     n_local = end - start + 1
     frames = list(range(n_local))
@@ -760,7 +758,6 @@ def window_nl_opf(
             price_zones,
             limit_flow_rate,
             weights_def,
-            OnlyGen,
             ts_base,
         )
         if grid.ESS:
@@ -850,7 +847,7 @@ def window_nl_opf(
             model.frame_model[last_local], grid, price_zones)
 
     for obj in weights_def:
-        weights_def[obj]['v'] = calculate_objective(grid, obj, OnlyGen)
+        weights_def[obj]['v'] = calculate_objective(grid, obj)
 
     t4 = time.perf_counter()
 
@@ -990,7 +987,6 @@ def rolling_window_nl_opf(
     future_sight=0.0,
     ObjRule=None,
     PV_set=False,
-    OnlyGen=True,
     limit_flow_rate=True,
     solver='ipopt',
     tee=False,
@@ -1187,7 +1183,6 @@ def rolling_window_nl_opf(
             end=solve_end,
             ObjRule=ObjRule,
             PV_set=PV_set,
-            OnlyGen=OnlyGen,
             limit_flow_rate=limit_flow_rate,
             solver=solver,
             tee=tee,

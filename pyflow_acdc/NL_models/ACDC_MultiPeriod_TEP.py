@@ -956,7 +956,7 @@ def multi_period_transmission_expansion(
 
     grid.reset_run_flags()
     analyse_grid(grid)
-    weights_def, PZ = obj_w_rule(grid,ObjRule,True)
+    weights_def, PZ = obj_w_rule(grid,ObjRule)
 
     grid.TEP_n_years = n_years
     grid.TEP_discount_rate =discount_rate
@@ -1023,7 +1023,7 @@ def multi_period_transmission_expansion(
         _modify_parameters(grid,model.inv_model[i],PZ)
 
 
-        obj_OPF = opf_obj(model.inv_model[i],grid,weights_def,True)
+        obj_OPF = opf_obj(model.inv_model[i],grid,weights_def)
 
         obj_OPF *=present_value_opf
 
@@ -1630,7 +1630,7 @@ def _build_period_scenario_block(
         sc_block.transfer_attributes_from(base_model.clone())
 
         _modify_parameters(grid, sc_block, Price_Zones)
-        sc_obj = opf_obj(sc_block, grid, weights_def, True)
+        sc_obj = opf_obj(sc_block, grid, weights_def)
         sc_block.obj = pyo.Objective(rule=sc_obj, sense=pyo.minimize)
 
         maybe_weight = _scenario_weight_for_frame(grid, t, n_clusters, clustering)
@@ -1749,7 +1749,7 @@ def multi_period_MS_TEP(
         raise ValueError("n_init_install must be one of: None, 'max', 'mean'.")
     grid.reset_run_flags()
     analyse_grid(grid)
-    weights_def, Price_Zones = obj_w_rule(grid, ObjRule, True)
+    weights_def, Price_Zones = obj_w_rule(grid, ObjRule)
 
     if alpha is not None:
         try:
@@ -1889,7 +1889,7 @@ def multi_period_MS_TEP(
         for t in period_block.scenario_frames:
             period_scenario_grid_res[int(i)][int(t)] = {
                 'weight': float(pyo.value(period_block.weights[t])),
-                'opf_objective': float(calculate_objective_from_model(period_block.scenario_model[t], grid, weights_def, True)),
+                'opf_objective': float(calculate_objective_from_model(period_block.scenario_model[t], grid, weights_def)),
             }
 
         present_value_tep = 1 / (1 + discount_rate) ** (i * n_years)
@@ -2012,7 +2012,7 @@ def run_opf_for_investment_period(
         )
 
 
-    _, PZ = obj_w_rule(grid,ObjRule,True)
+    _, PZ = obj_w_rule(grid,ObjRule)
     _set_grid_to_multiperiod_state(grid, period_idx,PZ)
     model, model_res, timing_info, solver_stats = optimal_pf(
         grid,
@@ -2159,7 +2159,7 @@ def run_ts_opf_for_investment_period(
         period_tag = period_idx
         if print_step:
             print(f"[run_ts_opf_for_investment_period] applying state: investment_period={period_idx}")
-        _, PZ = obj_w_rule(grid, ObjRule, True)
+        _, PZ = obj_w_rule(grid, ObjRule)
         _set_grid_to_multiperiod_state(grid, period_idx, PZ)
 
     times = ts_acdc_opf(
@@ -2411,10 +2411,10 @@ def calculate_mptep_objective_from_model(model,grid,weights_def,n_years,discount
             if not hasattr(period_block, 'scenario_frames') or not hasattr(period_block, 'scenario_model'):
                 raise ValueError(f"Investment period {i} has no scenario blocks for multi-scenario objective extraction.")
             for t in period_block.scenario_frames:
-                opf_obj_from_model = calculate_objective_from_model(period_block.scenario_model[t],grid,weights_def,True)
+                opf_obj_from_model = calculate_objective_from_model(period_block.scenario_model[t],grid,weights_def)
                 opf_objs.append(opf_obj_from_model)
         else:
-            opf_objs = [calculate_objective_from_model(model.inv_model[i],grid,weights_def,True)]
+            opf_objs = [calculate_objective_from_model(model.inv_model[i],grid,weights_def)]
 
         tep_obj = _inv_model_obj(model,grid,i)
         tep_obj_value = pyo.value(tep_obj)

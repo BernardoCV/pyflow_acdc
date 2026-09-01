@@ -224,6 +224,10 @@ def generate_add_ren_source_code(ren_sources,S_base):
             code += f"min_gamma={ren_source['min_gamma']}, "
         if ren_source.get("np_rsgen", 1) != 1:
             code += f"np_rsgen={ren_source['np_rsgen']}, "
+        if ren_source.get("qf"):
+            code += f"quadratic_cost_factor={ren_source['qf']}, "
+        if ren_source.get("lf"):
+            code += f"linear_cost_factor={ren_source['lf']}, "
         if ren_source.get("Qmin") is not None:
             code += f"Qmin={ren_source['Qmin'] * S_base}, "
         if ren_source.get("Qmax") is not None:
@@ -483,6 +487,8 @@ def create_dictionaries(grid):
                     "ren_type": ren_source.rs_type,
                     "min_gamma": ren_source.min_gamma,
                     "np_rsgen": ren_source.np_rsgen,
+                    "qf": ren_source.qf,
+                    "lf": ren_source.lf,
                     "Qmin": ren_source.Qmin,
                     "Qmax": ren_source.Qmax,
                     "geometry": ren_source.geometry.wkt if ren_source.geometry is not None else None,
