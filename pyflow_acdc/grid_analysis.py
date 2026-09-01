@@ -15,6 +15,7 @@ __all__ = [
     "cartz2pol",
     "converter_parameters",
     "cable_parameters",
+    "get_gen_p_min_eff",
     "grid_state",
     "analyse_grid",
     "current_fuel_type_distribution",
@@ -215,6 +216,19 @@ def cable_parameters(S_base, R, L_mH, C_uF, G_uS, A_rating, kV_base, km, N_cable
     return [Rpu, Xpu, Gpu, Bpu, MVA_rating]
 
 
+def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
+    """Effective lower active-power bound (pu) for a generator at ``np_gen_value`` parallel units."""
+    if not getattr(gen, 'is_ext_grid', False):
+        return gen.Min_pow_gen * np_gen_value
+    if not getattr(gen, 'allow_sell', True):
+        return 0
+    pmax_eff = gen.Max_pow_gen * np_gen_value
+    if pmax_eff == 0:
+        return gen.Min_pow_gen * np_gen_value
+    p_load_eff = gen.p_load_eff if p_load_eff_value is None else p_load_eff_value
+    return -(pmax_eff - p_load_eff)
+
+
 def grid_state(grid):
     """Return aggregate load and generation bounds for the current grid.
 
@@ -236,13 +250,7 @@ def grid_state(grid):
     for node in grid.nodes_DC:
         Total_load += node.PLi
     for gen in grid.Generators:
-        if getattr(gen, 'is_ext_grid', False):
-            if getattr(gen, 'allow_sell', True):
-                min_eff = -(gen.Max_pow_gen * gen.np_gen - gen.p_load_eff)
-            else:
-                min_eff = 0
-        else:
-            min_eff = gen.Min_pow_gen * gen.np_gen
+        min_eff = get_gen_p_min_eff(gen, gen.np_gen)
         min_generation += min_eff if not gen.activate_gen_opf else 0
         max_generation += gen.Max_pow_gen * gen.np_gen
 

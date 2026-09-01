@@ -15,8 +15,8 @@ import time
 
 __all__ = ['optimal_l_css_ortools']
 
-from ..ACDC_OPF import obj_w_rule, calculate_objective, get_gen_p_min_eff
-from ..grid_analysis import analyse_grid
+from ..ACDC_OPF import obj_w_rule, calculate_objective
+from ..grid_analysis import get_gen_p_min_eff, analyse_grid
 from ..constants import (
     HOURS_PER_YEAR,
     DEFAULT_DISCOUNT_RATE,

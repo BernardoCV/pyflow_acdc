@@ -12,7 +12,7 @@ from scipy import stats as st
 
 import time
 
-from .grid_analysis import analyse_grid, grid_state
+from .grid_analysis import analyse_grid, grid_state, get_gen_p_min_eff
 from .ACDC_PF import ac_power_flow, dc_power_flow, acdc_sequential
 from .constants import (
     DEFAULT_TOLERANCE,
@@ -1057,10 +1057,7 @@ def _modify_parameters_l(grid, model, Price_Zones=False, window_block=False):
             g = gen.genNumber
             np_gen_value = pyo.value(model.np_gen[g])
             pmax_eff = gen.Max_pow_gen * np_gen_value
-            if getattr(gen, 'allow_sell', True):
-                pmin_eff = -(pmax_eff - gen.p_load_eff)
-            else:
-                pmin_eff = 0
+            pmin_eff = get_gen_p_min_eff(gen, np_gen_value)
             model.PGi_gen[g].setlb(pmin_eff)
             model.PGi_gen[g].setub(pmax_eff)
 
@@ -1153,10 +1150,7 @@ def _modify_parameters(grid,model,Price_Zones,window_block=False):
                 g = gen.genNumber
                 np_gen_value = pyo.value(model.np_gen[g]) if hasattr(model, 'np_gen') else gen.np_gen
                 pmax_eff = gen.Max_pow_gen * np_gen_value
-                if getattr(gen, 'allow_sell', True):
-                    pmin_eff = -(pmax_eff - gen.p_load_eff)
-                else:
-                    pmin_eff = 0
+                pmin_eff = get_gen_p_min_eff(gen, np_gen_value)
                 model.PGi_gen[g].setlb(pmin_eff)
                 model.PGi_gen[g].setub(pmax_eff)
 

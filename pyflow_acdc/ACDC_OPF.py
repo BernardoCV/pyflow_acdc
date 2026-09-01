@@ -37,21 +37,10 @@ __all__ = [
     'fx_conv',
     'export_solver_progress_to_excel',
     'reset_to_initialize',
-    'get_gen_p_min_eff',
 ]
 
 def pack_variables(*args):
     return args
-
-
-def get_gen_p_min_eff(gen, np_gen_value, p_load_eff_value=None):
-    """Effective lower active-power bound (pu) for a generator at ``np_gen_value`` parallel units."""
-    if not getattr(gen, 'is_ext_grid', False):
-        return gen.Min_pow_gen * np_gen_value
-    if not getattr(gen, 'allow_sell', True):
-        return 0
-    p_load_eff = gen.p_load_eff if p_load_eff_value is None else p_load_eff_value
-    return -(gen.Max_pow_gen * np_gen_value - p_load_eff)
 
 
 def obj_w_rule(grid,ObjRule,OnlyGen):

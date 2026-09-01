@@ -7,9 +7,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 > This changelog was introduced during a maintenance/hardening effort; entries
 > for releases prior to its creation are not reconstructed here. The current
-> packaged version is **0.6.10**.
+> packaged version is **0.6.11**.
 
 ## [Unreleased]
+
+## [0.6.11]
+
+### Added
+- **Export-only external grids**: with ``Allow_sell=True`` and ``MWmax=0``,
+  ``MWmin`` sets the active-power export lower bound (e.g. ``MWmin=-MVAmax``).
+  ``get_gen_p_min_eff`` lives in ``grid_analysis`` and is used consistently
+  across NL/L OPF, time-series bound updates, and ``grid_state``.
 
 ## [0.6.10]
 
