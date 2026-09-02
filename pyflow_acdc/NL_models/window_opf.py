@@ -474,7 +474,12 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
             for hp in grid.heat_pumps:
                 h = hp.heatPumpNumber
                 row_p[hp.name] = np.float64(pyo.value(block.P_heat_pump[h])) * hp.np_hp * grid.S_base
-                row_q[hp.name] = np.float64(pyo.value(block.Q_heat_pump[h])) * hp.np_hp * grid.S_base
+                if hasattr(block, "Q_heat_pump"):
+                    row_q[hp.name] = (
+                        np.float64(pyo.value(block.Q_heat_pump[h])) * hp.np_hp * grid.S_base
+                    )
+                else:
+                    row_q[hp.name] = 0.0
                 row_e[hp.name] = np.float64(pyo.value(block.E_heat_pump[h]))
             rows_hp_p.append(row_p)
             rows_hp_q.append(row_q)
