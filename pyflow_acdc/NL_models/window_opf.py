@@ -275,7 +275,7 @@ def window_heat_pump_constraints(model, grid, heat_pump_info, frames):
     for i, t in enumerate(ordered):
         block = model.frame_model[t]
         for h, hp in heat_pump_by_number.items():
-            delta = block.P_heat_pump[h] * hp.S_base * hp.dt_hours
+            delta = block.P_heat_pump[h] * hp.np_hp * hp.S_base * hp.dt_hours
             if i == 0:
                 model.window_heat_pump_constraint.add(
                     block.E_heat_pump[h] == model.hp_energy_initial[h] + delta
@@ -473,8 +473,8 @@ def export_window_opf_results(model, grid, frames, ts_base=0):
             row_e = {'frame': abs_t}
             for hp in grid.heat_pumps:
                 h = hp.heatPumpNumber
-                row_p[hp.name] = np.float64(pyo.value(block.P_heat_pump[h])) * grid.S_base
-                row_q[hp.name] = np.float64(pyo.value(block.Q_heat_pump[h])) * grid.S_base
+                row_p[hp.name] = np.float64(pyo.value(block.P_heat_pump[h])) * hp.np_hp * grid.S_base
+                row_q[hp.name] = np.float64(pyo.value(block.Q_heat_pump[h])) * hp.np_hp * grid.S_base
                 row_e[hp.name] = np.float64(pyo.value(block.E_heat_pump[h]))
             rows_hp_p.append(row_p)
             rows_hp_q.append(row_q)

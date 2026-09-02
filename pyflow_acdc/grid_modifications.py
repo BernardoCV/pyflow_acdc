@@ -664,6 +664,9 @@ def update_attributes(
        if hasattr(element, 'np_rsgen'):
            element.np_rsgen_b = n_b
            element.np_rsgen = n_b
+       if hasattr(element, 'np_hp'):
+           element.np_hp_b = n_b
+           element.np_hp = n_b
 
    def _apply_max_rule(max_attr, current_attr):
        if not hasattr(element, max_attr):
@@ -684,6 +687,7 @@ def update_attributes(
    _apply_max_rule('np_conv_max', 'np_conv')
    _apply_max_rule('np_gen_max', 'np_gen')
    _apply_max_rule('np_rsgen_max', 'np_rsgen')
+   _apply_max_rule('np_hp_max', 'np_hp')
 
    if planned_installation is not None:
        element.planned_installation = planned_installation
@@ -704,6 +708,8 @@ def update_attributes(
        _sync_inv0('np_dynamic', element.np_gen)
    elif hasattr(element, 'np_rsgen'):
        _sync_inv0('np_dynamic', element.np_rsgen)
+   elif hasattr(element, 'np_hp'):
+       _sync_inv0('np_dynamic', element.np_hp)
 
    if life_time is not None:
        element.life_time = life_time
@@ -2071,7 +2077,7 @@ def add_heat_pump(
     *,
     P_ref_MW,
     Q_ref_MVAR=0.0,
-    n_units,
+    np_hp=1,
     E_min_kWh,
     E_max_kWh,
     heat_pump_name=None,
@@ -2085,18 +2091,28 @@ def add_heat_pump(
     linear_cost_factor_q=0,
     q_shed_lim_frac=1.0,
     S_rated_MVAR=None,
+    Q_min_MVAR=None,
+    Q_max_MVAR=None,
 ):
     """Append an AC-only controllable heat pump to ``grid.heat_pumps``.
 
-    Snapshot inputs are scalars for one-step OPF. For multi-hour studies, attach
-    ``TSType.HP_P_REF`` / ``HP_Q_REF`` (pu) and ``HP_E_MIN`` / ``HP_E_MAX``
-    (kWh) series to the heat-pump name; those override the scalars per frame.
+    Per-unit snapshot inputs (``P_ref_MW``, ``Q_ref_MVAR``, ``P_unit_max_MW``,
+    ``Q_min_MVAR``, ``Q_max_MVAR``, ``S_rated_MVAR``) describe one heat-pump unit;
+    parallel units are counted by ``np_hp``.
 
-    OPF optimizes ``P_shed`` / ``Q_shed`` with ``P_hp = P_ref - P_shed`` and
-    ``Q_hp = Q_ref - Q_shed``. Reactive shed limits use ``Max_S`` (pu, default
-    ``n_units * P_unit_max``) times ``q_shed_lim_frac``. Shed penalties in
-    ``Energy_cost`` use ``quadratic_cost_factor`` / ``linear_cost_factor`` (P)
-    and ``quadratic_cost_factor_q`` / ``linear_cost_factor_q`` (Q).
+    For multi-hour studies, attach ``TSType.HP_P_REF`` / ``HP_Q_REF`` and
+    ``HP_E_MIN`` / ``HP_E_MAX`` series to the heat-pump name; those override the
+    scalars per frame. ``Q_min`` / ``Q_max`` are fixed per-unit bounds on served
+    reactive power ``Q_ref - Q_shed`` and do not have time-series types.
+
+    OPF optimizes per-unit ``P_shed``, ``Q_shed``, ``P_heat_pump``, and ``Q_heat_pump`` with
+    ``P_heat_pump = P_ref - P_shed``, ``Q_heat_pump = Q_ref - Q_shed``,
+    stored on the element as per-unit ``P_hp`` / ``Q_hp``; nodal totals are
+    ``P_hp * np_hp``, ``Q_hp * np_hp``.
+    ``Q_shed`` is bounded by ``± Q_lim_shed = ± Max_S * q_shed_lim_frac``.
+    ``Q_heat_pump`` is bounded by fixed ``Q_min`` / ``Q_max`` (defaults ``± Max_S``).
+    Per-unit active shed cap is ``P_unit_max``. Per-unit injection is limited by ``Max_S²`` on
+    ``(P_ref - P_shed)² + Q_heat_pump²``.
     """
     node = _look_up_node(grid, node, ac_or_dc="AC")
 
@@ -2108,7 +2124,7 @@ def add_heat_pump(
         node,
         P_ref=P_ref_MW / grid.S_base,
         Q_ref=Q_ref_MVAR / grid.S_base,
-        n_units=n_units,
+        np_hp=int(np_hp),
         P_unit_max=P_unit_max_MW / grid.S_base,
         E_min=float(E_min_kWh),
         E_max=float(E_max_kWh),
@@ -2121,6 +2137,8 @@ def add_heat_pump(
         linear_cost_factor_q=linear_cost_factor_q,
         q_shed_lim_frac=q_shed_lim_frac,
         S_rated=None if S_rated_MVAR is None else S_rated_MVAR / grid.S_base,
+        Q_min=None if Q_min_MVAR is None else Q_min_MVAR / grid.S_base,
+        Q_max=None if Q_max_MVAR is None else Q_max_MVAR / grid.S_base,
     )
 
     if geometry is not None:

@@ -1540,8 +1540,8 @@ class Results:
         q_tot = 0.0
 
         for hp in self.Grid.heat_pumps:
-            p_mw = hp.P_hp * self.Grid.S_base
-            q_mvar = hp.Q_hp * self.Grid.S_base
+            p_mw = hp.P_hp * hp.np_hp * self.Grid.S_base
+            q_mvar = hp.Q_hp * hp.np_hp * self.Grid.S_base
             p_shed_mw = hp.P_shed * self.Grid.S_base
             q_shed_mvar = hp.Q_shed * self.Grid.S_base
             p_tot += p_mw

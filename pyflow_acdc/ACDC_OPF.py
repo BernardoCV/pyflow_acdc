@@ -340,7 +340,6 @@ def opf_obj_l(model,grid,ObjRule):
                 )
             if grid.HP:
                 total += sum(model.P_shed[hp.heatPumpNumber] * grid.S_base * hp.lf for hp in grid.heat_pumps)
-                total += sum(model.Q_shed[hp.heatPumpNumber] * grid.S_base * hp.lf_q for hp in grid.heat_pumps)
         if grid.DCmode and grid.Generators_DC:
             total += sum(
                 (
