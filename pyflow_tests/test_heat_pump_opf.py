@@ -16,7 +16,7 @@ def _grid_with_heat_pump():
         "4",
         P_ref_MW=0.08,
         Q_ref_MVAR=-0.02,
-        n_units=2,
+        np_hp=2,
         P_unit_max_MW=1.76 / 1000,
         E_min_kWh=-5.0,
         E_max_kWh=5.0,
@@ -61,23 +61,35 @@ def test_heat_pump_model_builds_and_bounds_match_montse():
     h = hp.heatPumpNumber
     energy_p_shed_lb = hp.E_min / hp.dt_hours - hp.E_state / hp.dt_hours
     energy_p_shed_ub = hp.E_max / hp.dt_hours - hp.E_state / hp.dt_hours
+    p_shed_cap = hp.P_unit_max
+    q_shed_lim = hp.Q_lim_shed
+    q_injected_lb = hp.Q_min
+    q_injected_ub = hp.Q_max
 
     assert hasattr(model, "heat_pumps")
     assert hasattr(model, "P_shed")
     assert hasattr(model, "Q_shed")
+    assert hasattr(model, "Q_heat_pump")
     assert hasattr(model, "P_heat_pump")
     assert hasattr(model, "E_heat_pump")
     assert hasattr(model, "Gen_Pheatpump_constraint")
     assert model.hp_p_ref[h].value == pytest.approx(hp.P_ref)
     assert model.hp_q_ref[h].value == pytest.approx(hp.Q_ref)
-    assert hp.Max_S == pytest.approx(hp.n_units * hp.P_unit_max)
-    assert float(model.hp_q_lim_shed[h]) == pytest.approx(hp.Q_lim_shed)
+    assert int(model.np_hp[h]) == hp.np_hp
+    assert hp.Max_S == pytest.approx(hp.P_unit_max)
+    assert hp.Q_lim_shed == pytest.approx(hp.Max_S)
+    assert hp.Q_min == pytest.approx(-hp.Max_S)
+    assert hp.Q_max == pytest.approx(hp.Max_S)
     assert model.hp_e_min[h].value == pytest.approx(hp.E_min)
     assert model.hp_e_max[h].value == pytest.approx(hp.E_max)
     assert pyo.value(model.heat_pump_p_shed_nonneg_constraint[h].lower) == pytest.approx(0.0)
-    assert pyo.value(model.heat_pump_p_shed_cap_constraint[h].upper) == pytest.approx(hp.n_units * hp.P_unit_max)
-    assert model.Q_shed[h].lb == pytest.approx(-hp.Q_lim_shed)
-    assert model.Q_shed[h].ub == pytest.approx(hp.Q_lim_shed)
+    assert pyo.value(model.heat_pump_p_shed_cap_constraint[h].upper) == pytest.approx(p_shed_cap)
+    assert model.Q_shed[h].lb == pytest.approx(-q_shed_lim)
+    assert model.Q_shed[h].ub == pytest.approx(q_shed_lim)
+    assert model.Q_heat_pump[h].lb == pytest.approx(q_injected_lb)
+    assert model.Q_heat_pump[h].ub == pytest.approx(q_injected_ub)
+    assert hasattr(model, "heat_pump_p_link_constraint")
+    assert hasattr(model, "heat_pump_q_link_constraint")
     assert pyo.value(model.heat_pump_p_shed_energy_lower_constraint[h].lower) == pytest.approx(energy_p_shed_lb)
     assert pyo.value(model.heat_pump_p_shed_energy_upper_constraint[h].upper) == pytest.approx(energy_p_shed_ub)
 
@@ -151,10 +163,11 @@ def test_heat_pump_linear_build_only_p_only():
     assert hasattr(model, "E_heat_pump")
     assert hasattr(model, "Gen_Pheatpump_constraint")
     assert not hasattr(model, "Gen_Qheatpump_constraint")
-    assert pyo.value(model.Q_heat_pump[h]) == pytest.approx(0.0)
-    assert pyo.value(model.Q_shed[h]) == pytest.approx(hp.Q_ref)
+    assert not hasattr(model, "Q_shed")
+    assert not hasattr(model, "Q_heat_pump")
+    assert not hasattr(model, "hp_q_ref")
+    assert hasattr(model, "heat_pump_p_link_constraint")
     assert model.hp_p_ref[h].value == pytest.approx(hp.P_ref)
-    assert model.hp_q_ref[h].value == pytest.approx(hp.Q_ref)
     assert pyo.value(model.heat_pump_p_shed_energy_lower_constraint[h].lower) == pytest.approx(energy_p_shed_lb)
     assert pyo.value(model.heat_pump_p_shed_energy_upper_constraint[h].upper) == pytest.approx(energy_p_shed_ub)
 

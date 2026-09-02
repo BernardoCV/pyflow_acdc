@@ -1120,8 +1120,6 @@ def _modify_parameters_l(grid, model, Price_Zones=False, window_block=False):
             if not window_block:
                 model.E_heat_pump_prev[h].set_value(float(hp.E_state))
             model.hp_p_ref[h].set_value(float(hp.P_ref))
-            model.hp_q_ref[h].set_value(float(hp.Q_ref))
-            model.Q_shed[h].set_value(float(hp.Q_ref))
             model.hp_e_min[h].set_value(float(hp.E_min))
             model.hp_e_max[h].set_value(float(hp.E_max))
 
@@ -1252,10 +1250,12 @@ def _carry_storage_h2_state_from_model(grid, model):
             h = hp.heatPumpNumber
             e_state = float(pyo.value(model.E_heat_pump[h]))
             hp.P_shed = float(pyo.value(model.P_shed[h]))
-            hp.Q_shed = float(pyo.value(model.Q_shed[h]))
             hp.E_state = e_state
-            hp.P_hp = hp.P_ref - hp.P_shed
-            hp.Q_hp = hp.Q_ref - hp.Q_shed
+            hp.P_hp = float(pyo.value(model.P_heat_pump[h]))
+            if hasattr(model, "Q_shed"):
+                hp.Q_shed = float(pyo.value(model.Q_shed[h]))
+            if hasattr(model, "Q_heat_pump"):
+                hp.Q_hp = float(pyo.value(model.Q_heat_pump[h]))
             model.E_heat_pump_prev[h].set_value(e_state)
 
 
@@ -1295,7 +1295,7 @@ def _ts_storage_power_row(grid, time_1based):
 def _ts_heat_pump_power_row(grid, time_1based):
     row = {'time': time_1based}
     for hp in grid.heat_pumps:
-        row[hp.name] = np.float64(hp.P_hp * hp.S_base)
+        row[hp.name] = np.float64(hp.P_hp * hp.np_hp * hp.S_base)
     return row
 
 
@@ -1691,7 +1691,7 @@ def ts_acdc_l_opf(
     Carries BESS SoC / H₂ mass / HP energy between hours when ``grid.ESS`` /
     ``grid.H2`` / ``grid.HP``. Hybrid via ``grid.ACmode`` / ``grid.DCmode``;
     ``fx_conv`` when converters have ``OPF_fx``. ``SoC_deviation`` is rejected
-    (quadratic). Heat pumps are P-only (``Q_hp`` exported as 0).
+    (quadratic). Heat pumps are P-only in the linear stack (no Q model objects).
 
     Parameters
     ----------

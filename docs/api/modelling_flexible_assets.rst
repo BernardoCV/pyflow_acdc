@@ -232,38 +232,63 @@ and :math:`(\underline{e},\overline{e})` encode thermal comfort / hot-water
 limits derived offline from building simulations; pyflow-acdc does **not**
 embed a thermal model.
 
-**pyflow-acdc implementation.** Baseline electrical demand is stored as
-``P_ref`` / ``Q_ref`` in **pu** on ``S_base``. OPF uses explicit shed
-actuators (Montse ``…_shedding`` sgen pattern): served power is
+**pyflow-acdc implementation.** Per-unit baseline demand is stored as
+``P_ref`` / ``Q_ref`` in **pu** on ``S_base``; parallel units use ``np_hp``
+(same pattern as ``np_gen`` / ``np_rsgen`` on :class:`~pyflow_acdc.Gen_AC` /
+:class:`~pyflow_acdc.Ren_Source`). Aggregate served power is
 
 .. math::
     :label: eq:hp_pyflow_served
 
-    P_{\mathrm{hp}} = P_{\mathrm{ref}} - P_{\mathrm{shed}}, \qquad
-    Q_{\mathrm{hp}} = Q_{\mathrm{ref}} - Q_{\mathrm{shed}}
+    P_{\mathrm{hp}} = n_{\mathrm{hp}}\,(P_{\mathrm{ref}} - P_{\mathrm{shed}}), \qquad
+    Q_{\mathrm{hp}} = n_{\mathrm{hp}}\,(Q_{\mathrm{ref}} - Q_{\mathrm{shed}})
 
-Installed apparent-power rating ``Max_S`` [pu] defaults to
-``n_units * P_unit_max``; override with ``add_heat_pump(..., S_rated_MVAR=)``.
-Reactive shed limits are fixed at creation:
-``Q_lim_shed = Max_S * Q_shed_lim_frac`` (default ``q_shed_lim_frac=1``).
+Per-unit apparent-power rating ``Max_S`` [pu] defaults to ``P_unit_max``;
+override with ``add_heat_pump(..., S_rated_MVAR=)``. Fixed per-unit bounds on
+served reactive power ``Q_{\mathrm{ref}} - Q_{\mathrm{shed}}`` are set at
+creation via ``add_heat_pump(..., Q_min_MVAR=, Q_max_MVAR=)``; when omitted
+they default to ``\pm S_{\mathrm{rated}}``. Reactive shedding is bounded
+separately by ``\pm Q_{\mathrm{lim}}^{\mathrm{shed}}`` with
+``Q_{\mathrm{lim}}^{\mathrm{shed}} = S_{\mathrm{rated}} \cdot q_{\mathrm{shed,lim,frac}}``.
+Neither limit has time-series types. Per-unit injection is also limited by
+``S_{\mathrm{rated}}`` on
+``(P_{\mathrm{ref}} - P_{\mathrm{shed}})^2 + (Q_{\mathrm{ref}} - Q_{\mathrm{shed}})^2 \leq S_{\mathrm{rated}}^2``.
 
 Non-linear model
 ^^^^^^^^^^^^^^^^
 
-Decision variables: ``P_shed``, ``Q_shed``, ``E_heat_pump``. Expressions:
-``P_heat_pump = P_ref - P_shed``, ``Q_heat_pump = Q_ref - Q_shed``.
+Decision variables: ``P_shed``, ``Q_shed``, ``P_heat_pump``, ``Q_heat_pump``, ``E_heat_pump``.
+Per-unit links: ``P_heat_pump = P_ref - P_shed``, ``Q_heat_pump = Q_ref - Q_shed``
+(``Q_heat_pump`` bounded by ``Q_min`` / ``Q_max``).
+Nodal totals: ``np_hp * P_heat_pump``, ``np_hp * Q_heat_pump``.
 
 Instantaneous bounds (every frame, including window blocks):
 
 .. math::
     :label: eq:hp_pyflow_p_shed
 
-    0 \leq P_{\mathrm{shed}} \leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}
+    0 \leq P_{\mathrm{shed}} \leq P_{\mathrm{unit}}^{\max}
 
 .. math::
     :label: eq:hp_pyflow_q_shed
 
-    -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} \leq Q_{\mathrm{lim}}^{\mathrm{shed}}
+    -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} \leq Q_{\mathrm{lim}}^{\mathrm{shed}},
+    \qquad
+    Q_{\mathrm{lim}}^{\mathrm{shed}} = S_{\mathrm{rated}} \cdot q_{\mathrm{shed,lim,frac}}
+
+.. math::
+    :label: eq:hp_pyflow_q_injected
+
+    Q_{\min} \leq Q_{\mathrm{hp}} \leq Q_{\max},
+    \qquad
+    Q_{\mathrm{hp}} = Q_{\mathrm{ref}} - Q_{\mathrm{shed}}
+
+.. math::
+    :label: eq:hp_pyflow_s_rating
+
+    (P_{\mathrm{ref}} - P_{\mathrm{shed}})^{2}
+    + Q_{\mathrm{hp}}^{2}
+    \leq S_{\mathrm{rated}}^{2}
 
 .. math::
     :label: eq:hp_pyflow_e
@@ -281,7 +306,7 @@ chain):
     =
     E_{t-1}
     +
-    P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t
+    n_{\mathrm{hp}}\, P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t
 
 .. math::
     :label: eq:hp_p_shed_energy
@@ -304,7 +329,7 @@ chain):
 
 Coefficients are set on ``add_heat_pump`` (``quadratic_cost_factor`` /
 ``linear_cost_factor`` and Q twins; default ``0``). Nodal injection subtracts
-``P_heat_pump`` / ``Q_heat_pump`` from the AC balance (load sign).
+``np_hp * P_heat_pump`` / ``np_hp * Q_heat_pump`` from the AC balance (load sign).
 
 Window OPF owns the energy chain across frames
 (:func:`~pyflow_acdc.NL_models.window_opf.window_heat_pump_constraints`).
@@ -313,21 +338,21 @@ Window OPF owns the energy chain across frames
 … via :func:`~pyflow_acdc.update_grid_for_pf`), heat-pump baselines stay on
 :func:`~pyflow_acdc.update_grid_data` (``hp_P_ref``, ``hp_Q_ref``,
 ``hp_E_min``, ``hp_E_max``). In AC power flow,
-:meth:`~pyflow_acdc.Grid.update_pq_ac` treats ``P_ref`` / ``Q_ref`` as known
-nodal loads (same sign convention as NL OPF).
+:meth:`~pyflow_acdc.Grid.update_pq_ac` treats ``P_ref * np_hp`` /
+``Q_ref * np_hp`` as known nodal loads (same sign convention as NL OPF).
 
 Linear model
 ^^^^^^^^^^^^
 
 Same ``P_shed`` / ``E_heat_pump`` chain as the non-linear model. Reactive
-shedding is not optimised: ``Q_shed`` is fixed at ``Q_ref``, so
-``Q_{\mathrm{hp}} = 0`` every frame.
+power is not part of the linear stack (no ``Q_shed`` / ``Q_heat_pump`` vars,
+no Q nodal injection).
 
 .. math::
     :label: eq:hp_l
 
     \begin{align}
-        0 &\leq P_{\mathrm{shed}} \leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max} \\
+        0 &\leq P_{\mathrm{shed}} \leq n_{\mathrm{hp}}\, P_{\mathrm{unit}}^{\max} \\
         \frac{E_{\min}}{ \Delta t} - \frac{E_{t-1}}{ \Delta t}
         &\leq P_{\mathrm{shed}}
         \leq \frac{E_{\max}}{ \Delta t} - \frac{E_{t-1}}{ \Delta t} \\
@@ -337,7 +362,7 @@ shedding is not optimised: ``Q_shed`` is fixed at ``Q_ref``, so
         +
         P_{\mathrm{hp}}\, S_{\mathrm{base}}\, \Delta t,
         \qquad
-        P_{\mathrm{hp}} = P_{\mathrm{ref}} - P_{\mathrm{shed}}
+        P_{\mathrm{hp}} = n_{\mathrm{hp}}\,(P_{\mathrm{ref}} - P_{\mathrm{shed}})
     \end{align}
 
 Only active ``P_shed`` shed costs enter ``Energy_cost`` in the linear stack
@@ -366,7 +391,7 @@ one-step OPF; for multi-hour studies attach time series to the heat-pump name
         "bus1",
         P_ref_MW=0.08,
         Q_ref_MVAR=-0.02,
-        n_units=2,
+        np_hp=2,
         P_unit_max_MW=1.76 / 1000,
         E_min_kWh=-5.0,
         E_max_kWh=5.0,

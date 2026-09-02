@@ -397,6 +397,11 @@ def heat_pump_variables(model, grid, heat_pump_info, window_block=False):
         raise ValueError("heat_pump_info is empty but grid.HP is True")
 
     model.heat_pumps = pyo.Set(initialize=lista_heat_pumps)
+    model.np_hp = pyo.Param(
+        model.heat_pumps,
+        initialize={h: heat_pump_by_number[h].np_hp for h in lista_heat_pumps},
+        mutable=False,
+    )
     model.hp_p_ref = pyo.Param(
         model.heat_pumps,
         initialize={h: heat_pump_by_number[h].P_ref for h in lista_heat_pumps},
@@ -417,26 +422,33 @@ def heat_pump_variables(model, grid, heat_pump_info, window_block=False):
         initialize={h: heat_pump_by_number[h].E_max for h in lista_heat_pumps},
         mutable=True,
     )
-    model.hp_p_unit_cap = pyo.Param(
+    model.hp_p_shed_cap = pyo.Param(
         model.heat_pumps,
-        initialize={h: heat_pump_by_number[h].n_units * heat_pump_by_number[h].P_unit_max for h in lista_heat_pumps},
-        mutable=False,
-    )
-
-    model.hp_q_lim_shed = pyo.Param(
-        model.heat_pumps,
-        initialize={h: heat_pump_by_number[h].Q_lim_shed for h in lista_heat_pumps},
+        initialize={h: heat_pump_by_number[h].P_unit_max for h in lista_heat_pumps},
         mutable=False,
     )
 
     model.P_shed = pyo.Var(model.heat_pumps, initialize=0.0)
     model.Q_shed = pyo.Var(
         model.heat_pumps,
-        bounds=lambda m, h: (-m.hp_q_lim_shed[h], m.hp_q_lim_shed[h]),
+        bounds={
+            h: (-heat_pump_by_number[h].Q_lim_shed, heat_pump_by_number[h].Q_lim_shed)
+            for h in lista_heat_pumps
+        },
         initialize=0.0,
     )
-    model.P_heat_pump = pyo.Expression(model.heat_pumps, rule=lambda m, h: m.hp_p_ref[h] - m.P_shed[h])
-    model.Q_heat_pump = pyo.Expression(model.heat_pumps, rule=lambda m, h: m.hp_q_ref[h] - m.Q_shed[h])
+    model.Q_heat_pump = pyo.Var(
+        model.heat_pumps,
+        bounds={
+            h: (heat_pump_by_number[h].Q_min, heat_pump_by_number[h].Q_max)
+            for h in lista_heat_pumps
+        },
+        initialize={h: heat_pump_by_number[h].Q_ref for h in lista_heat_pumps},
+    )
+    model.P_heat_pump = pyo.Var(
+        model.heat_pumps,
+        initialize={h: heat_pump_by_number[h].P_ref for h in lista_heat_pumps},
+    )
     model.E_heat_pump = pyo.Var(
         model.heat_pumps,
         initialize={h: heat_pump_by_number[h].E_state for h in lista_heat_pumps},
@@ -463,10 +475,20 @@ def heat_pump_constraints(model, grid, heat_pump_info, window_block=False):
         raise ValueError("heat_pump_info is empty but grid.HP is True")
 
     def hp_p_shed_cap_rule(model, h):
-        return model.P_shed[h] <= model.hp_p_unit_cap[h]
+        return model.P_shed[h] <= model.hp_p_shed_cap[h]
 
     def hp_p_shed_nonneg_rule(model, h):
         return model.P_shed[h] >= 0
+
+    def hp_s_rating_rule(model, h):
+        hp = heat_pump_by_number[h]
+        return model.P_heat_pump[h] ** 2 + model.Q_heat_pump[h] ** 2 <= hp.Max_S ** 2
+
+    def hp_p_link_rule(model, h):
+        return model.P_heat_pump[h] == model.hp_p_ref[h] - model.P_shed[h]
+
+    def hp_q_link_rule(model, h):
+        return model.Q_heat_pump[h] == model.hp_q_ref[h] - model.Q_shed[h]
 
     def hp_e_min_rule(model, h):
         return model.E_heat_pump[h] >= model.hp_e_min[h]
@@ -476,6 +498,9 @@ def heat_pump_constraints(model, grid, heat_pump_info, window_block=False):
 
     model.heat_pump_p_shed_cap_constraint = pyo.Constraint(model.heat_pumps, rule=hp_p_shed_cap_rule)
     model.heat_pump_p_shed_nonneg_constraint = pyo.Constraint(model.heat_pumps, rule=hp_p_shed_nonneg_rule)
+    model.heat_pump_s_rating_constraint = pyo.Constraint(model.heat_pumps, rule=hp_s_rating_rule)
+    model.heat_pump_p_link_constraint = pyo.Constraint(model.heat_pumps, rule=hp_p_link_rule)
+    model.heat_pump_q_link_constraint = pyo.Constraint(model.heat_pumps, rule=hp_q_link_rule)
     model.heat_pump_e_min_constraint = pyo.Constraint(model.heat_pumps, rule=hp_e_min_rule)
     model.heat_pump_e_max_constraint = pyo.Constraint(model.heat_pumps, rule=hp_e_max_rule)
 
@@ -484,7 +509,7 @@ def heat_pump_constraints(model, grid, heat_pump_info, window_block=False):
 
     def e_heat_pump_balance_rule(model, h):
         hp = heat_pump_by_number[h]
-        return model.E_heat_pump[h] == model.E_heat_pump_prev[h] + model.P_heat_pump[h] * hp.S_base * hp.dt_hours
+        return model.E_heat_pump[h] == model.E_heat_pump_prev[h] + model.P_heat_pump[h] * model.np_hp[h] * hp.S_base * hp.dt_hours
 
     def hp_p_shed_energy_upper_rule(model, h):
         hp = heat_pump_by_number[h]
@@ -898,7 +923,7 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
         def Gen_Pheatpump_rule(model, node):
             nAC = grid.nodes_AC[node]
             p_hp = sum(
-                model.P_heat_pump[hp.heatPumpNumber]
+                model.P_heat_pump[hp.heatPumpNumber] * model.np_hp[hp.heatPumpNumber]
                 for hp in nAC.connected_heat_pumps
             )
             return model.PGi_heat_pump[node] == p_hp
@@ -906,7 +931,7 @@ def AC_constraints(model,grid,AC_info,limit_flow_rate=True,TEP=False):
         def Gen_Qheatpump_rule(model, node):
             nAC = grid.nodes_AC[node]
             q_hp = sum(
-                model.Q_heat_pump[hp.heatPumpNumber]
+                model.Q_heat_pump[hp.heatPumpNumber] * model.np_hp[hp.heatPumpNumber]
                 for hp in nAC.connected_heat_pumps
             )
             return model.QGi_heat_pump[node] == q_hp
@@ -2691,14 +2716,18 @@ def export_acdc_nl_model_to_pyflow_acdc(model,grid,Price_Zones,TEP=False):
             k: np.float64(pyo.value(v)) for k, v in model.P_shed.items()}
         q_shed_values = {
             k: np.float64(pyo.value(v)) for k, v in model.Q_shed.items()}
+        q_heat_pump_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.Q_heat_pump.items()}
+        p_heat_pump_values = {
+            k: np.float64(pyo.value(v)) for k, v in model.P_heat_pump.items()}
         e_hp_values = {
             k: np.float64(pyo.value(v)) for k, v in model.E_heat_pump.items()}
         for hp in grid.heat_pumps:
             h = hp.heatPumpNumber
             hp.P_shed = p_shed_values[h]
             hp.Q_shed = q_shed_values[h]
-            hp.P_hp = hp.P_ref - hp.P_shed
-            hp.Q_hp = hp.Q_ref - hp.Q_shed
+            hp.P_hp = p_heat_pump_values[h]
+            hp.Q_hp = q_heat_pump_values[h]
             hp.E_state = e_hp_values[h]
 
     if Price_Zones:
