@@ -410,27 +410,20 @@ Only active ``P_shed`` shed costs enter ``Energy_cost`` in the linear stack
 SOCP model
 ^^^^^^^^^^
 
-In the sparse SOCP stack the heat pump uses the same ``P_shed`` / ``Q_shed``
-actuators as the NL model:
+Same per-unit decision structure as the non-linear model: ``P_shed``,
+``Q_shed``, ``P_heat_pump``, ``Q_heat_pump``, ``E_heat_pump`` with links
+``P_heat_pump = P_ref - P_shed``, ``Q_heat_pump = Q_ref - Q_shed``,
+``Q_shed`` bounded by ``± Q_lim_shed``, ``Q_heat_pump`` by ``Q_min``/``Q_max``,
+and per-unit apparent-power limit
+``\|P_heat_pump, Q_heat_pump\|_2 \leq Max_S`` (SOCP circle). Nodal injection
+uses ``np_hp * P_heat_pump`` and ``np_hp * Q_heat_pump``. Active shed cap is
+per-unit ``P_unit_max``. Energy balance uses aggregate electrical input
+``np_hp * P_heat_pump * S_base * Δt`` (same as :eq:`eq:hp_energy_pyflow`).
 
-.. math::
-    :label: eq:hp_socp_shed
-
-    \begin{align}
-        P_{\mathrm{hp}} &= P_{\mathrm{ref}} - P_{\mathrm{shed}}, \\
-        Q_{\mathrm{hp}} &= Q_{\mathrm{ref}} - Q_{\mathrm{shed}}, \\
-        0 \leq P_{\mathrm{shed}} &\leq n_{\mathrm{units}}\, P_{\mathrm{unit}}^{\max}, \\
-        -Q_{\mathrm{lim}}^{\mathrm{shed}} \leq Q_{\mathrm{shed}} &\leq Q_{\mathrm{lim}}^{\mathrm{shed}},
-    \end{align}
-
-with ``Q_lim_shed = Max_S * Q_shed_lim_frac`` (pu). The cumulative energy chain
-:eq:`eq:hp_energy_pyflow` and its :math:`E_{t-1}`-linked :math:`P_{\mathrm{shed}}`
-reformulations match the NL OPF. ``Energy_cost`` penalises shed directly
-(MW/MVAR via ``S_base``; same formula as :eq:`eq:hp_energy_cost`). All
-constraints are linear. The heat pump (AC-only) enters the AC nodal balance as
-a load, subtracting :math:`P_{\mathrm{hp}}` and :math:`Q_{\mathrm{hp}}`.
-Time-varying references and energy envelopes are read from ``grid.Time_series``
-(``hp_P_ref``, ``hp_Q_ref``, ``hp_E_min``, ``hp_E_max``) by
+``Energy_cost`` penalises ``P_shed`` / ``Q_shed`` directly (MW/MVAR via
+``S_base``; same formula as :eq:`eq:hp_energy_cost`). Time-varying references
+and energy envelopes are read from ``grid.Time_series`` (``hp_P_ref``,
+``hp_Q_ref``, ``hp_E_min``, ``hp_E_max``) by
 :func:`~pyflow_acdc.translate_pyf_socp`.
 
 * :attr:`~pyflow_acdc.Node_AC.connected_heat_pumps` /

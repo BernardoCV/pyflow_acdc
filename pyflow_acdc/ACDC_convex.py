@@ -510,24 +510,17 @@ def _export_to_grid(grid, variables, socp_data):
                     f"hp_data index mismatch: expected heatPumpNumber "
                     f"{hd['idx']}, got {h_obj.heatPumpNumber}"
                 )
-            p_ref_0 = float(socp_data.hp_P_ref[hi][0])
-            q_ref_0 = float(socp_data.hp_Q_ref[hi][0])
             h_obj.P_shed = float(hp.P_shed.value[hi, 0])
             h_obj.Q_shed = float(hp.Q_shed.value[hi, 0])
-            h_obj.P_hp = p_ref_0 - h_obj.P_shed
-            h_obj.Q_hp = q_ref_0 - h_obj.Q_shed
+            h_obj.P_hp = float(hp.P_heat_pump.value[hi, 0])
+            h_obj.Q_hp = float(hp.Q_heat_pump.value[hi, 0])
             h_obj.E_state = float(hp.E_heat_pump.value[hi, t_last])
 
     hp_P_served = None
     hp_Q_served = None
     if hp is not None and hp.P_shed.value is not None:
-        n_hp = len(socp_data.hp_data)
-        T = socp_data.T
-        hp_P_served = np.zeros((n_hp, T))
-        hp_Q_served = np.zeros((n_hp, T))
-        for hi in range(n_hp):
-            hp_P_served[hi, :] = socp_data.hp_P_ref[hi] - hp.P_shed.value[hi, :]
-            hp_Q_served[hi, :] = socp_data.hp_Q_ref[hi] - hp.Q_shed.value[hi, :]
+        hp_P_served = hp.P_heat_pump.value
+        hp_Q_served = hp.Q_heat_pump.value
 
     # Store full time-series for post-processing
     grid.socp_results = SimpleNamespace(

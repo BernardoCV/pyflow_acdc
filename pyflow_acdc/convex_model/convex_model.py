@@ -271,7 +271,7 @@ def build_socp_data(grid):
             h2_by_dc_node.setdefault(node_num, []).append(len(h2_data) - 1)
 
     # ------------------------------------------------------------- heat pumps
-    # AC-only controllable load with cumulative energy state (Q-18 A: NL twin).
+    # AC-only controllable load with cumulative energy state (NL/SOCP twin).
     hp_data = []
     hp_by_ac_node = {}
     for hp in grid.heat_pumps:
@@ -281,7 +281,11 @@ def build_socp_data(grid):
             'node': node_num,
             'P_ref': hp.P_ref,
             'Q_ref': hp.Q_ref,
-            'P_unit_cap': hp.n_units * hp.P_unit_max,
+            'P_unit_max': hp.P_unit_max,
+            'np_hp': hp.np_hp,
+            'Max_S': hp.Max_S,
+            'Q_min': hp.Q_min,
+            'Q_max': hp.Q_max,
             'Q_lim_shed': hp.Q_lim_shed,
             'E_min': hp.E_min,
             'E_max': hp.E_max,
@@ -551,58 +555,76 @@ def hydrogen_constraints(d, h2_vars):
 
 
 # ---------------------------------------------------------------------------
-# Heat-pump variables / constraints (Q-18 A: NL Q twin, AC-only, linear)
+# Heat-pump variables / constraints (NL twin: per-unit P/Q + SOCP S circle)
 # ---------------------------------------------------------------------------
 
 def heat_pump_variables(d, T):
-    """Declare P/Q shed actuators and cumulative energy state over ``T``."""
+    """Declare P/Q shed actuators, served P/Q, and cumulative energy over ``T``."""
     n_hp = len(d.hp_data)
     if n_hp == 0:
         raise ValueError("heat_pump_variables called with empty hp_data")
 
     P_shed = cp.Variable((n_hp, T), nonneg=True, name="P_shed")
     Q_shed = cp.Variable((n_hp, T), name="Q_shed")
+    P_heat_pump = cp.Variable((n_hp, T), name="P_heat_pump")
+    Q_heat_pump = cp.Variable((n_hp, T), name="Q_heat_pump")
     E_heat_pump = cp.Variable((n_hp, T), name="E_heat_pump")
 
     return SimpleNamespace(
         P_shed=P_shed,
         Q_shed=Q_shed,
+        P_heat_pump=P_heat_pump,
+        Q_heat_pump=Q_heat_pump,
         E_heat_pump=E_heat_pump,
     )
 
 
 def heat_pump_constraints(d, hp_vars):
-    """P/Q shed bounds and cumulative energy chain (NL twin).
+    """P/Q shed bounds, served-power links, S rating, and energy chain (NL twin).
 
-    Served power follows ``P_hp = P_ref - P_shed``, ``Q_hp = Q_ref - Q_shed``.
-    Refs and energy envelopes are time-varying (from ``translate_pyf_socp``).
+    Per-unit ``P_heat_pump`` / ``Q_heat_pump`` with nodal totals scaled by
+    ``np_hp`` in :func:`ac_constraints`. Refs and energy envelopes are
+    time-varying (from ``translate_pyf_socp``).
     """
     constrs = []
     T = d.T
     P_shed = hp_vars.P_shed
     Q_shed = hp_vars.Q_shed
+    P_hp = hp_vars.P_heat_pump
+    Q_hp = hp_vars.Q_heat_pump
     E = hp_vars.E_heat_pump
 
     for hi, hd in enumerate(d.hp_data):
         p_ref = d.hp_P_ref[hi]
+        q_ref = d.hp_Q_ref[hi]
         e_min = d.hp_E_min[hi]
         e_max = d.hp_E_max[hi]
-        p_cap = hd['P_unit_cap']
+        p_cap = hd['P_unit_max']
         q_lim = hd['Q_lim_shed']
+        q_min = hd['Q_min']
+        q_max = hd['Q_max']
+        max_s = hd['Max_S']
+        np_hp = float(hd['np_hp'])
         dt = hd['dt_hours']
         scale = hd['S_base'] * dt
 
         for t in range(T):
             e_prev = hd['E_state'] if t == 0 else E[hi, t - 1]
             p_ref_t = p_ref[t]
+            q_ref_t = q_ref[t]
             constrs += [
                 P_shed[hi, t] >= 0,
                 P_shed[hi, t] <= p_cap,
                 Q_shed[hi, t] >= -q_lim,
                 Q_shed[hi, t] <= q_lim,
+                P_hp[hi, t] == p_ref_t - P_shed[hi, t],
+                Q_hp[hi, t] == q_ref_t - Q_shed[hi, t],
+                Q_hp[hi, t] >= q_min,
+                Q_hp[hi, t] <= q_max,
+                cp.norm(cp.vstack([P_hp[hi, t], Q_hp[hi, t]])) <= max_s,
                 E[hi, t] >= e_min[t],
                 E[hi, t] <= e_max[t],
-                E[hi, t] == e_prev + (p_ref_t - P_shed[hi, t]) * scale,
+                E[hi, t] == e_prev + P_hp[hi, t] * np_hp * scale,
                 P_shed[hi, t] >= e_min[t] / dt - e_prev / dt,
                 P_shed[hi, t] <= e_max[t] / dt - e_prev / dt,
             ]
@@ -976,8 +998,9 @@ def _ac_node_injection(k, t, d, gen_vars, Ss, st_vars=None, h2_vars=None, hp_var
 
     if hp_vars is not None and k in d.hp_by_ac_node:
         for hi in d.hp_by_ac_node[k]:
-            p_hp = d.hp_P_ref[hi][t] - hp_vars.P_shed[hi, t]
-            q_hp = d.hp_Q_ref[hi][t] - hp_vars.Q_shed[hi, t]
+            np_hp = float(d.hp_data[hi]['np_hp'])
+            p_hp = hp_vars.P_heat_pump[hi, t] * np_hp
+            q_hp = hp_vars.Q_heat_pump[hi, t] * np_hp
             parts.append(-p_hp - 1j * q_hp)
 
     if not parts:

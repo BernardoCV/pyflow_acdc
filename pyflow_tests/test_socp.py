@@ -234,7 +234,7 @@ def _case39_socp_grid_with_heat_pump(n_frames=3):
         "30",
         P_ref_MW=0.08,
         Q_ref_MVAR=-0.02,
-        n_units=2,
+        np_hp=2,
         P_unit_max_MW=1.76 / 1000,
         E_min_kWh=-5.0,
         E_max_kWh=5.0,
@@ -280,7 +280,7 @@ def test_soc_window_optimisation_solves_case39_with_heat_pump():
     assert P is not None and P.shape == (1, 3)
 
     p_ref = hp.P_ref
-    p_cap = hp.n_units * hp.P_unit_max
+    p_cap = hp.P_unit_max
     assert (P[0, :] <= p_ref + 1e-6).all()
     assert (P[0, :] >= p_ref - p_cap - 1e-6).all()
 
@@ -292,7 +292,9 @@ def test_soc_window_optimisation_solves_case39_with_heat_pump():
 
     Q = grid.socp_results.Q_heat_pump
     assert Q is not None and Q.shape == (1, 3)
-    assert (Q[0, :] <= hp.Q_ref + 1e-6).all()
+    assert (Q[0, :] <= hp.Q_max + 1e-6).all()
+    assert (Q[0, :] >= hp.Q_min - 1e-6).all()
+    assert (Q[0, :] <= hp.Q_ref + q_lim + 1e-6).all()
     assert (Q[0, :] >= hp.Q_ref - q_lim - 1e-6).all()
 
 
