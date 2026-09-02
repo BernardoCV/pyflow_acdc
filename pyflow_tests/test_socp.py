@@ -236,6 +236,7 @@ def _case39_socp_grid_with_heat_pump(n_frames=3):
         Q_ref_MVAR=-0.02,
         np_hp=2,
         P_unit_max_MW=1.76 / 1000,
+        S_rated_MVAR=0.1,
         E_min_kWh=-5.0,
         E_max_kWh=5.0,
         E_state_initial_kWh=0.0,
